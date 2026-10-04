@@ -7,6 +7,7 @@ from __future__ import annotations
 import argparse
 import gc
 import json
+import math
 import os
 import sys
 import tempfile
@@ -148,6 +149,36 @@ def resolve_device(torch, device: str) -> str:
     return device
 
 
+def configure_vocalization_duration(model: Any, seconds: float | None) -> None:
+    """为单个感叹音设置 S2A 长度；保留完整 T2S 输出，不截断词汇语音。"""
+    if seconds is None:
+        return
+    if (
+        not isinstance(seconds, (int, float))
+        or isinstance(seconds, bool)
+        or not math.isfinite(seconds)
+        or not 0 < seconds <= 2
+    ):
+        raise ValueError("vocalization_duration_seconds 必须是 (0, 2] 内的有限秒数。")
+    frames = round(seconds * model.sample_rate / model.hop_length)
+    if frames < 1:
+        raise ValueError("vocalization_duration_seconds 小于一个 Mel 帧，无法合成。")
+    original_inference = model.s2a_model.inference
+    calls = 0
+
+    def timed_inference(*args: Any, **kwargs: Any) -> Any:
+        """只改变长度调节器的目标帧数，不裁剪语义 token、latent 或最终 WAV。"""
+        nonlocal calls
+        calls += 1
+        if calls > 1:
+            raise ValueError("vocalization_duration_seconds 只支持单个合成块，不能用于多段台词。")
+        lengths = kwargs["target_feat_len"]
+        kwargs["target_feat_len"] = lengths.new_full(lengths.shape, frames)
+        return original_inference(*args, **kwargs)
+
+    model.s2a_model.inference = timed_inference
+
+
 def generate_audio(request: dict[str, Any], output_path: Path) -> None:
     """加载 Confucius4-TTS 两阶段模型并生成 WAV。"""
     configure_offline_environment(request)
@@ -179,6 +210,7 @@ def generate_audio(request: dict[str, Any], output_path: Path) -> None:
     model = None
     try:
         model = confucius_tts(config_path=str(runtime_config_path), device=device)
+        configure_vocalization_duration(model, request.get("vocalization_duration_seconds"))
         audio = model.generate(
             text=require_text(request.get("text"), "text"),
             lang=require_text(request.get("lang"), "lang"),

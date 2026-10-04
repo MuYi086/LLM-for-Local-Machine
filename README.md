@@ -212,6 +212,13 @@ Confucius4-TTS 使用与其他克隆服务相同的上传和检查流程：先�
 请求 JSON 至少包含 `text`、`lang` 和 `audio_path`，成功返回 `audio/wav`，并将生成结果保存到
 `storage/clone/`。官方默认生成参数可通过 `CONFUCIUS4_TTS_*` 环境变量覆盖。
 
+对单个极短非语言感叹音，可选传入 `vocalization_duration_seconds`（有限正数，最多 2 秒）。
+worker 使用官方 S2A 的 `target_feat_len` 指定 Mel 帧数，完整保留 T2S 语义序列；不截断
+最终 WAV，不用于压缩普通词汇台词。多合成块请求会明确失败。省略该字段时保持官方默认
+生成长度，仍须对输出执行语义和时长验收。`GET /v1/health` 的
+`runtime.native_vocalization_duration=true` 表示已加载支持此字段的 HTTP 版本；更新后需要
+重新运行 `bash start.sh`，仅修改 worker 文件不能更新已启动的接口校验。
+
 ## 48 kHz 母带与 Steam Audio 正式导出
 
 控制面保留两条职责不同的 CPU 路径。`POST /v1/audio/export` 是兼容接口，只接收一个已混合

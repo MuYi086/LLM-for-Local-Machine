@@ -202,6 +202,9 @@ class Confucius4TtsRequest(BaseModel):
     cross_fade_duration: float = Field(default=DEFAULT_CROSS_FADE_DURATION, ge=0, le=10)
     edge_fade_duration: float = Field(default=DEFAULT_EDGE_FADE_DURATION, ge=0, le=10)
     edge_pad_duration: float = Field(default=DEFAULT_EDGE_PAD_DURATION, ge=0, le=10)
+    vocalization_duration_seconds: float | None = Field(
+        default=None, gt=0, le=2, allow_inf_nan=False
+    )
     verbose: bool = False
 
 
@@ -446,6 +449,7 @@ def health():
         },
         "cuda": cuda,
         "runtime": {
+            "native_vocalization_duration": True,
             "worker_runtime": "uv",
             "worker_python": sys.executable,
             "model_lifecycle": "one request -> one worker -> process exit releases VRAM",

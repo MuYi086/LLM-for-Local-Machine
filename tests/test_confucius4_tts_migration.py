@@ -77,6 +77,26 @@ spec.loader.exec_module(main)
 class Confucius4TtsMigrationTests(unittest.TestCase):
     """验证 HTTP 契约、参考音频存储和一次性 worker 生命周期。"""
 
+    def test_optional_vocalization_duration_reaches_worker_payload(self) -> None:
+        """原生感叹音时长只作为可选字段，默认请求仍兼容。"""
+        request = main.Confucius4TtsRequest(
+            text="아", lang="ko", audio_path="native-test", vocalization_duration_seconds=0.441
+        )
+        with patch.object(main, "prompt_audio_path", return_value=str(STYLE_CHECKPOINT)):
+            payload = main.manager.build_worker_payload(request)
+        self.assertEqual(payload["vocalization_duration_seconds"], 0.441)
+        self.assertIsNone(
+            main.Confucius4TtsRequest(text="hello", audio_path="test").vocalization_duration_seconds
+        )
+
+    def test_vocalization_duration_rejects_invalid_values(self) -> None:
+        """非有限、零、负数和过长控制值必须在取得 GPU 锁前拒绝。"""
+        for duration in (float("nan"), float("inf"), 0, -1, 3):
+            with self.subTest(duration=duration), self.assertRaises(ValueError):
+                main.Confucius4TtsRequest(
+                    text="아", audio_path="test", vocalization_duration_seconds=duration
+                )
+
     def test_start_script_exposes_service_on_8361(self) -> None:
         source = (REPOSITORY_DIR / "start.sh").read_text(encoding="utf-8")
 
