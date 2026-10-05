@@ -85,6 +85,12 @@ class FastApiExecutionModelTests(unittest.TestCase):
             "Step_Audio_EditX/main.py": {"/v1/health", "/v1/check/audio"},
             "TIGER-DnR/main.py": {"/v1/health"},
             "seed-vc/main.py": {"/v1/health", "/v1/check/audio", "/v1/seedVc/voiceConversion"},
+            "SoulX-FlashHead-1_3B/main.py": {
+                "/v1/health",
+                "/v1/check/audio",
+                "/v1/check/image",
+                "/v1/soulX/flashHead",
+            },
         }
 
         for relative_path, routes in expected_routes.items():
@@ -110,6 +116,7 @@ class FastApiExecutionModelTests(unittest.TestCase):
             "Step_Audio_EditX/main.py",
             "Confucius4_TTS/main.py",
             "seed-vc/main.py",
+            "SoulX-FlashHead-1_3B/main.py",
         }
 
         for relative_path in upload_sources:

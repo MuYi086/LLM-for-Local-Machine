@@ -1,7 +1,7 @@
 # Unitale AI Local Backend
 
 Unitale 前端使用的本地语音后端，提供参考音频克隆、音色设计、语音编辑和
-SoundEffect 生成。仓库采用“一个服务一个 uv 项目”的边界：HTTP 控制面不加载
+SoundEffect 生成，以及音频驱动人像视频生成。仓库采用“一个服务一个 uv 项目”的边界：HTTP 控制面不加载
 重型模型，模型推理由对应目录中的一次性 worker 完成。
 
 ## 服务总览
@@ -28,11 +28,13 @@ SoundEffect 生成。仓库采用“一个服务一个 uv 项目”的边界：H
 | TIGER-DnR | 8351 | 电影混音的对白、音效、音乐三 Stem 分离 | `/v1/tigerDnr/separate` |
 | Qwen3-ASR-1.7B | 8371 | 本地多语言音频识别 | `/v1/qwen3/asr` |
 | Seed-VC | 8381 | 原始语音到参考音色的转换，可选 F0 歌声转换 | `/v1/seedVc/voiceConversion` |
+| SoulX-FlashHead-1_3B | 8391 | 图片与音频驱动人像视频，支持 Lite/Pro | `/v1/soulX/flashHead` |
 
 每个服务都提供 `GET /v1/health`。后端只注册表中列出的最终接口；模型生成接口返回
 `audio/wav`，并在服务端保存一份 WAV。MOSS-Audio-4B Thinking/Instruct 与 Qwen3-ASR 接收音频并返回 JSON 文本，
 不会生成或保留 WAV。TIGER-DnR 返回含 `dialog.wav`、`effects.wav`、`music.wav` 的 ZIP，并将
 三路 Stem 原子保存。空间音频导出返回 WAV 或 MP3，响应完成后删除临时成品。
+SoulX-FlashHead 返回带声音的 `video/mp4`，并在 `storage/video/` 原子保存成品。
 
 ## 目录与运行数据
 
@@ -56,6 +58,7 @@ firered_tts3/                 FireRedTTS3 Instruct/Base 服务和 worker
 TIGER-DnR/                    TIGER-DnR 三 Stem 分离服务和 worker
 Qwen3_ASR_1.7B/               Qwen3-ASR-1.7B 语音识别服务和 worker
 seed-vc/                      Seed-VC 音色转换服务和一次性 worker
+SoulX-FlashHead-1_3B/          音频驱动人像视频服务和一次性 worker
 tests/                        根目录无模型回归测试
 soundEffect/                  MOSS GPU 示例和提示词说明
 storage/                      上传音频、生成音频、sidecar、缓存和 GPU 锁
@@ -70,6 +73,8 @@ storage/                      上传音频、生成音频、sidecar、缓存和 
 | `storage/bgm/` | ACE-Step 有声小说 BGM 和 OST | `BGM_STORAGE_DIR`、`ACESTEP_OUTPUT_DIR` |
 | `storage/clone/` | 参考音频、克隆结果、Step 编辑结果和 Seed-VC 转换结果 | `CLONE_STORAGE_DIR`、各服务的 `*_OUTPUT_DIR` |
 | `storage/separation/` | TIGER-DnR 每次分离的 dialog、effects、music Stem 与 ZIP | `TIGER_DNR_OUTPUT_DIR` |
+| `storage/video/` | SoulX-FlashHead 生成的 MP4 | `SOULX_FLASHHEAD_OUTPUT_DIR` |
+| `storage/flashhead/images/` | SoulX-FlashHead 上传的参考图片 | `SOULX_FLASHHEAD_IMAGE_DIR` |
 | `storage/.cache/runtime/` | worker 临时文件、母带/Steam Audio 任务缓存、库缓存和共享 GPU 锁 | `RUNTIME_CACHE_DIR`、`SPATIAL_EXPORT_CACHE_DIR`、`STEAM_AUDIO_RENDER_CACHE_DIR`、`GPU_LOCK_FILE` |
 
 如果上传音频的内容与 `storage/timbre/` 中已有的设计音色一致，Qwen3-TTS、VoxCPM2、
@@ -88,7 +93,7 @@ LongCat、dots.tts-soar 和 FireRedTTS3 会在 `storage/timbre/.references/` 保
 ```bash
 for project in qwen3_tts mimo_tts voxcpm2 LongCat_AudioDiT_3.5B_bf16 \
   dots_tts_soar moss_soundEffect stable_audio_3_medium ace_step_1_5 \
-  qwen3_voiceDesign moss_voiceGenerator moss_audio_4b_thinking Confucius4_TTS Qwen3_ASR_1.7B seed-vc Step_Audio_EditX firered_tts3 TIGER-DnR; do
+  qwen3_voiceDesign moss_voiceGenerator moss_audio_4b_thinking Confucius4_TTS Qwen3_ASR_1.7B seed-vc SoulX-FlashHead-1_3B Step_Audio_EditX firered_tts3 TIGER-DnR; do
   uv sync --project "$project" --locked
 done
 ```
@@ -111,7 +116,7 @@ bash start.sh
 ```
 
 `start.sh` 会启动 8300、8301、8302、8303、8304、8311、8312、8313、8321、8322、8323、8324、8325、
-8331、8341、8342、8351、8361、8371 和 8381 共 20 个进程；8300 使用 `qwen3_tts` uv 项目中的轻量 HTTP 依赖，其余服务使用
+8331、8341、8342、8351、8361、8371、8381 和 8391 共 21 个进程；8300 使用 `qwen3_tts` uv 项目中的轻量 HTTP 依赖，其余服务使用
 各自的 uv 项目。启动命令统一使用 `uv run --no-sync`，不会在运行阶段联网解析依赖；
 本地 GPU 服务通过 `GPU_LOCK_FILE` 串行访问 GPU。默认最多排队 900 秒，超过时返回
 `503`；用 `GPU_LOCK_WAIT_TIMEOUT` 调整（设为非正值可关闭时限）。健康检查可结合
@@ -133,6 +138,18 @@ HOST=127.0.0.1 PORT=8321 \
   uv run --project qwen3_tts python qwen3_tts/main.py
 ```
 
+## SoulX-FlashHead 人像视频
+
+新增独立服务以 `8391` 提供 `POST /v1/soulX/flashHead`，接收已上传的图片和驱动音频逻辑路径，
+默认使用 Lite，也支持 Pro。先调用该服务的 `/v1/upload_image` 和 `/v1/upload_audio`，
+再发送 `{"image_path":"portrait.png","audio_path":"speech.wav","model_type":"lite","seed":42}`。
+成功返回带声音的 MP4，成品保存在 `storage/video/`。
+
+需要额外准备官方 `Soul-AILab/SoulX-FlashHead` 源码和 `facebook/wav2vec2-base-960h` 权重，
+再执行 `uv sync --project SoulX-FlashHead-1_3B --locked`。
+完整安装命令、上传/生成示例、字段、状态码和配置见
+[SoulX-FlashHead 服务文档](SoulX-FlashHead-1_3B/README.md)。
+
 ## 模型路径与主要配置
 
 `start.sh` 默认使用 `HF_MIRROR_DIR`（默认为 `$HOME/hf-mirror`）和 `$HOME/tts-depency`；
@@ -148,6 +165,7 @@ HOST=127.0.0.1 PORT=8321 \
 | Confucius4-TTS | `$HF_MIRROR_DIR/netease-youdao/Confucius4-TTS` | `CONFUCIUS4_TTS_MODEL_DIR`、`CONFUCIUS4_TTS_CODE_PATH`、`CONFUCIUS4_TTS_W2V_BERT_MODEL_DIR`、`CONFUCIUS4_TTS_VOCODER_MODEL_DIR`、`CONFUCIUS4_TTS_STYLE_ENCODER_CHECKPOINT` |
 | Qwen3-ASR-1.7B | `$HF_MIRROR_DIR/Qwen/Qwen3-ASR-1.7B` | `QWEN3_ASR_MODEL_DIR` |
 | Seed-VC | `$HF_MIRROR_DIR/Plachta/Seed-VC` | `SEED_VC_CODE_PATH`、`SEED_VC_WHISPER_MODEL_DIR`、`SEED_VC_VOCODER_MODEL_DIR`、`SEED_VC_STYLE_ENCODER_CHECKPOINT`；F0 模式另需 `SEED_VC_F0_VOCODER_MODEL_DIR`、`SEED_VC_RMVPE_CHECKPOINT` |
+| SoulX-FlashHead | `$HF_MIRROR_DIR/Soul-AILab/SoulX-FlashHead-1_3B` | `SOULX_FLASHHEAD_CODE_PATH`（默认 `$HOME/tts-depency/SoulX-FlashHead`）、`SOULX_FLASHHEAD_WAV2VEC_DIR`（默认 `$HF_MIRROR_DIR/facebook/wav2vec2-base-960h`） |
 | MOSS-SoundEffect | `$HF_MIRROR_DIR/OpenMOSS-Team/MOSS-SoundEffect-v2.0` | `MOSS_SOUNDEFFECT_CODE_PATH`、`MOSS_SOUNDEFFECT_MODEL_DIR` |
 | Stable Audio 3 Medium | `$HF_MIRROR_DIR/stabilityai/stable-audio-3-medium` | `STABLE_AUDIO_3_REPO_PATH`、`STABLE_AUDIO_3_MEDIUM_MODEL_DIR` |
 | ACE-Step 1.5 XL Turbo | `$HF_MIRROR_DIR/ACE-Step/acestep-v15-xl-turbo-diffusers` | `ACESTEP_MODEL_DIR`、`ACESTEP_OFFLOAD`、`ACESTEP_VAE_TILING` |
@@ -172,7 +190,7 @@ HOST=127.0.0.1 PORT=8321 \
 `QWEN_VOICEDESIGN_*`、`MOSS_VOICEGENERATOR_*`、`MOSS_AUDIO_4B_THINKING_*`、
 `MOSS_AUDIO_4B_INSTRUCT_*` 和
 `CONFUCIUS4_TTS_*`、
-`FIRERED_TTS3_*`、`TIGER_DNR_*`、`SEED_VC_*`。每个服务的 `/v1/health` 会报告
+`FIRERED_TTS3_*`、`TIGER_DNR_*`、`SEED_VC_*`、`SOULX_FLASHHEAD_*`。每个服务的 `/v1/health` 会报告
 生效的路径、运行时和可用性。
 FireRedTTS3 的官方源码默认位于 `$HOME/tts-depency/FireRedTTS3`，通过
 `FIRERED_TTS3_CODE_PATH` 覆盖；8304 以 `timbre` 模式加载 Instruct，8325 以 `clone` 模式加载

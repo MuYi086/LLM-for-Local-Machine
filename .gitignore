@@ -43,3 +43,8 @@ vendor/
 
 tests/testConfucius4TTS/*.wav
 tests/testConfucius4TTS/output/
+
+# SoulX 手动模型演示的本地素材和生成结果
+tests/testSoulX_FlashHead/*.wav
+tests/testSoulX_FlashHead/*.png
+tests/testSoulX_FlashHead/dist/

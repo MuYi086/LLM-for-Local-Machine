@@ -24,6 +24,7 @@ MOSS_AUDIO_4B_THINKING_PROJECT_DIR="${MOSS_AUDIO_4B_THINKING_PROJECT_DIR:-$PROJE
 CONFUCIUS4_TTS_PROJECT_DIR="${CONFUCIUS4_TTS_PROJECT_DIR:-$PROJECT_DIR/Confucius4_TTS}"
 QWEN3_ASR_PROJECT_DIR="${QWEN3_ASR_PROJECT_DIR:-$PROJECT_DIR/Qwen3_ASR_1.7B}"
 SEED_VC_PROJECT_DIR="${SEED_VC_PROJECT_DIR:-$PROJECT_DIR/seed-vc}"
+SOULX_FLASHHEAD_PROJECT_DIR="${SOULX_FLASHHEAD_PROJECT_DIR:-$PROJECT_DIR/SoulX-FlashHead-1_3B}"
 STEP_AUDIO_EDITX_PROJECT_DIR="${STEP_AUDIO_EDITX_PROJECT_DIR:-$PROJECT_DIR/Step_Audio_EditX}"
 LONGCAT_AUDIODIT_PROJECT_DIR="${LONGCAT_AUDIODIT_PROJECT_DIR:-$PROJECT_DIR/LongCat_AudioDiT_3.5B_bf16}"
 DOTS_TTS_SOAR_PROJECT_DIR="${DOTS_TTS_SOAR_PROJECT_DIR:-$PROJECT_DIR/dots_tts_soar}"
@@ -64,6 +65,10 @@ export SEED_VC_STYLE_ENCODER_CHECKPOINT="${SEED_VC_STYLE_ENCODER_CHECKPOINT:-$HF
 export SEED_VC_RMVPE_CHECKPOINT="${SEED_VC_RMVPE_CHECKPOINT:-$HF_MIRROR_DIR/lj1995/VoiceConversionWebUI/rmvpe.pt}"
 export SEED_VC_REQUEST_TIMEOUT="${SEED_VC_REQUEST_TIMEOUT:-900}"
 export SEED_VC_DEVICE="${SEED_VC_DEVICE:-cuda:0}"
+export SOULX_FLASHHEAD_MODEL_DIR="${SOULX_FLASHHEAD_MODEL_DIR:-$HF_MIRROR_DIR/Soul-AILab/SoulX-FlashHead-1_3B}"
+export SOULX_FLASHHEAD_CODE_PATH="${SOULX_FLASHHEAD_CODE_PATH:-$HOME/tts-depency/SoulX-FlashHead}"
+export SOULX_FLASHHEAD_WAV2VEC_DIR="${SOULX_FLASHHEAD_WAV2VEC_DIR:-$HF_MIRROR_DIR/facebook/wav2vec2-base-960h}"
+export SOULX_FLASHHEAD_REQUEST_TIMEOUT="${SOULX_FLASHHEAD_REQUEST_TIMEOUT:-1800}"
 export STEP_AUDIO_EDITX_MODEL_DIR="${STEP_AUDIO_EDITX_MODEL_DIR:-$HF_MIRROR_DIR/stepfun-ai/Step-Audio-EditX}"
 export STEP_AUDIO_TOKENIZER_PATH="${STEP_AUDIO_TOKENIZER_PATH:-$HF_MIRROR_DIR/stepfun-ai/Step-Audio-Tokenizer}"
 export STEP_AUDIO_EDITX_CODE_PATH="${STEP_AUDIO_EDITX_CODE_PATH:-$HOME/tts-depency/Step-Audio-EditX}"
@@ -116,6 +121,7 @@ export SOUNDEFFECT_STORAGE_DIR="${SOUNDEFFECT_STORAGE_DIR:-$STORAGE_DIR/soundEff
 export CLONE_STORAGE_DIR="${CLONE_STORAGE_DIR:-$STORAGE_DIR/clone}"
 export CONFUCIUS4_TTS_OUTPUT_DIR="${CONFUCIUS4_TTS_OUTPUT_DIR:-$CLONE_STORAGE_DIR}"
 export SEED_VC_OUTPUT_DIR="${SEED_VC_OUTPUT_DIR:-$CLONE_STORAGE_DIR}"
+export SOULX_FLASHHEAD_OUTPUT_DIR="${SOULX_FLASHHEAD_OUTPUT_DIR:-$STORAGE_DIR/video}"
 export TIGER_DNR_OUTPUT_DIR="${TIGER_DNR_OUTPUT_DIR:-$STORAGE_DIR/separation}"
 export STABLE_AUDIO_3_MEDIUM_OUTPUT_DIR="${STABLE_AUDIO_3_MEDIUM_OUTPUT_DIR:-$SOUNDEFFECT_STORAGE_DIR}"
 export QWEN3_TTS_OUTPUT_DIR="${QWEN3_TTS_OUTPUT_DIR:-$CLONE_STORAGE_DIR}"
@@ -204,6 +210,8 @@ export QWEN3_ASR_HOST="${QWEN3_ASR_HOST:-$HOST}"
 export QWEN3_ASR_PORT="${QWEN3_ASR_PORT:-8371}"
 export SEED_VC_HOST="${SEED_VC_HOST:-$HOST}"
 export SEED_VC_PORT="${SEED_VC_PORT:-8381}"
+export SOULX_FLASHHEAD_HOST="${SOULX_FLASHHEAD_HOST:-$HOST}"
+export SOULX_FLASHHEAD_PORT="${SOULX_FLASHHEAD_PORT:-8391}"
 export ACESTEP_HOST="${ACESTEP_HOST:-$HOST}"
 export ACESTEP_PORT="${ACESTEP_PORT:-8313}"
 
@@ -325,6 +333,11 @@ echo "Qwen3-ASR API: http://$QWEN3_ASR_HOST:$QWEN3_ASR_PORT"
 echo "Qwen3-ASR health: http://127.0.0.1:$QWEN3_ASR_PORT/v1/health"
 echo "Seed-VC API: http://$SEED_VC_HOST:$SEED_VC_PORT"
 echo "Seed-VC health: http://127.0.0.1:$SEED_VC_PORT/v1/health"
+echo "SoulX-FlashHead API: http://$SOULX_FLASHHEAD_HOST:$SOULX_FLASHHEAD_PORT"
+echo "SoulX-FlashHead health: http://127.0.0.1:$SOULX_FLASHHEAD_PORT/v1/health"
+echo "SoulX-FlashHead model: $SOULX_FLASHHEAD_MODEL_DIR"
+echo "SoulX-FlashHead source: $SOULX_FLASHHEAD_CODE_PATH"
+echo "SoulX-FlashHead Wav2Vec2: $SOULX_FLASHHEAD_WAV2VEC_DIR"
 echo "VoxCPM2 API:         http://$VOXCPM2_HOST:$VOXCPM2_PORT"
 echo "VoxCPM2 health:      http://127.0.0.1:$VOXCPM2_PORT/v1/health"
 echo "LongCat health:      http://127.0.0.1:$LONGCAT_AUDIODIT_PORT/v1/health"
@@ -362,6 +375,7 @@ printf '%-24s %-6s %s\n' 'MOSS-Audio-4B-Instruct' "$MOSS_AUDIO_4B_INSTRUCT_PORT"
 printf '%-24s %-6s %s\n' 'Confucius4-TTS' "$CONFUCIUS4_TTS_PORT" '/v1/confucius4TTS/generate'
 printf '%-24s %-6s %s\n' 'Qwen3-ASR-1.7B' "$QWEN3_ASR_PORT" '/v1/qwen3/asr'
 printf '%-24s %-6s %s\n' 'Seed-VC' "$SEED_VC_PORT" '/v1/seedVc/voiceConversion'
+printf '%-24s %-6s %s\n' 'SoulX-FlashHead' "$SOULX_FLASHHEAD_PORT" '/v1/soulX/flashHead'
 printf '%-24s %-6s %s\n' 'MiMo TTS VoiceDesign' "$MIMO_TTS_PORT" '/v1/mimo/timbre'
 printf '%-24s %-6s %s\n' 'Stable Audio 3 Medium' "$STABLE_AUDIO_3_MEDIUM_PORT" '/v1/stableAudio/soundEffect'
 printf '%-24s %-6s %s\n' 'ACE-Step 1.5 XL Turbo' "$ACESTEP_PORT" '/v1/aceStep/bgm'
@@ -396,6 +410,7 @@ moss_audio_4b_instruct_pid=""
 confucius4_tts_pid=""
 qwen3_asr_pid=""
 seed_vc_pid=""
+soulx_flashhead_pid=""
 step_audio_editx_pid=""
 
 cleanup() {
@@ -415,6 +430,7 @@ cleanup() {
     "$confucius4_tts_pid"
     "$qwen3_asr_pid"
     "$seed_vc_pid"
+    "$soulx_flashhead_pid"
     "$step_audio_editx_pid"
     "$voxcpm2_pid"
     "$longcat_audiodit_pid"
@@ -539,6 +555,12 @@ SEED_VC_HOST="$SEED_VC_HOST" SEED_VC_PORT="$SEED_VC_PORT" \
   setsid uv run --no-sync --project "$SEED_VC_PROJECT_DIR" \
   python "$SEED_VC_PROJECT_DIR/main.py" &
 seed_vc_pid=$!
+# SoulX-FlashHead 独立 uv 服务：8391 音频驱动人像视频，模型只在一次性 worker 中加载。
+SOULX_FLASHHEAD_HOST="$SOULX_FLASHHEAD_HOST" SOULX_FLASHHEAD_PORT="$SOULX_FLASHHEAD_PORT" \
+  HOST="$SOULX_FLASHHEAD_HOST" PORT="$SOULX_FLASHHEAD_PORT" \
+  setsid uv run --no-sync --project "$SOULX_FLASHHEAD_PROJECT_DIR" \
+  python "$SOULX_FLASHHEAD_PROJECT_DIR/main.py" &
+soulx_flashhead_pid=$!
 # Step-Audio-EditX 独立 uv 服务：完整提供上传、检查和编辑接口。
 # 依赖由部署前手动执行 `uv sync --project Step_Audio_EditX --locked`；启动阶段不再联网解析。
 STEP_AUDIO_EDITX_HOST="$STEP_AUDIO_EDITX_HOST" STEP_AUDIO_EDITX_PORT="$STEP_AUDIO_EDITX_PORT" \
@@ -573,4 +595,4 @@ FIRERED_TTS3_MODE="clone" FIRERED_TTS3_HOST="$FIRERED_TTS3_CLONE_HOST" \
   python "$FIRERED_TTS3_PROJECT_DIR/main.py" &
 firered_tts3_clone_pid=$!
 
-wait -n "$main_pid" "$mimo_tts_pid" "$soundeffect_pid" "$stable_audio_3_medium_pid" "$acestep_pid" "$qwen3_tts_pid" "$qwen_voicedesign_pid" "$tiger_dnr_pid" "$moss_voicegenerator_pid" "$moss_audio_4b_thinking_pid" "$moss_audio_4b_instruct_pid" "$confucius4_tts_pid" "$qwen3_asr_pid" "$seed_vc_pid" "$step_audio_editx_pid" "$voxcpm2_pid" "$longcat_audiodit_pid" "$dots_tts_soar_pid" "$firered_tts3_timbre_pid" "$firered_tts3_clone_pid"
+wait -n "$main_pid" "$mimo_tts_pid" "$soundeffect_pid" "$stable_audio_3_medium_pid" "$acestep_pid" "$qwen3_tts_pid" "$qwen_voicedesign_pid" "$tiger_dnr_pid" "$moss_voicegenerator_pid" "$moss_audio_4b_thinking_pid" "$moss_audio_4b_instruct_pid" "$confucius4_tts_pid" "$qwen3_asr_pid" "$seed_vc_pid" "$soulx_flashhead_pid" "$step_audio_editx_pid" "$voxcpm2_pid" "$longcat_audiodit_pid" "$dots_tts_soar_pid" "$firered_tts3_timbre_pid" "$firered_tts3_clone_pid"
