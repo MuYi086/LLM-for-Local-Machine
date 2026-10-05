@@ -27,6 +27,7 @@ SoundEffect 生成。仓库采用“一个服务一个 uv 项目”的边界：H
 | Confucius4-TTS | 8361 | 参考音频零样本、多语言语音克隆 | `/v1/confucius4TTS/generate` |
 | TIGER-DnR | 8351 | 电影混音的对白、音效、音乐三 Stem 分离 | `/v1/tigerDnr/separate` |
 | Qwen3-ASR-1.7B | 8371 | 本地多语言音频识别 | `/v1/qwen3/asr` |
+| Seed-VC | 8381 | 原始语音到参考音色的转换，可选 F0 歌声转换 | `/v1/seedVc/voiceConversion` |
 
 每个服务都提供 `GET /v1/health`。后端只注册表中列出的最终接口；模型生成接口返回
 `audio/wav`，并在服务端保存一份 WAV。MOSS-Audio-4B Thinking/Instruct 与 Qwen3-ASR 接收音频并返回 JSON 文本，
@@ -54,6 +55,7 @@ Step_Audio_EditX/             Step-Audio-EditX 服务和 worker
 firered_tts3/                 FireRedTTS3 Instruct/Base 服务和 worker
 TIGER-DnR/                    TIGER-DnR 三 Stem 分离服务和 worker
 Qwen3_ASR_1.7B/               Qwen3-ASR-1.7B 语音识别服务和 worker
+seed-vc/                      Seed-VC 音色转换服务和一次性 worker
 tests/                        根目录无模型回归测试
 soundEffect/                  MOSS GPU 示例和提示词说明
 storage/                      上传音频、生成音频、sidecar、缓存和 GPU 锁
@@ -66,7 +68,7 @@ storage/                      上传音频、生成音频、sidecar、缓存和 
 | `storage/timbre/` | Qwen、MOSS、MiMo、FireRedTTS3 生成的音色参考音频 | `TIMBRE_STORAGE_DIR` |
 | `storage/soundEffect/` | MOSS 和 Stable Audio 生成的声效 | `SOUNDEFFECT_STORAGE_DIR`、`STABLE_AUDIO_3_MEDIUM_OUTPUT_DIR` |
 | `storage/bgm/` | ACE-Step 有声小说 BGM 和 OST | `BGM_STORAGE_DIR`、`ACESTEP_OUTPUT_DIR` |
-| `storage/clone/` | 参考音频、克隆结果和 Step 编辑结果 | `CLONE_STORAGE_DIR`、各服务的 `*_OUTPUT_DIR` |
+| `storage/clone/` | 参考音频、克隆结果、Step 编辑结果和 Seed-VC 转换结果 | `CLONE_STORAGE_DIR`、各服务的 `*_OUTPUT_DIR` |
 | `storage/separation/` | TIGER-DnR 每次分离的 dialog、effects、music Stem 与 ZIP | `TIGER_DNR_OUTPUT_DIR` |
 | `storage/.cache/runtime/` | worker 临时文件、母带/Steam Audio 任务缓存、库缓存和共享 GPU 锁 | `RUNTIME_CACHE_DIR`、`SPATIAL_EXPORT_CACHE_DIR`、`STEAM_AUDIO_RENDER_CACHE_DIR`、`GPU_LOCK_FILE` |
 
@@ -86,7 +88,7 @@ LongCat、dots.tts-soar 和 FireRedTTS3 会在 `storage/timbre/.references/` 保
 ```bash
 for project in qwen3_tts mimo_tts voxcpm2 LongCat_AudioDiT_3.5B_bf16 \
   dots_tts_soar moss_soundEffect stable_audio_3_medium ace_step_1_5 \
-  qwen3_voiceDesign moss_voiceGenerator moss_audio_4b_thinking Confucius4_TTS Qwen3_ASR_1.7B Step_Audio_EditX firered_tts3 TIGER-DnR; do
+  qwen3_voiceDesign moss_voiceGenerator moss_audio_4b_thinking Confucius4_TTS Qwen3_ASR_1.7B seed-vc Step_Audio_EditX firered_tts3 TIGER-DnR; do
   uv sync --project "$project" --locked
 done
 ```
@@ -109,7 +111,7 @@ bash start.sh
 ```
 
 `start.sh` 会启动 8300、8301、8302、8303、8304、8311、8312、8313、8321、8322、8323、8324、8325、
-8331、8341、8342、8351、8361 和 8371 共 19 个进程；8300 使用 `qwen3_tts` uv 项目中的轻量 HTTP 依赖，其余服务使用
+8331、8341、8342、8351、8361、8371 和 8381 共 20 个进程；8300 使用 `qwen3_tts` uv 项目中的轻量 HTTP 依赖，其余服务使用
 各自的 uv 项目。启动命令统一使用 `uv run --no-sync`，不会在运行阶段联网解析依赖；
 本地 GPU 服务通过 `GPU_LOCK_FILE` 串行访问 GPU。默认最多排队 900 秒，超过时返回
 `503`；用 `GPU_LOCK_WAIT_TIMEOUT` 调整（设为非正值可关闭时限）。健康检查可结合
@@ -119,7 +121,7 @@ bash start.sh
 健康检查：
 
 ```bash
-for port in 8300 8301 8302 8303 8304 8311 8312 8313 8321 8322 8323 8324 8325 8331 8341 8342 8351 8361 8371; do
+for port in 8300 8301 8302 8303 8304 8311 8312 8313 8321 8322 8323 8324 8325 8331 8341 8342 8351 8361 8371 8381; do
   curl -fsS "http://127.0.0.1:${port}/v1/health" >/dev/null && echo "${port}: ok"
 done
 ```
@@ -145,6 +147,7 @@ HOST=127.0.0.1 PORT=8321 \
 | MOSS-Audio-4B-Instruct | `$HF_MIRROR_DIR/OpenMOSS-Team/MOSS-Audio-4B-Instruct` | `MOSS_AUDIO_4B_INSTRUCT_MODEL_DIR`、`MOSS_AUDIO_4B_INSTRUCT_DEPENDENCY_PATH` |
 | Confucius4-TTS | `$HF_MIRROR_DIR/netease-youdao/Confucius4-TTS` | `CONFUCIUS4_TTS_MODEL_DIR`、`CONFUCIUS4_TTS_CODE_PATH`、`CONFUCIUS4_TTS_W2V_BERT_MODEL_DIR`、`CONFUCIUS4_TTS_VOCODER_MODEL_DIR`、`CONFUCIUS4_TTS_STYLE_ENCODER_CHECKPOINT` |
 | Qwen3-ASR-1.7B | `$HF_MIRROR_DIR/Qwen/Qwen3-ASR-1.7B` | `QWEN3_ASR_MODEL_DIR` |
+| Seed-VC | `$HF_MIRROR_DIR/Plachta/Seed-VC` | `SEED_VC_CODE_PATH`、`SEED_VC_WHISPER_MODEL_DIR`、`SEED_VC_VOCODER_MODEL_DIR`、`SEED_VC_STYLE_ENCODER_CHECKPOINT`；F0 模式另需 `SEED_VC_F0_VOCODER_MODEL_DIR`、`SEED_VC_RMVPE_CHECKPOINT` |
 | MOSS-SoundEffect | `$HF_MIRROR_DIR/OpenMOSS-Team/MOSS-SoundEffect-v2.0` | `MOSS_SOUNDEFFECT_CODE_PATH`、`MOSS_SOUNDEFFECT_MODEL_DIR` |
 | Stable Audio 3 Medium | `$HF_MIRROR_DIR/stabilityai/stable-audio-3-medium` | `STABLE_AUDIO_3_REPO_PATH`、`STABLE_AUDIO_3_MEDIUM_MODEL_DIR` |
 | ACE-Step 1.5 XL Turbo | `$HF_MIRROR_DIR/ACE-Step/acestep-v15-xl-turbo-diffusers` | `ACESTEP_MODEL_DIR`、`ACESTEP_OFFLOAD`、`ACESTEP_VAE_TILING` |
@@ -169,7 +172,7 @@ HOST=127.0.0.1 PORT=8321 \
 `QWEN_VOICEDESIGN_*`、`MOSS_VOICEGENERATOR_*`、`MOSS_AUDIO_4B_THINKING_*`、
 `MOSS_AUDIO_4B_INSTRUCT_*` 和
 `CONFUCIUS4_TTS_*`、
-`FIRERED_TTS3_*`、`TIGER_DNR_*`。每个服务的 `/v1/health` 会报告
+`FIRERED_TTS3_*`、`TIGER_DNR_*`、`SEED_VC_*`。每个服务的 `/v1/health` 会报告
 生效的路径、运行时和可用性。
 FireRedTTS3 的官方源码默认位于 `$HOME/tts-depency/FireRedTTS3`，通过
 `FIRERED_TTS3_CODE_PATH` 覆盖；8304 以 `timbre` 模式加载 Instruct，8325 以 `clone` 模式加载
@@ -218,6 +221,79 @@ worker 使用官方 S2A 的 `target_feat_len` 指定 Mel 帧数，完整保留 T
 生成长度，仍须对输出执行语义和时长验收。`GET /v1/health` 的
 `runtime.native_vocalization_duration=true` 表示已加载支持此字段的 HTTP 版本；更新后需要
 重新运行 `bash start.sh`，仅修改 worker 文件不能更新已启动的接口校验。
+
+## Seed-VC 音色转换
+
+`seed-vc` 沿用 Confucius4-TTS 的独立 uv 项目、轻量 HTTP 进程和一次性 worker 结构，
+默认监听 `8381`。worker 复用 [官方 `inference.py`](https://github.com/Plachtaa/seed-vc/blob/main/inference.py)
+的离线转换流程，保留长音频分块和交叉淡化；参考音色按官方流程最多使用前 25 秒。
+它接收原始音频与目标音色参考音频，不需要 TTS 文本。
+
+官方源码在仓库外准备，通过 `SEED_VC_CODE_PATH` 覆盖默认目录：
+
+```bash
+git clone https://github.com/Plachtaa/seed-vc.git "$HOME/tts-depency/seed-vc"
+uv sync --project seed-vc --locked
+```
+
+默认 22.05 kHz 语音转换需要以下本地文件；模型目录中的 `v2/ar_base.pth` 和
+`v2/cfm_small.pth` 属于另一套上游 V2 流程，本接口使用下表的离线 DiT 模型。
+
+| 用途 | 默认路径 | 覆盖变量 |
+| --- | --- | --- |
+| DiT 权重 | `$HF_MIRROR_DIR/Plachta/Seed-VC/DiT_seed_v2_uvit_whisper_small_wavenet_bigvgan_pruned.pth` | `SEED_VC_CHECKPOINT_PATH`、`SEED_VC_MODEL_DIR` |
+| 配置 | `$HF_MIRROR_DIR/Plachta/Seed-VC/config_dit_mel_seed_uvit_whisper_small_wavenet.yml` | `SEED_VC_CONFIG_PATH` |
+| Whisper-small | `$HF_MIRROR_DIR/openai/whisper-small`，含 `config.json`、`preprocessor_config.json` 与 `model.safetensors` 或 `pytorch_model.bin` | `SEED_VC_WHISPER_MODEL_DIR` |
+| BigVGAN | `$HF_MIRROR_DIR/netease-youdao/nv-community/bigvgan_v2_22khz_80band_256x`，含 `config.json` 与 `bigvgan_generator.pt` | `SEED_VC_VOCODER_MODEL_DIR` |
+| CAMPPlus | `$HF_MIRROR_DIR/netease-youdao/funasr/campplus/campplus_cn_common.bin` | `SEED_VC_STYLE_ENCODER_CHECKPOINT` |
+
+先分别上传两路音频，`full_path` 是 WebUI 逻辑标识，不是任意服务端文件路径：
+
+```bash
+curl -fsS http://127.0.0.1:8381/v1/upload_audio \
+  -F 'audio=@source.wav;type=audio/wav' -F 'full_path=source.wav'
+curl -fsS http://127.0.0.1:8381/v1/upload_audio \
+  -F 'audio=@reference.wav;type=audio/wav' -F 'full_path=reference.wav'
+curl -fsS http://127.0.0.1:8381/v1/check/audio?file_name=reference.wav
+curl -fsS http://127.0.0.1:8381/v1/seedVc/voiceConversion \
+  -H 'Content-Type: application/json' \
+  -d '{"source_audio_path":"source.wav","reference_audio_path":"reference.wav","diffusion_steps":30,"length_adjust":1.0,"inference_cfg_rate":0.7}' \
+  -o converted.wav
+```
+
+成功响应为 `audio/wav`，并原子保存到 `storage/clone/`，可通过 `SEED_VC_OUTPUT_DIR`
+覆盖。上传复用共享流式暂存、SHA-256、64 MiB 上限和设计音色引用机制。
+可选 `prompt_text` 仅用于上传 sidecar，不参与转换。
+
+| JSON 字段 | 默认值 | 范围或含义 |
+| --- | --- | --- |
+| `source_audio_path` | 必填 | 已上传的原始音频 `full_path` |
+| `reference_audio_path` | 必填 | 已上传的参考音色 `full_path`，可引用设计音色 |
+| `diffusion_steps` | `30` | 1–200 |
+| `length_adjust` | `1.0` | 0.5–2，输出时长比例 |
+| `inference_cfg_rate` | `0.7` | 0–1 |
+| `f0_condition` | `false` | 切换到 44.1 kHz F0 模型 |
+| `auto_f0_adjust` | `false` | 按参考音频自动调整音高，需启用 F0 |
+| `semi_tone_shift` | `0` | -24–24 半音，非零时需启用 F0 |
+| `fp16` | `true` | CUDA 上 DiT 使用 FP16 autocast；非 CUDA 设备关闭此选项 |
+
+F0 模式另需模型目录内的
+`DiT_seed_v2_uvit_whisper_base_f0_44k_bigvgan_pruned_ft_ema_v2.pth` 与
+`config_dit_mel_seed_uvit_whisper_base_f0_44k.yml`，分别通过 `SEED_VC_F0_CHECKPOINT_PATH`
+和 `SEED_VC_F0_CONFIG_PATH` 覆盖；另准备
+`$HF_MIRROR_DIR/nvidia/bigvgan_v2_44khz_128band_512x` 与
+`$HF_MIRROR_DIR/lj1995/VoiceConversionWebUI/rmvpe.pt`，分别通过
+`SEED_VC_F0_VOCODER_MODEL_DIR` 和 `SEED_VC_RMVPE_CHECKPOINT` 覆盖。F0 配置同样使用 Whisper-small。
+
+所有推理默认值集中在 `seed-vc/main.py` 顶部，可通过对应的 `SEED_VC_*` 环境变量覆盖；
+`start.sh` 仅配置路径、端口和运行参数。`SEED_VC_HOST`、`SEED_VC_PORT`、
+`SEED_VC_PROJECT_DIR`、`SEED_VC_DEVICE`（默认 `cuda:0`）、`SEED_VC_REQUEST_TIMEOUT`
+（默认 900 秒）和 `SEED_VC_WORKER_TMP_DIR` 均可覆盖。
+即使关闭 `LOCAL_FILES_ONLY`，本接口仍要求部署时准备所有本地模型，不在请求中下载。
+`GET /v1/health` 分别报告普通/F0 模式缺失的文件、存储容量和最近一次 GPU 指标。
+输入不存在返回 `404`，模型文件缺失或 GPU 排队超时返回 `503`，非法参数返回 `422`。
+Seed-VC 要求 `GPU_LOCK_WAIT_TIMEOUT` 为正数，worker 成功、失败和超时均终止进程组、
+清理临时 JSON/WAV，并在释放共享 GPU 锁前等待 `CUDA_RELEASE_DELAY`。
 
 ## 48 kHz 母带与 Steam Audio 正式导出
 
