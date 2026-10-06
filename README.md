@@ -1,8 +1,18 @@
-# Unitale AI Local Backend
+# Unitale 本地 AI 音视频后端
 
-Unitale 前端使用的本地语音后端，提供参考音频克隆、音色设计、语音编辑和
-SoundEffect 生成，以及音频驱动人像视频生成。仓库采用“一个服务一个 uv 项目”的边界：HTTP 控制面不加载
-重型模型，模型推理由对应目录中的一次性 worker 完成。
+Unitale 前端使用的本地后端，提供参考音频语音克隆、音色设计、语音编辑、音效与 BGM
+生成、音频理解与转写、三路音源分离、音色转换、音频驱动人像视频，以及 CPU 音频母带和
+Steam Audio 对象级空间导出。MiMo 音色设计调用云端，其余模型使用本地权重。
+
+仓库包含 **19 个独立服务 uv 项目，统一启动 22 个 HTTP 进程**：FireRedTTS3 和 MOSS-Audio
+各启动两个模式进程，另有一个轻量控制面。HTTP 进程不加载重型模型，模型推理由对应目录
+中的一次性 worker 完成；共享运行时和无模型 QA 环境分别位于 `unitale_runtime/`、`qa/`。
+接口、路径和默认值以当前 `main.py`、`worker.py`、`pyproject.toml` 与 `start.sh` 为准。
+
+导航：[服务总览](#服务总览) · [已移除能力](#已移除与兼容边界) ·
+[安装与启动](#安装与启动) · [模型与配置](#模型路径与主要配置) ·
+[空间导出](#48-khz-母带与-steam-audio-正式导出) · [语音克隆](#参考音频克隆) ·
+[训练实验](#文本润色训练实验) · [测试与开发](#测试与开发)。
 
 ## 服务总览
 
@@ -19,23 +29,51 @@ SoundEffect 生成，以及音频驱动人像视频生成。仓库采用“一�
 | Qwen3-TTS Base | 8321 | 参考音频语音克隆 | `/v1/qwen/clone` |
 | VoxCPM2 | 8322 | 语音克隆 | `/v1/voxcpm2/clone` |
 | LongCat-AudioDiT-3.5B | 8323 | 参考音频语音克隆 | `/v1/longCat/clone` |
-| dots.tts-soar | 8324 | 参考音频语音克隆 | `/v2/dotsTTS/clone` |
+| dots.tts-soar | 8324 | 参考音频语音克隆 | `/v1/dotsTTS/clone` |
 | FireRedTTS3 Base | 8325 | 参考音频语音克隆 | `/v1/FireRedTTS3/clone` |
 | Step-Audio-EditX | 8331 | 语音编辑 | `/v1/stepAudioEditx/edit` |
 | MOSS-Audio-4B-Thinking | 8341 | 音频转写、描述与问答 | `/v1/mossAudioThinking/understand` |
 | MOSS-Audio-4B-Instruct | 8342 | 音频转写、描述与问答 | `/v1/mossAudioThinking/understand` |
-| Confucius4-TTS | 8361 | 参考音频零样本、多语言语音克隆 | `/v1/confucius4TTS/generate` |
 | TIGER-DnR | 8351 | 电影混音的对白、音效、音乐三 Stem 分离 | `/v1/tigerDnr/separate` |
+| Confucius4-TTS | 8361 | 参考音频零样本、多语言语音克隆 | `/v1/confucius4TTS/generate` |
 | Qwen3-ASR-1.7B | 8371 | 本地多语言音频识别 | `/v1/qwen3/asr` |
 | Seed-VC | 8381 | 原始语音到参考音色的转换，可选 F0 歌声转换 | `/v1/seedVc/voiceConversion` |
 | SoulX-FlashHead-1_3B | 8391 | 图片与音频驱动人像视频，支持 Lite/Pro | `/v1/soulX/flashHead` |
 | Ditto | 8392 | 图片与音频驱动人像视频，ONNX CUDA 后端 | `/v1/ditto/talkingHead` |
 
-每个服务都提供 `GET /v1/health`。后端只注册表中列出的最终接口；模型生成接口返回
-`audio/wav`，并在服务端保存一份 WAV。MOSS-Audio-4B Thinking/Instruct 与 Qwen3-ASR 接收音频并返回 JSON 文本，
-不会生成或保留 WAV。TIGER-DnR 返回含 `dialog.wav`、`effects.wav`、`music.wav` 的 ZIP，并将
-三路 Stem 原子保存。空间音频导出返回 WAV 或 MP3，响应完成后删除临时成品。
-SoulX-FlashHead 和 Ditto 返回带声音的 `video/mp4`，并在 `storage/video/` 原子保存成品。
+表中为业务入口，方法均为 `POST`，控制面的 `/v1/control` 为 `GET`。每个进程提供
+`GET /v1/health`，FastAPI 的 `/docs` 和 `/openapi.json` 可查看该进程实际注册的字段与路由。
+健康接口成功表示 HTTP 服务可访问，还须检查响应内的 `available` 和模型文件状态。
+
+| 能力 | 成功响应 | 服务端保存行为 |
+| --- | --- | --- |
+| 克隆、音色设计、编辑、音效、BGM、音色转换 | `audio/wav` | 按用途保存 WAV |
+| MOSS-Audio Thinking/Instruct、Qwen3-ASR | JSON 文本及上传摘要 | 请求结束后删除上传暂存和 worker 结果，不保留输入音频 |
+| TIGER-DnR | `application/zip`，含 `dialog.wav`、`effects.wav`、`music.wav` | 原子保存三路 Stem 与 ZIP 批次 |
+| SoulX-FlashHead、Ditto | 带声音的 `video/mp4` | 原子保存 MP4 |
+| 控制面音频导出 | WAV 或 MP3 | 响应完成后删除临时成品 |
+
+FireRedTTS3 的 `8304` 只注册音色设计，`8325` 只注册克隆及其上传/检查接口。
+MOSS-Audio 的两个变体都从 `moss_audio_4b_thinking/` 启动，共用
+`/v1/mossAudioThinking/understand` 路径，通过端口区分；没有独立的 Instruct uv 项目。
+
+## 已移除与兼容边界
+
+以下功能没有现行服务入口，不能按旧教程安装或调用：
+
+| 已移除项 | 当前接入方式 |
+| --- | --- |
+| IndexTTS2、Ming/Ming-Omni、OmniVoice、旧 MOSS-TTS 克隆 | 使用服务表中的克隆模型；MOSS VoiceGenerator 仍提供音色设计 |
+| Stable Audio 3 Small SFX | 声效使用 MOSS-SoundEffect v2 或 Stable Audio 3 Medium |
+| VoxCPM2 音色设计及 `voice_design_worker.py` | 音色设计使用 Qwen、MOSS、MiMo 或 FireRedTTS3 Instruct；VoxCPM2 保留参考音频克隆和可控克隆 |
+| 集中式 `api/`、旧 Conda API/worker 和运行时回退 | 从各服务 uv 项目的 `main.py` 启动 |
+| 旧通用合成、音色设计和声效路由别名 | 使用服务总览中的最终路由，路径大小写需一致 |
+
+8300 仅保留 MiMo 的同路径代理 `/v1/mimo/timbre`，不转发其他模型请求。
+Qwen/VoxCPM2/LongCat/dots/FireRed 克隆接口的 `style_prompt` 已禁用；
+VoxCPM2 可控克隆使用 `control_instruction`。
+`/v1/audio/export` 仍兼容旧总线滤镜，但正式空间导出使用
+`/v1/audio/spatial/render`，详见音频导出章节。
 
 ## 目录与运行数据
 
@@ -62,9 +100,18 @@ seed-vc/                      Seed-VC 音色转换服务和一次性 worker
 SoulX-FlashHead-1_3B/          音频驱动人像视频服务和一次性 worker
 ditto/                        Ditto 人像视频服务和一次性 worker
 tests/                        根目录无模型回归测试
+qa/                           锁定的轻量测试与 Ruff 环境，不安装模型依赖
+unitale_runtime/              共享流式上传、引用存储、GPU 队列与容量工具
+scripts/                      质量门禁、renderer 构建与训练辅助工具
+training/configs/             有声书纯文本润色 LoRA 的实验配置
+docs/                         Python 工程规范
 soundEffect/                  MOSS GPU 示例和提示词说明
-storage/                      上传音频、生成音频、sidecar、缓存和 GPU 锁
+storage/                      上传素材、生成音视频、sidecar、训练产物、缓存和 GPU 锁
 ```
+
+根目录的 `流行*模型功能简介.md` 是调研资料，`special-audio-effect/` 是方案与验收记录，
+`task*.md` 是任务资料；其中提到的模型或计划不表示已注册服务。实际服务清单以本 README
+和 `start.sh` 为准。
 
 默认运行数据目录为：
 
@@ -78,32 +125,44 @@ storage/                      上传音频、生成音频、sidecar、缓存和 
 | `storage/video/` | SoulX-FlashHead 和 Ditto 生成的 MP4 | `SOULX_FLASHHEAD_OUTPUT_DIR`、`DITTO_OUTPUT_DIR` |
 | `storage/ditto/images/` | Ditto 上传的参考图片 | `DITTO_IMAGE_DIR` |
 | `storage/flashhead/images/` | SoulX-FlashHead 上传的参考图片 | `SOULX_FLASHHEAD_IMAGE_DIR` |
+| `storage/training/` | 文本润色实验的数据集、adapter 和预测结果 | 训练脚本的 `--output-dir` 与训练配置 |
 | `storage/.cache/runtime/` | worker 临时文件、母带/Steam Audio 任务缓存、库缓存和共享 GPU 锁 | `RUNTIME_CACHE_DIR`、`SPATIAL_EXPORT_CACHE_DIR`、`STEAM_AUDIO_RENDER_CACHE_DIR`、`GPU_LOCK_FILE` |
 
 如果上传音频的内容与 `storage/timbre/` 中已有的设计音色一致，Qwen3-TTS、VoxCPM2、
-LongCat、dots.tts-soar 和 FireRedTTS3 会在 `storage/timbre/.references/` 保存带 SHA-256 和相对路径的
+LongCat、dots.tts-soar、FireRedTTS3、Confucius4-TTS、Seed-VC，以及人像视频服务会在
+`storage/timbre/.references/` 保存带 SHA-256 和相对路径的
 小型 JSON 引用映射，不再把同一 WAV 复制到 `storage/clone/`；普通用户上传的参考音频仍保存到
 `storage/clone/`。上传按块暂存并通过原子替换提交，默认上限为 64 MiB，可用
 `UPLOAD_MAX_BYTES` 覆盖。这些目录是运行数据，不要提交到 Git。
 
 ## 安装与启动
 
-运行要求：Python `3.12.13`、`uv`、FFmpeg、可用的 CUDA/NVIDIA 驱动（本地模型服务），以及
-下方列出的模型权重和外部源码目录。权重与第三方源码不放进本仓库。
+统一启动和 GPU 锁使用 Linux 的 `setsid`、进程组信号与 `fcntl.flock`，部署目标为 Linux。
+运行要求：Python `3.12.13`、`uv`、FFmpeg/ffprobe、可用的 CUDA/NVIDIA 驱动（本地模型服务），
+以及下方列出的模型权重和外部源码目录。Step-Audio-EditX 还需要系统 `sox`；Ditto 需要
+GCC 编译上游 Cython 扩展；正式 Steam Audio renderer 需要 CMake 3.17+、C++17 编译器和本地 SDK。
+不同模型锁定不同 Torch/CUDA 组合，必须使用各自环境。权重与第三方源码不放进本仓库。
 
 先为需要的服务同步锁定依赖；部署全部服务时可以执行：
 
 ```bash
+test -d /home/muyi086/tts-depency/MOSS-TTS &&
 for project in qwen3_tts mimo_tts voxcpm2 LongCat_AudioDiT_3.5B_bf16 \
   dots_tts_soar moss_soundEffect stable_audio_3_medium ace_step_1_5 \
-  qwen3_voiceDesign moss_voiceGenerator moss_audio_4b_thinking Confucius4_TTS Qwen3_ASR_1.7B seed-vc SoulX-FlashHead-1_3B ditto Step_Audio_EditX firered_tts3 TIGER-DnR; do
+  qwen3_voiceDesign moss_voiceGenerator moss_audio_4b_thinking Confucius4_TTS \
+  Qwen3_ASR_1.7B seed-vc SoulX-FlashHead-1_3B ditto Step_Audio_EditX \
+  firered_tts3 TIGER-DnR; do
   uv sync --project "$project" --locked
 done
 ```
 
-ACE-Step 的 Diffusers 依赖当前使用官方 Git 版本；Step-Audio-EditX、MOSS-SoundEffect 和 Stable Audio 3 依赖外部源码或系统命令；
-先准备对应路径，再执行 `uv sync`。启动前应完成依赖同步，不要把 `start.sh` 当作依赖
-安装流程；使用 `--no-sync` 的服务尤其要求对应环境已经准备好。
+`moss_voiceGenerator` 的 `moss-tts` 必须来自已准备的本地 editable 源码
+`/home/muyi086/tts-depency/MOSS-TTS`；该固定路径是本仓库唯一明确保留的部署例外，
+不能用 Git/PyPI 来源替换。上面的检查须成功后才同步该项目。
+ACE-Step 的 Diffusers 和 dots 的 `dots-tts` 使用锁定的 Git revision，Step-Audio-EditX
+使用指定的 vLLM wheel；首次安装和锁文件校验可能需要访问这些依赖来源。
+`LOCAL_FILES_ONLY` 只控制模型加载，不代替依赖安装。启动前应完成 `uv sync --locked`；
+`start.sh` 不执行依赖同步，也不下载权重或外部源码。
 
 MiMo 是云端服务，必须配置密钥：
 
@@ -122,17 +181,20 @@ bash start.sh
 8331、8341、8342、8351、8361、8371、8381、8391 和 8392 共 22 个进程；8300 使用 `qwen3_tts` uv 项目中的轻量 HTTP 依赖，其余服务使用
 各自的 uv 项目。启动命令统一使用 `uv run --no-sync`，不会在运行阶段联网解析依赖；
 本地 GPU 服务通过 `GPU_LOCK_FILE` 串行访问 GPU。默认最多排队 900 秒，超过时返回
-`503`；用 `GPU_LOCK_WAIT_TIMEOUT` 调整（设为非正值可关闭时限）。健康检查可结合
-`nvidia-smi` 观察显存，持锁期间会记录本次请求的峰值显存。
+`503`；用正数 `GPU_LOCK_WAIT_TIMEOUT` 调整。共享锁实现仍兼容非正值无限等待，
+但 Seed-VC 明确拒绝该配置，整套部署应保持正数。持锁期间用 `nvidia-smi` 采样，
+`peak_vram_mib` 是所有可见 GPU 的已用显存总和峰值，并非某个 worker 的独立分配量。
 任一子进程退出时脚本会终止其余进程组并清理 worker。
 启动前会检查全部服务的监听地址；端口已被占用或配置相互冲突时，列出服务名和地址后退出。
 更新代码后重新启动，应先在旧 `start.sh` 终端按 `Ctrl+C`，等待旧进程退出，再执行启动命令。
 可用 `ss -lntp` 查看占用端口的进程。
 
-健康检查：
+控制面诊断与 HTTP 健康检查：
 
 ```bash
-for port in 8300 8301 8302 8303 8304 8311 8312 8313 8321 8322 8323 8324 8325 8331 8341 8342 8351 8361 8371 8381 8391 8392; do
+curl -fsS http://127.0.0.1:8300/v1/control
+for port in 8300 8301 8302 8303 8304 8311 8312 8313 8321 8322 8323 8324 \
+  8325 8331 8341 8342 8351 8361 8371 8381 8391 8392; do
   curl -fsS "http://127.0.0.1:${port}/v1/health" >/dev/null && echo "${port}: ok"
 done
 ```
@@ -141,15 +203,34 @@ done
 
 ```bash
 HOST=127.0.0.1 PORT=8321 \
-  uv run --project qwen3_tts python qwen3_tts/main.py
+  uv run --no-sync --project qwen3_tts python qwen3_tts/main.py
+```
+
+统一脚本没有按模型启停的开关；只部署部分模型时，准备并直接启动相应目录。
+MOSS-Audio 单独启动要显式设置 `MOSS_AUDIO_4B_VARIANT=thinking` 或 `instruct`；
+FireRedTTS3 设置 `FIRERED_TTS3_MODE=timbre` 或 `clone`，例如：
+
+```bash
+MOSS_AUDIO_4B_VARIANT=instruct MOSS_AUDIO_4B_INSTRUCT_PORT=8342 \
+  uv run --no-sync --project moss_audio_4b_thinking python moss_audio_4b_thinking/main.py
+FIRERED_TTS3_MODE=clone FIRERED_TTS3_PORT=8325 \
+  uv run --no-sync --project firered_tts3 python firered_tts3/main.py
 ```
 
 ## SoulX-FlashHead 人像视频
 
-新增独立服务以 `8391` 提供 `POST /v1/soulX/flashHead`，接收已上传的图片和驱动音频逻辑路径，
+独立服务以 `8391` 提供 `POST /v1/soulX/flashHead`，接收已上传的图片和驱动音频逻辑路径，
 默认使用 Lite，也支持 Pro。先调用该服务的 `/v1/upload_image` 和 `/v1/upload_audio`，
 再发送 `{"image_path":"portrait.png","audio_path":"speech.wav","model_type":"lite","seed":42}`。
 成功返回带声音的 MP4，成品保存在 `storage/video/`。
+
+默认 `model_type=lite`、`seed=42`、`use_face_crop=false`；驱动音频默认上限 300 秒，
+worker 超时 1800 秒。图片支持 PNG/JPG/JPEG/WebP，上传使用 64 MiB 共享上限。
+该接口生成完整文件，使用单 GPU，不提供实时视频流或 Pro 多 GPU 推理。
+
+SoulX 与 Ditto 均提供 `GET /v1/check/image?file_name=portrait.png` 和
+`GET /v1/check/audio?file_name=speech.wav` 检查已上传输入；`file_name` 使用原 `full_path`。
+图片上传表单字段为 `image`、`full_path`，成功返回 `filename`、`sha256`、`size_bytes`。
 
 需要额外准备官方 `Soul-AILab/SoulX-FlashHead` 源码和 `facebook/wav2vec2-base-960h` 权重，
 再执行 `uv sync --project SoulX-FlashHead-1_3B --locked`。
@@ -163,6 +244,9 @@ HOST=127.0.0.1 PORT=8321 \
 `{"image_path":"portrait.png","audio_path":"speech.wav","seed":42,"sampling_timesteps":50,"max_size":1920}`。
 返回带声音的 MP4，成品默认保存在 `storage/video/`。
 
+`sampling_timesteps` 为 1–100，`max_size` 为 256–4096；音频默认最长 300 秒，worker
+超时 1800 秒。输入图片与 SoulX 一样支持 PNG/JPG/JPEG/WebP。
+
 使用 `$HF_MIRROR_DIR/thewintersun/ditto-talkinghead` 的本地 ONNX 权重和官方外部源码，
 沿用 Confucius4-TTS 的一次性 worker、共享 GPU 锁、超时与进程组清理方式。
 同步 `uv sync --project ditto --locked` 后即可由 `start.sh` 启动。
@@ -173,9 +257,10 @@ Python 3.12 环境采用 ONNX Runtime CUDA 后端；配置映射和三维采样�
 ## 模型路径与主要配置
 
 `start.sh` 默认使用 `HF_MIRROR_DIR`（默认为 `$HOME/hf-mirror`）和 `$HOME/tts-depency`；
-所有路径都可在启动前用环境变量覆盖。
+模型和运行数据路径可在启动前用环境变量覆盖；MOSS VoiceGenerator 的 editable 依赖路径
+仍遵循安装章节中的固定路径例外。
 
-| 服务 | 默认权重 | 其他必需路径 |
+| 服务 | 默认权重 | 权重覆盖变量与额外配置 |
 | --- | --- | --- |
 | Qwen3-TTS Base | `$HF_MIRROR_DIR/Qwen/Qwen3-TTS-12Hz-1.7B-Base` | `QWEN3_TTS_MODEL_DIR` |
 | Qwen VoiceDesign | `$HF_MIRROR_DIR/Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign` | `QWEN_VOICEDESIGN_MODEL_DIR` |
@@ -184,18 +269,37 @@ Python 3.12 环境采用 ONNX Runtime CUDA 后端；配置映射和三维采样�
 | MOSS-Audio-4B-Instruct | `$HF_MIRROR_DIR/OpenMOSS-Team/MOSS-Audio-4B-Instruct` | `MOSS_AUDIO_4B_INSTRUCT_MODEL_DIR`、`MOSS_AUDIO_4B_INSTRUCT_DEPENDENCY_PATH` |
 | Confucius4-TTS | `$HF_MIRROR_DIR/netease-youdao/Confucius4-TTS` | `CONFUCIUS4_TTS_MODEL_DIR`、`CONFUCIUS4_TTS_CODE_PATH`、`CONFUCIUS4_TTS_W2V_BERT_MODEL_DIR`、`CONFUCIUS4_TTS_VOCODER_MODEL_DIR`、`CONFUCIUS4_TTS_STYLE_ENCODER_CHECKPOINT` |
 | Qwen3-ASR-1.7B | `$HF_MIRROR_DIR/Qwen/Qwen3-ASR-1.7B` | `QWEN3_ASR_MODEL_DIR` |
-| Seed-VC | `$HF_MIRROR_DIR/Plachta/Seed-VC` | `SEED_VC_CODE_PATH`、`SEED_VC_WHISPER_MODEL_DIR`、`SEED_VC_VOCODER_MODEL_DIR`、`SEED_VC_STYLE_ENCODER_CHECKPOINT`；F0 模式另需 `SEED_VC_F0_VOCODER_MODEL_DIR`、`SEED_VC_RMVPE_CHECKPOINT` |
-| SoulX-FlashHead | `$HF_MIRROR_DIR/Soul-AILab/SoulX-FlashHead-1_3B` | `SOULX_FLASHHEAD_CODE_PATH`（默认 `$HOME/tts-depency/SoulX-FlashHead`）、`SOULX_FLASHHEAD_WAV2VEC_DIR`（默认 `$HF_MIRROR_DIR/facebook/wav2vec2-base-960h`） |
-| Ditto | `$HF_MIRROR_DIR/thewintersun/ditto-talkinghead` | `DITTO_CODE_PATH`（默认 `$HOME/tts-depency/ditto-talkinghead`）、`DITTO_DATA_ROOT`、`DITTO_CONFIG_PATH` |
+| Seed-VC | `$HF_MIRROR_DIR/Plachta/Seed-VC` | `SEED_VC_MODEL_DIR`、`SEED_VC_CODE_PATH`、`SEED_VC_WHISPER_MODEL_DIR`、`SEED_VC_VOCODER_MODEL_DIR`、`SEED_VC_STYLE_ENCODER_CHECKPOINT`；F0 模式另需 `SEED_VC_F0_VOCODER_MODEL_DIR`、`SEED_VC_RMVPE_CHECKPOINT` |
+| SoulX-FlashHead | `$HF_MIRROR_DIR/Soul-AILab/SoulX-FlashHead-1_3B` | `SOULX_FLASHHEAD_MODEL_DIR`、`SOULX_FLASHHEAD_CODE_PATH`、`SOULX_FLASHHEAD_WAV2VEC_DIR`（默认 `$HF_MIRROR_DIR/facebook/wav2vec2-base-960h`） |
+| Ditto | `$HF_MIRROR_DIR/thewintersun/ditto-talkinghead` | `DITTO_MODEL_DIR`、`DITTO_CODE_PATH`、`DITTO_DATA_ROOT`（`$DITTO_MODEL_DIR/ditto_onnx`）、`DITTO_CONFIG_PATH`（`$DITTO_MODEL_DIR/ditto_cfg/v0.4_hubert_cfg_trt.pkl`） |
 | MOSS-SoundEffect | `$HF_MIRROR_DIR/OpenMOSS-Team/MOSS-SoundEffect-v2.0` | `MOSS_SOUNDEFFECT_CODE_PATH`、`MOSS_SOUNDEFFECT_MODEL_DIR` |
 | Stable Audio 3 Medium | `$HF_MIRROR_DIR/stabilityai/stable-audio-3-medium` | `STABLE_AUDIO_3_REPO_PATH`、`STABLE_AUDIO_3_MEDIUM_MODEL_DIR` |
 | ACE-Step 1.5 XL Turbo | `$HF_MIRROR_DIR/ACE-Step/acestep-v15-xl-turbo-diffusers` | `ACESTEP_MODEL_DIR`、`ACESTEP_OFFLOAD`、`ACESTEP_VAE_TILING` |
 | VoxCPM2 | `$HF_MIRROR_DIR/openbmb/VoxCPM2` | `VOXCPM2_MODEL_DIR`、仓库内 `voxcpm2/voxcpm2_helpers.py` |
-| LongCat-AudioDiT | `$HF_MIRROR_DIR/drbaph/LongCat-AudioDiT-3.5B-bf16` | `LONGCAT_AUDIODIT_REPO_PATH`、`LONGCAT_AUDIODIT_TOKENIZER_PATH` |
+| LongCat-AudioDiT | `$HF_MIRROR_DIR/drbaph/LongCat-AudioDiT-3.5B-bf16` | `LONGCAT_AUDIODIT_MODEL_DIR`、`LONGCAT_AUDIODIT_REPO_PATH`、`LONGCAT_AUDIODIT_TOKENIZER_PATH`（`$HF_MIRROR_DIR/google/umt5-base`） |
 | dots.tts-soar | `$HF_MIRROR_DIR/rednote-hilab/dots.tts-soar` | `DOTS_TTS_SOAR_MODEL_DIR` |
-| Step-Audio-EditX | `$HF_MIRROR_DIR/stepfun-ai/Step-Audio-EditX` | `STEP_AUDIO_TOKENIZER_PATH`、`STEP_AUDIO_EDITX_CODE_PATH` |
+| Step-Audio-EditX | `$HF_MIRROR_DIR/stepfun-ai/Step-Audio-EditX` | `STEP_AUDIO_EDITX_MODEL_DIR`、`STEP_AUDIO_TOKENIZER_PATH`（`$HF_MIRROR_DIR/stepfun-ai/Step-Audio-Tokenizer`）、`STEP_AUDIO_EDITX_CODE_PATH` |
 | FireRedTTS3 Base/Instruct | `$HF_MIRROR_DIR/drbaph/FireRedTTS3-bf16` | `FIRERED_TTS3_MODEL_DIR`、`FIRERED_TTS3_CODE_PATH` |
-| TIGER-DnR | `$HF_MIRROR_DIR/JusperLee/TIGER-DnR` | `TIGER_DNR_SOURCE_DIR`（默认 `$HOME/.local/share/tiger-dnr/TIGER`） |
+| TIGER-DnR | `$HF_MIRROR_DIR/JusperLee/TIGER-DnR` | `TIGER_DNR_MODEL_DIR`、`TIGER_DNR_SOURCE_DIR` |
+
+仓库外推理源码的默认位置如下，须在请求前准备；`start.sh` 不负责拉取源码：
+
+| 服务 | 外部源码默认路径 | 覆盖变量 |
+| --- | --- | --- |
+| MOSS-SoundEffect | `$HOME/tts-depency/MOSS-TTS` | `MOSS_SOUNDEFFECT_CODE_PATH` |
+| MOSS-Audio 两个变体 | `$HOME/tts-depency/MOSS-Audio` | `MOSS_AUDIO_4B_THINKING_DEPENDENCY_PATH`、`MOSS_AUDIO_4B_INSTRUCT_DEPENDENCY_PATH` |
+| Stable Audio 3 | `$HOME/tts-depency/stable-audio-3` | `STABLE_AUDIO_3_REPO_PATH` |
+| LongCat | `$HOME/tts-depency/LongCat-AudioDiT` | `LONGCAT_AUDIODIT_REPO_PATH` |
+| Step-Audio-EditX | `$HOME/tts-depency/Step-Audio-EditX` | `STEP_AUDIO_EDITX_CODE_PATH` |
+| FireRedTTS3 | `$HOME/tts-depency/FireRedTTS3` | `FIRERED_TTS3_CODE_PATH` |
+| Confucius4-TTS | `$HOME/tts-depency/Confucius4-TTS` | `CONFUCIUS4_TTS_CODE_PATH` |
+| Seed-VC | `$HOME/tts-depency/seed-vc` | `SEED_VC_CODE_PATH` |
+| SoulX-FlashHead | `$HOME/tts-depency/SoulX-FlashHead` | `SOULX_FLASHHEAD_CODE_PATH` |
+| Ditto | `$HOME/tts-depency/ditto-talkinghead` | `DITTO_CODE_PATH` |
+| TIGER-DnR | `$HOME/.local/share/tiger-dnr/TIGER` | `TIGER_DNR_SOURCE_DIR` |
+
+MOSS VoiceGenerator 的 editable 源码位置见安装章节，音频 tokenizer 默认为
+`$HF_MIRROR_DIR/OpenMOSS-Team/MOSS-Audio-Tokenizer`（v1）。
 
 通用配置包括 `HOST`、`PORT`、`STORAGE_DIR`、`PROMPTS_DIR`、`RUNTIME_CACHE_DIR`、
 `GPU_LOCK_FILE`、`LOCAL_FILES_ONLY` 和 `CUDA_RELEASE_DELAY`。48 kHz 导出可用
@@ -211,19 +315,58 @@ Python 3.12 环境采用 ONNX Runtime CUDA 后端；配置映射和三维采样�
 `QWEN_VOICEDESIGN_*`、`MOSS_VOICEGENERATOR_*`、`MOSS_AUDIO_4B_THINKING_*`、
 `MOSS_AUDIO_4B_INSTRUCT_*` 和
 `CONFUCIUS4_TTS_*`、
-`FIRERED_TTS3_*`、`TIGER_DNR_*`、`SEED_VC_*`、`SOULX_FLASHHEAD_*`。每个服务的 `/v1/health` 会报告
+`FIRERED_TTS3_*`、`TIGER_DNR_*`、`SEED_VC_*`、`SOULX_FLASHHEAD_*`、`DITTO_*`。每个服务的 `/v1/health` 会报告
 生效的路径、运行时和可用性。
 FireRedTTS3 的官方源码默认位于 `$HOME/tts-depency/FireRedTTS3`，通过
 `FIRERED_TTS3_CODE_PATH` 覆盖；8304 以 `timbre` 模式加载 Instruct，8325 以 `clone` 模式加载
 Base，两者不会同时在 worker 中常驻显存。
+
+重要共享配置如下；运行数据路径默认位于 `STORAGE_DIR`（仓库内 `storage/`）下：
+
+| 变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `HF_MIRROR_DIR` | `$HOME/hf-mirror` | 本地权重根目录 |
+| `HOST`、`PORT` | `0.0.0.0`、`8300` | 统一启动时的控制面地址；其他服务有独立端口 |
+| `PROMPTS_DIR` | `$CLONE_STORAGE_DIR` | 普通参考音频和 sidecar；多服务须共享该目录才能复用逻辑标识 |
+| `UPLOAD_MAX_BYTES` | `67108864` | 参考音频、理解/转写/分离输入与人像图片的单文件上限 |
+| `GPU_LOCK_FILE` | `$RUNTIME_CACHE_DIR/gpu-runtime.lock` | 本地模型共用排他锁 |
+| `GPU_LOCK_WAIT_TIMEOUT` | `900` 秒 | GPU 排队时限；整套启动须为正数 |
+| `GPU_METRICS_SAMPLE_INTERVAL` | `0.5` 秒 | 显存采样间隔，实际不低于 0.1 秒 |
+| `CUDA_RELEASE_DELAY` | `2.0` 秒 | worker 退出后持锁等待显存回收 |
+| `LOCAL_FILES_ONLY` | `1` | 本地模型离线加载；不控制 MiMo 云端请求 |
+| `SPATIAL_EXPORT_MAX_BYTES` | `536870912` | 预混总线上传上限，512 MiB |
+| `SPATIAL_EXPORT_TIMEOUT` | `600` 秒 | FFmpeg 子进程超时 |
+| `STEAM_AUDIO_RENDER_TIMEOUT` | `900` 秒 | renderer 子进程超时 |
+| `STEAM_AUDIO_RENDER_MAX_BYTES` | `2147483648` | 正式空间导出上传总量上限，2 GiB |
+| `STEAM_AUDIO_RENDER_MAX_ASSETS` | `500` | 上传资产数量上限；Manifest 同时最多 500 个对象 |
+| `STEAM_AUDIO_RENDER_MAX_MANIFEST_BYTES` | `8388608` | Manifest 大小上限，8 MiB |
+| `STEAM_AUDIO_RENDER_THREADS` | `4` | renderer 线程数 |
+| `STEAM_AUDIO_PROGRESS_RETENTION_SECONDS` | `3600` 秒 | 空间任务终态在进程内保留时间 |
+| `STORAGE_RETENTION_HOURS`、`STORAGE_RETENTION_MAX_BYTES` | `0`、`0` | 默认不启用生成 WAV 清理 |
+
+`start.sh` 的监听配置通常使用 `<服务前缀>_HOST` / `<服务前缀>_PORT`，例外是
+MOSS-SoundEffect 使用 `SOUNDEFFECT_HOST` / `SOUNDEFFECT_PORT`，Qwen VoiceDesign 使用
+`QWEN_VOICEDESIGN_HOST` / `QWEN_VOICEDESIGN_PORT`，FireRedTTS3 使用
+`FIRERED_TTS3_TIMBRE_*` 与 `FIRERED_TTS3_CLONE_*` 区分两个地址。
+`*_PROJECT_DIR` 用于覆盖启动脚本中的 uv 项目路径；直接启动服务时使用该服务实际读取的
+环境变量。省略 JSON 推理字段时，生效值由模块默认值和显式环境配置决定；
+`start.sh` 当前也导出部分音效、ACE-Step、Step-Audio 和 MiMo 默认参数，修改模块后需同时核对脚本。
+
+MiMo 默认 `MIMO_MODEL=mimo-v2.5-tts-voicedesign`、
+`MIMO_BASE_URL=https://api.xiaomimimo.com/v1`、`MIMO_TIMEOUT=300` 秒，
+`MIMO_AUTH_HEADER=api-key`；密钥仅从 `MIMO_API_KEY` 环境读取。
+8300 代理可用 `MIMO_TTS_PROXY_URL` 和 `MIMO_TTS_PROXY_TIMEOUT`（默认 310 秒）配置。
+客户端超时应覆盖排队、worker 执行和显存释放时间，代理超时也需覆盖 MiMo 分段和重试。
 
 TIGER-DnR 的官方推理代码不包含在本仓库。默认使用已准备的
 `$HOME/.local/share/tiger-dnr/TIGER`；也可以通过 `TIGER_DNR_SOURCE_DIR` 指向作者的
 `JusperLee/TIGER` 克隆。worker 只使用其中的 `look2hear` DnR 模型代码，并在
 `LOCAL_FILES_ONLY=1` 下从本地 `config.json` 与 `model.safetensors` 加载权重。
 
-Confucius4-TTS 的官方推理代码也不包含在本仓库。默认使用
-`$HOME/tts-depency/Confucius4-TTS`，模型目录默认读取题目指定的
+## Confucius4-TTS 零样本克隆
+
+Confucius4-TTS 的官方推理代码不包含在本仓库。默认使用
+`$HOME/tts-depency/Confucius4-TTS`，模型目录默认读取
 `$HF_MIRROR_DIR/netease-youdao/Confucius4-TTS`。除 Confucius4-TTS 自身权重外，还需准备
 Wav2Vec2-BERT、BigVGAN 和 CAMPPlus 权重；当前默认目录分别是
 `$HF_MIRROR_DIR/netease-youdao/facebook/w2v-bert-2.0`、
@@ -233,26 +376,24 @@ Wav2Vec2-BERT、BigVGAN 和 CAMPPlus 权重；当前默认目录分别是
 `CONFUCIUS4_TTS_STYLE_ENCODER_CHECKPOINT` 覆盖；`LOCAL_FILES_ONLY=1` 时 worker 不会隐式下载。
 Confucius4-TTS 项目固定使用 TorchAudio 2.11，需先按锁文件同步其中声明的 `torchcodec` 依赖。
 
-Qwen3-ASR 使用官方 `qwen-asr` Transformers 后端和题目指定的本地模型目录。项目锁定了 `qwen-asr`
-及其 Transformers 依赖；`LOCAL_FILES_ONLY=1` 时不会隐式下载模型。服务通过一次性 worker 执行识别，
-并使用与其他本地 GPU 服务共享的排他锁。
-
-调用 `POST http://127.0.0.1:8371/v1/qwen3/asr` 时以 multipart/form-data 发送 `audio` 文件；
-可选传入 `language` 强制指定识别语言、`context` 提供识别上下文、`max_new_tokens` 设置生成上限。
-省略 `language` 时自动识别。成功响应为 JSON，包含 `text`、识别出的 `language`、耗时和上传文件摘要：
-
-```bash
-curl -X POST http://127.0.0.1:8371/v1/qwen3/asr \
-  -F 'audio=@speech.wav;type=audio/wav' \
-  -F 'language=Chinese' \
-  -F 'context=人名：张三' \
-  -F 'max_new_tokens=512'
-```
-
 Confucius4-TTS 使用与其他克隆服务相同的上传和检查流程：先调用 `POST /v1/upload_audio`，
 再以保存后的 `audio_path` 调用 `POST http://127.0.0.1:8361/v1/confucius4TTS/generate`。
-请求 JSON 至少包含 `text`、`lang` 和 `audio_path`，成功返回 `audio/wav`，并将生成结果保存到
+请求 JSON 必须包含 `text` 和 `audio_path`，`lang` 默认 `zh`。成功返回 `audio/wav`，并将生成结果保存到
 `storage/clone/`。官方默认生成参数可通过 `CONFUCIUS4_TTS_*` 环境变量覆盖。
+
+```bash
+curl -fsS http://127.0.0.1:8361/v1/upload_audio \
+  -F 'audio=@reference.wav;type=audio/wav' -F 'full_path=reference.wav'
+curl -fsS http://127.0.0.1:8361/v1/confucius4TTS/generate \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"你好，欢迎使用。","lang":"zh","audio_path":"reference.wav"}' \
+  -o confucius4-clone.wav
+```
+
+可选字段包括 `raw`、`temperature`、`top_p`、`top_k`、`num_beams`、`repetition_penalty`、
+`max_length`、`n_timesteps`、`inference_cfg_rate`、`max_text_tokens_per_segment`、
+`cross_fade_duration`、`edge_fade_duration`、`edge_pad_duration` 和 `verbose`。
+参考音频的可选 `prompt_text` 会保存为 sidecar，本服务推理不读取该转写。
 
 对单个极短非语言感叹音，可选传入 `vocalization_duration_seconds`（有限正数，最多 2 秒）。
 worker 使用官方 S2A 的 `target_feat_len` 指定 Mel 帧数，完整保留 T2S 语义序列；不截断
@@ -260,6 +401,26 @@ worker 使用官方 S2A 的 `target_feat_len` 指定 Mel 帧数，完整保留 T
 生成长度，仍须对输出执行语义和时长验收。`GET /v1/health` 的
 `runtime.native_vocalization_duration=true` 表示已加载支持此字段的 HTTP 版本；更新后需要
 重新运行 `bash start.sh`，仅修改 worker 文件不能更新已启动的接口校验。
+
+## Qwen3-ASR 语音识别
+
+Qwen3-ASR 使用官方 `qwen-asr` Transformers 后端和本地模型目录。项目锁定了 `qwen-asr`
+及其 Transformers 依赖；`LOCAL_FILES_ONLY=1` 时不会隐式下载模型。服务通过一次性 worker
+执行识别，并使用与其他本地 GPU 服务共享的排他锁。
+
+调用 `POST http://127.0.0.1:8371/v1/qwen3/asr` 时直接以 multipart/form-data 发送 `audio`，
+无需先上传、也不使用 `full_path`。可选 `language`（最多 64 字符）强制指定识别语言，
+`context`（最多 2000 字符）提供上下文，`max_new_tokens`（1–4096，默认 256）设置生成上限。
+省略 `language` 时自动识别。成功 JSON 包含 `code`、`text`、`language`、`elapsed_seconds`
+和 `audio`（`sha256`、`size_bytes`、`suffix`）；输入只暂存，请求完成后删除：
+
+```bash
+curl -fsS http://127.0.0.1:8371/v1/qwen3/asr \
+  -F 'audio=@speech.wav;type=audio/wav' \
+  -F 'language=Chinese' \
+  -F 'context=人名：张三' \
+  -F 'max_new_tokens=512'
+```
 
 ## Seed-VC 音色转换
 
@@ -338,7 +499,11 @@ Seed-VC 要求 `GPU_LOCK_WAIT_TIMEOUT` 为正数，worker 成功、失败和超�
 
 控制面保留两条职责不同的 CPU 路径。`POST /v1/audio/export` 是兼容接口，只接收一个已混合
 双声道总线；WebUI 的 `standard` 档使用它完成 48 kHz 重采样、双遍 EBU R128 loudnorm 和编码，
-不加入 Haas、aecho 或其他空间处理：
+不加入 Haas、aecho 或其他空间处理。
+
+旧接口的实际默认 `profile` 仍为 `balanced`，并保留 `balanced`/`immersive` 的旧 Haas/aecho
+滤镜，不能视为 Steam Audio 对象级渲染。标准母带调用必须显式传 `profile=standard`；
+正式空间导出走下面的 `/v1/audio/spatial/render`，其 pre-master 后只做母带与编码。
 
 ```bash
 curl -X POST http://127.0.0.1:8300/v1/audio/export \
@@ -355,10 +520,40 @@ Audio Direct Effect（距离衰减、空气吸收）和 Binaural Effect，再在
 双声道 pre-master。随后只执行 loudnorm 和最终编码，绝不叠加旧 Haas/aecho 链。该任务不获取
 GPU 锁，失败、超时和响应完成后都会清理暂存文件。
 
+先将下列最小示例保存为 `render-manifest.json`；示例假设两份上传音频均至少有 1 秒：
+
+```json
+{
+  "version": "1.0",
+  "sample_rate": 48000,
+  "timeline_duration_ms": 2000,
+  "scene": {"room": "dry_studio", "acoustic_quality": "balanced"},
+  "sources": [
+    {
+      "id": "narrator-1",
+      "kind": "narrator",
+      "asset_id": "narrator",
+      "asset_filename": "asset_narrator.wav",
+      "start_ms": 0,
+      "duration_ms": 1000,
+      "spatial": {"mode": "dry_center"}
+    },
+    {
+      "id": "door-1",
+      "kind": "sfx",
+      "asset_id": "door",
+      "asset_filename": "asset_door.wav",
+      "start_ms": 1000,
+      "duration_ms": 1000,
+      "spatial": {"mode": "point", "location": "front_left", "distance": "near"}
+    }
+  ]
+}
+```
+
 ```bash
-manifest="$(tr -d '\n' < render-manifest.json)"
 curl -X POST http://127.0.0.1:8300/v1/audio/spatial/render \
-  -F "manifest=$manifest" \
+  -F 'manifest=<render-manifest.json' \
   -F 'assets=@narrator.wav;filename=asset_narrator.wav' \
   -F 'assets=@door.wav;filename=asset_door.wav' \
   -F 'profile=balanced' \
@@ -372,8 +567,8 @@ WebUI 会为每次正式导出生成唯一 `job_id`，并在 POST 执行期间�
 和中文 `message`；成功或失败终态默认保留 1 小时，可由
 `STEAM_AUDIO_PROGRESS_RETENTION_SECONDS` 调整。控制面终端使用同一 job ID 输出资产暂存、逐对象
 标准化、Steam Audio 逐对象渲染、母带和完成/失败阶段；标准化完成首个对象后，消息还会按实际
-平均耗时给出预计剩余时间。1× 倍速对象会跳过无意义的 `atempo=1`，避免 FFmpeg 6.1.1 在其后
-衔接 SoXR 时偶发无法结束滤镜链。成功响应还会返回
+平均耗时给出预计剩余时间。任务进度仅保存在当前控制面进程内，服务重启后不保留。
+成功响应还会返回
 `X-Spatial-Job-ID`；未传 `job_id` 的旧客户端仍可同步调用，但只能从响应头和终端获取服务端生成的 ID。
 
 每个 `asset_filename` 必须是安全 basename，并与重复 `assets` 字段的上传文件名一一对应；缺失、
@@ -410,10 +605,21 @@ LongCat、dots.tts-soar 和 Step-Audio-EditX 的默认项目路径不要求安�
 
 Qwen3-TTS、VoxCPM2、LongCat、dots.tts-soar 和 FireRedTTS3 使用相同的三步 WebUI 流程：
 
-1. `POST /v1/upload_audio`，表单字段为 `audio`、`full_path`；Qwen、VoxCPM2、LongCat、
-   dots.tts-soar 和 FireRedTTS3 还接受可选的 `prompt_text`。
+1. `POST /v1/upload_audio`，表单字段为 `audio`、`full_path`，可选 `prompt_text`。
 2. `GET /v1/check/audio?file_name=...` 检查服务自己的存储状态。
-3. 调用当前模型的克隆路由，请求中的 `audio_path` 使用上传时的 `full_path` 文件名。
+3. 调用当前模型的克隆路由，请求中的 `audio_path` 使用上传时完全相同的 `full_path` 标识。
+
+`full_path` 是 1–1024 字符、带受支持音频扩展名的客户端逻辑标识，可以包含目录前缀，
+服务端通过摘要映射解析，不能用它直接读取任意本地文件。共享音频策略支持
+WAV/MP3/OGG/FLAC/M4A/AAC/WebM，检查扩展名与 Content-Type；普通上传默认按 1 MiB
+分块暂存，总量最多 64 MiB。成功 JSON 返回 `filename`（逻辑标识）、`has_prompt_text`、
+`sha256`、`size_bytes`、`storage`（`clone` 或 `timbre_reference`）。
+检查接口应读取响应的 `exists`/`code`，不能只用 HTTP 状态判断文件存在。
+
+Confucius4-TTS、Seed-VC、SoulX、Ditto 复用相同音频上传契约。
+8300 和 Step-Audio-EditX 的上传接口只接收 `audio` 与 `full_path`，不保存参考转写；
+编辑文本在 Step 的 JSON 请求中提供。MOSS-Audio、Qwen3-ASR 和 TIGER-DnR 则直接在业务
+请求中发送 multipart 音频，不提供独立的上传/检查接口。
 
 FireRedTTS3 Base 使用同样的上传与检查接口，最终克隆路由为
 `POST http://127.0.0.1:8325/v1/FireRedTTS3/clone`。它要求参考音频对应的准确
@@ -439,10 +645,39 @@ curl -X POST http://127.0.0.1:8321/v1/qwen/clone \
 
 | 服务 | 行为 |
 | --- | --- |
-| Qwen3-TTS Base | 有准确参考文本时映射为官方 `ref_text`；也可使用仅音色向量克隆。 |
+| Qwen3-TTS Base | 有准确参考文本时映射为官方 `ref_text`；无文本或显式 `x_vector_only=true` 时使用仅音色向量克隆。 |
 | VoxCPM2 | `clone_mode=ultimate` 使用参考文本；`clone_mode=controllable` 改用 `control_instruction`，二者互斥。`nonverbal_tags` 最多一个，且只能用于可控模式。 |
-| LongCat-AudioDiT | 推荐提供与参考音频逐字一致的文本；参考音频会按官方流程重采样为 24 kHz 单声道。 |
+| LongCat-AudioDiT | 必须提供与参考音频逐字一致的文本，可来自请求或 sidecar；缺失时 worker 会失败。参考音频重采样为 24 kHz 单声道。 |
 | dots.tts-soar | 有参考文本时使用 continuation cloning；省略时保留官方 x-vector-only cloning。输出为 48 kHz 单声道。 |
+| FireRedTTS3 Base | 请求中的非空 `prompt_text` 优先于 sidecar；二者都缺失时返回 `400`。 |
+
+五个克隆服务均要求 `text` 和 `audio_path`，可选参数按模型区分，不能跨模型混用：
+
+| 服务 | 模型专用 JSON 字段 |
+| --- | --- |
+| Qwen3-TTS | `language`、`x_vector_only`、`device_map`、`dtype`、`attn_implementation`、`max_new_tokens`、`top_p`、`temperature`、`trim_leading_silence` 与 `trim_leading_silence_*` |
+| VoxCPM2 | `clone_mode`、`control_instruction`、`nonverbal_tags`、`cfg_value`、`inference_timesteps`、`normalize`、`denoise`、`retry_badcase`、`load_denoiser`、`optimize`、`device`、`seed` |
+| LongCat | `nfe`、`guidance_strength`、`guidance_method`（`cfg`/`apg`）、`seed`、`duration_scale`、`vae_dtype` |
+| dots.tts-soar | `language`、`template_name`、`precision`、`seed`、`ode_method`、`num_steps`、`guidance_scale`、`speaker_scale`、`max_generate_length`、`normalize_text`、`profile_inference` |
+| FireRedTTS3 | `language`、`n_timesteps`、`inference_cfg`、`stop_threshold`、`seed` |
+
+前四个服务还支持 `max_chars_per_chunk` 和 `pause_ms`，默认分块长度依次为
+120、0（不分块）、180、120 字符，段间停顿默认 250 ms。
+LongCat 默认 `nfe=16`、`guidance_strength=4.0`、`guidance_method=apg`；dots 默认
+`num_steps=10`、`guidance_scale=1.2`、`speaker_scale=1.5`。
+VoxCPM2 默认 `cfg_value=2.0`、`inference_timesteps=10`。
+
+VoxCPM2 可控克隆示例（先在 8322 上传参考音频）：
+
+```bash
+curl -fsS http://127.0.0.1:8322/v1/voxcpm2/clone \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"你终于来了。","audio_path":"reference.wav","clone_mode":"controllable","control_instruction":"用轻松、带笑意的语气说话","nonverbal_tags":["laughing"]}' \
+  -o voxcpm2-controllable.wav
+```
+
+`nonverbal_tags` 是白名单标签名，最多一个；不能把 `[laughing]` 等标记塞进 `text` 或
+`prompt_text`。可控模式忽略已上传的参考文本 sidecar，且不允许在 JSON 中同时传参考文本。
 
 所有这些克隆请求都拒绝 `style_prompt`；声音风格应通过音色设计或
 VoxCPM2 的 `control_instruction` 表达。`text` 中的 Markdown 标题和列表标记会按服务
@@ -479,9 +714,21 @@ MiMo 的 8303 服务只做云端请求编排、重试、分段和本地音色缓
 代理。后端无法连接 MiMo API 时，独立服务和代理会返回 `503`，请检查
 `MIMO_API_KEY`、`MIMO_BASE_URL`、DNS、HTTPS 出网和 `HTTPS_PROXY`。
 
-FireRedTTS3 Instruct 音色设计监听 `8304`，只接收 `voice_description` 和 `text`，并将
+FireRedTTS3 Instruct 音色设计监听 `8304`，基础字段为 `voice_description` 和可选 `text`，并将
 生成 WAV 保存在 `storage/timbre/`。最终路由为
 `POST http://127.0.0.1:8304/v1/FireRedTTS3/timbre`。
+
+模型额外字段如下；完整限制可在各进程的 `/docs` 查看：
+
+| 音色设计服务 | 可选 JSON 字段 |
+| --- | --- |
+| Qwen VoiceDesign | `language`、`max_chars_per_chunk`、`pause_ms`、`max_new_tokens`、`top_p`、`temperature`、`dtype`、`attn_implementation`、`device_map` |
+| MOSS VoiceGenerator | `max_chars_per_chunk`、`pause_ms`、`max_new_tokens`、`audio_temperature`、`audio_top_p`、`audio_top_k`、`audio_repetition_penalty`、`dtype`、`attn_implementation` |
+| MiMo | `model`、`timeout`、`max_chars_per_chunk`、`pause_ms`、`optimize_text_preview`、`min_request_interval_seconds`、`max_retries`、`retry_base_seconds`、`retry_max_seconds` |
+| FireRedTTS3 Instruct | `language`、`n_timesteps`、`inference_cfg`、`seed`、`stop_threshold` |
+
+FireRedTTS3 两个模式均默认 `n_timesteps=10`、`stop_threshold=0.5`，音色设计默认
+`inference_cfg=1.2`、`seed=2`，克隆默认 `inference_cfg=2.0`、`seed=1234`。
 
 MOSS VoiceGenerator 必须使用 **MOSS-Audio-Tokenizer v1**（24 kHz、单声道）。
 不要把 48 kHz 双声道的 v2 codec 作为该服务的 tokenizer；8302 的健康检查中
@@ -495,6 +742,9 @@ MOSS-Audio-4B-Thinking 监听 `8341`，MOSS-Audio-4B-Instruct 监听 `8342`，�
 `$HF_MIRROR_DIR/OpenMOSS-Team/MOSS-Audio-4B-Thinking` 和
 `$HF_MIRROR_DIR/OpenMOSS-Team/MOSS-Audio-4B-Instruct` 加载；可分别通过对应的
 `MOSS_AUDIO_4B_THINKING_*` 与 `MOSS_AUDIO_4B_INSTRUCT_*` 环境变量覆盖。
+
+不先调用上传接口，也不传 `audio_path`。成功 JSON 包含 `code`、`text`、
+`elapsed_seconds` 和 `audio`（SHA-256、大小、扩展名）；`strip_thinking=true` 可移除思考段。
 
 ```bash
 curl -X POST http://127.0.0.1:8341/v1/mossAudioThinking/understand \
@@ -517,6 +767,9 @@ curl -X POST http://127.0.0.1:8342/v1/mossAudioThinking/understand \
 仅当 `do_sample=true` 时才把采样参数传给模型。两个服务使用共享 `GPU_LOCK_FILE`，一项请求对应一个
 worker，worker 退出后释放显存。
 
+单独启动时务必设置 `MOSS_AUDIO_4B_VARIANT`；若省略且环境中出现任何
+`MOSS_AUDIO_4B_INSTRUCT_*` 变量，代码会推断为 Instruct。统一启动脚本已为两个进程明确设置变体。
+
 ## TIGER-DnR 三 Stem 分离
 
 TIGER-DnR 监听 `8351`，接收任意支持的音频格式，以 44.1 kHz 按上游模型分离，再恢复输入的
@@ -535,7 +788,7 @@ curl -X POST http://127.0.0.1:8351/v1/tigerDnr/separate \
 ## SoundEffect 生成
 
 MOSS-SoundEffect v2 接受中英文非语言声效提示词，输出 48 kHz 单声道 WAV，`seconds`
-范围为 `(0, 30]`。默认字段为 `num_inference_steps=100`、`cfg_scale=4.0`、
+范围为 `(0, 30]`，默认 10 秒。默认字段为 `num_inference_steps=100`、`cfg_scale=4.0`、
 `sigma_shift=5.0`、`seed=0`：
 
 ```bash
@@ -560,6 +813,9 @@ curl -X POST http://127.0.0.1:8311/v1/stableAudio/soundEffect \
 `prompt_en` 约束和 GPU 示例见 [`soundEffect/README.md`](soundEffect/README.md) 与
 [`soundEffect/声效提示词说明.md`](soundEffect/声效提示词说明.md)。
 
+MOSS 可按请求传 `device`、`torch_dtype`；Stable Audio 的设备/精度字段只允许
+`device=cuda`、`dtype=float16`，其他值返回 `422`。两者均不接收参考音频。
+
 ## ACE-Step BGM 生成
 
 ACE-Step 独立监听 `8313`，只负责有声小说纯配乐；Stable Audio 继续承担 ambience /
@@ -574,7 +830,7 @@ curl -X POST http://127.0.0.1:8313/v1/aceStep/bgm \
   -o ace-step-bgm.wav
 ```
 
-`prompt` 长度为 1–2000，`seconds` 为 10–600，`steps` 为 1–20，`bpm` 为 30–240；
+`prompt` 长度为 1–2000，`seconds` 为 10–600（默认 60），`steps` 为 1–20（默认 8），`bpm` 为 30–240；
 `keyscale`、`timesignature` 可省略，`seed=-1` 表示随机。成功响应包含
 `X-ACE-Step-Seed`、`X-ACE-Step-Sample-Rate` 和 `X-ACE-Step-Model` 响应头。先手动准备
 依赖再启动：
@@ -605,14 +861,53 @@ curl -X POST http://127.0.0.1:8331/v1/stepAudioEditx/edit \
 其他编辑类型需要与 prompt 音频匹配的 `prompt_text`。请求字段映射到上游命令的同名
 编辑语义，输出保存到 `STEP_AUDIO_EDITX_OUTPUT_DIR`（默认 `storage/clone/`）。
 
+## 文本润色训练实验
+
+`scripts/training/` 与 `training/configs/` 提供有声书“原始小说片段 → 纯净可朗读文本”的
+LoRA 流程实验，不属于 HTTP 服务，也不会随 `start.sh` 启动。模型为
+`Qwen/Qwen3-4B-Instruct-2507`，模板为 `qwen3_nothink`；这部分处理文本，不训练语音模型。
+
+| 文件 | 用途 |
+| --- | --- |
+| `scripts/training/build_audio_polisher_poc.py` | 抽取 Markdown、调用本地 Ollama 教师、按来源划分训练/验证/测试集，并生成 Alpaca 数据和导入清单 |
+| `scripts/training/import_audio_polisher_to_easy_dataset.py` | 将来源和待确认候选导入独立运行的 Easy Dataset |
+| `scripts/training/run_audio_polisher_inference.py` | 用 Transformers/PEFT 对基础模型与可选 adapter 执行确定性 GPU 推理 |
+| `scripts/training/compare_audio_polisher_predictions.py` | 比较格式检查、相对教师标签的字符相似度与长度比例 |
+| `training/configs/audio_polisher_qwen3_4b_lora_poc.yaml` | LLaMA-Factory LoRA 训练模板，rank 8、BF16、3 epochs |
+| `training/configs/audio_polisher_qwen3_4b_predict_poc.yaml` | 隔离测试集预测模板 |
+
+生成数据集前自行启动本地 Ollama 并准备教师模型（默认 `qwen3.5:9b`）。从仓库根目录执行：
+
+```bash
+uv run --project qa --locked python -m scripts.training.build_audio_polisher_poc \
+  --source-dir /path/to/story-markdown \
+  --output-dir storage/training/audio-polisher-poc
+```
+
+默认抽取 10 个来源、每个来源 3 条样本（不足则中止），来源按 8/1/1 分组；支持续跑缓存、固定 seed
+和源文件 SHA-256。导入 Easy Dataset 的脚本会写入其项目，默认地址 `http://127.0.0.1:1717`，
+需要操作者主动执行。候选标记为 `research-only`、`automated-poc`、`confirmed=false`，
+须完成人工审核后再考虑生产训练。
+
+训练与真实预测需要仓库外单独准备 LLaMA-Factory 或 Transformers/PEFT/CUDA 环境；
+本仓库没有训练 uv 项目，不能在 `qa` 环境运行模型训练。配置中的 `model_name_or_path`
+默认是模型 ID，离线运行时应替换为已准备的本地目录。
+训练 CLI 和预测脚本不获取服务的共享 GPU 锁，应由操作者安排独占 GPU 时间。
+adapter、数据集和预测都写入 `storage/training/`，不提交到 Git。
+
 ## 健康检查与错误语义
 
 - 健康检查不会加载模型；`available`、`paths`、`runtime` 和 `last_errors` 用于区分依赖、
   权重、CUDA、worker 和配置问题。
-- 请求校验失败通常返回 `422`；上传后找不到参考音频通常返回 `404`。
+- 请求校验或媒体类型失败通常返回 `422`，上传超过大小上限返回 `413`；
+  找不到参考音频通常返回 `404`，但 Confucius4-TTS 的现有文件预检统一返回 `503`。
+- GPU 排队超时返回 `503`。本地依赖缺失按服务返回 `503` 或 `500`；模型执行失败通常为
+  `500`。SoulX/Ditto 的 worker 超时返回 `504`，其他服务通常转换为 `500`。
+  Steam Audio 的非法 Manifest 返回 `422`、重复 `job_id` 返回 `409`、未知任务返回 `404`。
 - 模型 worker 失败或超时会清理临时文件和进程组，再返回服务错误；共享 GPU 锁在
   `finally` 中释放。
-- 生成接口响应体是 WAV，同时会写入语义对应的输出目录。保留策略默认关闭：先通过
+- 音频生成接口响应体是 WAV，同时会写入语义对应的输出目录；JSON、ZIP、MP4 和临时导出
+  的保存行为见服务总览。保留策略默认关闭：先通过
   `GET /v1/control` 的 `storage` 字段查看所在文件系统的容量与可用空间；需要治理历史
   生成结果时，再由运维显式配置并执行维护脚本，绝不自动删除用户上传或音色引用：
 
@@ -623,6 +918,13 @@ curl -X POST http://127.0.0.1:8331/v1/stepAudioEditx/edit \
   uv run --project qwen3_tts python main/storage_maintenance.py --apply
   ```
 
+维护脚本目前仅处理四个默认音频目录中指定前缀的 WAV：Qwen/MOSS/MiMo 设计音色，
+Qwen3-TTS/VoxCPM2/LongCat/dots/Step 的克隆或编辑结果，MOSS/Stable 声效及 ACE-Step BGM。
+它保护普通上传和仍被 `.references` 引用的音色，但**尚不清理 FireRedTTS3、Confucius4-TTS、
+Seed-VC 的生成结果、TIGER 分离批次、MP4、图片或训练产物**，也不自动遍历每个自定义
+`*_OUTPUT_DIR`。`STORAGE_RETENTION_MAX_BYTES` 针对这些匹配的生成 WAV 总量，不是整个
+`storage/` 容量限制。修改输出目录时需同步考虑维护脚本的扫描范围。
+
 ## 测试与开发
 
 根目录回归测试不下载权重、不调用外部服务、不需要 CUDA：
@@ -632,18 +934,36 @@ bash -n start.sh
 bash scripts/quality_gate.sh
 ```
 
-Stable Audio 的服务内测试需要从它自己的目录运行，否则 `test_migration.py` 无法解析
-同目录的 `runtime.py`：
+统一质量门禁先执行 shell 语法和三个无 SDK 的 C++ 核心测试，再检查 19 个服务与 QA 的
+锁文件、Ruff 和格式，最后执行根目录、ACE-Step、Stable Audio 的无模型测试。
+GitHub Actions 使用同一脚本；需要 `uv` 和 `g++`，不需要 CUDA 或 Steam Audio SDK。
+锁文件检查仍可能访问 Git/wheel 元数据，初次运行需具备这些依赖来源的网络或本地缓存。
+已有完整缓存时可运行 `UV_OFFLINE=1 bash scripts/quality_gate.sh`。
+
+仅运行无模型测试时使用轻量 QA 环境。两个服务内的测试必须从各自目录运行，以免同名
+`runtime` 模块解析错误：
 
 ```bash
-(cd stable_audio_3_medium && uv run --project . python -m unittest discover -s tests -v)
+uv sync --project qa --locked
+uv run --project qa --locked python -m unittest discover -s tests -v
+(cd ace_step_1_5 && uv run --project ../qa --locked python -m unittest discover -s tests -v)
+(cd stable_audio_3_medium && uv run --project ../qa --locked python -m unittest discover -s tests -v)
 ```
+
+FastAPI TestClient 回归使用 QA 的 `httpx2` 兼容依赖。不得为无模型测试安装整套模型环境或
+恢复旧客户端组合；worker、subprocess、网络与 CUDA 边界由测试替身替换。
+`scripts/training/` 的纯文本逻辑也有根目录回归测试，但当前质量门禁的 Ruff 路径不包含训练脚本。
 
 MOSS 的真实 CUDA/权重 smoke test 是独立流程：
 
 ```bash
 bash soundEffect/run_moss_soundeffect_v2.sh
 ```
+
+手动模型演示还包括 `tests/testConfucius4TTS/run_confucius4_tts.py`、
+[`tests/testSoulX_FlashHead/testFlashHead.py`](tests/testSoulX_FlashHead/README.md) 和
+[`tests/testDitto/testDitto.py`](tests/testDitto/README.md)。这些脚本需自行准备音频/图片并启动
+对应模型服务，不属于常规无模型测试，不应把其历史样例结果视为当前机器已通过验证。
 
 所有模型服务的 uv、Ruff、日志和无模型测试规范见
 [`docs/python-engineering.md`](docs/python-engineering.md)。
@@ -652,6 +972,16 @@ bash soundEffect/run_moss_soundeffect_v2.sh
 测试，并在 README 中更新兼容字段。不要提交模型权重、上传音频、生成 WAV、缓存、虚拟
 环境、密钥或机器专用绝对路径。
 
-各服务的依赖、单服务启动和模型专用配置可继续参考目录内 README：
-`mimo_tts/README.md`、`Step_Audio_EditX/README.md`、`LongCat_AudioDiT_3.5B_bf16/README.md`、
-`dots_tts_soar/README.md`、`moss_soundEffect/README.md` 和 `stable_audio_3_medium/README.md`。
+模型专用说明见 [MiMo](mimo_tts/README.md)、[Step-Audio-EditX](Step_Audio_EditX/README.md)、
+[LongCat](LongCat_AudioDiT_3.5B_bf16/README.md)、[dots](dots_tts_soar/README.md)、
+[MOSS-SoundEffect](moss_soundEffect/README.md)、[Stable Audio](stable_audio_3_medium/README.md)、
+[ACE-Step](ace_step_1_5/README.md)、[SoulX](SoulX-FlashHead-1_3B/README.md)、
+[Ditto](ditto/README.md) 和 [Steam Audio renderer](steam_audio_renderer/README.md)。
+子目录中的迁移记录和本机实验描述仅作背景，部署命令、服务清单与测试环境以本 README
+和实际代码为准。贡献规则见 [AGENTS.md](AGENTS.md)，中文文档要求见
+[CONSTITUTION.md](CONSTITUTION.md)。
+
+## 许可证
+
+本仓库代码采用 [Apache-2.0](LICENSE)。模型权重、上游推理源码、Steam Audio SDK 和云端
+服务各自的许可与使用条款独立适用。

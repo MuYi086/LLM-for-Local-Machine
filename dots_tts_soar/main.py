@@ -486,8 +486,8 @@ def check_audio_exists(file_name: str):
     }
 
 
-@app.post("/v2/dotsTTS/clone")
-def synthesize_v2(request: DotsTtsSoarSynthesizeRequest):
+@app.post("/v1/dotsTTS/clone")
+def synthesize(request: DotsTtsSoarSynthesizeRequest):
     """串行执行 dots.tts-soar 克隆并返回生成 WAV。"""
     try:
         payload = manager.build_worker_payload(request)

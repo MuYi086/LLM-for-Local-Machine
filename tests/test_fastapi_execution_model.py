@@ -60,7 +60,7 @@ class FastApiExecutionModelTests(unittest.TestCase):
             "dots_tts_soar/main.py": {
                 "/v1/health",
                 "/v1/check/audio",
-                "/v2/dotsTTS/clone",
+                "/v1/dotsTTS/clone",
             },
             "moss_soundEffect/main.py": {
                 "/v1/health",

@@ -69,7 +69,7 @@ class DotsTtsSoarMigrationTests(unittest.TestCase):
             ("GET", "/v1/health"),
             ("POST", "/v1/upload_audio"),
             ("GET", "/v1/check/audio"),
-            ("POST", "/v2/dotsTTS/clone"),
+            ("POST", "/v1/dotsTTS/clone"),
         }
         actual_routes = {
             (method, route.path)
@@ -165,7 +165,7 @@ class DotsTtsSoarMigrationTests(unittest.TestCase):
         )
         self.assertEqual(webui_compatible.audio_path, self.filename)
 
-        with self.assertRaises(ValueError):
+        with self.assertRaisesRegex(ValueError, "style_prompt 不适用于 /v1/dotsTTS/clone"):
             main.DotsTtsSoarSynthesizeRequest.model_validate(
                 {
                     "text": "台词",
@@ -180,7 +180,7 @@ class DotsTtsSoarMigrationTests(unittest.TestCase):
         wav = b"RIFF" + b"\0" * 40
         with patch.object(main.manager, "run_worker", return_value=wav) as run_worker:
             response = TestClient(main.app).post(
-                "/v2/dotsTTS/clone",
+                "/v1/dotsTTS/clone",
                 json={
                     "text": "目标台词",
                     "audio_path": self.filename,
@@ -191,6 +191,24 @@ class DotsTtsSoarMigrationTests(unittest.TestCase):
         self.assertEqual(response.headers["content-type"], "audio/wav")
         self.assertEqual(response.content, wav)
         run_worker.assert_called_once()
+
+    def test_legacy_v2_clone_route_is_not_registered(self) -> None:
+        from fastapi.testclient import TestClient
+
+        with patch.object(
+            main.manager, "run_worker", return_value=b"RIFF" + b"\0" * 40
+        ) as run_worker:
+            response = TestClient(main.app).post(
+                "/v2/dotsTTS/clone",
+                json={
+                    "text": "目标台词",
+                    "audio_path": self.filename,
+                    "prompt_text": self.prompt_text,
+                },
+            )
+
+        self.assertEqual(response.status_code, 404)
+        run_worker.assert_not_called()
 
     def test_worker_uses_current_uv_interpreter_and_cleans_temp_files(self) -> None:
         captured: dict[str, object] = {}

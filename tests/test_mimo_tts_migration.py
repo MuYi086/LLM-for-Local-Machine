@@ -125,7 +125,7 @@ class MimoTtsMigrationTests(unittest.TestCase):
             "/v1/qwen/clone",
             "/v1/voxcpm2/clone",
             "/v1/longCat/clone",
-            "/v2/dotsTTS/clone",
+            "/v1/dotsTTS/clone",
             "/v1/stepAudioEditx/edit",
         ):
             self.assertIn(route, start_script)

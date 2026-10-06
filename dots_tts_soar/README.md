@@ -24,9 +24,9 @@ uv run --project dots_tts_soar python dots_tts_soar/main.py
 - `GET /v1/health`
 - `POST /v1/upload_audio`
 - `GET /v1/check/audio?file_name=...`
-- `POST /v2/dotsTTS/clone`
+- `POST /v1/dotsTTS/clone`
 
-`/v2/dotsTTS/clone` 成功返回 `audio/wav`，默认输出 48 kHz 单声道。`prompt_text`
+`/v1/dotsTTS/clone` 成功返回 `audio/wav`，默认输出 48 kHz 单声道。`prompt_text`
 可以直接传入，也可以使用上传时保存的 sidecar；省略参考文本时保留官方
 x-vector-only cloning 行为。
 

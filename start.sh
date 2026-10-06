@@ -402,7 +402,7 @@ echo "TIGER-DnR route:     http://127.0.0.1:$TIGER_DNR_PORT/v1/tigerDnr/separate
 echo "Qwen3-TTS clone:     http://127.0.0.1:$QWEN3_TTS_PORT/v1/qwen/clone"
 echo "VoxCPM2 clone:       http://127.0.0.1:$VOXCPM2_PORT/v1/voxcpm2/clone"
 echo "LongCat clone:       http://127.0.0.1:$LONGCAT_AUDIODIT_PORT/v1/longCat/clone"
-echo "dots.tts-soar clone: http://127.0.0.1:$DOTS_TTS_SOAR_PORT/v2/dotsTTS/clone"
+echo "dots.tts-soar clone: http://127.0.0.1:$DOTS_TTS_SOAR_PORT/v1/dotsTTS/clone"
 echo "FireRedTTS3 timbre: http://127.0.0.1:$FIRERED_TTS3_TIMBRE_PORT/v1/FireRedTTS3/timbre"
 echo "FireRedTTS3 clone: http://127.0.0.1:$FIRERED_TTS3_CLONE_PORT/v1/FireRedTTS3/clone"
 echo ""
@@ -426,7 +426,7 @@ printf '%-24s %-6s %s\n' 'MOSS-SoundEffect v2' "$SOUNDEFFECT_PORT" '/v1/moss/sou
 printf '%-24s %-6s %s\n' 'Qwen3-TTS Base' "$QWEN3_TTS_PORT" '/v1/qwen/clone'
 printf '%-24s %-6s %s\n' 'VoxCPM2' "$VOXCPM2_PORT" '/v1/voxcpm2/clone'
 printf '%-24s %-6s %s\n' 'LongCat-AudioDiT' "$LONGCAT_AUDIODIT_PORT" '/v1/longCat/clone'
-printf '%-24s %-6s %s\n' 'dots.tts-soar' "$DOTS_TTS_SOAR_PORT" '/v2/dotsTTS/clone'
+printf '%-24s %-6s %s\n' 'dots.tts-soar' "$DOTS_TTS_SOAR_PORT" '/v1/dotsTTS/clone'
 printf '%-24s %-6s %s\n' 'FireRedTTS3 Instruct' "$FIRERED_TTS3_TIMBRE_PORT" '/v1/FireRedTTS3/timbre'
 printf '%-24s %-6s %s\n' 'FireRedTTS3 Base' "$FIRERED_TTS3_CLONE_PORT" '/v1/FireRedTTS3/clone'
 printf '%-24s %-6s %s\n' 'Step-Audio-EditX' "$STEP_AUDIO_EDITX_PORT" '/v1/stepAudioEditx/edit'
