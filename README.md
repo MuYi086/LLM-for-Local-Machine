@@ -29,12 +29,13 @@ SoundEffect 生成，以及音频驱动人像视频生成。仓库采用“一�
 | Qwen3-ASR-1.7B | 8371 | 本地多语言音频识别 | `/v1/qwen3/asr` |
 | Seed-VC | 8381 | 原始语音到参考音色的转换，可选 F0 歌声转换 | `/v1/seedVc/voiceConversion` |
 | SoulX-FlashHead-1_3B | 8391 | 图片与音频驱动人像视频，支持 Lite/Pro | `/v1/soulX/flashHead` |
+| Ditto | 8392 | 图片与音频驱动人像视频，ONNX CUDA 后端 | `/v1/ditto/talkingHead` |
 
 每个服务都提供 `GET /v1/health`。后端只注册表中列出的最终接口；模型生成接口返回
 `audio/wav`，并在服务端保存一份 WAV。MOSS-Audio-4B Thinking/Instruct 与 Qwen3-ASR 接收音频并返回 JSON 文本，
 不会生成或保留 WAV。TIGER-DnR 返回含 `dialog.wav`、`effects.wav`、`music.wav` 的 ZIP，并将
 三路 Stem 原子保存。空间音频导出返回 WAV 或 MP3，响应完成后删除临时成品。
-SoulX-FlashHead 返回带声音的 `video/mp4`，并在 `storage/video/` 原子保存成品。
+SoulX-FlashHead 和 Ditto 返回带声音的 `video/mp4`，并在 `storage/video/` 原子保存成品。
 
 ## 目录与运行数据
 
@@ -59,6 +60,7 @@ TIGER-DnR/                    TIGER-DnR 三 Stem 分离服务和 worker
 Qwen3_ASR_1.7B/               Qwen3-ASR-1.7B 语音识别服务和 worker
 seed-vc/                      Seed-VC 音色转换服务和一次性 worker
 SoulX-FlashHead-1_3B/          音频驱动人像视频服务和一次性 worker
+ditto/                        Ditto 人像视频服务和一次性 worker
 tests/                        根目录无模型回归测试
 soundEffect/                  MOSS GPU 示例和提示词说明
 storage/                      上传音频、生成音频、sidecar、缓存和 GPU 锁
@@ -73,7 +75,8 @@ storage/                      上传音频、生成音频、sidecar、缓存和 
 | `storage/bgm/` | ACE-Step 有声小说 BGM 和 OST | `BGM_STORAGE_DIR`、`ACESTEP_OUTPUT_DIR` |
 | `storage/clone/` | 参考音频、克隆结果、Step 编辑结果和 Seed-VC 转换结果 | `CLONE_STORAGE_DIR`、各服务的 `*_OUTPUT_DIR` |
 | `storage/separation/` | TIGER-DnR 每次分离的 dialog、effects、music Stem 与 ZIP | `TIGER_DNR_OUTPUT_DIR` |
-| `storage/video/` | SoulX-FlashHead 生成的 MP4 | `SOULX_FLASHHEAD_OUTPUT_DIR` |
+| `storage/video/` | SoulX-FlashHead 和 Ditto 生成的 MP4 | `SOULX_FLASHHEAD_OUTPUT_DIR`、`DITTO_OUTPUT_DIR` |
+| `storage/ditto/images/` | Ditto 上传的参考图片 | `DITTO_IMAGE_DIR` |
 | `storage/flashhead/images/` | SoulX-FlashHead 上传的参考图片 | `SOULX_FLASHHEAD_IMAGE_DIR` |
 | `storage/.cache/runtime/` | worker 临时文件、母带/Steam Audio 任务缓存、库缓存和共享 GPU 锁 | `RUNTIME_CACHE_DIR`、`SPATIAL_EXPORT_CACHE_DIR`、`STEAM_AUDIO_RENDER_CACHE_DIR`、`GPU_LOCK_FILE` |
 
@@ -93,7 +96,7 @@ LongCat、dots.tts-soar 和 FireRedTTS3 会在 `storage/timbre/.references/` 保
 ```bash
 for project in qwen3_tts mimo_tts voxcpm2 LongCat_AudioDiT_3.5B_bf16 \
   dots_tts_soar moss_soundEffect stable_audio_3_medium ace_step_1_5 \
-  qwen3_voiceDesign moss_voiceGenerator moss_audio_4b_thinking Confucius4_TTS Qwen3_ASR_1.7B seed-vc SoulX-FlashHead-1_3B Step_Audio_EditX firered_tts3 TIGER-DnR; do
+  qwen3_voiceDesign moss_voiceGenerator moss_audio_4b_thinking Confucius4_TTS Qwen3_ASR_1.7B seed-vc SoulX-FlashHead-1_3B ditto Step_Audio_EditX firered_tts3 TIGER-DnR; do
   uv sync --project "$project" --locked
 done
 ```
@@ -116,17 +119,20 @@ bash start.sh
 ```
 
 `start.sh` 会启动 8300、8301、8302、8303、8304、8311、8312、8313、8321、8322、8323、8324、8325、
-8331、8341、8342、8351、8361、8371、8381 和 8391 共 21 个进程；8300 使用 `qwen3_tts` uv 项目中的轻量 HTTP 依赖，其余服务使用
+8331、8341、8342、8351、8361、8371、8381、8391 和 8392 共 22 个进程；8300 使用 `qwen3_tts` uv 项目中的轻量 HTTP 依赖，其余服务使用
 各自的 uv 项目。启动命令统一使用 `uv run --no-sync`，不会在运行阶段联网解析依赖；
 本地 GPU 服务通过 `GPU_LOCK_FILE` 串行访问 GPU。默认最多排队 900 秒，超过时返回
 `503`；用 `GPU_LOCK_WAIT_TIMEOUT` 调整（设为非正值可关闭时限）。健康检查可结合
 `nvidia-smi` 观察显存，持锁期间会记录本次请求的峰值显存。
 任一子进程退出时脚本会终止其余进程组并清理 worker。
+启动前会检查全部服务的监听地址；端口已被占用或配置相互冲突时，列出服务名和地址后退出。
+更新代码后重新启动，应先在旧 `start.sh` 终端按 `Ctrl+C`，等待旧进程退出，再执行启动命令。
+可用 `ss -lntp` 查看占用端口的进程。
 
 健康检查：
 
 ```bash
-for port in 8300 8301 8302 8303 8304 8311 8312 8313 8321 8322 8323 8324 8325 8331 8341 8342 8351 8361 8371 8381; do
+for port in 8300 8301 8302 8303 8304 8311 8312 8313 8321 8322 8323 8324 8325 8331 8341 8342 8351 8361 8371 8381 8391 8392; do
   curl -fsS "http://127.0.0.1:${port}/v1/health" >/dev/null && echo "${port}: ok"
 done
 ```
@@ -150,6 +156,20 @@ HOST=127.0.0.1 PORT=8321 \
 完整安装命令、上传/生成示例、字段、状态码和配置见
 [SoulX-FlashHead 服务文档](SoulX-FlashHead-1_3B/README.md)。
 
+## Ditto 人像视频
+
+独立 `ditto/` 服务以 `8392` 提供 `POST /v1/ditto/talkingHead`。先调用该服务的
+`/v1/upload_image` 和 `/v1/upload_audio`，再发送
+`{"image_path":"portrait.png","audio_path":"speech.wav","seed":42,"sampling_timesteps":50,"max_size":1920}`。
+返回带声音的 MP4，成品默认保存在 `storage/video/`。
+
+使用 `$HF_MIRROR_DIR/thewintersun/ditto-talkinghead` 的本地 ONNX 权重和官方外部源码，
+沿用 Confucius4-TTS 的一次性 worker、共享 GPU 锁、超时与进程组清理方式。
+同步 `uv sync --project ditto --locked` 后即可由 `start.sh` 启动。
+Python 3.12 环境采用 ONNX Runtime CUDA 后端；配置映射和三维采样适配只写入临时目录。
+完整安装、上传/生成示例、字段、状态码和环境变量见 [Ditto 服务文档](ditto/README.md)。
+使用本地图片和音频生成视频的手动演示见 [tests/testDitto](tests/testDitto/README.md)。
+
 ## 模型路径与主要配置
 
 `start.sh` 默认使用 `HF_MIRROR_DIR`（默认为 `$HOME/hf-mirror`）和 `$HOME/tts-depency`；
@@ -166,6 +186,7 @@ HOST=127.0.0.1 PORT=8321 \
 | Qwen3-ASR-1.7B | `$HF_MIRROR_DIR/Qwen/Qwen3-ASR-1.7B` | `QWEN3_ASR_MODEL_DIR` |
 | Seed-VC | `$HF_MIRROR_DIR/Plachta/Seed-VC` | `SEED_VC_CODE_PATH`、`SEED_VC_WHISPER_MODEL_DIR`、`SEED_VC_VOCODER_MODEL_DIR`、`SEED_VC_STYLE_ENCODER_CHECKPOINT`；F0 模式另需 `SEED_VC_F0_VOCODER_MODEL_DIR`、`SEED_VC_RMVPE_CHECKPOINT` |
 | SoulX-FlashHead | `$HF_MIRROR_DIR/Soul-AILab/SoulX-FlashHead-1_3B` | `SOULX_FLASHHEAD_CODE_PATH`（默认 `$HOME/tts-depency/SoulX-FlashHead`）、`SOULX_FLASHHEAD_WAV2VEC_DIR`（默认 `$HF_MIRROR_DIR/facebook/wav2vec2-base-960h`） |
+| Ditto | `$HF_MIRROR_DIR/thewintersun/ditto-talkinghead` | `DITTO_CODE_PATH`（默认 `$HOME/tts-depency/ditto-talkinghead`）、`DITTO_DATA_ROOT`、`DITTO_CONFIG_PATH` |
 | MOSS-SoundEffect | `$HF_MIRROR_DIR/OpenMOSS-Team/MOSS-SoundEffect-v2.0` | `MOSS_SOUNDEFFECT_CODE_PATH`、`MOSS_SOUNDEFFECT_MODEL_DIR` |
 | Stable Audio 3 Medium | `$HF_MIRROR_DIR/stabilityai/stable-audio-3-medium` | `STABLE_AUDIO_3_REPO_PATH`、`STABLE_AUDIO_3_MEDIUM_MODEL_DIR` |
 | ACE-Step 1.5 XL Turbo | `$HF_MIRROR_DIR/ACE-Step/acestep-v15-xl-turbo-diffusers` | `ACESTEP_MODEL_DIR`、`ACESTEP_OFFLOAD`、`ACESTEP_VAE_TILING` |

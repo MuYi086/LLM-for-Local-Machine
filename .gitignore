@@ -48,3 +48,8 @@ tests/testConfucius4TTS/output/
 tests/testSoulX_FlashHead/*.wav
 tests/testSoulX_FlashHead/*.png
 tests/testSoulX_FlashHead/dist/
+
+# Ditto 手动模型演示的本地素材和生成结果
+tests/testDitto/*.wav
+tests/testDitto/*.png
+tests/testDitto/dist/

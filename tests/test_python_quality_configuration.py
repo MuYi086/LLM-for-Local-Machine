@@ -23,6 +23,7 @@ MODEL_PROJECTS = (
     "Confucius4_TTS",
     "seed-vc",
     "SoulX-FlashHead-1_3B",
+    "ditto",
     "Step_Audio_EditX",
     "firered_tts3",
     "TIGER-DnR",
@@ -75,10 +76,18 @@ class PythonQualityConfigurationTests(unittest.TestCase):
     def test_startup_uses_locked_environments_without_runtime_sync(self) -> None:
         start_script = (REPOSITORY_DIR / "start.sh").read_text(encoding="utf-8")
 
-        self.assertEqual(start_script.count("setsid uv run --no-sync --project"), 21)
+        self.assertEqual(start_script.count("setsid uv run --no-sync --project"), 22)
         self.assertNotIn("setsid uv run --project", start_script)
         self.assertEqual(start_script.count('for pid in "${pids[@]}"; do'), 3)
         self.assertNotIn('wait "$qwen3_tts_pid"', start_script)
+
+    def test_ditto_onnxruntime_stays_on_cuda12_release_series(self) -> None:
+        """ORT 1.27 起默认使用 CUDA 13，不能复用本服务 Torch 的 CUDA 12 动态库。"""
+        lock = tomllib.loads((REPOSITORY_DIR / "ditto/uv.lock").read_text(encoding="utf-8"))
+        package = next(item for item in lock["package"] if item["name"] == "onnxruntime-gpu")
+        version = tuple(int(value) for value in package["version"].split(".")[:2])
+        self.assertGreaterEqual(version, (1, 21))
+        self.assertLess(version, (1, 27))
 
 
 if __name__ == "__main__":

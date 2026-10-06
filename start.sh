@@ -25,6 +25,7 @@ CONFUCIUS4_TTS_PROJECT_DIR="${CONFUCIUS4_TTS_PROJECT_DIR:-$PROJECT_DIR/Confucius
 QWEN3_ASR_PROJECT_DIR="${QWEN3_ASR_PROJECT_DIR:-$PROJECT_DIR/Qwen3_ASR_1.7B}"
 SEED_VC_PROJECT_DIR="${SEED_VC_PROJECT_DIR:-$PROJECT_DIR/seed-vc}"
 SOULX_FLASHHEAD_PROJECT_DIR="${SOULX_FLASHHEAD_PROJECT_DIR:-$PROJECT_DIR/SoulX-FlashHead-1_3B}"
+DITTO_PROJECT_DIR="${DITTO_PROJECT_DIR:-$PROJECT_DIR/ditto}"
 STEP_AUDIO_EDITX_PROJECT_DIR="${STEP_AUDIO_EDITX_PROJECT_DIR:-$PROJECT_DIR/Step_Audio_EditX}"
 LONGCAT_AUDIODIT_PROJECT_DIR="${LONGCAT_AUDIODIT_PROJECT_DIR:-$PROJECT_DIR/LongCat_AudioDiT_3.5B_bf16}"
 DOTS_TTS_SOAR_PROJECT_DIR="${DOTS_TTS_SOAR_PROJECT_DIR:-$PROJECT_DIR/dots_tts_soar}"
@@ -69,6 +70,11 @@ export SOULX_FLASHHEAD_MODEL_DIR="${SOULX_FLASHHEAD_MODEL_DIR:-$HF_MIRROR_DIR/So
 export SOULX_FLASHHEAD_CODE_PATH="${SOULX_FLASHHEAD_CODE_PATH:-$HOME/tts-depency/SoulX-FlashHead}"
 export SOULX_FLASHHEAD_WAV2VEC_DIR="${SOULX_FLASHHEAD_WAV2VEC_DIR:-$HF_MIRROR_DIR/facebook/wav2vec2-base-960h}"
 export SOULX_FLASHHEAD_REQUEST_TIMEOUT="${SOULX_FLASHHEAD_REQUEST_TIMEOUT:-1800}"
+export DITTO_MODEL_DIR="${DITTO_MODEL_DIR:-$HF_MIRROR_DIR/thewintersun/ditto-talkinghead}"
+export DITTO_CODE_PATH="${DITTO_CODE_PATH:-$HOME/tts-depency/ditto-talkinghead}"
+export DITTO_DATA_ROOT="${DITTO_DATA_ROOT:-$DITTO_MODEL_DIR/ditto_onnx}"
+export DITTO_CONFIG_PATH="${DITTO_CONFIG_PATH:-$DITTO_MODEL_DIR/ditto_cfg/v0.4_hubert_cfg_trt.pkl}"
+export DITTO_REQUEST_TIMEOUT="${DITTO_REQUEST_TIMEOUT:-1800}"
 export STEP_AUDIO_EDITX_MODEL_DIR="${STEP_AUDIO_EDITX_MODEL_DIR:-$HF_MIRROR_DIR/stepfun-ai/Step-Audio-EditX}"
 export STEP_AUDIO_TOKENIZER_PATH="${STEP_AUDIO_TOKENIZER_PATH:-$HF_MIRROR_DIR/stepfun-ai/Step-Audio-Tokenizer}"
 export STEP_AUDIO_EDITX_CODE_PATH="${STEP_AUDIO_EDITX_CODE_PATH:-$HOME/tts-depency/Step-Audio-EditX}"
@@ -122,6 +128,7 @@ export CLONE_STORAGE_DIR="${CLONE_STORAGE_DIR:-$STORAGE_DIR/clone}"
 export CONFUCIUS4_TTS_OUTPUT_DIR="${CONFUCIUS4_TTS_OUTPUT_DIR:-$CLONE_STORAGE_DIR}"
 export SEED_VC_OUTPUT_DIR="${SEED_VC_OUTPUT_DIR:-$CLONE_STORAGE_DIR}"
 export SOULX_FLASHHEAD_OUTPUT_DIR="${SOULX_FLASHHEAD_OUTPUT_DIR:-$STORAGE_DIR/video}"
+export DITTO_OUTPUT_DIR="${DITTO_OUTPUT_DIR:-$STORAGE_DIR/video}"
 export TIGER_DNR_OUTPUT_DIR="${TIGER_DNR_OUTPUT_DIR:-$STORAGE_DIR/separation}"
 export STABLE_AUDIO_3_MEDIUM_OUTPUT_DIR="${STABLE_AUDIO_3_MEDIUM_OUTPUT_DIR:-$SOUNDEFFECT_STORAGE_DIR}"
 export QWEN3_TTS_OUTPUT_DIR="${QWEN3_TTS_OUTPUT_DIR:-$CLONE_STORAGE_DIR}"
@@ -212,8 +219,35 @@ export SEED_VC_HOST="${SEED_VC_HOST:-$HOST}"
 export SEED_VC_PORT="${SEED_VC_PORT:-8381}"
 export SOULX_FLASHHEAD_HOST="${SOULX_FLASHHEAD_HOST:-$HOST}"
 export SOULX_FLASHHEAD_PORT="${SOULX_FLASHHEAD_PORT:-8391}"
+export DITTO_HOST="${DITTO_HOST:-$HOST}"
+export DITTO_PORT="${DITTO_PORT:-8392}"
 export ACESTEP_HOST="${ACESTEP_HOST:-$HOST}"
 export ACESTEP_PORT="${ACESTEP_PORT:-8313}"
+
+# 先检查整组监听地址；重复启动或配置内端口冲突时不创建任何服务进程。
+uv run --no-sync --project "$QWEN3_TTS_PROJECT_DIR" python "$MAIN_DIR/check_ports.py" \
+  'Control-plane' "$HOST" "$PORT" \
+  'MiMo TTS' "$MIMO_TTS_HOST" "$MIMO_TTS_PORT" \
+  'MOSS-SoundEffect' "$SOUNDEFFECT_HOST" "$SOUNDEFFECT_PORT" \
+  'Stable Audio 3 Medium' "$STABLE_AUDIO_3_MEDIUM_HOST" "$STABLE_AUDIO_3_MEDIUM_PORT" \
+  'ACE-Step' "$ACESTEP_HOST" "$ACESTEP_PORT" \
+  'Qwen3-TTS Base' "$QWEN3_TTS_HOST" "$QWEN3_TTS_PORT" \
+  'Qwen VoiceDesign' "$QWEN_VOICEDESIGN_HOST" "$QWEN_VOICEDESIGN_PORT" \
+  'TIGER-DnR' "$TIGER_DNR_HOST" "$TIGER_DNR_PORT" \
+  'MOSS VoiceGenerator' "$MOSS_VOICEGENERATOR_HOST" "$MOSS_VOICEGENERATOR_PORT" \
+  'MOSS-Audio Thinking' "$MOSS_AUDIO_4B_THINKING_HOST" "$MOSS_AUDIO_4B_THINKING_PORT" \
+  'MOSS-Audio Instruct' "$MOSS_AUDIO_4B_INSTRUCT_HOST" "$MOSS_AUDIO_4B_INSTRUCT_PORT" \
+  'Confucius4-TTS' "$CONFUCIUS4_TTS_HOST" "$CONFUCIUS4_TTS_PORT" \
+  'Qwen3-ASR' "$QWEN3_ASR_HOST" "$QWEN3_ASR_PORT" \
+  'Seed-VC' "$SEED_VC_HOST" "$SEED_VC_PORT" \
+  'SoulX-FlashHead' "$SOULX_FLASHHEAD_HOST" "$SOULX_FLASHHEAD_PORT" \
+  'Ditto' "$DITTO_HOST" "$DITTO_PORT" \
+  'Step-Audio-EditX' "$STEP_AUDIO_EDITX_HOST" "$STEP_AUDIO_EDITX_PORT" \
+  'VoxCPM2' "$VOXCPM2_HOST" "$VOXCPM2_PORT" \
+  'LongCat-AudioDiT' "$LONGCAT_AUDIODIT_HOST" "$LONGCAT_AUDIODIT_PORT" \
+  'dots.tts-soar' "$DOTS_TTS_SOAR_HOST" "$DOTS_TTS_SOAR_PORT" \
+  'FireRedTTS3 Instruct' "$FIRERED_TTS3_TIMBRE_HOST" "$FIRERED_TTS3_TIMBRE_PORT" \
+  'FireRedTTS3 Base' "$FIRERED_TTS3_CLONE_HOST" "$FIRERED_TTS3_CLONE_PORT"
 
 export HF_MODULES_CACHE="${HF_MODULES_CACHE:-$RUNTIME_CACHE_DIR/hf_modules}"
 export NUMBA_CACHE_DIR="${NUMBA_CACHE_DIR:-$RUNTIME_CACHE_DIR/numba}"
@@ -338,6 +372,14 @@ echo "SoulX-FlashHead health: http://127.0.0.1:$SOULX_FLASHHEAD_PORT/v1/health"
 echo "SoulX-FlashHead model: $SOULX_FLASHHEAD_MODEL_DIR"
 echo "SoulX-FlashHead source: $SOULX_FLASHHEAD_CODE_PATH"
 echo "SoulX-FlashHead Wav2Vec2: $SOULX_FLASHHEAD_WAV2VEC_DIR"
+echo "Ditto uv project: $DITTO_PROJECT_DIR"
+echo "Ditto API: http://$DITTO_HOST:$DITTO_PORT"
+echo "Ditto health: http://127.0.0.1:$DITTO_PORT/v1/health"
+echo "Ditto route: http://127.0.0.1:$DITTO_PORT/v1/ditto/talkingHead"
+echo "Ditto model: $DITTO_MODEL_DIR"
+echo "Ditto source: $DITTO_CODE_PATH"
+echo "Ditto ONNX: $DITTO_DATA_ROOT"
+echo "Ditto config: $DITTO_CONFIG_PATH"
 echo "VoxCPM2 API:         http://$VOXCPM2_HOST:$VOXCPM2_PORT"
 echo "VoxCPM2 health:      http://127.0.0.1:$VOXCPM2_PORT/v1/health"
 echo "LongCat health:      http://127.0.0.1:$LONGCAT_AUDIODIT_PORT/v1/health"
@@ -376,6 +418,7 @@ printf '%-24s %-6s %s\n' 'Confucius4-TTS' "$CONFUCIUS4_TTS_PORT" '/v1/confucius4
 printf '%-24s %-6s %s\n' 'Qwen3-ASR-1.7B' "$QWEN3_ASR_PORT" '/v1/qwen3/asr'
 printf '%-24s %-6s %s\n' 'Seed-VC' "$SEED_VC_PORT" '/v1/seedVc/voiceConversion'
 printf '%-24s %-6s %s\n' 'SoulX-FlashHead' "$SOULX_FLASHHEAD_PORT" '/v1/soulX/flashHead'
+printf '%-24s %-6s %s\n' 'Ditto' "$DITTO_PORT" '/v1/ditto/talkingHead'
 printf '%-24s %-6s %s\n' 'MiMo TTS VoiceDesign' "$MIMO_TTS_PORT" '/v1/mimo/timbre'
 printf '%-24s %-6s %s\n' 'Stable Audio 3 Medium' "$STABLE_AUDIO_3_MEDIUM_PORT" '/v1/stableAudio/soundEffect'
 printf '%-24s %-6s %s\n' 'ACE-Step 1.5 XL Turbo' "$ACESTEP_PORT" '/v1/aceStep/bgm'
@@ -411,6 +454,7 @@ confucius4_tts_pid=""
 qwen3_asr_pid=""
 seed_vc_pid=""
 soulx_flashhead_pid=""
+ditto_pid=""
 step_audio_editx_pid=""
 
 cleanup() {
@@ -431,6 +475,7 @@ cleanup() {
     "$qwen3_asr_pid"
     "$seed_vc_pid"
     "$soulx_flashhead_pid"
+    "$ditto_pid"
     "$step_audio_editx_pid"
     "$voxcpm2_pid"
     "$longcat_audiodit_pid"
@@ -561,6 +606,12 @@ SOULX_FLASHHEAD_HOST="$SOULX_FLASHHEAD_HOST" SOULX_FLASHHEAD_PORT="$SOULX_FLASHH
   setsid uv run --no-sync --project "$SOULX_FLASHHEAD_PROJECT_DIR" \
   python "$SOULX_FLASHHEAD_PROJECT_DIR/main.py" &
 soulx_flashhead_pid=$!
+# Ditto 独立 uv 服务：8392 音频驱动人像视频，推理只在一次性 worker 中执行。
+DITTO_HOST="$DITTO_HOST" DITTO_PORT="$DITTO_PORT" \
+  HOST="$DITTO_HOST" PORT="$DITTO_PORT" \
+  setsid uv run --no-sync --project "$DITTO_PROJECT_DIR" \
+  python "$DITTO_PROJECT_DIR/main.py" &
+ditto_pid=$!
 # Step-Audio-EditX 独立 uv 服务：完整提供上传、检查和编辑接口。
 # 依赖由部署前手动执行 `uv sync --project Step_Audio_EditX --locked`；启动阶段不再联网解析。
 STEP_AUDIO_EDITX_HOST="$STEP_AUDIO_EDITX_HOST" STEP_AUDIO_EDITX_PORT="$STEP_AUDIO_EDITX_PORT" \
@@ -595,4 +646,4 @@ FIRERED_TTS3_MODE="clone" FIRERED_TTS3_HOST="$FIRERED_TTS3_CLONE_HOST" \
   python "$FIRERED_TTS3_PROJECT_DIR/main.py" &
 firered_tts3_clone_pid=$!
 
-wait -n "$main_pid" "$mimo_tts_pid" "$soundeffect_pid" "$stable_audio_3_medium_pid" "$acestep_pid" "$qwen3_tts_pid" "$qwen_voicedesign_pid" "$tiger_dnr_pid" "$moss_voicegenerator_pid" "$moss_audio_4b_thinking_pid" "$moss_audio_4b_instruct_pid" "$confucius4_tts_pid" "$qwen3_asr_pid" "$seed_vc_pid" "$soulx_flashhead_pid" "$step_audio_editx_pid" "$voxcpm2_pid" "$longcat_audiodit_pid" "$dots_tts_soar_pid" "$firered_tts3_timbre_pid" "$firered_tts3_clone_pid"
+wait -n "$main_pid" "$mimo_tts_pid" "$soundeffect_pid" "$stable_audio_3_medium_pid" "$acestep_pid" "$qwen3_tts_pid" "$qwen_voicedesign_pid" "$tiger_dnr_pid" "$moss_voicegenerator_pid" "$moss_audio_4b_thinking_pid" "$moss_audio_4b_instruct_pid" "$confucius4_tts_pid" "$qwen3_asr_pid" "$seed_vc_pid" "$soulx_flashhead_pid" "$ditto_pid" "$step_audio_editx_pid" "$voxcpm2_pid" "$longcat_audiodit_pid" "$dots_tts_soar_pid" "$firered_tts3_timbre_pid" "$firered_tts3_clone_pid"

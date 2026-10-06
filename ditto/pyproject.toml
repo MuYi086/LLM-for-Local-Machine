@@ -1,0 +1,65 @@
+[project]
+name = "ditto-talkinghead-service"
+version = "0.1.0"
+description = "Unitale Ditto audio-driven talking head HTTP service"
+requires-python = "==3.12.13"
+dependencies = [
+    "fastapi==0.141.1",
+    "starlette==1.6.0",
+    "uvicorn==0.52.1",
+    "pydantic==2.13.4",
+    "python-multipart==0.0.32",
+    # ONNX 后端使用 CUDA 12/cuDNN 9，与 Torch 的动态库保持一致。
+    "torch==2.7.1",
+    # PyPI 从 ORT 1.27 起默认提供 CUDA 13 构建；限定 CUDA 12 系列以复用 Torch cu128。
+    "onnxruntime-gpu>=1.21,<1.27",
+    "onnx>=1.18,<2",
+    # 官方人脸 ROI 代码使用 NumPy 2 的 atan2 等 Array API 名称。
+    "numpy==2.0.1",
+    "librosa==0.10.2.post1",
+    "soundfile>=0.13.1",
+    "scipy>=1.15.3",
+    "opencv-python-headless==4.11.0.86",
+    "scikit-image>=0.25.2",
+    "filetype==1.2.0",
+    "imageio>=2.37.0",
+    "imageio-ffmpeg>=0.6.0",
+    "tqdm>=4.67.1",
+    "cython>=3.0.11",
+    "setuptools>=75.1",
+    "unitale-runtime",
+]
+
+[dependency-groups]
+dev = ["ruff>=0.15.9"]
+
+[tool.uv]
+package = false
+index-strategy = "first-index"
+
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
+default = true
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv.sources]
+unitale-runtime = { path = "../unitale_runtime", editable = true }
+torch = { index = "pytorch-cu128" }
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["B008", "E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"

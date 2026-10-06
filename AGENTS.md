@@ -29,12 +29,14 @@ HTTP 入口和 worker。
   仓库外官方源码、Whisper-small、BigVGAN 和 CAMPPlus；可选 F0 模式另需 RMVPE 和 44.1 kHz BigVGAN。
 - `SoulX-FlashHead-1_3B/` 是独立的音频驱动人像视频服务，使用 Soul-AILab 本地 Lite/Pro 权重、
   仓库外官方源码和 `facebook/wav2vec2-base-960h`；返回 MP4，成品默认写入 `storage/video/`。
+- `ditto/` 是独立的 Ditto 音频驱动人像视频服务，使用 thewintersun 本地 ONNX 权重和
+  仓库外 antgroup 官方源码，通过 ONNX Runtime CUDA 推理，返回 MP4，默认写入 `storage/video/`。
 - 最终默认端口：`8300` 控制面、`8301` Qwen VoiceDesign、`8302` MOSS VoiceGenerator、
   `8303` MiMo、`8304` FireRedTTS3 Instruct、`8311` Stable Audio 3 Medium、
   `8312` MOSS-SoundEffect、`8313` ACE-Step BGM、`8321` Qwen3-TTS、`8322` VoxCPM2、
   `8323` LongCat、`8324` dots.tts-soar、`8325` FireRedTTS3 Base、`8331` Step-Audio-EditX、
   `8341` MOSS-Audio-4B-Thinking、`8342` MOSS-Audio-4B-Instruct、`8361` Confucius4-TTS、
-  `8371` Qwen3-ASR-1.7B、`8381` Seed-VC、`8391` SoulX-FlashHead；另有 `8351` TIGER-DnR。
+  `8371` Qwen3-ASR-1.7B、`8381` Seed-VC、`8391` SoulX-FlashHead、`8392` Ditto；另有 `8351` TIGER-DnR。
 - `tests/` 存放无模型 `unittest` 迁移回归测试；ACE-Step 和 Stable Audio 的服务内测试独立存放。
   `soundEffect/` 存放 MOSS GPU 示例；`storage/` 存放运行音频、sidecar、缓存和 GPU 锁，
   不得提交其内容。
@@ -47,7 +49,7 @@ HTTP 入口和 worker。
 源码 `/home/muyi086/tts-depency/MOSS-TTS`，不得改为 Git/PyPI 下载；执行该项目的
 `uv sync` 前先确认该目录存在。
 `bash start.sh` 会在 `qwen3_tts` uv 项目中启动轻量的 8300 控制面，并在各自项目中启动其余
-20 个 HTTP 进程（MOSS-Audio 占用 8341 和 8342 两个变体进程，FireRedTTS3 占用 8304 和 8325 两个模式进程）；共启动 21 个进程。
+21 个 HTTP 进程（MOSS-Audio 占用 8341 和 8342 两个变体进程，FireRedTTS3 占用 8304 和 8325 两个模式进程）；共启动 22 个进程。
 端口、路径、项目和运行参数均通过环境变量覆盖。
 启动脚本使用 `uv run --no-sync`，并将 `unitale_runtime/src` 放入 `PYTHONPATH` 作为共享包的
 离线兜底；新增或变更项目依赖仍必须提前执行对应项目的 `uv sync --locked`。
@@ -99,7 +101,8 @@ uv run --project qa --locked python -m unittest discover -s tests -v
   语音编辑使用 `/v1/stepAudioEditx/edit`；音频理解使用
   `/v1/mossAudioThinking/understand`；Qwen3-ASR 转写使用 `/v1/qwen3/asr`；Seed-VC 音色转换使用
   `/v1/seedVc/voiceConversion`。Seed-VC 输入通过上传后的 `full_path` 解析，结果写入 `storage/clone/`。
-  SoulX-FlashHead 人像视频使用 `/v1/soulX/flashHead`，图片和音频均通过上传后的 `full_path` 解析。
+  SoulX-FlashHead 人像视频使用 `/v1/soulX/flashHead`，Ditto 使用 `/v1/ditto/talkingHead`，
+  图片和音频均通过上传后的 `full_path` 解析。
 - 后端只注册并使用上述最终接口；不得新增或保留任何旧接口兼容别名。
 - `/v1/audio/export` 只保留预混总线的标准母带兼容；正式 `balanced`/`immersive` 使用
   `/v1/audio/spatial/render` 的 Manifest v1 和重复 `assets` 字段。正式 Steam Audio pre-master
