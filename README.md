@@ -137,6 +137,22 @@ LongCat、dots.tts-soar、FireRedTTS3、Confucius4-TTS、Seed-VC，以及人像�
 
 ## 安装与启动
 
+只用于本地部署时，建议浅克隆主分支，只下载最新版本：
+
+```bash
+git clone --depth 1 --single-branch --branch main https://github.com/MuYi086/LLM-for-Local-Machine.git
+cd LLM-for-Local-Machine
+```
+
+普通 `git clone` 会下载可达的历史对象，过去提交过的大型音频即使已从当前版本删除，仍会
+随完整历史下载。浅克隆可避开这些旧对象；以后需要完整历史时再执行 `git fetch --unshallow`，
+届时也会下载历史中的素材。删除当前文件或在本地运行 `git gc` 都不能清除远端可达历史。
+
+各项目的 `pyproject.toml`、`uv.lock` 和 `.python-version` 必须保留，用于复现锁定环境；
+`.venv/`、uv 缓存、安装包、构建产物、模型权重和音视频素材不提交，由本地安装或另行准备。
+`special-audio-effect/` 中的音频文件属于手动研究素材，不是服务或自动测试依赖；文档保留
+实测记录，复现示例时请自备素材并修改输入路径。
+
 统一启动和 GPU 锁使用 Linux 的 `setsid`、进程组信号与 `fcntl.flock`，部署目标为 Linux。
 运行要求：Python `3.12.13`、`uv`、FFmpeg/ffprobe、可用的 CUDA/NVIDIA 驱动（本地模型服务），
 以及下方列出的模型权重和外部源码目录。Step-Audio-EditX 还需要系统 `sox`；Ditto 需要

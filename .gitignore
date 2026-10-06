@@ -8,24 +8,66 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.uv-cache/
+.tox/
+.nox/
 
 # Local virtual environments
 .venv/
 venv/
 env/
+ENV/
+__pypackages__/
+site-packages/
 
-# Generated/uploaded audio
+# Installed packages and build artifacts; keep pyproject.toml and uv.lock tracked
+*.egg-info/
+.eggs/
+build/
+dist/
+*.whl
+*.so
+*.dylib
+*.dll
+*.exe
+
+# Local model weights; download separately from the code repository
+checkpoints/
+weights/
+pretrained_models/
+*.safetensors
+*.gguf
+*.ckpt
+*.pth
+*.pt
+*.onnx
+*.bin
+
+# Local audio/video samples, uploads and generated output
+*.wav
+*.mp3
+*.flac
+*.ogg
+*.opus
+*.aac
+*.m4a
+*.mp4
+*.webm
+*.mov
+*.avi
 prompts/
 tempAudio/
 qwen_test*.wav
 synth*.wav
 *.tmp.wav
 soundEffect/outputs/
+special-audio-effect/output/
 steam_audio_renderer/build/
 steam_audio_renderer/sdk/
 
 # Third-party source clones and side-loaded Python packages
 vendor/
+tts-depency/
 
 # Local/cloud workspace config not needed for GitHub local runtime
 .cnb/
