@@ -26,6 +26,10 @@ QWEN3_ASR_PROJECT_DIR="${QWEN3_ASR_PROJECT_DIR:-$PROJECT_DIR/Qwen3_ASR_1.7B}"
 SEED_VC_PROJECT_DIR="${SEED_VC_PROJECT_DIR:-$PROJECT_DIR/seed-vc}"
 SOULX_FLASHHEAD_PROJECT_DIR="${SOULX_FLASHHEAD_PROJECT_DIR:-$PROJECT_DIR/SoulX-FlashHead-1_3B}"
 DITTO_PROJECT_DIR="${DITTO_PROJECT_DIR:-$PROJECT_DIR/ditto}"
+INDEX_ECHO_S2ST_PROJECT_DIR="${INDEX_ECHO_S2ST_PROJECT_DIR:-$PROJECT_DIR/Index-Echo-S2ST-9B-GGUF}"
+INDEX_HOMURA_PROJECT_DIR="${INDEX_HOMURA_PROJECT_DIR:-$PROJECT_DIR/Index-Homura-9B-GGUF}"
+INDEX_NAILONG_PROJECT_DIR="${INDEX_NAILONG_PROJECT_DIR:-$PROJECT_DIR/Index-Nailong-9B-GGUF}"
+INDEX_TRANSLATE_PROJECT_DIR="${INDEX_TRANSLATE_PROJECT_DIR:-$PROJECT_DIR/Index-Translate-9B-GGUF}"
 STEP_AUDIO_EDITX_PROJECT_DIR="${STEP_AUDIO_EDITX_PROJECT_DIR:-$PROJECT_DIR/Step_Audio_EditX}"
 LONGCAT_AUDIODIT_PROJECT_DIR="${LONGCAT_AUDIODIT_PROJECT_DIR:-$PROJECT_DIR/LongCat_AudioDiT_3.5B_bf16}"
 DOTS_TTS_SOAR_PROJECT_DIR="${DOTS_TTS_SOAR_PROJECT_DIR:-$PROJECT_DIR/dots_tts_soar}"
@@ -74,6 +78,41 @@ export DITTO_MODEL_DIR="${DITTO_MODEL_DIR:-$HF_MIRROR_DIR/thewintersun/ditto-tal
 export DITTO_CODE_PATH="${DITTO_CODE_PATH:-$HOME/tts-depency/ditto-talkinghead}"
 export DITTO_DATA_ROOT="${DITTO_DATA_ROOT:-$DITTO_MODEL_DIR/ditto_onnx}"
 export DITTO_CONFIG_PATH="${DITTO_CONFIG_PATH:-$DITTO_MODEL_DIR/ditto_cfg/v0.4_hubert_cfg_trt.pkl}"
+export INDEX_ECHO_S2ST_MODEL_DIR="${INDEX_ECHO_S2ST_MODEL_DIR:-$HF_MIRROR_DIR/IndexTeam/Index-Echo-S2ST-9B-GGUF}"
+export INDEX_ECHO_S2ST_MODEL_PATH="${INDEX_ECHO_S2ST_MODEL_PATH:-$INDEX_ECHO_S2ST_MODEL_DIR/Index-Echo-S2ST-9B.Q8_0.gguf}"
+export INDEX_ECHO_S2ST_LLAMA_SERVER_BIN="${INDEX_ECHO_S2ST_LLAMA_SERVER_BIN:-llama-server}"
+export INDEX_ECHO_S2ST_REQUEST_TIMEOUT="${INDEX_ECHO_S2ST_REQUEST_TIMEOUT:-900}"
+export INDEX_ECHO_S2ST_STARTUP_TIMEOUT="${INDEX_ECHO_S2ST_STARTUP_TIMEOUT:-300}"
+export INDEX_ECHO_S2ST_N_GPU_LAYERS="${INDEX_ECHO_S2ST_N_GPU_LAYERS:-99}"
+export INDEX_ECHO_S2ST_CONTEXT_SIZE="${INDEX_ECHO_S2ST_CONTEXT_SIZE:-4096}"
+export INDEX_ECHO_S2ST_MAX_NEW_TOKENS="${INDEX_ECHO_S2ST_MAX_NEW_TOKENS:-1024}"
+export INDEX_HOMURA_MODEL_DIR="${INDEX_HOMURA_MODEL_DIR:-$HF_MIRROR_DIR/IndexTeam/Index-Homura-9B-GGUF}"
+export INDEX_HOMURA_MODEL_PATH="${INDEX_HOMURA_MODEL_PATH:-$INDEX_HOMURA_MODEL_DIR/Index-Homura-9B.Q8_0.gguf}"
+export INDEX_HOMURA_LLAMA_SERVER_BIN="${INDEX_HOMURA_LLAMA_SERVER_BIN:-llama-server}"
+export INDEX_HOMURA_REQUEST_TIMEOUT="${INDEX_HOMURA_REQUEST_TIMEOUT:-900}"
+export INDEX_HOMURA_STARTUP_TIMEOUT="${INDEX_HOMURA_STARTUP_TIMEOUT:-300}"
+export INDEX_HOMURA_N_GPU_LAYERS="${INDEX_HOMURA_N_GPU_LAYERS:-99}"
+export INDEX_HOMURA_CONTEXT_SIZE="${INDEX_HOMURA_CONTEXT_SIZE:-4096}"
+export INDEX_HOMURA_MAX_NEW_TOKENS="${INDEX_HOMURA_MAX_NEW_TOKENS:-8192}"
+export INDEX_HOMURA_TEMPERATURE="${INDEX_HOMURA_TEMPERATURE:-0.3}"
+export INDEX_NAILONG_MODEL_DIR="${INDEX_NAILONG_MODEL_DIR:-$HF_MIRROR_DIR/IndexTeam/Index-Nailong-9B-GGUF}"
+export INDEX_NAILONG_MODEL_PATH="${INDEX_NAILONG_MODEL_PATH:-$INDEX_NAILONG_MODEL_DIR/Index-Nailong-9B.Q8_0.gguf}"
+export INDEX_NAILONG_LLAMA_SERVER_BIN="${INDEX_NAILONG_LLAMA_SERVER_BIN:-llama-server}"
+export INDEX_NAILONG_REQUEST_TIMEOUT="${INDEX_NAILONG_REQUEST_TIMEOUT:-900}"
+export INDEX_NAILONG_STARTUP_TIMEOUT="${INDEX_NAILONG_STARTUP_TIMEOUT:-300}"
+export INDEX_NAILONG_N_GPU_LAYERS="${INDEX_NAILONG_N_GPU_LAYERS:-99}"
+export INDEX_NAILONG_CONTEXT_SIZE="${INDEX_NAILONG_CONTEXT_SIZE:-32768}"
+export INDEX_NAILONG_MAX_NEW_TOKENS="${INDEX_NAILONG_MAX_NEW_TOKENS:-8192}"
+export INDEX_NAILONG_TEMPERATURE="${INDEX_NAILONG_TEMPERATURE:-0}"
+export INDEX_TRANSLATE_MODEL_DIR="${INDEX_TRANSLATE_MODEL_DIR:-$HF_MIRROR_DIR/IndexTeam/Index-Translate-9B-GGUF}"
+export INDEX_TRANSLATE_MODEL_PATH="${INDEX_TRANSLATE_MODEL_PATH:-$INDEX_TRANSLATE_MODEL_DIR/Index-Translate-9B.Q8_0.gguf}"
+export INDEX_TRANSLATE_LLAMA_SERVER_BIN="${INDEX_TRANSLATE_LLAMA_SERVER_BIN:-llama-server}"
+export INDEX_TRANSLATE_REQUEST_TIMEOUT="${INDEX_TRANSLATE_REQUEST_TIMEOUT:-900}"
+export INDEX_TRANSLATE_STARTUP_TIMEOUT="${INDEX_TRANSLATE_STARTUP_TIMEOUT:-300}"
+export INDEX_TRANSLATE_N_GPU_LAYERS="${INDEX_TRANSLATE_N_GPU_LAYERS:-99}"
+export INDEX_TRANSLATE_CONTEXT_SIZE="${INDEX_TRANSLATE_CONTEXT_SIZE:-32768}"
+export INDEX_TRANSLATE_MAX_NEW_TOKENS="${INDEX_TRANSLATE_MAX_NEW_TOKENS:-1024}"
+export INDEX_TRANSLATE_TEMPERATURE="${INDEX_TRANSLATE_TEMPERATURE:-0}"
 export DITTO_REQUEST_TIMEOUT="${DITTO_REQUEST_TIMEOUT:-1800}"
 export STEP_AUDIO_EDITX_MODEL_DIR="${STEP_AUDIO_EDITX_MODEL_DIR:-$HF_MIRROR_DIR/stepfun-ai/Step-Audio-EditX}"
 export STEP_AUDIO_TOKENIZER_PATH="${STEP_AUDIO_TOKENIZER_PATH:-$HF_MIRROR_DIR/stepfun-ai/Step-Audio-Tokenizer}"
@@ -223,6 +262,22 @@ export DITTO_HOST="${DITTO_HOST:-$HOST}"
 export DITTO_PORT="${DITTO_PORT:-8392}"
 export ACESTEP_HOST="${ACESTEP_HOST:-$HOST}"
 export ACESTEP_PORT="${ACESTEP_PORT:-8313}"
+export INDEX_ECHO_S2ST_HOST="${INDEX_ECHO_S2ST_HOST:-$HOST}"
+export INDEX_ECHO_S2ST_PORT="${INDEX_ECHO_S2ST_PORT:-8382}"
+export INDEX_ECHO_S2ST_ASR_URL="${INDEX_ECHO_S2ST_ASR_URL:-http://127.0.0.1:$QWEN3_ASR_PORT/v1/qwen3/asr}"
+export INDEX_ECHO_S2ST_TTS_URL="${INDEX_ECHO_S2ST_TTS_URL:-http://127.0.0.1:$CONFUCIUS4_TTS_PORT/v1/confucius4TTS/generate}"
+export INDEX_HOMURA_HOST="${INDEX_HOMURA_HOST:-$HOST}"
+export INDEX_HOMURA_PORT="${INDEX_HOMURA_PORT:-8383}"
+export INDEX_HOMURA_ASR_URL="${INDEX_HOMURA_ASR_URL:-http://127.0.0.1:$QWEN3_ASR_PORT/v1/qwen3/asr}"
+export INDEX_HOMURA_TTS_URL="${INDEX_HOMURA_TTS_URL:-http://127.0.0.1:$CONFUCIUS4_TTS_PORT/v1/confucius4TTS/generate}"
+export INDEX_NAILONG_HOST="${INDEX_NAILONG_HOST:-$HOST}"
+export INDEX_NAILONG_PORT="${INDEX_NAILONG_PORT:-8384}"
+export INDEX_NAILONG_ASR_URL="${INDEX_NAILONG_ASR_URL:-http://127.0.0.1:$QWEN3_ASR_PORT/v1/qwen3/asr}"
+export INDEX_NAILONG_TTS_URL="${INDEX_NAILONG_TTS_URL:-http://127.0.0.1:$CONFUCIUS4_TTS_PORT/v1/confucius4TTS/generate}"
+export INDEX_TRANSLATE_HOST="${INDEX_TRANSLATE_HOST:-$HOST}"
+export INDEX_TRANSLATE_PORT="${INDEX_TRANSLATE_PORT:-8385}"
+export INDEX_TRANSLATE_ASR_URL="${INDEX_TRANSLATE_ASR_URL:-http://127.0.0.1:$QWEN3_ASR_PORT/v1/qwen3/asr}"
+export INDEX_TRANSLATE_TTS_URL="${INDEX_TRANSLATE_TTS_URL:-http://127.0.0.1:$CONFUCIUS4_TTS_PORT/v1/confucius4TTS/generate}"
 
 # 先检查整组监听地址；重复启动或配置内端口冲突时不创建任何服务进程。
 uv run --no-sync --project "$QWEN3_TTS_PROJECT_DIR" python "$MAIN_DIR/check_ports.py" \
@@ -240,6 +295,10 @@ uv run --no-sync --project "$QWEN3_TTS_PROJECT_DIR" python "$MAIN_DIR/check_port
   'Confucius4-TTS' "$CONFUCIUS4_TTS_HOST" "$CONFUCIUS4_TTS_PORT" \
   'Qwen3-ASR' "$QWEN3_ASR_HOST" "$QWEN3_ASR_PORT" \
   'Seed-VC' "$SEED_VC_HOST" "$SEED_VC_PORT" \
+  'Index-Echo S2ST' "$INDEX_ECHO_S2ST_HOST" "$INDEX_ECHO_S2ST_PORT" \
+  'Index-Homura' "$INDEX_HOMURA_HOST" "$INDEX_HOMURA_PORT" \
+  'Index-Nailong' "$INDEX_NAILONG_HOST" "$INDEX_NAILONG_PORT" \
+  'Index-Translate' "$INDEX_TRANSLATE_HOST" "$INDEX_TRANSLATE_PORT" \
   'SoulX-FlashHead' "$SOULX_FLASHHEAD_HOST" "$SOULX_FLASHHEAD_PORT" \
   'Ditto' "$DITTO_HOST" "$DITTO_PORT" \
   'Step-Audio-EditX' "$STEP_AUDIO_EDITX_HOST" "$STEP_AUDIO_EDITX_PORT" \
@@ -376,10 +435,33 @@ echo "Ditto uv project: $DITTO_PROJECT_DIR"
 echo "Ditto API: http://$DITTO_HOST:$DITTO_PORT"
 echo "Ditto health: http://127.0.0.1:$DITTO_PORT/v1/health"
 echo "Ditto route: http://127.0.0.1:$DITTO_PORT/v1/ditto/talkingHead"
+echo "Index-Echo S2ST API: http://$INDEX_ECHO_S2ST_HOST:$INDEX_ECHO_S2ST_PORT"
+echo "Index-Echo uv project: $INDEX_ECHO_S2ST_PROJECT_DIR"
+echo "Index-Echo S2ST route: http://127.0.0.1:$INDEX_ECHO_S2ST_PORT/v1/indexTranslate/echoS2ST"
 echo "Ditto model: $DITTO_MODEL_DIR"
 echo "Ditto source: $DITTO_CODE_PATH"
 echo "Ditto ONNX: $DITTO_DATA_ROOT"
 echo "Ditto config: $DITTO_CONFIG_PATH"
+echo "Index-Echo GGUF: $INDEX_ECHO_S2ST_MODEL_PATH"
+echo "Index-Echo llama-server: $INDEX_ECHO_S2ST_LLAMA_SERVER_BIN"
+echo "Index-Echo ASR/TTS: $INDEX_ECHO_S2ST_ASR_URL -> $INDEX_ECHO_S2ST_TTS_URL"
+echo "Index-Homura API: http://$INDEX_HOMURA_HOST:$INDEX_HOMURA_PORT"
+echo "Index-Homura project: $INDEX_HOMURA_PROJECT_DIR"
+echo "Index-Homura route: http://127.0.0.1:$INDEX_HOMURA_PORT/v1/indexTranslate/homura"
+echo "Index-Homura GGUF: $INDEX_HOMURA_MODEL_PATH"
+echo "Index-Homura llama-server: $INDEX_HOMURA_LLAMA_SERVER_BIN"
+echo "Index-Homura ASR/TTS: $INDEX_HOMURA_ASR_URL -> $INDEX_HOMURA_TTS_URL"
+echo "Index-Nailong API: http://$INDEX_NAILONG_HOST:$INDEX_NAILONG_PORT"
+echo "Index-Nailong project: $INDEX_NAILONG_PROJECT_DIR"
+echo "Index-Nailong route: http://127.0.0.1:$INDEX_NAILONG_PORT/v1/indexTranslate/naiLong"
+echo "Index-Nailong GGUF: $INDEX_NAILONG_MODEL_PATH"
+echo "Index-Nailong llama-server: $INDEX_NAILONG_LLAMA_SERVER_BIN"
+echo "Index-Nailong ASR/TTS: $INDEX_NAILONG_ASR_URL -> $INDEX_NAILONG_TTS_URL"
+echo "Index-Translate project: $INDEX_TRANSLATE_PROJECT_DIR"
+echo "Index-Translate route: http://127.0.0.1:$INDEX_TRANSLATE_PORT/v1/indexTranslate/translate"
+echo "Index-Translate GGUF: $INDEX_TRANSLATE_MODEL_PATH"
+echo "Index-Translate llama-server: $INDEX_TRANSLATE_LLAMA_SERVER_BIN"
+echo "Index-Translate ASR/TTS: $INDEX_TRANSLATE_ASR_URL -> $INDEX_TRANSLATE_TTS_URL"
 echo "VoxCPM2 API:         http://$VOXCPM2_HOST:$VOXCPM2_PORT"
 echo "VoxCPM2 health:      http://127.0.0.1:$VOXCPM2_PORT/v1/health"
 echo "LongCat health:      http://127.0.0.1:$LONGCAT_AUDIODIT_PORT/v1/health"
@@ -415,6 +497,10 @@ printf '%-24s %-6s %s\n' 'MOSS VoiceGenerator' "$MOSS_VOICEGENERATOR_PORT" '/v1/
 printf '%-24s %-6s %s\n' 'MOSS-Audio-4B-Thinking' "$MOSS_AUDIO_4B_THINKING_PORT" '/v1/mossAudioThinking/understand'
 printf '%-24s %-6s %s\n' 'MOSS-Audio-4B-Instruct' "$MOSS_AUDIO_4B_INSTRUCT_PORT" '/v1/mossAudioThinking/understand'
 printf '%-24s %-6s %s\n' 'Confucius4-TTS' "$CONFUCIUS4_TTS_PORT" '/v1/confucius4TTS/generate'
+printf '%-24s %-6s %s\n' 'Index-Echo S2ST' "$INDEX_ECHO_S2ST_PORT" '/v1/indexTranslate/echoS2ST'
+printf '%-24s %-6s %s\n' 'Index-Homura' "$INDEX_HOMURA_PORT" '/v1/indexTranslate/homura'
+printf '%-24s %-6s %s\n' 'Index-Nailong' "$INDEX_NAILONG_PORT" '/v1/indexTranslate/naiLong'
+printf '%-24s %-6s %s\n' 'Index-Translate' "$INDEX_TRANSLATE_PORT" '/v1/indexTranslate/translate'
 printf '%-24s %-6s %s\n' 'Qwen3-ASR-1.7B' "$QWEN3_ASR_PORT" '/v1/qwen3/asr'
 printf '%-24s %-6s %s\n' 'Seed-VC' "$SEED_VC_PORT" '/v1/seedVc/voiceConversion'
 printf '%-24s %-6s %s\n' 'SoulX-FlashHead' "$SOULX_FLASHHEAD_PORT" '/v1/soulX/flashHead'
@@ -455,6 +541,10 @@ qwen3_asr_pid=""
 seed_vc_pid=""
 soulx_flashhead_pid=""
 ditto_pid=""
+index_echo_s2st_pid=""
+index_homura_pid=""
+index_nailong_pid=""
+index_translate_pid=""
 step_audio_editx_pid=""
 
 cleanup() {
@@ -476,6 +566,10 @@ cleanup() {
     "$seed_vc_pid"
     "$soulx_flashhead_pid"
     "$ditto_pid"
+    "$index_echo_s2st_pid"
+    "$index_homura_pid"
+    "$index_nailong_pid"
+    "$index_translate_pid"
     "$step_audio_editx_pid"
     "$voxcpm2_pid"
     "$longcat_audiodit_pid"
@@ -612,6 +706,57 @@ DITTO_HOST="$DITTO_HOST" DITTO_PORT="$DITTO_PORT" \
   setsid uv run --no-sync --project "$DITTO_PROJECT_DIR" \
   python "$DITTO_PROJECT_DIR/main.py" &
 ditto_pid=$!
+# Index-Echo GGUF 是文本主干，通过 Qwen3-ASR 和 Confucius4-TTS 组成短句语音翻译流程。
+INDEX_ECHO_S2ST_HOST="$INDEX_ECHO_S2ST_HOST" INDEX_ECHO_S2ST_PORT="$INDEX_ECHO_S2ST_PORT" \
+  INDEX_ECHO_S2ST_MODEL_DIR="$INDEX_ECHO_S2ST_MODEL_DIR" \
+  INDEX_ECHO_S2ST_MODEL_PATH="$INDEX_ECHO_S2ST_MODEL_PATH" \
+  INDEX_ECHO_S2ST_LLAMA_SERVER_BIN="$INDEX_ECHO_S2ST_LLAMA_SERVER_BIN" \
+  INDEX_ECHO_S2ST_ASR_URL="$INDEX_ECHO_S2ST_ASR_URL" \
+  INDEX_ECHO_S2ST_TTS_URL="$INDEX_ECHO_S2ST_TTS_URL" \
+  HOST="$INDEX_ECHO_S2ST_HOST" PORT="$INDEX_ECHO_S2ST_PORT" \
+  setsid uv run --no-sync --project "$INDEX_ECHO_S2ST_PROJECT_DIR" \
+  python "$INDEX_ECHO_S2ST_PROJECT_DIR/main.py" &
+index_echo_s2st_pid=$!
+# Index-Homura GGUF 是音节约束文本主干，串接 ASR 和 Confucius4-TTS 输出配音 WAV。
+INDEX_HOMURA_HOST="$INDEX_HOMURA_HOST" INDEX_HOMURA_PORT="$INDEX_HOMURA_PORT" \
+  INDEX_HOMURA_MODEL_DIR="$INDEX_HOMURA_MODEL_DIR" \
+  INDEX_HOMURA_MODEL_PATH="$INDEX_HOMURA_MODEL_PATH" \
+  INDEX_HOMURA_LLAMA_SERVER_BIN="$INDEX_HOMURA_LLAMA_SERVER_BIN" \
+  INDEX_HOMURA_ASR_URL="$INDEX_HOMURA_ASR_URL" \
+  INDEX_HOMURA_TTS_URL="$INDEX_HOMURA_TTS_URL" \
+  INDEX_HOMURA_MAX_NEW_TOKENS="$INDEX_HOMURA_MAX_NEW_TOKENS" \
+  INDEX_HOMURA_TEMPERATURE="$INDEX_HOMURA_TEMPERATURE" \
+  HOST="$INDEX_HOMURA_HOST" PORT="$INDEX_HOMURA_PORT" \
+  setsid uv run --no-sync --project "$INDEX_HOMURA_PROJECT_DIR" \
+  python "$INDEX_HOMURA_PROJECT_DIR/main.py" &
+index_homura_pid=$!
+# Index-Nailong GGUF 负责多语种翻译，串接 ASR 与 Confucius4-TTS 输出配音 WAV。
+INDEX_NAILONG_HOST="$INDEX_NAILONG_HOST" INDEX_NAILONG_PORT="$INDEX_NAILONG_PORT" \
+  INDEX_NAILONG_MODEL_DIR="$INDEX_NAILONG_MODEL_DIR" \
+  INDEX_NAILONG_MODEL_PATH="$INDEX_NAILONG_MODEL_PATH" \
+  INDEX_NAILONG_LLAMA_SERVER_BIN="$INDEX_NAILONG_LLAMA_SERVER_BIN" \
+  INDEX_NAILONG_ASR_URL="$INDEX_NAILONG_ASR_URL" \
+  INDEX_NAILONG_TTS_URL="$INDEX_NAILONG_TTS_URL" \
+  INDEX_NAILONG_MAX_NEW_TOKENS="$INDEX_NAILONG_MAX_NEW_TOKENS" \
+  INDEX_NAILONG_TEMPERATURE="$INDEX_NAILONG_TEMPERATURE" \
+  HOST="$INDEX_NAILONG_HOST" PORT="$INDEX_NAILONG_PORT" \
+  setsid uv run --no-sync --project "$INDEX_NAILONG_PROJECT_DIR" \
+  python "$INDEX_NAILONG_PROJECT_DIR/main.py" &
+index_nailong_pid=$!
+# Index-Translate GGUF 翻译 ASR 转写文本，再由 Confucius4-TTS 以原始音频音色合成 WAV。
+INDEX_TRANSLATE_HOST="$INDEX_TRANSLATE_HOST" INDEX_TRANSLATE_PORT="$INDEX_TRANSLATE_PORT" \
+  INDEX_TRANSLATE_MODEL_DIR="$INDEX_TRANSLATE_MODEL_DIR" \
+  INDEX_TRANSLATE_MODEL_PATH="$INDEX_TRANSLATE_MODEL_PATH" \
+  INDEX_TRANSLATE_LLAMA_SERVER_BIN="$INDEX_TRANSLATE_LLAMA_SERVER_BIN" \
+  INDEX_TRANSLATE_ASR_URL="$INDEX_TRANSLATE_ASR_URL" \
+  INDEX_TRANSLATE_TTS_URL="$INDEX_TRANSLATE_TTS_URL" \
+  INDEX_TRANSLATE_CONTEXT_SIZE="$INDEX_TRANSLATE_CONTEXT_SIZE" \
+  INDEX_TRANSLATE_MAX_NEW_TOKENS="$INDEX_TRANSLATE_MAX_NEW_TOKENS" \
+  INDEX_TRANSLATE_TEMPERATURE="$INDEX_TRANSLATE_TEMPERATURE" \
+  HOST="$INDEX_TRANSLATE_HOST" PORT="$INDEX_TRANSLATE_PORT" \
+  setsid uv run --no-sync --project "$INDEX_TRANSLATE_PROJECT_DIR" \
+  python "$INDEX_TRANSLATE_PROJECT_DIR/main.py" &
+index_translate_pid=$!
 # Step-Audio-EditX 独立 uv 服务：完整提供上传、检查和编辑接口。
 # 依赖由部署前手动执行 `uv sync --project Step_Audio_EditX --locked`；启动阶段不再联网解析。
 STEP_AUDIO_EDITX_HOST="$STEP_AUDIO_EDITX_HOST" STEP_AUDIO_EDITX_PORT="$STEP_AUDIO_EDITX_PORT" \
@@ -646,4 +791,4 @@ FIRERED_TTS3_MODE="clone" FIRERED_TTS3_HOST="$FIRERED_TTS3_CLONE_HOST" \
   python "$FIRERED_TTS3_PROJECT_DIR/main.py" &
 firered_tts3_clone_pid=$!
 
-wait -n "$main_pid" "$mimo_tts_pid" "$soundeffect_pid" "$stable_audio_3_medium_pid" "$acestep_pid" "$qwen3_tts_pid" "$qwen_voicedesign_pid" "$tiger_dnr_pid" "$moss_voicegenerator_pid" "$moss_audio_4b_thinking_pid" "$moss_audio_4b_instruct_pid" "$confucius4_tts_pid" "$qwen3_asr_pid" "$seed_vc_pid" "$soulx_flashhead_pid" "$ditto_pid" "$step_audio_editx_pid" "$voxcpm2_pid" "$longcat_audiodit_pid" "$dots_tts_soar_pid" "$firered_tts3_timbre_pid" "$firered_tts3_clone_pid"
+wait -n "$main_pid" "$mimo_tts_pid" "$soundeffect_pid" "$stable_audio_3_medium_pid" "$acestep_pid" "$qwen3_tts_pid" "$qwen_voicedesign_pid" "$tiger_dnr_pid" "$moss_voicegenerator_pid" "$moss_audio_4b_thinking_pid" "$moss_audio_4b_instruct_pid" "$confucius4_tts_pid" "$qwen3_asr_pid" "$seed_vc_pid" "$soulx_flashhead_pid" "$ditto_pid" "$index_echo_s2st_pid" "$index_homura_pid" "$index_nailong_pid" "$index_translate_pid" "$step_audio_editx_pid" "$voxcpm2_pid" "$longcat_audiodit_pid" "$dots_tts_soar_pid" "$firered_tts3_timbre_pid" "$firered_tts3_clone_pid"

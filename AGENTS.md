@@ -9,7 +9,7 @@
 
 ## 项目结构与服务速查
 
-当前有 19 个服务 uv 项目，`start.sh` 启动 22 个 HTTP 进程。表中业务入口均为 `POST`，
+当前有 23 个服务 uv 项目，`start.sh` 启动 26 个 HTTP 进程。表中业务入口均为 `POST`，
 `/v1/control` 为 `GET`；各进程另有 `GET /v1/health`。路径大小写必须与代码一致。
 
 | 目录 | 默认端口 | 能力与业务入口 |
@@ -32,6 +32,10 @@
 | `Confucius4_TTS/` | 8361 | 零样本克隆 `/v1/confucius4TTS/generate` |
 | `Qwen3_ASR_1.7B/` | 8371 | 转写 `/v1/qwen3/asr` |
 | `seed-vc/` | 8381 | 音色转换 `/v1/seedVc/voiceConversion` |
+| `Index-Echo-S2ST-9B-GGUF/` | 8382 | Qwen3-ASR、GGUF 文本翻译与 Confucius4-TTS 语音合成 `/v1/indexTranslate/echoS2ST` |
+| `Index-Homura-9B-GGUF/` | 8383 | Qwen3-ASR、Homura 音节约束翻译与 Confucius4-TTS 语音合成 `/v1/indexTranslate/homura` |
+| `Index-Nailong-9B-GGUF/` | 8384 | Qwen3-ASR、Nailong 约束翻译与 Confucius4-TTS 语音合成 `/v1/indexTranslate/naiLong` |
+| `Index-Translate-9B-GGUF/` | 8385 | Qwen3-ASR、Index-Translate 多语种翻译与 Confucius4-TTS 语音合成 `/v1/indexTranslate/translate` |
 | `SoulX-FlashHead-1_3B/` | 8391 | 人像视频 `/v1/soulX/flashHead` |
 | `ditto/` | 8392 | 人像视频 `/v1/ditto/talkingHead` |
 
@@ -40,6 +44,18 @@
   `FIRERED_TTS3_MODE=timbre|clone`，每个进程只注册其模式对应的业务路由。
 - `main/main.py` 只处理健康/控制、共享上传/检查、MiMo 代理和 CPU 导出，不加载模型包或推理。
   空间任务进度为 `GET /v1/audio/spatial/render/progress/{job_id}`，是进程内状态。
+- `Index-Echo-S2ST-9B-GGUF/` 使用 GGUF 文本主干和外部 llama.cpp `llama-server`，编排 Qwen3-ASR 与
+  Confucius4-TTS 的现有服务；GGUF 不包含原生音频塔、连接器或语音合成栈。请求按 ASR、翻译、
+  TTS 顺序执行，各 GPU 阶段分别使用共享 GPU 锁。
+- `Index-Homura-9B-GGUF/` 使用 Homura GGUF 文本模型，通过 `llama-server` 按目标音节数翻译，
+  再编排 Qwen3-ASR 与 Confucius4-TTS 合成。接口目标语种限定为 Confucius4-TTS 当前支持的 14 种，
+  音节数为模型控制目标，不保证精确命中；ASR、翻译、TTS 各阶段分别使用共享 GPU 锁。
+- `Index-Nailong-9B-GGUF/` 使用 Nailong GGUF 文本模型，通过 `llama-server` 翻译 ASR 转写，
+  可选传入术语表、硬性和软性约束，再由 Confucius4-TTS 合成。Nailong 的长文档固定模板能力
+  与本语音翻译路由的普通/instTrans 翻译提示分开；目标语种限定为 TTS 当前支持的 14 种。
+- `Index-Translate-9B-GGUF/` 使用 Index-Translate GGUF 文本模型，按模型 README 的默认提示和
+  instTrans 术语表/硬软约束格式翻译 Qwen3-ASR 转写，再由 Confucius4-TTS 以原始参考音频合成。
+  9B 上下文默认 32768、输出上限默认 1024、温度默认 0 且关闭 thinking；目标语种受 TTS 限制为 14 种。
 - `unitale_runtime/` 是共享轻量包，负责流式上传、引用、原子提交、GPU 队列及存储容量/保留策略；
   不得导入 FastAPI、Torch 或模型包。它是其他项目的 editable 依赖，没有独立 `uv.lock`。
 - `steam_audio_renderer/` 是 C++17 Steam Audio CPU renderer，不获取 GPU 锁；SDK 和动态库在仓库外。
@@ -53,7 +69,7 @@
 
 ## 安装、启动与测试
 
-部署使用 Linux、Python `3.12.13`、`uv`、FFmpeg/ffprobe 和 CUDA/NVIDIA 驱动。
+部署使用 Linux、Python `3.12.13`、`uv`、FFmpeg/ffprobe、llama.cpp `llama-server` 和 CUDA/NVIDIA 驱动。
 统一启动依赖 `setsid`、进程组信号与 `fcntl.flock`；不同服务必须保留各自 Torch/CUDA 环境。
 Step-Audio-EditX 另需系统 `sox`，Ditto 需要 GCC，renderer 构建需要 CMake 3.17+ 和 C++17。
 
@@ -75,7 +91,7 @@ bash scripts/quality_gate.sh
 curl -fsS http://127.0.0.1:8300/v1/control
 ```
 
-质量门禁包含无 SDK 的三个 C++ 核心测试、20 个项目的锁检查、Ruff 与格式检查及三组无模型
+质量门禁包含无 SDK 的三个 C++ 核心测试、24 个项目的锁检查、Ruff 与格式检查及三组无模型
 测试。锁校验可能读取 Git/wheel 元数据；已有完整缓存时可设置 `UV_OFFLINE=1` 运行。
 单独执行测试必须用 QA，不能通过模型环境安装依赖来运行根目录回归：
 
@@ -109,6 +125,17 @@ uv run --project qa --locked python -m unittest discover -s tests -v
 - MOSS-Audio、Qwen3-ASR、TIGER 直接接收 multipart `audio`，输入只暂存；前两者返回 JSON，
   TIGER 返回 ZIP 并原子保存分离批次。SoulX/Ditto 返回带声音 MP4，不使用 WAV 响应约定。
   两个人像视频服务提供 `POST /v1/upload_image` 和 `GET /v1/check/image`，同样使用逻辑标识。
+- Index-Echo S2ST 接收共享 `AudioReferenceStore` 的 `audio_path`，返回 `audio/wav`，源语言支持
+  中文/英文，目标语言支持 zh/en/es/ja；需要已安装的 llama.cpp 可执行文件和已启动的 ASR/TTS 服务。
+- Index-Homura 接收共享 `AudioReferenceStore` 的 `audio_path`，要求 `target_syllables`，可选术语映射
+  `glossary`，返回 `audio/wav`；目标语种限 Confucius4-TTS 支持的 zh/en/ja/ko/de/fr/th/id/vi/es/pt/it/ru/ms。
+  它同样需要 `llama-server` 与现有 ASR/TTS 服务。
+- Index-Nailong 接收共享 `AudioReferenceStore` 的 `audio_path`，由 Qwen3-ASR 转写并由 Nailong 翻译，
+  可选传入 `glossary`、`hard_constraints`、`soft_constraints` 和 `genre`，再调用 Confucius4-TTS 返回
+  `audio/wav`；目标语种限制为 TTS 支持的 14 种。推理需 `llama-server`、Qwen3-ASR 和 Confucius4-TTS。
+- Index-Translate 接收共享 `AudioReferenceStore` 的 `audio_path`，由 Qwen3-ASR 转写后调用 GGUF
+  翻译，再由 Confucius4-TTS 以原始音频作为音色参考返回 `audio/wav`；支持 `glossary`、
+  `hard_constraints`、`soft_constraints` 和 `genre`，目标语种限制为 TTS 支持的 14 种。
 - 正式 `balanced`/`immersive` 必须保留对象边界，走 `/v1/audio/spatial/render` 的 Manifest v1
   与重复 `assets` 字段，不在浏览器预混、不获取 GPU 锁。Steam Audio pre-master 后只能
   loudnorm/编码，禁止再叠加 Haas/aecho。`/v1/audio/export` 调用只用于显式 `profile=standard`
