@@ -16,46 +16,56 @@ Steam Audio 对象级空间导出。MiMo 音色设计调用云端，其余模型
 
 ## 服务总览
 
-| 服务 | 端口 | 主要用途 | 主要路由 |
-| --- | ---: | --- | --- |
-| 控制面 | 8300 | 控制面、共享上传/检查、48 kHz 母带与 Steam Audio 正式导出、MiMo 兼容代理 | `/v1/control`、`/v1/audio/export`、`/v1/audio/spatial/render` |
-| Qwen3-TTS VoiceDesign | 8301 | 本地音色设计 | `/v1/qwen/timbre` |
-| MOSS VoiceGenerator | 8302 | 本地音色设计 | `/v1/moss/timbre` |
-| MiMo TTS VoiceDesign | 8303 | 云端音色设计 | `/v1/mimo/timbre` |
-| FireRedTTS3 Instruct | 8304 | 指令式音色设计 | `/v1/FireRedTTS3/timbre` |
-| Stable Audio 3 Medium | 8311 | 文本生成音乐或声效 | `/v1/stableAudio/soundEffect` |
-| MOSS-SoundEffect v2 | 8312 | 文本生成声效 | `/v1/moss/soundEffect` |
-| ACE-Step 1.5 XL Turbo | 8313 | 有声小说 BGM、主题音乐和 underscore | `/v1/aceStep/bgm` |
-| Qwen3-TTS Base | 8321 | 参考音频语音克隆 | `/v1/qwen/clone` |
-| VoxCPM2 | 8322 | 语音克隆 | `/v1/voxcpm2/clone` |
-| LongCat-AudioDiT-3.5B | 8323 | 参考音频语音克隆 | `/v1/longCat/clone` |
-| dots.tts-soar | 8324 | 参考音频语音克隆 | `/v1/dotsTTS/clone` |
-| FireRedTTS3 Base | 8325 | 参考音频语音克隆 | `/v1/FireRedTTS3/clone` |
-| Step-Audio-EditX | 8331 | 语音编辑 | `/v1/stepAudioEditx/edit` |
-| MOSS-Audio-4B-Thinking | 8341 | 音频转写、描述与问答 | `/v1/mossAudioThinking/understand` |
-| MOSS-Audio-4B-Instruct | 8342 | 音频转写、描述与问答 | `/v1/mossAudioThinking/understand` |
-| TIGER-DnR | 8351 | 电影混音的对白、音效、音乐三 Stem 分离 | `/v1/tigerDnr/separate` |
-| Confucius4-TTS | 8361 | 参考音频零样本、多语言语音克隆 | `/v1/confucius4TTS/generate` |
-| Qwen3-ASR-1.7B | 8371 | 本地多语言音频识别 | `/v1/qwen3/asr` |
-| Seed-VC | 8381 | 原始语音到参考音色的转换，可选 F0 歌声转换 | `/v1/seedVc/voiceConversion` |
-| Index-Echo S2ST | 8382 | Qwen3-ASR 转写、GGUF 文本翻译、Confucius4-TTS 保留音色合成 | `/v1/indexTranslate/echoS2ST` |
-| Index-Homura | 8383 | Qwen3-ASR 转写、Homura 音节约束翻译、Confucius4-TTS 保留音色合成 | `/v1/indexTranslate/homura` |
-| Index-Nailong | 8384 | Qwen3-ASR 转写、Nailong 多语种约束翻译、Confucius4-TTS 保留音色合成 | `/v1/indexTranslate/naiLong` |
-| Index-Translate | 8385 | Qwen3-ASR 转写、Index-Translate 多语种翻译、Confucius4-TTS 保留音色合成 | `/v1/indexTranslate/translate` |
-| SoulX-FlashHead-1_3B | 8391 | 图片与音频驱动人像视频，支持 Lite/Pro | `/v1/soulX/flashHead` |
-| Ditto | 8392 | 图片与音频驱动人像视频，ONNX CUDA 后端 | `/v1/ditto/talkingHead` |
+能力与原生输出依据各行链接的官方模型卡或推理文档；端口与 HTTP 路由依据本仓库
+`main.py` 和 `start.sh`。模型原生能力列描述对应模型或官方完整模型包，接口列列出当前
+服务入口；原生能力是否已接入某个接口，还需查看该接口实际字段和 worker 调用。
 
-表中为业务入口，方法均为 `POST`，控制面的 `/v1/control` 为 `GET`。每个进程提供
-`GET /v1/health`，FastAPI 的 `/docs` 和 `/openapi.json` 可查看该进程实际注册的字段与路由。
-健康接口成功表示 HTTP 服务可访问，还须检查响应内的 `available` 和模型文件状态。
+| 模型/服务 | 默认端口 | 主业务接口 | 模型原生能力/职责 | 原生输出 |
+| --- | --- | --- | --- | --- |
+| [控制面 `main/`](main/) | 8300 | `GET /v1/control`；`POST /v1/audio/export`；`POST /v1/audio/spatial/render` | 控制、共享上传/检查、MiMo 代理、CPU 母带与 Steam Audio 空间导出（[源码](main/main.py)） | 非模型服务，响应见下节 |
+| [Qwen3-TTS 1.7B VoiceDesign `qwen3_voiceDesign/`](qwen3_voiceDesign/) | 8301 | `POST /v1/qwen/timbre` | 根据自然语言音色描述和待朗读文本生成语音，支持音色、情绪和韵律描述（[官方](https://github.com/QwenLM/Qwen3-TTS#voice-design)） | 语音波形 |
+| [MOSS-VoiceGenerator `moss_voiceGenerator/`](moss_voiceGenerator/) | 8302 | `POST /v1/moss/timbre` | 根据音色/风格描述合成中英文语音，无需参考音频（[官方](https://huggingface.co/OpenMOSS-Team/MOSS-VoiceGenerator)） | 语音波形 |
+| [MiMo-V2.5-TTS-VoiceDesign `mimo_tts/`](mimo_tts/) | 8303 | `POST /v1/mimo/timbre` | 云端根据文本描述设计音色，并朗读指定文本（[官方](https://mimo.mi.com/docs/en-US/quick-start/usage-guide/audio/speech-synthesis-v2.5)） | 语音音频 |
+| [FireRedTTS3 `firered_tts3/`](firered_tts3/) | 8304 Instruct / 8325 Base | `POST /v1/FireRedTTS3/timbre`；`POST /v1/FireRedTTS3/clone` | Base：多语言、多方言零样本克隆；Instruct：克隆、音色设计、内容编辑与模板式声学编辑（[官方](https://huggingface.co/FireRedTeam/FireRedTTS3)） | 语音波形；部分 Instruct API 另返回规划/编辑文本 |
+| [Stable Audio 3 Medium `stable_audio_3_medium/`](stable_audio_3_medium/) | 8311 | `POST /v1/stableAudio/soundEffect` | 文本生成音乐和音效；音频局部补全、编辑与续写（[官方](https://huggingface.co/stabilityai/stable-audio-3-medium)） | 音频波形 |
+| [MOSS-SoundEffect v2.0 `moss_soundEffect/`](moss_soundEffect/) | 8312 | `POST /v1/moss/soundEffect` | 中英文提示生成环境、动物、动作等非语音音效，时长可控，单次最长 30 秒（[官方](https://huggingface.co/OpenMOSS-Team/MOSS-SoundEffect-v2.0)） | 音效波形 |
+| [ACE-Step 1.5 XL Turbo `ace_step_1_5/`](ace_step_1_5/) | 8313 | `POST /v1/aceStep/bgm` | 按风格描述、可选歌词与音乐元数据生成音乐，包含纯音乐与带歌声歌曲（[官方](https://huggingface.co/ACE-Step/acestep-v15-xl-turbo-diffusers)） | 音乐波形 |
+| [Qwen3-TTS 1.7B Base `qwen3_tts/`](qwen3_tts/) | 8321 | `POST /v1/qwen/clone` | 参考音频条件下的零样本音色克隆与多语言 TTS（[官方](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-Base)） | 语音波形 |
+| [VoxCPM2 `voxcpm2/`](voxcpm2/) | 8322 | `POST /v1/voxcpm2/clone` | 30 语种 TTS、文本描述音色设计、参考音频克隆，以及带风格指令的可控克隆（[官方](https://huggingface.co/openbmb/VoxCPM2)） | 语音波形 |
+| [LongCat-AudioDiT-3.5B `LongCat_AudioDiT_3.5B_bf16/`](LongCat_AudioDiT_3.5B_bf16/) | 8323 | `POST /v1/longCat/clone` | 扩散式 TTS；支持参考音频与对应转写条件下的零样本克隆（[官方](https://huggingface.co/meituan-longcat/LongCat-AudioDiT-3.5B)） | 语音波形 |
+| [dots.tts-soar `dots_tts_soar/`](dots_tts_soar/) | 8324 | `POST /v1/dotsTTS/clone` | 连续自回归 TTS，支持多语言零样本克隆与跨语言音色迁移（[官方](https://huggingface.co/dots-studio/dots.tts-soar)） | 语音波形 |
+| [Step-Audio-EditX `Step_Audio_EditX/`](Step_Audio_EditX/) | 8331 | `POST /v1/stepAudioEditx/edit` | 语音情绪、说话风格与副语言特征的迭代编辑，并支持零样本 TTS 克隆（[官方](https://huggingface.co/stepfun-ai/Step-Audio-EditX)） | 语音波形 |
+| [MOSS-Audio 4B `moss_audio_4b_thinking/`](moss_audio_4b_thinking/) | 8341 Thinking / 8342 Instruct | 两端口均为 `POST /v1/mossAudioThinking/understand` | 音频转写、描述、环境声/音乐理解、带时间信息的问答与推理；Thinking 提供思考过程，Instruct 面向直接指令回答（[Thinking](https://huggingface.co/OpenMOSS-Team/MOSS-Audio-4B-Thinking)、[Instruct](https://huggingface.co/OpenMOSS-Team/MOSS-Audio-4B-Instruct)） | 文本 |
+| [TIGER-DnR `TIGER-DnR/`](TIGER-DnR/) | 8351 | `POST /v1/tigerDnr/separate` | 将混音分离为对白、音效、音乐三路 Stem（[官方推理](https://github.com/JusperLee/TIGER/blob/main/inference_dnr.py)） | 三路音频波形 |
+| [Confucius4-TTS `Confucius4_TTS/`](Confucius4_TTS/) | 8361 | `POST /v1/confucius4TTS/generate` | 无需参考转写的零样本克隆与跨语言 TTS，支持 14 语种及参考音频的情感迁移（[官方](https://huggingface.co/netease-youdao/Confucius4-TTS)） | 语音波形 |
+| [Qwen3-ASR-1.7B `Qwen3_ASR_1.7B/`](Qwen3_ASR_1.7B/) | 8371 | `POST /v1/qwen3/asr` | 语种识别与语音转写，支持 30 种语言和 22 种中文方言（[官方](https://huggingface.co/Qwen/Qwen3-ASR-1.7B)） | 转写文本与语种 |
+| [Seed-VC `seed-vc/`](seed-vc/) | 8381 | `POST /v1/seedVc/voiceConversion` | 零样本语音音色转换；对应 F0 条件权重支持歌声音色转换（[官方](https://github.com/Plachtaa/seed-vc)） | 转换后的音频波形 |
+| [Index-Echo-S2ST-9B `Index-Echo-S2ST-9B-GGUF/`](Index-Echo-S2ST-9B-GGUF/) | 8382 | `POST /v1/indexTranslate/echoS2ST` | 原生语音到语音翻译，使用源说话人的音色条件；支持中→英/西/日、英→中/西/日六个方向（[官方完整包](https://huggingface.co/IndexTeam/Index-Echo-S2ST-9B)） | 目标语种语音波形，可保存 WAV |
+| [Index-Homura-9B `Index-Homura-9B-GGUF/`](Index-Homura-9B-GGUF/) | 8383 | `POST /v1/indexTranslate/homura` | 文本翻译，同时接受目标音节数与可选术语表；音节数为近似控制目标（[官方](https://huggingface.co/IndexTeam/Index-Homura-9B)） | 译文文本 |
+| [Index-NativeLong / Nailong 9B `Index-Nailong-9B-GGUF/`](Index-Nailong-9B-GGUF/) | 8384 | `POST /v1/indexTranslate/naiLong` | 整篇长文档一次生成译文，利用全文上下文保持内容、实体与术语连贯；官方文档模板支持中英、中日双向（[官方](https://huggingface.co/IndexTeam/Index-Nailong-9B)） | 长文档译文文本 |
+| [Index-Translate-9B `Index-Translate-9B-GGUF/`](Index-Translate-9B-GGUF/) | 8385 | `POST /v1/indexTranslate/translate` | 150 语种翻译，支持术语、格式、风格等硬软约束；配套视觉组件支持图片到译文的翻译（[官方](https://huggingface.co/IndexTeam/Index-Translate-9B)） | 译文文本 |
+| [SoulX-FlashHead-1_3B `SoulX-FlashHead-1_3B/`](SoulX-FlashHead-1_3B/) | 8391 | `POST /v1/soulX/flashHead` | 人像图片与音频驱动的说话人像视频生成，发布 Lite / Pro 两个变体（[官方](https://huggingface.co/Soul-AILab/SoulX-FlashHead-1_3B)） | 视频帧 / 视频 |
+| [Ditto `ditto/`](ditto/) | 8392 | `POST /v1/ditto/talkingHead` | 根据人像图片和驱动音频，通过运动空间扩散生成说话人像视频（[官方](https://github.com/antgroup/ditto-talkinghead)） | 视频帧 / 视频 |
 
-| 能力 | 成功响应 | 服务端保存行为 |
+表格按服务项目归并；FireRedTTS3 与 MOSS-Audio 各由同一个 uv 项目启动两个模式进程。
+Echo 上述 S2ST 能力依赖官方完整语音模型包；本仓库现行 GGUF worker 仅运行它的文本主干。
+`tests/testIndexEchoS2ST/demo.py` 使用原生语音 API 保存 WAV；Homura、Nailong、Index-Translate
+的 Demo 使用各自官方文本脚本，保留 TXT 译文。
+
+表中列出主业务入口。各 HTTP 进程还提供 `GET /v1/health`；FastAPI 的 `/docs` 和
+`/openapi.json` 可查看实际注册的字段与路由。部分服务另有音频/图片上传和检查接口。
+健康接口成功仅表示 HTTP 服务可访问，还须检查响应中的 `available` 和模型文件状态。
+
+## HTTP 响应与存储
+
+以下记录当前 HTTP 实现的响应与存储。四个 Index GGUF 接口目前额外编排 Qwen3-ASR 和
+Confucius4-TTS，返回合成 WAV；这是本仓库的服务实现流程。各模型原生输出见上表，
+接口实现细节见后文的 Index 章节。
+
+| HTTP 服务 | 成功响应 | 服务端保存行为 |
 | --- | --- | --- |
 | 克隆、音色设计、编辑、音效、BGM、音色转换 | `audio/wav` | 按用途保存 WAV |
-| Index-Echo S2ST | `audio/wav` | Confucius4-TTS 保存合成 WAV；源音频使用已上传引用 |
-| Index-Homura | `audio/wav` | Confucius4-TTS 保存合成 WAV；源音频使用已上传引用 |
-| Index-Nailong | `audio/wav` | Confucius4-TTS 保存合成 WAV；源音频使用已上传引用 |
-| Index-Translate | `audio/wav` | Confucius4-TTS 保存合成 WAV；源音频使用已上传引用 |
+| Index GGUF 组合接口（8382–8385） | `audio/wav` | Confucius4-TTS 保存服务编排产生的 WAV；源音频使用已上传引用 |
 | MOSS-Audio Thinking/Instruct、Qwen3-ASR | JSON 文本及上传摘要 | 请求结束后删除上传暂存和 worker 结果，不保留输入音频 |
 | TIGER-DnR | `application/zip`，含 `dialog.wav`、`effects.wav`、`music.wav` | 原子保存三路 Stem 与 ZIP 批次 |
 | SoulX-FlashHead、Ditto | 带声音的 `video/mp4` | 原子保存 MP4 |

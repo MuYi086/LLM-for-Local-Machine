@@ -9,53 +9,49 @@
 
 ## 项目结构与服务速查
 
-当前有 23 个服务 uv 项目，`start.sh` 启动 26 个 HTTP 进程。表中业务入口均为 `POST`，
-`/v1/control` 为 `GET`；各进程另有 `GET /v1/health`。路径大小写必须与代码一致。
+当前有 23 个服务 uv 项目与一个轻量控制面，`start.sh` 合计启动 26 个 HTTP 进程。
+原生能力/输出的官方依据见 [README 服务总览](README.md#服务总览)；端口、方法及路径以源码为准。
+区分原生能力、已接入接口与服务编排，额外模型流程不得写成单模型能力；各进程提供 `GET /v1/health`。
 
-| 目录 | 默认端口 | 能力与业务入口 |
-| --- | --- | --- |
-| `main/` | 8300 | 控制面 `/v1/control`；母带 `/v1/audio/export`；空间导出 `/v1/audio/spatial/render`；MiMo 同路径代理 |
-| `qwen3_voiceDesign/` | 8301 | 音色设计 `/v1/qwen/timbre` |
-| `moss_voiceGenerator/` | 8302 | 音色设计 `/v1/moss/timbre` |
-| `mimo_tts/` | 8303 | 云端音色设计 `/v1/mimo/timbre` |
-| `firered_tts3/` | 8304、8325 | Instruct `/v1/FireRedTTS3/timbre`；Base `/v1/FireRedTTS3/clone` |
-| `stable_audio_3_medium/` | 8311 | 音效/音乐 `/v1/stableAudio/soundEffect` |
-| `moss_soundEffect/` | 8312 | 音效 `/v1/moss/soundEffect` |
-| `ace_step_1_5/` | 8313 | BGM `/v1/aceStep/bgm` |
-| `qwen3_tts/` | 8321 | 克隆 `/v1/qwen/clone` |
-| `voxcpm2/` | 8322 | 克隆与可控克隆 `/v1/voxcpm2/clone` |
-| `LongCat_AudioDiT_3.5B_bf16/` | 8323 | 克隆 `/v1/longCat/clone` |
-| `dots_tts_soar/` | 8324 | 克隆 `/v1/dotsTTS/clone` |
-| `Step_Audio_EditX/` | 8331 | 编辑 `/v1/stepAudioEditx/edit` |
-| `moss_audio_4b_thinking/` | 8341、8342 | Thinking/Instruct 共用 `/v1/mossAudioThinking/understand` |
-| `TIGER-DnR/` | 8351 | 对白/音效/音乐分离 `/v1/tigerDnr/separate` |
-| `Confucius4_TTS/` | 8361 | 零样本克隆 `/v1/confucius4TTS/generate` |
-| `Qwen3_ASR_1.7B/` | 8371 | 转写 `/v1/qwen3/asr` |
-| `seed-vc/` | 8381 | 音色转换 `/v1/seedVc/voiceConversion` |
-| `Index-Echo-S2ST-9B-GGUF/` | 8382 | Qwen3-ASR、GGUF 文本翻译与 Confucius4-TTS 语音合成 `/v1/indexTranslate/echoS2ST` |
-| `Index-Homura-9B-GGUF/` | 8383 | Qwen3-ASR、Homura 音节约束翻译与 Confucius4-TTS 语音合成 `/v1/indexTranslate/homura` |
-| `Index-Nailong-9B-GGUF/` | 8384 | Qwen3-ASR、Nailong 约束翻译与 Confucius4-TTS 语音合成 `/v1/indexTranslate/naiLong` |
-| `Index-Translate-9B-GGUF/` | 8385 | Qwen3-ASR、Index-Translate 多语种翻译与 Confucius4-TTS 语音合成 `/v1/indexTranslate/translate` |
-| `SoulX-FlashHead-1_3B/` | 8391 | 人像视频 `/v1/soulX/flashHead` |
-| `ditto/` | 8392 | 人像视频 `/v1/ditto/talkingHead` |
+| 模型/服务 | 默认端口 | 主业务接口 | 模型原生能力/职责 | 原生输出 |
+| --- | --- | --- | --- | --- |
+| 控制面 `main/` | 8300 | `GET /v1/control`；`POST /v1/audio/export`；`POST /v1/audio/spatial/render` | 控制、上传/检查、MiMo 代理、CPU 母带及空间导出 | 非模型服务 |
+| `qwen3_voiceDesign/` | 8301 | `POST /v1/qwen/timbre` | 文本音色设计与 TTS | 语音波形 |
+| `moss_voiceGenerator/` | 8302 | `POST /v1/moss/timbre` | 中英文音色/风格设计，无需参考音频 | 语音波形 |
+| `mimo_tts/` | 8303 | `POST /v1/mimo/timbre` | 云端文本音色设计与 TTS | 语音音频 |
+| `firered_tts3/` | 8304 Instruct / 8325 Base | `POST /v1/FireRedTTS3/timbre`；`POST /v1/FireRedTTS3/clone` | Base 克隆；Instruct 克隆/设计/内容与声学编辑 | 语音波形；部分 Instruct API 另返回规划/编辑文本 |
+| `stable_audio_3_medium/` | 8311 | `POST /v1/stableAudio/soundEffect` | 音乐/音效生成与局部补全/编辑/续写 | 音频波形 |
+| `moss_soundEffect/` | 8312 | `POST /v1/moss/soundEffect` | 中英文非语音音效生成，最长 30 秒 | 音效波形 |
+| `ace_step_1_5/` | 8313 | `POST /v1/aceStep/bgm` | 纯音乐/歌词条件歌曲生成 | 音乐波形 |
+| `qwen3_tts/` | 8321 | `POST /v1/qwen/clone` | 参考音频零样本多语言 TTS 克隆 | 语音波形 |
+| `voxcpm2/` | 8322 | `POST /v1/voxcpm2/clone` | 30 语种 TTS、设计、克隆及指令可控克隆 | 语音波形 |
+| `LongCat_AudioDiT_3.5B_bf16/` | 8323 | `POST /v1/longCat/clone` | 扩散 TTS，参考音频+转写克隆 | 语音波形 |
+| `dots_tts_soar/` | 8324 | `POST /v1/dotsTTS/clone` | 多语言/跨语言零样本克隆 | 语音波形 |
+| `Step_Audio_EditX/` | 8331 | `POST /v1/stepAudioEditx/edit` | 情绪/风格/副语言迭代编辑与零样本 TTS | 语音波形 |
+| `moss_audio_4b_thinking/` | 8341 Thinking / 8342 Instruct | 两端口均为 `POST /v1/mossAudioThinking/understand` | 语音/环境声/音乐理解、时间问答/推理 | 文本 |
+| `TIGER-DnR/` | 8351 | `POST /v1/tigerDnr/separate` | 对白/音效/音乐三路 Stem 分离 | 三路音频波形 |
+| `Confucius4_TTS/` | 8361 | `POST /v1/confucius4TTS/generate` | 14 语种跨语言零样本 TTS 克隆，无需参考转写 | 语音波形 |
+| `Qwen3_ASR_1.7B/` | 8371 | `POST /v1/qwen3/asr` | 语种识别与转写（30 语种、22 中文方言） | 转写文本与语种 |
+| `seed-vc/` | 8381 | `POST /v1/seedVc/voiceConversion` | 零样本语音转换及 F0 条件歌声转换 | 转换后的音频波形 |
+| `Index-Echo-S2ST-9B-GGUF/` | 8382 | `POST /v1/indexTranslate/echoS2ST` | 完整包 S2ST，源音色条件；中/英源语言 | 目标语种语音波形，可保存 WAV |
+| `Index-Homura-9B-GGUF/` | 8383 | `POST /v1/indexTranslate/homura` | 目标音节数/术语约束文本翻译，音节控制近似 | 译文文本 |
+| `Index-Nailong-9B-GGUF/` | 8384 | `POST /v1/indexTranslate/naiLong` | NativeLong 整篇长文档翻译（中英/中日双向） | 长文档译文文本 |
+| `Index-Translate-9B-GGUF/` | 8385 | `POST /v1/indexTranslate/translate` | 150 语种文本/图片翻译、硬软约束（图片需视觉组件） | 译文文本 |
+| `SoulX-FlashHead-1_3B/` | 8391 | `POST /v1/soulX/flashHead` | 人像图+音频→说话视频（Lite/Pro） | 视频帧 / 视频 |
+| `ditto/` | 8392 | `POST /v1/ditto/talkingHead` | 人像图+音频→运动空间扩散说话视频 | 视频帧 / 视频 |
 
 - MOSS-Audio 的变体由 `MOSS_AUDIO_4B_VARIANT=thinking|instruct` 明确指定，两者共用一个项目。
   不要把 `moss_audio_4b_instruct/` 当作独立服务。FireRed 使用
   `FIRERED_TTS3_MODE=timbre|clone`，每个进程只注册其模式对应的业务路由。
 - `main/main.py` 只处理健康/控制、共享上传/检查、MiMo 代理和 CPU 导出，不加载模型包或推理。
   空间任务进度为 `GET /v1/audio/spatial/render/progress/{job_id}`，是进程内状态。
-- `Index-Echo-S2ST-9B-GGUF/` 使用 GGUF 文本主干和外部 llama.cpp `llama-server`，编排 Qwen3-ASR 与
-  Confucius4-TTS 的现有服务；GGUF 不包含原生音频塔、连接器或语音合成栈。请求按 ASR、翻译、
-  TTS 顺序执行，各 GPU 阶段分别使用共享 GPU 锁。
-- `Index-Homura-9B-GGUF/` 使用 Homura GGUF 文本模型，通过 `llama-server` 按目标音节数翻译，
-  再编排 Qwen3-ASR 与 Confucius4-TTS 合成。接口目标语种限定为 Confucius4-TTS 当前支持的 14 种，
-  音节数为模型控制目标，不保证精确命中；ASR、翻译、TTS 各阶段分别使用共享 GPU 锁。
-- `Index-Nailong-9B-GGUF/` 使用 Nailong GGUF 文本模型，通过 `llama-server` 翻译 ASR 转写，
-  可选传入术语表、硬性和软性约束，再由 Confucius4-TTS 合成。Nailong 的长文档固定模板能力
-  与本语音翻译路由的普通/instTrans 翻译提示分开；目标语种限定为 TTS 当前支持的 14 种。
-- `Index-Translate-9B-GGUF/` 使用 Index-Translate GGUF 文本模型，按模型 README 的默认提示和
-  instTrans 术语表/硬软约束格式翻译 Qwen3-ASR 转写，再由 Confucius4-TTS 以原始参考音频合成。
-  9B 上下文默认 32768、输出上限默认 1024、温度默认 0 且关闭 thinking；目标语种受 TTS 限制为 14 种。
+- 四个 Index GGUF 项目的当前 HTTP 实现使用一次性 `llama-server` 文本 worker，编排
+  Qwen3-ASR 与 Confucius4-TTS；ASR、翻译、TTS 各阶段分别使用共享 GPU 锁。
+  Echo GGUF 不含原生音频塔、连接器或语音合成栈；Nailong 的 NativeLong 固定模板不用于
+  当前语音路由；Index-Translate 当前 worker 未接入配套视觉组件。推理默认值见 README。
+- `tests/testIndex*` Demo 必须调用各自 Index 官方 API/推理脚本，保留原始输出：Echo 为 WAV，
+  Homura、Nailong、Index-Translate 为 TXT。不得混入 Confucius4-TTS 等额外模型流程。
+  Echo 默认读取 `tests/testIndexTranslate/speech.wav`，三个文本 Demo 默认读取同目录 `subtitles.md`。
 - `unitale_runtime/` 是共享轻量包，负责流式上传、引用、原子提交、GPU 队列及存储容量/保留策略；
   不得导入 FastAPI、Torch 或模型包。它是其他项目的 editable 依赖，没有独立 `uv.lock`。
 - `steam_audio_renderer/` 是 C++17 Steam Audio CPU renderer，不获取 GPU 锁；SDK 和动态库在仓库外。
@@ -63,7 +59,7 @@
   `tests/` 为根目录回归，ACE-Step 和 Stable Audio 的服务内测试须从各自目录执行。
 - `scripts/training/`、`training/configs/` 是纯文本润色 LoRA 实验，不是语音训练或 HTTP 服务。
   模型训练需要独立外部环境；数据、adapter、预测保存到 `storage/training/`。
-- `soundEffect/` 和 `tests/testConfucius4TTS/`、`tests/testSoulX_FlashHead/`、`tests/testDitto/`
+- `soundEffect/` 和 `tests/testConfucius4TTS/`、`tests/testSoulX_FlashHead/`、`tests/testDitto/`、`tests/testIndex*/`
   含真实模型演示，不能纳入自动无模型推理测试。`流行*模型功能简介.md`、`task*.md` 和
   `special-audio-effect/` 是调研/任务/方案资料，不能据此推断已实现能力。
 
@@ -118,24 +114,18 @@ uv run --project qa --locked python -m unittest discover -s tests -v
 - 模型默认值集中在服务模块顶部；新增/修改 `start.sh` 配置只负责路由、路径、端口、环境和
   共享运行参数，不应新增静默推理覆盖。现有部分服务的默认参数还由脚本导出，改默认值须核对两处。
 - 不恢复 IndexTTS2、Ming、OmniVoice、旧 MOSS-TTS 克隆、Stable Audio 3 Small SFX、VoxCPM2
-  音色设计、集中式 `api/` 或 Conda 回退；不新增旧接口别名。8300 的 MiMo 同路径代理是既有边界。
+  音色设计服务、集中式 `api/` 或 Conda 回退；不新增旧接口别名。8300 的 MiMo 同路径代理是既有边界。
 - Qwen/VoxCPM2/LongCat/dots/FireRed 克隆拒绝 `style_prompt`。VoxCPM2 `controllable` 模式使用
   `control_instruction`，与 `prompt_text` 互斥且忽略 sidecar；`nonverbal_tags` 最多一个白名单标签。
   LongCat 与 FireRed Base 要求准确参考转写；Confucius4 默认 `lang=zh`，参考 sidecar 不参与推理。
 - MOSS-Audio、Qwen3-ASR、TIGER 直接接收 multipart `audio`，输入只暂存；前两者返回 JSON，
   TIGER 返回 ZIP 并原子保存分离批次。SoulX/Ditto 返回带声音 MP4，不使用 WAV 响应约定。
   两个人像视频服务提供 `POST /v1/upload_image` 和 `GET /v1/check/image`，同样使用逻辑标识。
-- Index-Echo S2ST 接收共享 `AudioReferenceStore` 的 `audio_path`，返回 `audio/wav`，源语言支持
-  中文/英文，目标语言支持 zh/en/es/ja；需要已安装的 llama.cpp 可执行文件和已启动的 ASR/TTS 服务。
-- Index-Homura 接收共享 `AudioReferenceStore` 的 `audio_path`，要求 `target_syllables`，可选术语映射
-  `glossary`，返回 `audio/wav`；目标语种限 Confucius4-TTS 支持的 zh/en/ja/ko/de/fr/th/id/vi/es/pt/it/ru/ms。
-  它同样需要 `llama-server` 与现有 ASR/TTS 服务。
-- Index-Nailong 接收共享 `AudioReferenceStore` 的 `audio_path`，由 Qwen3-ASR 转写并由 Nailong 翻译，
-  可选传入 `glossary`、`hard_constraints`、`soft_constraints` 和 `genre`，再调用 Confucius4-TTS 返回
-  `audio/wav`；目标语种限制为 TTS 支持的 14 种。推理需 `llama-server`、Qwen3-ASR 和 Confucius4-TTS。
-- Index-Translate 接收共享 `AudioReferenceStore` 的 `audio_path`，由 Qwen3-ASR 转写后调用 GGUF
-  翻译，再由 Confucius4-TTS 以原始音频作为音色参考返回 `audio/wav`；支持 `glossary`、
-  `hard_constraints`、`soft_constraints` 和 `genre`，目标语种限制为 TTS 支持的 14 种。
+- 四个 Index GGUF HTTP 接口接收共享 `AudioReferenceStore` 的 `audio_path`，以原始音频作为
+  TTS 音色参考，返回编排产生的 `audio/wav`；需要 `llama-server` 与已启动的 ASR/TTS 服务。
+  Echo 源语言支持中文/英文，目标支持 zh/en/es/ja；其他三者的语音目标语种限定为 TTS 支持的
+  zh/en/ja/ko/de/fr/th/id/vi/es/pt/it/ru/ms。Homura 要求 `target_syllables`，可选 `glossary`；
+  Nailong/Index-Translate 支持 `glossary`、`hard_constraints`、`soft_constraints` 和 `genre`。
 - 正式 `balanced`/`immersive` 必须保留对象边界，走 `/v1/audio/spatial/render` 的 Manifest v1
   与重复 `assets` 字段，不在浏览器预混、不获取 GPU 锁。Steam Audio pre-master 后只能
   loudnorm/编码，禁止再叠加 Haas/aecho。`/v1/audio/export` 调用只用于显式 `profile=standard`

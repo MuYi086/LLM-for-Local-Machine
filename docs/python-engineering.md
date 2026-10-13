@@ -7,7 +7,7 @@
 
 ## 可复现环境
 
-- 19 个服务项目固定使用 Python `3.12.13`。服务的 `.python-version` 与
+- 23 个服务项目固定使用 Python `3.12.13`。服务的 `.python-version` 与
   `requires-python` 必须保持一致；`qa` 和共享运行时也声明相同 Python 版本。
 - 各服务独立锁定 Torch、CUDA wheel 和上游运行时，不能合并到一个环境。
   核心依赖尽量使用精确版本；范围依赖、开发工具和 Git 依赖由对应 `uv.lock` 锁定。
@@ -41,7 +41,7 @@ bash scripts/quality_gate.sh
 ```
 
 统一入口先运行 `bash -n start.sh` 和不依赖 Steam Audio SDK 的三个 C++ 核心测试，
-再检查 19 个服务项目与 QA 的锁文件，使用轻量 QA 环境执行 Ruff、格式检查和三组单元测试。
+再检查 23 个服务项目与 QA 的锁文件，使用轻量 QA 环境执行 Ruff、格式检查和三组单元测试。
 GitHub Actions 调用同一脚本，不需要模型环境或 CUDA；需要 `uv` 与 `g++`。
 锁检查仍可能访问 Git/wheel 元数据；已有完整缓存时可用 `UV_OFFLINE=1`，
 离线模式不能代替首次准备依赖元数据。
