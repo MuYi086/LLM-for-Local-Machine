@@ -51,7 +51,7 @@ def main() -> int:
                 "step_audio_editx_",
             ),
             soundeffect_dir: ("moss_soundeffect_", "stable_audio_3_medium_"),
-            bgm_dir: ("ace_step_1_5_",),
+            bgm_dir: ("ace_step_1_5_", "yue2_3b_"),
         },
         retention_hours=float(status["retention_hours"]),
         retention_max_bytes=int(status["retention_max_bytes"]),

@@ -1,10 +1,10 @@
 # 本地 AI 音视频后端
 
 前端使用的本地后端，提供参考音频语音克隆、音色设计、语音编辑、语音翻译、音效与 BGM
-生成、音频理解与转写、三路音源分离、音色转换、音频驱动人像视频，以及 CPU 音频母带和
+生成、音频理解与转写、音乐转谱、三路音源分离、音色转换、音频驱动人像视频，以及 CPU 音频母带和
 Steam Audio 对象级空间导出。MiMo 音色设计调用云端，其余模型使用本地权重。
 
-仓库包含 **23 个独立服务 uv 项目，统一启动 26 个 HTTP 进程**：FireRedTTS3 和 MOSS-Audio
+仓库包含 **27 个独立服务 uv 项目，统一启动 30 个 HTTP 进程**：FireRedTTS3 和 MOSS-Audio
 各启动两个模式进程，另有一个轻量控制面。HTTP 进程不加载重型模型，模型推理由对应目录
 中的一次性 worker 完成；共享运行时和无模型 QA 环境分别位于 `unitale_runtime/`、`qa/`。
 接口、路径和默认值以当前 `main.py`、`worker.py`、`pyproject.toml` 与 `start.sh` 为准。
@@ -30,6 +30,10 @@ Steam Audio 对象级空间导出。MiMo 音色设计调用云端，其余模型
 | [Stable Audio 3 Medium `stable_audio_3_medium/`](stable_audio_3_medium/) | 8311 | `POST /v1/stableAudio/soundEffect` | 文本生成音乐和音效；音频局部补全、编辑与续写（[官方](https://huggingface.co/stabilityai/stable-audio-3-medium)） | 音频波形 |
 | [MOSS-SoundEffect v2.0 `moss_soundEffect/`](moss_soundEffect/) | 8312 | `POST /v1/moss/soundEffect` | 中英文提示生成环境、动物、动作等非语音音效，时长可控，单次最长 30 秒（[官方](https://huggingface.co/OpenMOSS-Team/MOSS-SoundEffect-v2.0)） | 音效波形 |
 | [ACE-Step 1.5 XL Turbo `ace_step_1_5/`](ace_step_1_5/) | 8313 | `POST /v1/aceStep/bgm` | 按风格描述、可选歌词与音乐元数据生成音乐，包含纯音乐与带歌声歌曲（[官方](https://huggingface.co/ACE-Step/acestep-v15-xl-turbo-diffusers)） | 音乐波形 |
+| [YuE2-3B `YuE2-3B/`](YuE2-3B/) | 8314 | `POST /v1/m-a-p/YuE2` | 根据风格、歌词和可选 ABC 乐谱生成带歌声与伴奏的歌曲（[官方](https://huggingface.co/m-a-p/YuE2-3B)） | 48 kHz 立体声音乐波形 |
+| [SheetSage2 `SheetSage2/`](SheetSage2/) | 8315 | `POST /v1/m-a-p/SheetSage2` | 将音乐转为可编辑乐谱、MIDI、节拍/和弦/调性/结构与时间标注（[官方](https://huggingface.co/m-a-p/SheetSage2)） | ABC、MIDI 与 JSON/LAB 标注 ZIP |
+| [YuE2-Vae `YuE2-Vae/`](YuE2-Vae/) | 8316 | `POST /v1/m-a-p/YuE2-Vae` | 将 48 kHz 音频编码为 acoustic latent，或将 latent 解码为立体声音乐（[官方](https://huggingface.co/m-a-p/YuE2-Vae)） | `[T,64]` NPY latent 或 48 kHz WAV |
+| [MERT-v2-FullSong `MERT-v2-FullSong/`](MERT-v2-FullSong/) | 8317 | `POST /v1/m-a-p/MERT-v2-FullSong` | 为 30–360 秒完整歌曲提取 MERT-v2 逐帧特征和整曲表征（[官方](https://huggingface.co/m-a-p/MERT-v2-FullSong)） | 1024 维 JSON embedding 或 25 Hz 特征 NPZ |
 | [Qwen3-TTS 1.7B Base `qwen3_tts/`](qwen3_tts/) | 8321 | `POST /v1/qwen/clone` | 参考音频条件下的零样本音色克隆与多语言 TTS（[官方](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-Base)） | 语音波形 |
 | [VoxCPM2 `voxcpm2/`](voxcpm2/) | 8322 | `POST /v1/voxcpm2/clone` | 30 语种 TTS、文本描述音色设计、参考音频克隆，以及带风格指令的可控克隆（[官方](https://huggingface.co/openbmb/VoxCPM2)） | 语音波形 |
 | [LongCat-AudioDiT-3.5B `LongCat_AudioDiT_3.5B_bf16/`](LongCat_AudioDiT_3.5B_bf16/) | 8323 | `POST /v1/longCat/clone` | 扩散式 TTS；支持参考音频与对应转写条件下的零样本克隆（[官方](https://huggingface.co/meituan-longcat/LongCat-AudioDiT-3.5B)） | 语音波形 |
@@ -66,6 +70,9 @@ Demo 调用对应端口，Echo 保存 WAV，Homura、Nailong、Index-Translate �
 | 克隆、音色设计、编辑、音效、BGM、音色转换 | `audio/wav` | 按用途保存 WAV |
 | Index-Echo 原生接口（8382） | `audio/wav`；`return_info=true` 时为 WAV/info ZIP | 输入与 worker 输出只暂存，请求结束后清理；Demo 在本地保存响应 |
 | Index-Homura、Nailong、Index-Translate（8383–8385） | UTF-8 `text/plain` | 原生译文直接响应，Demo 在本地保存 TXT；worker JSON 请求后清理 |
+| SheetSage2（8315） | `application/zip`，含可用时的 ABC、MIDI、事件与窗口输出 | 原子保存到 `storage/sheetsage2/`；上传音频和 worker 临时文件请求后清理 |
+| YuE2-Vae（8316） | `audio/wav`（decode）或 `application/octet-stream`（encode NPY） | 原子保存到 `storage/yue2_vae/`；上传和 worker 临时文件请求后清理 |
+| MERT-v2-FullSong（8317） | JSON mean embedding 或 `application/octet-stream` NPZ 逐帧特征 | 原子保存到 `storage/mert_v2_fullsong/`；请求音频和 worker 临时文件请求后清理 |
 | MOSS-Audio Thinking/Instruct、Qwen3-ASR | JSON 文本及上传摘要 | 请求结束后删除上传暂存和 worker 结果，不保留输入音频 |
 | TIGER-DnR | `application/zip`，含 `dialog.wav`、`effects.wav`、`music.wav` | 原子保存三路 Stem 与 ZIP 批次 |
 | SoulX-FlashHead、Ditto | 带声音的 `video/mp4` | 原子保存 MP4 |
@@ -109,6 +116,10 @@ dots_tts_soar/                dots.tts-soar 服务和 worker
 moss_soundEffect/             MOSS-SoundEffect v2 服务和 worker
 stable_audio_3_medium/        Stable Audio 3 Medium 服务和 worker
 ace_step_1_5/                  ACE-Step 1.5 BGM 服务和 worker
+YuE2-3B/                       YuE2-3B 歌曲生成服务和一次性 worker
+SheetSage2/                    SheetSage2 音乐转谱服务和一次性 worker
+YuE2-Vae/                      YuE2 acoustic latent 编码/解码服务和一次性 worker
+MERT-v2-FullSong/              MERT-v2-FullSong 音乐表征服务和一次性 worker
 qwen3_voiceDesign/            Qwen VoiceDesign 服务和 worker
 moss_voiceGenerator/          MOSS VoiceGenerator 服务和 worker
 moss_audio_4b_thinking/       MOSS-Audio-4B-Thinking/Instruct 服务和 worker
@@ -141,7 +152,10 @@ storage/                      上传素材、生成音视频、sidecar、训练�
 | --- | --- | --- |
 | `storage/timbre/` | Qwen、MOSS、MiMo、FireRedTTS3 生成的音色参考音频 | `TIMBRE_STORAGE_DIR` |
 | `storage/soundEffect/` | MOSS 和 Stable Audio 生成的声效 | `SOUNDEFFECT_STORAGE_DIR`、`STABLE_AUDIO_3_MEDIUM_OUTPUT_DIR` |
-| `storage/bgm/` | ACE-Step 有声小说 BGM 和 OST | `BGM_STORAGE_DIR`、`ACESTEP_OUTPUT_DIR` |
+| `storage/bgm/` | ACE-Step 与 YuE2-3B 生成的 BGM、歌曲和 OST | `BGM_STORAGE_DIR`、`ACESTEP_OUTPUT_DIR`、`YUE2_3B_OUTPUT_DIR` |
+| `storage/yue2_vae/` | YuE2-Vae 编码的 latent NPY 与解码 WAV | `YUE2_VAE_OUTPUT_DIR` |
+| `storage/sheetsage2/` | SheetSage2 转写生成的 ABC、MIDI 与标注 ZIP | `SHEETSAGE2_OUTPUT_DIR` |
+| `storage/mert_v2_fullsong/` | MERT-v2-FullSong 的整曲 JSON embedding 与逐帧 NPZ 特征 | `MERT_V2_FULLSONG_OUTPUT_DIR` |
 | `storage/clone/` | 参考音频、克隆结果、Step 编辑结果和 Seed-VC 转换结果 | `CLONE_STORAGE_DIR`、各服务的 `*_OUTPUT_DIR` |
 | `storage/separation/` | TIGER-DnR 每次分离的 dialog、effects、music Stem 与 ZIP | `TIGER_DNR_OUTPUT_DIR` |
 | `storage/video/` | SoulX-FlashHead 和 Ditto 生成的 MP4 | `SOULX_FLASHHEAD_OUTPUT_DIR`、`DITTO_OUTPUT_DIR` |
@@ -188,7 +202,7 @@ GCC 编译上游 Cython 扩展；正式 Steam Audio renderer 需要 CMake 3.17+�
 ```bash
 test -d /home/muyi086/tts-depency/MOSS-TTS &&
 for project in qwen3_tts mimo_tts voxcpm2 LongCat_AudioDiT_3.5B_bf16 \
-  dots_tts_soar moss_soundEffect stable_audio_3_medium ace_step_1_5 \
+  dots_tts_soar moss_soundEffect stable_audio_3_medium ace_step_1_5 YuE2-3B SheetSage2 YuE2-Vae MERT-v2-FullSong \
   qwen3_voiceDesign moss_voiceGenerator moss_audio_4b_thinking Confucius4_TTS \
   Qwen3_ASR_1.7B seed-vc Index-Echo-S2ST-9B-GGUF Index-Homura-9B-GGUF Index-Nailong-9B-GGUF Index-Translate-9B-GGUF SoulX-FlashHead-1_3B ditto Step_Audio_EditX \
   firered_tts3 TIGER-DnR; do
@@ -201,8 +215,27 @@ done
 不能用 Git/PyPI 来源替换。上面的检查须成功后才同步该项目。
 ACE-Step 的 Diffusers 和 dots 的 `dots-tts` 使用锁定的 Git revision，Step-Audio-EditX
 使用指定的 vLLM wheel；首次安装和锁文件校验可能需要访问这些依赖来源。
+YuE2-3B 使用官方 `yue2_infer` 0.1.5 wheel 和 PyTorch 2.10；MOT 与 `YuE2-Vae`
+权重需分别准备在下表默认目录，模型目录缺失时健康接口会报告 `ready=false`。
 `LOCAL_FILES_ONLY` 只控制模型加载，不代替依赖安装。启动前应完成 `uv sync --locked`；
 `start.sh` 不执行依赖同步，也不下载权重或外部源码。
+
+YuE2-Vae 独立项目使用官方 `AutoModel` remote code，依赖 PyTorch 2.10、Transformers 4.57.6、
+NumPy 2.2.6 与 SoundFile。准备 `m-a-p/YuE2-Vae` 本地快照后执行
+`uv sync --project YuE2-Vae --locked`。`POST /v1/m-a-p/YuE2-Vae` 的
+`operation=decode` 接收 `latent=@latent.npy` 并返回 48 kHz WAV；
+`operation=encode` 接收 `audio=@song.wav` 并返回 `[T,64]` NPY。音频由 FFmpeg
+转换为 48 kHz 双声道；VAE 使用 FP32 与官方 `decode_tiled` 分块解码。
+
+SheetSage2 使用 `transformers` 官方 `AutoModel` 调用及一次性 worker。请按模型卡准备
+SheetSage2 与其配置固定 revision 的 MERT-v2-FullSong 两个本地目录，再执行
+`uv sync --project SheetSage2 --locked`。服务默认使用 BF16 推理和 SheetSage2 `default`
+preset，FFmpeg 解码上传音频；转写结果 ZIP 原子保存到 `storage/sheetsage2/`。
+
+MERT-v2-FullSong 有独立服务项目，使用模型卡测试过的 PyTorch/Torchaudio 2.6.0 与
+Transformers 4.53.2。模型代码、processor 和权重来自 `$HF_MIRROR_DIR/m-a-p/MERT-v2-FullSong`；
+执行 `uv sync --project MERT-v2-FullSong --locked` 后由本服务自己的 worker 加载，和 SheetSage2
+使用不同的 uv 环境。
 
 MiMo 是云端服务，必须配置密钥：
 
@@ -217,8 +250,8 @@ Tokenizer 和上游源码就绪后启动全部服务：
 bash start.sh
 ```
 
-`start.sh` 会启动 8300、8301、8302、8303、8304、8311、8312、8313、8321、8322、8323、8324、8325、
-8331、8341、8342、8351、8361、8371、8381、8382、8383、8384、8385、8391 和 8392 共 26 个进程；8300 使用 `qwen3_tts` uv 项目中的轻量 HTTP 依赖，其余服务使用
+`start.sh` 会启动 8300、8301、8302、8303、8304、8311、8312、8313、8314、8315、8316、8317、8321、8322、8323、
+8324、8325、8331、8341、8342、8351、8361、8371、8381、8382、8383、8384、8385、8391 和 8392 共 30 个进程；8300 使用 `qwen3_tts` uv 项目中的轻量 HTTP 依赖，其余服务使用
 各自的 uv 项目。启动命令统一使用 `uv run --no-sync`，不会在运行阶段联网解析依赖；
 本地 GPU 服务通过 `GPU_LOCK_FILE` 串行访问 GPU。默认最多排队 900 秒，超过时返回
 `503`；用正数 `GPU_LOCK_WAIT_TIMEOUT` 调整。共享锁实现仍兼容非正值无限等待，
@@ -319,6 +352,10 @@ Python 3.12 环境采用 ONNX Runtime CUDA 后端；配置映射和三维采样�
 | MOSS-SoundEffect | `$HF_MIRROR_DIR/OpenMOSS-Team/MOSS-SoundEffect-v2.0` | `MOSS_SOUNDEFFECT_CODE_PATH`、`MOSS_SOUNDEFFECT_MODEL_DIR` |
 | Stable Audio 3 Medium | `$HF_MIRROR_DIR/stabilityai/stable-audio-3-medium` | `STABLE_AUDIO_3_REPO_PATH`、`STABLE_AUDIO_3_MEDIUM_MODEL_DIR` |
 | ACE-Step 1.5 XL Turbo | `$HF_MIRROR_DIR/ACE-Step/acestep-v15-xl-turbo-diffusers` | `ACESTEP_MODEL_DIR`、`ACESTEP_OFFLOAD`、`ACESTEP_VAE_TILING` |
+| YuE2-3B | `$HF_MIRROR_DIR/m-a-p/YuE2-3B` 与 `$HF_MIRROR_DIR/m-a-p/YuE2-Vae` | `YUE2_3B_MODEL_DIR`、`YUE2_VAE_MODEL_DIR`、`YUE2_3B_MEMORY_BUDGET_GIB`、`YUE2_3B_REQUEST_TIMEOUT` |
+| YuE2-Vae | `$HF_MIRROR_DIR/m-a-p/YuE2-Vae` | `YUE2_VAE_MODEL_DIR`、`YUE2_VAE_OUTPUT_DIR`、`YUE2_VAE_DEVICE`、`YUE2_VAE_REQUEST_TIMEOUT`、`YUE2_VAE_MAX_AUDIO_SECONDS` |
+| SheetSage2 | `$HF_MIRROR_DIR/m-a-p/SheetSage2` 与 `$HF_MIRROR_DIR/m-a-p/MERT-v2-FullSong` | `SHEETSAGE2_MODEL_DIR`、`SHEETSAGE2_BASE_MODEL_DIR`、`SHEETSAGE2_OUTPUT_DIR`、`SHEETSAGE2_DEVICE`、`SHEETSAGE2_DTYPE`、`SHEETSAGE2_PRESET`、`SHEETSAGE2_REQUEST_TIMEOUT` |
+| MERT-v2-FullSong | `$HF_MIRROR_DIR/m-a-p/MERT-v2-FullSong` | `MERT_V2_FULLSONG_MODEL_DIR`、`MERT_V2_FULLSONG_OUTPUT_DIR`、`MERT_V2_FULLSONG_DEVICE`、`MERT_V2_FULLSONG_REQUEST_TIMEOUT` |
 | VoxCPM2 | `$HF_MIRROR_DIR/openbmb/VoxCPM2` | `VOXCPM2_MODEL_DIR`、仓库内 `voxcpm2/voxcpm2_helpers.py` |
 | LongCat-AudioDiT | `$HF_MIRROR_DIR/drbaph/LongCat-AudioDiT-3.5B-bf16` | `LONGCAT_AUDIODIT_MODEL_DIR`、`LONGCAT_AUDIODIT_REPO_PATH`、`LONGCAT_AUDIODIT_TOKENIZER_PATH`（`$HF_MIRROR_DIR/google/umt5-base`） |
 | dots.tts-soar | `$HF_MIRROR_DIR/rednote-hilab/dots.tts-soar` | `DOTS_TTS_SOAR_MODEL_DIR` |
@@ -983,6 +1020,121 @@ uv sync --project ace_step_1_5 --locked
 
 本仓库的 `start.sh` 对 ACE-Step 使用 `uv run --no-sync`，不会在启动时安装依赖。
 
+## YuE2-3B 歌曲生成
+
+YuE2-3B 在 `8314` 提供官方文本到音乐管线，输入风格描述和歌词，可选使用 `cot` 选择
+完整和弦规划、旋律规划或关闭规划，也可提供 ABC 乐谱和原生采样参数。服务默认使用
+`m-a-p/YuE2-3B` 与配套 `m-a-p/YuE2-Vae` 本地目录，生成 48 kHz 立体声 WAV，保存到
+`storage/bgm/`，并在 HTTP 响应中返回同一 WAV。
+
+```bash
+curl -X POST http://127.0.0.1:8314/v1/m-a-p/YuE2 \
+  -H 'Content-Type: application/json' \
+  -d '{"style":"Mandarin funk, nu-disco, warm female lead vocal, bright bass and tight drums","lyrics":"[Verse 1]\n夜色落在窗台\n城市还没有睡\n\n[Chorus]\n今晚不眠 一起追着星光飞","cot":"full","seed":831001}' \
+  -o yue2-song.wav
+```
+
+`style` 或其原生别名 `tags` 至少提供一项，`lyrics` 必填。`cot` 可取 `off`、`melody`、
+`full`；`seed` 默认 `831001`；可选 `abc`、`cfg_scale`、`id`、`abc_sampling` 和
+`semantic_sampling` 都映射到官方 pipeline 参数。采样对象只需传要覆盖的字段，未提供的
+值继续使用 YuE2 官方默认配置。成功响应包含 `X-YuE2-3B-Seed`、
+`X-YuE2-3B-Sample-Rate` 和 `X-YuE2-3B-Model`。健康接口不会加载模型；当依赖、MOT、VAE
+或 CUDA 缺失时，`ready` 为 false，生成请求返回 `503`。
+
+先同步该项目锁定环境，再准备模型文件：
+
+```bash
+uv sync --project YuE2-3B --locked
+```
+
+运行依赖固定 PyTorch `2.10.0` 和 Transformers `4.57.6`。官方 `yue2_infer` `0.1.5` wheel
+从主模型目录加载，不需复制到仓库。主模型默认放在
+`$HF_MIRROR_DIR/m-a-p/YuE2-3B`，VAE 默认放在 `$HF_MIRROR_DIR/m-a-p/YuE2-Vae`；
+服务默认离线加载，请求不会下载权重。官方资源说明建议使用 24 GB GPU 和 24 GB 可用主机
+内存，单次只生成一首歌。YuE2 使用共享 GPU 文件锁和一次性 worker；模型在每个请求中重新
+加载，默认请求超时为 1800 秒，GPU 排队超时沿用正数 `GPU_LOCK_WAIT_TIMEOUT`。
+本机显存较小时可通过 `YUE2_3B_MEMORY_BUDGET_GIB` 限制 worker 显存预算，但实际可生成的
+歌曲长度仍取决于空闲显存。
+
+## SheetSage2 音乐转谱
+
+SheetSage2 在 `8315` 接收 multipart 音频，转写完整歌曲的旋律、和弦、节拍、调性和结构，
+返回 `application/zip`，其中包含可用时的 ABC、MIDI、`events.json`、LAB、`result.json` 及模型实际
+生成的其他原生文件。若 ABC 无法构建，`result.json` 会写入 `abc_error`，MIDI 和标注仍会返回。
+可用 `dtype=bf16|fp32`、`preset=default|paper`、`max_seconds`、
+`overlap_seconds`、`lookahead_seconds`、重复 `prompts`、`melody_only` 与特征导出开关控制
+转写。`paper` preset 固定窗口参数为 `overlap_seconds=100`、`lookahead_seconds=0`。
+
+```bash
+curl -X POST http://127.0.0.1:8315/v1/m-a-p/SheetSage2 \
+  -F 'audio=@song.mp3' \
+  -F 'dtype=bf16' \
+  -F 'preset=default' \
+  -o sheetsage2-result.zip
+```
+
+模型代码和权重由 Hugging Face SheetSage2 本地快照提供，不复制到本仓库。SheetSage2
+adapter 还要求配置指定 commit 的 MERT-v2-FullSong 权重和代码，加载时会按官方实现校验
+父模型文件摘要。默认目录分别为 `$HF_MIRROR_DIR/m-a-p/SheetSage2` 与
+`$HF_MIRROR_DIR/m-a-p/MERT-v2-FullSong`；`SHEETSAGE2_MODEL_DIR` 和
+`SHEETSAGE2_BASE_MODEL_DIR` 可覆盖路径。上传经共享暂存器按块校验，单次 worker 退出后释放
+GPU；请求音频临时文件会删除，生成 ZIP 保留在 `SHEETSAGE2_OUTPUT_DIR`，当前保留策略工具
+不会自动清理这些 ZIP。
+
+## YuE2-Vae latent 编码与解码
+
+YuE2-Vae 在 `8316` 提供官方 VAE 编码和解码能力。解码接收 YuE2 acoustic latent 的 NPY 文件，
+形状为 `[T,64]`，输出 48 kHz 立体声 PCM_24 WAV；编码接收音频，FFmpeg 先转为 48 kHz 双声道，
+再输出 `[T,64]` float32 NPY。编码默认使用 posterior mean，可选 `sample=true` 和 `seed`
+进行 posterior sampling。输入文件按块暂存，模型在一次性 worker 中加载，成品原子保存至
+`storage/yue2_vae/`；该目录当前不由存储保留策略自动清理。
+
+解码已有 YuE2 `song.save_artifacts(...)` 生成的 `latent.npy`：
+
+```bash
+curl -X POST http://127.0.0.1:8316/v1/m-a-p/YuE2-Vae \
+  -F 'operation=decode' \
+  -F 'latent=@outputs/song/latent.npy' \
+  -o decoded.wav
+```
+
+编码输入音频：
+
+```bash
+curl -X POST http://127.0.0.1:8316/v1/m-a-p/YuE2-Vae \
+  -F 'operation=encode' \
+  -F 'audio=@song.wav' \
+  -o song-latent.npy
+```
+
+`GET /v1/health` 检查本地模型、Python 依赖、FFmpeg/ffprobe 和 GPU，不加载权重。官方 VAE
+要求 FP32；`decode_tiled` 按窗口解码以限制显存使用。请求默认最大音频时长为 600 秒，
+最大 latent 帧数为 15000，可通过 `YUE2_VAE_MAX_AUDIO_SECONDS` 和
+`YUE2_VAE_MAX_LATENT_FRAMES` 调整。
+
+## MERT-v2-FullSong 音乐表征
+
+MERT-v2-FullSong 在 `8317` 接收 30–360 秒完整歌曲，并按模型卡流程将音频混为单声道、转换到
+24 kHz，再调用官方 `AutoFeatureExtractor` 与 `AutoModel`。模型输出 25 Hz、1024 维逐帧特征；
+默认返回掩码平均后的整曲 JSON embedding，`output=frames` 则返回含 `last_hidden_state`、
+`embedding` 和元数据的 NPZ。模型保持 FP32，使用 PyTorch SDPA attention。
+
+```bash
+curl -X POST http://127.0.0.1:8317/v1/m-a-p/MERT-v2-FullSong \
+  -F 'audio=@song.flac' \
+  -F 'output=embedding'
+
+curl -X POST http://127.0.0.1:8317/v1/m-a-p/MERT-v2-FullSong \
+  -F 'audio=@song.flac' \
+  -F 'output=frames' \
+  -o mert-v2-features.npz
+```
+
+权重、Transformers remote code 与 `preprocessor_config.json` 必须存在于本地快照，服务默认离线，
+不会在请求中下载。默认目录为 `$HF_MIRROR_DIR/m-a-p/MERT-v2-FullSong`；模型状态、Python 依赖、
+FFmpeg/ffprobe 和 CUDA 由 `GET /v1/health` 检查。成品原子保存到 `storage/mert_v2_fullsong/`，
+当前存储维护工具不会自动清理该目录。
+
 ## Step-Audio-EditX 编辑
 
 8331 自己负责 prompt 音频的上传、检查和编辑，不经过 8300 代理。先上传，再调用编辑：
@@ -1062,9 +1214,9 @@ adapter、数据集和预测都写入 `storage/training/`，不提交到 Git。
   ```
 
 维护脚本目前仅处理四个默认音频目录中指定前缀的 WAV：Qwen/MOSS/MiMo 设计音色，
-Qwen3-TTS/VoxCPM2/LongCat/dots/Step 的克隆或编辑结果，MOSS/Stable 声效及 ACE-Step BGM。
+Qwen3-TTS/VoxCPM2/LongCat/dots/Step 的克隆或编辑结果，MOSS/Stable 声效及 ACE-Step、YuE2-3B BGM。
 它保护普通上传和仍被 `.references` 引用的音色，但**尚不清理 FireRedTTS3、Confucius4-TTS、
-Seed-VC 的生成结果、TIGER 分离批次、MP4、图片或训练产物**，也不自动遍历每个自定义
+Seed-VC 的生成结果、SheetSage2 ZIP、YuE2-Vae latent/WAV、MERT-v2-FullSong JSON/NPZ、TIGER 分离批次、MP4、图片或训练产物**，也不自动遍历每个自定义
 `*_OUTPUT_DIR`。`STORAGE_RETENTION_MAX_BYTES` 针对这些匹配的生成 WAV 总量，不是整个
 `storage/` 容量限制。修改输出目录时需同步考虑维护脚本的扫描范围。
 
@@ -1077,7 +1229,7 @@ bash -n start.sh
 bash scripts/quality_gate.sh
 ```
 
-统一质量门禁先执行 shell 语法和三个无 SDK 的 C++ 核心测试，再检查 23 个服务项目与 QA
+统一质量门禁先执行 shell 语法和三个无 SDK 的 C++ 核心测试，再检查 27 个服务项目与 QA
 项目的锁文件、Ruff 和格式，最后执行根目录、ACE-Step、Stable Audio 的无模型测试。
 GitHub Actions 使用同一脚本；需要 `uv` 和 `g++`，不需要 CUDA 或 Steam Audio SDK。
 锁文件检查仍可能访问 Git/wheel 元数据，初次运行需具备这些依赖来源的网络或本地缓存。

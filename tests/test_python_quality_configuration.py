@@ -21,6 +21,10 @@ MODEL_PROJECTS = (
     "moss_voiceGenerator",
     "moss_audio_4b_thinking",
     "Confucius4_TTS",
+    "YuE2-3B",
+    "SheetSage2",
+    "YuE2-Vae",
+    "MERT-v2-FullSong",
     "seed-vc",
     "SoulX-FlashHead-1_3B",
     "ditto",
@@ -77,7 +81,7 @@ class PythonQualityConfigurationTests(unittest.TestCase):
     def test_startup_uses_locked_environments_without_runtime_sync(self) -> None:
         start_script = (REPOSITORY_DIR / "start.sh").read_text(encoding="utf-8")
 
-        self.assertEqual(start_script.count("setsid uv run --no-sync --project"), 26)
+        self.assertEqual(start_script.count("setsid uv run --no-sync --project"), 30)
         self.assertNotIn("setsid uv run --project", start_script)
         self.assertEqual(start_script.count('for pid in "${pids[@]}"; do'), 3)
         self.assertNotIn('wait "$qwen3_tts_pid"', start_script)

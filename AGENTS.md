@@ -9,7 +9,7 @@
 
 ## 项目结构与服务速查
 
-当前有 23 个服务 uv 项目与一个轻量控制面，`start.sh` 合计启动 26 个 HTTP 进程。
+当前有 27 个服务 uv 项目与一个轻量控制面，`start.sh` 合计启动 30 个 HTTP 进程。
 原生能力/输出的官方依据见 [README 服务总览](README.md#服务总览)；端口、方法及路径以源码为准。
 区分原生能力、已接入接口与服务编排，额外模型流程不得写成单模型能力；各进程提供 `GET /v1/health`。
 
@@ -23,6 +23,10 @@
 | `stable_audio_3_medium/` | 8311 | `POST /v1/stableAudio/soundEffect` | 音乐/音效生成与局部补全/编辑/续写 | 音频波形 |
 | `moss_soundEffect/` | 8312 | `POST /v1/moss/soundEffect` | 中英文非语音音效生成，最长 30 秒 | 音效波形 |
 | `ace_step_1_5/` | 8313 | `POST /v1/aceStep/bgm` | 纯音乐/歌词条件歌曲生成 | 音乐波形 |
+| `YuE2-3B/` | 8314 | `POST /v1/m-a-p/YuE2` | 根据风格、歌词与可选 ABC 乐谱生成带歌声和伴奏的歌曲 | 48 kHz 立体声音频 |
+| `SheetSage2/` | 8315 | `POST /v1/m-a-p/SheetSage2` | 音乐转录为可编辑乐谱、MIDI、和弦/节拍/调性/结构与时间标注 | 可用时的 ABC、MIDI 与 JSON/LAB ZIP |
+| `YuE2-Vae/` | 8316 | `POST /v1/m-a-p/YuE2-Vae` | YuE2 acoustic latent 编码与分块解码 | `[T,64]` NPY latent 或 48 kHz 立体声 WAV |
+| `MERT-v2-FullSong/` | 8317 | `POST /v1/m-a-p/MERT-v2-FullSong` | 完整歌曲音乐表征提取（24 kHz 单声道，30–360 秒） | 1024 维整曲 embedding 或 25 Hz 逐帧 NPZ |
 | `qwen3_tts/` | 8321 | `POST /v1/qwen/clone` | 参考音频零样本多语言 TTS 克隆 | 语音波形 |
 | `voxcpm2/` | 8322 | `POST /v1/voxcpm2/clone` | 30 语种 TTS、设计、克隆及指令可控克隆 | 语音波形 |
 | `LongCat_AudioDiT_3.5B_bf16/` | 8323 | `POST /v1/longCat/clone` | 扩散 TTS，参考音频+转写克隆 | 语音波形 |
@@ -74,6 +78,22 @@ Step-Audio-EditX 另需系统 `sox`，Ditto 需要 GCC，renderer 构建需要 C
 `moss_voiceGenerator` 的 `moss-tts` 是唯一固定路径例外：必须使用预先准备的本地 editable
 源码 `/home/muyi086/tts-depency/MOSS-TTS`，同步前确认该目录存在，不得改为 Git/PyPI 下载。
 修改依赖后在对应项目执行 `uv lock`，提交 `pyproject.toml` 与 `uv.lock`，并用 `uv lock --check` 验证。
+YuE2-3B 使用模型目录随附的官方 `yue2_infer` 0.1.5 wheel 和本地 MOT/VAE 权重；按模型卡准备
+24 GB GPU 及 24 GB 可用主机内存，服务请求不下载模型。
+
+YuE2-Vae 使用本地 Hugging Face remote code 与 `AutoModel`。独立 API 接收 48 kHz 立体声音频
+编码为 `[T,64]` NPY，或将该 latent 解码成 48 kHz WAV；FFmpeg/ffprobe 在 GPU 排队前负责音频预检和格式转换。
+VAE 保持 FP32，解码使用官方分块 `decode_tiled`，模型只在一次性 worker 中加载。
+
+MERT-v2-FullSong 使用本地官方 Transformers `AutoFeatureExtractor`/`AutoModel` 与独立 uv 环境；
+PyTorch/Torchaudio 2.6.0、Transformers 4.53.2 按模型卡固定。CPU 预检限制完整歌曲为 30–360 秒，
+FFmpeg 转为 24 kHz 单声道后，worker 输出掩码平均 JSON embedding 或逐帧 NPZ；成品写入
+`MERT_V2_FULLSONG_OUTPUT_DIR`，不由 WAV 保留策略自动清理。
+
+SheetSage2 使用 Hugging Face 本地快照的官方 Transformers remote code 和 `AutoModel` 接口；
+除 SheetSage2 adapter 外，还须在 `SHEETSAGE2_BASE_MODEL_DIR` 准备其配置固定 revision 的
+MERT-v2-FullSong 父模型。服务用一次性 worker 推理，默认 FFmpeg 解码，ZIP 成品写入
+`SHEETSAGE2_OUTPUT_DIR`；请求音频暂存仅用于推理并在请求结束后删除。
 
 `bash start.sh` 在 `qwen3_tts` 环境启动 8300，其他进程使用各自服务环境；端口/路径可通过
 环境变量覆盖。启动统一使用 `uv run --no-sync`，并将 `unitale_runtime/src` 加入 `PYTHONPATH`
@@ -88,7 +108,7 @@ bash scripts/quality_gate.sh
 curl -fsS http://127.0.0.1:8300/v1/control
 ```
 
-质量门禁包含无 SDK 的三个 C++ 核心测试、24 个项目的锁检查、Ruff 与格式检查及三组无模型
+质量门禁包含无 SDK 的三个 C++ 核心测试、28 个项目的锁检查、Ruff 与格式检查及三组无模型
 测试。锁校验可能读取 Git/wheel 元数据；已有完整缓存时可设置 `UV_OFFLINE=1` 运行。
 单独执行测试必须用 QA，不能通过模型环境安装依赖来运行根目录回归：
 
@@ -147,7 +167,8 @@ uv run --project qa --locked python -m unittest discover -s tests -v
   8300/Step 上传不接收 `prompt_text`，MOSS-Audio/ASR/TIGER 没有独立上传/检查接口。
 - 默认目录：音色 `storage/timbre/`，音效 `storage/soundEffect/`，BGM `storage/bgm/`，普通
   参考音频、克隆、编辑、Seed-VC 结果 `storage/clone/`，分离批次 `storage/separation/`，
-  人像视频 `storage/video/`；SoulX/Ditto 图片各保存在 `storage/flashhead/images/`、
+  转谱 ZIP `storage/sheetsage2/`、YuE2-Vae latent/WAV `storage/yue2_vae/`、MERT 表征 JSON/NPZ
+  `storage/mert_v2_fullsong/`，人像视频 `storage/video/`；SoulX/Ditto 图片各保存在 `storage/flashhead/images/`、
   `storage/ditto/images/`。目录均可按对应配置覆盖。
 - 设计 WAV 只保留在 `storage/timbre/`。通过共享 `AudioReferenceStore` 同步到其他服务时，
   同内容上传只在 `storage/timbre/.references/` 保存小型引用映射/文本，不在 clone 再复制 WAV。

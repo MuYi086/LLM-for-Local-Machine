@@ -35,6 +35,10 @@ LONGCAT_AUDIODIT_PROJECT_DIR="${LONGCAT_AUDIODIT_PROJECT_DIR:-$PROJECT_DIR/LongC
 DOTS_TTS_SOAR_PROJECT_DIR="${DOTS_TTS_SOAR_PROJECT_DIR:-$PROJECT_DIR/dots_tts_soar}"
 STABLE_AUDIO_3_MEDIUM_PROJECT_DIR="${STABLE_AUDIO_3_MEDIUM_PROJECT_DIR:-$PROJECT_DIR/stable_audio_3_medium}"
 ACESTEP_PROJECT_DIR="${ACESTEP_PROJECT_DIR:-$PROJECT_DIR/ace_step_1_5}"
+YUE2_3B_PROJECT_DIR="${YUE2_3B_PROJECT_DIR:-$PROJECT_DIR/YuE2-3B}"
+SHEETSAGE2_PROJECT_DIR="${SHEETSAGE2_PROJECT_DIR:-$PROJECT_DIR/SheetSage2}"
+YUE2_VAE_PROJECT_DIR="${YUE2_VAE_PROJECT_DIR:-$PROJECT_DIR/YuE2-Vae}"
+MERT_V2_FULLSONG_PROJECT_DIR="${MERT_V2_FULLSONG_PROJECT_DIR:-$PROJECT_DIR/MERT-v2-FullSong}"
 VOXCPM2_PROJECT_DIR="${VOXCPM2_PROJECT_DIR:-$PROJECT_DIR/voxcpm2}"
 FIRERED_TTS3_PROJECT_DIR="${FIRERED_TTS3_PROJECT_DIR:-$PROJECT_DIR/firered_tts3}"
 TIGER_DNR_PROJECT_DIR="${TIGER_DNR_PROJECT_DIR:-$PROJECT_DIR/TIGER-DnR}"
@@ -140,8 +144,17 @@ export STABLE_AUDIO_3_MEDIUM_DEFAULT_SEED="${STABLE_AUDIO_3_MEDIUM_DEFAULT_SEED:
 export STABLE_AUDIO_3_MEDIUM_REQUEST_TIMEOUT="${STABLE_AUDIO_3_MEDIUM_REQUEST_TIMEOUT:-900}"
 export STABLE_AUDIO_3_MEDIUM_REQUIRE_FLASH_ATTN="${STABLE_AUDIO_3_MEDIUM_REQUIRE_FLASH_ATTN:-0}"
 export ACESTEP_MODEL_DIR="${ACESTEP_MODEL_DIR:-$HF_MIRROR_DIR/ACE-Step/acestep-v15-xl-turbo-diffusers}"
+export YUE2_3B_MODEL_DIR="${YUE2_3B_MODEL_DIR:-$HF_MIRROR_DIR/m-a-p/YuE2-3B}"
+export YUE2_VAE_MODEL_DIR="${YUE2_VAE_MODEL_DIR:-$HF_MIRROR_DIR/m-a-p/YuE2-Vae}"
+export SHEETSAGE2_MODEL_DIR="${SHEETSAGE2_MODEL_DIR:-$HF_MIRROR_DIR/m-a-p/SheetSage2}"
+export SHEETSAGE2_BASE_MODEL_DIR="${SHEETSAGE2_BASE_MODEL_DIR:-$HF_MIRROR_DIR/m-a-p/MERT-v2-FullSong}"
+export MERT_V2_FULLSONG_MODEL_DIR="${MERT_V2_FULLSONG_MODEL_DIR:-$HF_MIRROR_DIR/m-a-p/MERT-v2-FullSong}"
 export BGM_STORAGE_DIR="${BGM_STORAGE_DIR:-$STORAGE_DIR/bgm}"
 export ACESTEP_OUTPUT_DIR="${ACESTEP_OUTPUT_DIR:-$BGM_STORAGE_DIR}"
+export YUE2_3B_OUTPUT_DIR="${YUE2_3B_OUTPUT_DIR:-$BGM_STORAGE_DIR}"
+export SHEETSAGE2_OUTPUT_DIR="${SHEETSAGE2_OUTPUT_DIR:-$STORAGE_DIR/sheetsage2}"
+export YUE2_VAE_OUTPUT_DIR="${YUE2_VAE_OUTPUT_DIR:-$STORAGE_DIR/yue2_vae}"
+export MERT_V2_FULLSONG_OUTPUT_DIR="${MERT_V2_FULLSONG_OUTPUT_DIR:-$STORAGE_DIR/mert_v2_fullsong}"
 export ACESTEP_DEVICE="${ACESTEP_DEVICE:-cuda}"
 export ACESTEP_DTYPE="${ACESTEP_DTYPE:-bfloat16}"
 export ACESTEP_OFFLOAD="${ACESTEP_OFFLOAD:-model}"
@@ -256,6 +269,16 @@ export DITTO_HOST="${DITTO_HOST:-$HOST}"
 export DITTO_PORT="${DITTO_PORT:-8392}"
 export ACESTEP_HOST="${ACESTEP_HOST:-$HOST}"
 export ACESTEP_PORT="${ACESTEP_PORT:-8313}"
+export YUE2_3B_HOST="${YUE2_3B_HOST:-$HOST}"
+export YUE2_3B_PORT="${YUE2_3B_PORT:-8314}"
+export SHEETSAGE2_HOST="${SHEETSAGE2_HOST:-$HOST}"
+export SHEETSAGE2_PORT="${SHEETSAGE2_PORT:-8315}"
+export YUE2_VAE_HOST="${YUE2_VAE_HOST:-$HOST}"
+export YUE2_VAE_PORT="${YUE2_VAE_PORT:-8316}"
+export MERT_V2_FULLSONG_HOST="${MERT_V2_FULLSONG_HOST:-$HOST}"
+export MERT_V2_FULLSONG_PORT="${MERT_V2_FULLSONG_PORT:-8317}"
+export MERT_V2_FULLSONG_DEVICE="${MERT_V2_FULLSONG_DEVICE:-cuda:0}"
+export MERT_V2_FULLSONG_REQUEST_TIMEOUT="${MERT_V2_FULLSONG_REQUEST_TIMEOUT:-900}"
 export INDEX_ECHO_S2ST_HOST="${INDEX_ECHO_S2ST_HOST:-$HOST}"
 export INDEX_ECHO_S2ST_PORT="${INDEX_ECHO_S2ST_PORT:-8382}"
 export INDEX_HOMURA_HOST="${INDEX_HOMURA_HOST:-$HOST}"
@@ -272,6 +295,10 @@ uv run --no-sync --project "$QWEN3_TTS_PROJECT_DIR" python "$MAIN_DIR/check_port
   'MOSS-SoundEffect' "$SOUNDEFFECT_HOST" "$SOUNDEFFECT_PORT" \
   'Stable Audio 3 Medium' "$STABLE_AUDIO_3_MEDIUM_HOST" "$STABLE_AUDIO_3_MEDIUM_PORT" \
   'ACE-Step' "$ACESTEP_HOST" "$ACESTEP_PORT" \
+  'YuE2-3B' "$YUE2_3B_HOST" "$YUE2_3B_PORT" \
+  'SheetSage2' "$SHEETSAGE2_HOST" "$SHEETSAGE2_PORT" \
+  'YuE2-Vae' "$YUE2_VAE_HOST" "$YUE2_VAE_PORT" \
+  'MERT-v2-FullSong' "$MERT_V2_FULLSONG_HOST" "$MERT_V2_FULLSONG_PORT" \
   'Qwen3-TTS Base' "$QWEN3_TTS_HOST" "$QWEN3_TTS_PORT" \
   'Qwen VoiceDesign' "$QWEN_VOICEDESIGN_HOST" "$QWEN_VOICEDESIGN_PORT" \
   'TIGER-DnR' "$TIGER_DNR_HOST" "$TIGER_DNR_PORT" \
@@ -330,6 +357,20 @@ echo "ACE-Step uv project:           $ACESTEP_PROJECT_DIR"
 echo "ACE-Step model:                $ACESTEP_MODEL_DIR"
 echo "ACE-Step BGM storage:          $BGM_STORAGE_DIR"
 echo "ACE-Step runtime:              $ACESTEP_DTYPE / offload=$ACESTEP_OFFLOAD"
+echo "YuE2-3B uv project:            $YUE2_3B_PROJECT_DIR"
+echo "YuE2-3B model:                 $YUE2_3B_MODEL_DIR"
+echo "YuE2 VAE model:                $YUE2_VAE_MODEL_DIR"
+echo "YuE2-3B BGM storage:           $YUE2_3B_OUTPUT_DIR"
+echo "SheetSage2 uv project:         $SHEETSAGE2_PROJECT_DIR"
+echo "SheetSage2 model:              $SHEETSAGE2_MODEL_DIR"
+echo "MERT-v2 FullSong model:        $SHEETSAGE2_BASE_MODEL_DIR"
+echo "SheetSage2 output:             $SHEETSAGE2_OUTPUT_DIR"
+echo "YuE2-Vae uv project:           $YUE2_VAE_PROJECT_DIR"
+echo "YuE2-Vae model:                $YUE2_VAE_MODEL_DIR"
+echo "YuE2-Vae output:               $YUE2_VAE_OUTPUT_DIR"
+echo "MERT-v2-FullSong uv project:   $MERT_V2_FULLSONG_PROJECT_DIR"
+echo "MERT-v2-FullSong model:        $MERT_V2_FULLSONG_MODEL_DIR"
+echo "MERT-v2-FullSong output:       $MERT_V2_FULLSONG_OUTPUT_DIR"
 echo "Qwen3-TTS uv project:  $QWEN3_TTS_PROJECT_DIR"
 echo "Qwen3-TTS model:     $QWEN3_TTS_MODEL_DIR"
 echo "Qwen VoiceDesign uv project: $QWEN3_VOICEDESIGN_PROJECT_DIR"
@@ -394,6 +435,14 @@ echo "Stable Audio 3 Medium API:    http://$STABLE_AUDIO_3_MEDIUM_HOST:$STABLE_A
 echo "Stable Audio 3 Medium health: http://127.0.0.1:$STABLE_AUDIO_3_MEDIUM_PORT/v1/health"
 echo "ACE-Step BGM API:             http://$ACESTEP_HOST:$ACESTEP_PORT"
 echo "ACE-Step BGM health:           http://127.0.0.1:$ACESTEP_PORT/v1/health"
+echo "YuE2-3B music API:             http://$YUE2_3B_HOST:$YUE2_3B_PORT"
+echo "YuE2-3B health:                http://127.0.0.1:$YUE2_3B_PORT/v1/health"
+echo "SheetSage2 API:                http://$SHEETSAGE2_HOST:$SHEETSAGE2_PORT"
+echo "SheetSage2 health:             http://127.0.0.1:$SHEETSAGE2_PORT/v1/health"
+echo "YuE2-Vae API:                  http://$YUE2_VAE_HOST:$YUE2_VAE_PORT"
+echo "YuE2-Vae health:               http://127.0.0.1:$YUE2_VAE_PORT/v1/health"
+echo "MERT-v2-FullSong API:          http://$MERT_V2_FULLSONG_HOST:$MERT_V2_FULLSONG_PORT"
+echo "MERT-v2-FullSong health:       http://127.0.0.1:$MERT_V2_FULLSONG_PORT/v1/health"
 echo "Qwen3-TTS API:       http://$QWEN3_TTS_HOST:$QWEN3_TTS_PORT"
 echo "Qwen3-TTS health:    http://127.0.0.1:$QWEN3_TTS_PORT/v1/health"
 echo "Qwen VoiceDesign API: http://$QWEN_VOICEDESIGN_HOST:$QWEN_VOICEDESIGN_PORT"
@@ -460,6 +509,10 @@ echo "Step-Audio-EditX route: http://127.0.0.1:$STEP_AUDIO_EDITX_PORT/v1/stepAud
 echo "MOSS sound-effect route: http://127.0.0.1:$SOUNDEFFECT_PORT/v1/moss/soundEffect"
 echo "Stable Audio 3 Medium route: http://127.0.0.1:$STABLE_AUDIO_3_MEDIUM_PORT/v1/stableAudio/soundEffect"
 echo "ACE-Step BGM route:     http://127.0.0.1:$ACESTEP_PORT/v1/aceStep/bgm"
+echo "YuE2-3B music route:    http://127.0.0.1:$YUE2_3B_PORT/v1/m-a-p/YuE2"
+echo "SheetSage2 route:       http://127.0.0.1:$SHEETSAGE2_PORT/v1/m-a-p/SheetSage2"
+echo "YuE2-Vae route:         http://127.0.0.1:$YUE2_VAE_PORT/v1/m-a-p/YuE2-Vae"
+echo "MERT-v2-FullSong route: http://127.0.0.1:$MERT_V2_FULLSONG_PORT/v1/m-a-p/MERT-v2-FullSong"
 echo "Qwen timbre route:   http://127.0.0.1:$QWEN_VOICEDESIGN_PORT/v1/qwen/timbre"
 echo "TIGER-DnR route:     http://127.0.0.1:$TIGER_DNR_PORT/v1/tigerDnr/separate"
 echo "Qwen3-TTS clone:     http://127.0.0.1:$QWEN3_TTS_PORT/v1/qwen/clone"
@@ -489,6 +542,10 @@ printf '%-24s %-6s %s\n' 'Ditto' "$DITTO_PORT" '/v1/ditto/talkingHead'
 printf '%-24s %-6s %s\n' 'MiMo TTS VoiceDesign' "$MIMO_TTS_PORT" '/v1/mimo/timbre'
 printf '%-24s %-6s %s\n' 'Stable Audio 3 Medium' "$STABLE_AUDIO_3_MEDIUM_PORT" '/v1/stableAudio/soundEffect'
 printf '%-24s %-6s %s\n' 'ACE-Step 1.5 XL Turbo' "$ACESTEP_PORT" '/v1/aceStep/bgm'
+printf '%-24s %-6s %s\n' 'YuE2-3B' "$YUE2_3B_PORT" '/v1/m-a-p/YuE2'
+printf '%-24s %-6s %s\n' 'SheetSage2' "$SHEETSAGE2_PORT" '/v1/m-a-p/SheetSage2'
+printf '%-24s %-6s %s\n' 'YuE2-Vae' "$YUE2_VAE_PORT" '/v1/m-a-p/YuE2-Vae'
+printf '%-24s %-6s %s\n' 'MERT-v2-FullSong' "$MERT_V2_FULLSONG_PORT" '/v1/m-a-p/MERT-v2-FullSong'
 printf '%-24s %-6s %s\n' 'MOSS-SoundEffect v2' "$SOUNDEFFECT_PORT" '/v1/moss/soundEffect'
 printf '%-24s %-6s %s\n' 'Qwen3-TTS Base' "$QWEN3_TTS_PORT" '/v1/qwen/clone'
 printf '%-24s %-6s %s\n' 'VoxCPM2' "$VOXCPM2_PORT" '/v1/voxcpm2/clone'
@@ -506,6 +563,10 @@ mimo_tts_pid=""
 soundeffect_pid=""
 stable_audio_3_medium_pid=""
 acestep_pid=""
+yue2_3b_pid=""
+sheetsage2_pid=""
+yue2_vae_pid=""
+mert_v2_fullsong_pid=""
 qwen3_tts_pid=""
 voxcpm2_pid=""
 longcat_audiodit_pid=""
@@ -536,6 +597,10 @@ cleanup() {
     "$soundeffect_pid"
     "$stable_audio_3_medium_pid"
     "$acestep_pid"
+    "$yue2_3b_pid"
+    "$sheetsage2_pid"
+    "$yue2_vae_pid"
+    "$mert_v2_fullsong_pid"
     "$qwen3_tts_pid"
     "$qwen_voicedesign_pid"
     "$tiger_dnr_pid"
@@ -607,6 +672,41 @@ HOST="$ACESTEP_HOST" PORT="$ACESTEP_PORT" \
   setsid uv run --no-sync --project "$ACESTEP_PROJECT_DIR" \
   python "$ACESTEP_PROJECT_DIR/main.py" &
 acestep_pid=$!
+# YuE2-3B 是独立的一次性 worker uv 服务；服务使用本地 MOT/VAE 权重并通过 GPU 锁排队。
+YUE2_3B_HOST="$YUE2_3B_HOST" YUE2_3B_PORT="$YUE2_3B_PORT" \
+  YUE2_3B_MODEL_DIR="$YUE2_3B_MODEL_DIR" YUE2_VAE_MODEL_DIR="$YUE2_VAE_MODEL_DIR" \
+  YUE2_3B_OUTPUT_DIR="$YUE2_3B_OUTPUT_DIR" \
+  HOST="$YUE2_3B_HOST" PORT="$YUE2_3B_PORT" \
+  setsid uv run --no-sync --project "$YUE2_3B_PROJECT_DIR" \
+  python "$YUE2_3B_PROJECT_DIR/main.py" &
+yue2_3b_pid=$!
+# SheetSage2 独立 uv 服务：8315 接收音乐并返回 ABC、MIDI 与事件标注 ZIP。
+SHEETSAGE2_HOST="$SHEETSAGE2_HOST" SHEETSAGE2_PORT="$SHEETSAGE2_PORT" \
+  SHEETSAGE2_MODEL_DIR="$SHEETSAGE2_MODEL_DIR" \
+  SHEETSAGE2_BASE_MODEL_DIR="$SHEETSAGE2_BASE_MODEL_DIR" \
+  SHEETSAGE2_OUTPUT_DIR="$SHEETSAGE2_OUTPUT_DIR" \
+  HOST="$SHEETSAGE2_HOST" PORT="$SHEETSAGE2_PORT" \
+  setsid uv run --no-sync --project "$SHEETSAGE2_PROJECT_DIR" \
+  python "$SHEETSAGE2_PROJECT_DIR/main.py" &
+sheetsage2_pid=$!
+# YuE2-Vae 在 8316 独立提供 acoustic latent 编码和 48 kHz 音频解码。
+YUE2_VAE_HOST="$YUE2_VAE_HOST" YUE2_VAE_PORT="$YUE2_VAE_PORT" \
+  YUE2_VAE_MODEL_DIR="$YUE2_VAE_MODEL_DIR" \
+  YUE2_VAE_OUTPUT_DIR="$YUE2_VAE_OUTPUT_DIR" \
+  HOST="$YUE2_VAE_HOST" PORT="$YUE2_VAE_PORT" \
+  setsid uv run --no-sync --project "$YUE2_VAE_PROJECT_DIR" \
+  python "$YUE2_VAE_PROJECT_DIR/main.py" &
+yue2_vae_pid=$!
+# MERT-v2-FullSong 独立提供完整歌曲音乐表征与逐帧特征，使用官方 Transformers 调用。
+MERT_V2_FULLSONG_HOST="$MERT_V2_FULLSONG_HOST" MERT_V2_FULLSONG_PORT="$MERT_V2_FULLSONG_PORT" \
+  MERT_V2_FULLSONG_MODEL_DIR="$MERT_V2_FULLSONG_MODEL_DIR" \
+  MERT_V2_FULLSONG_OUTPUT_DIR="$MERT_V2_FULLSONG_OUTPUT_DIR" \
+  MERT_V2_FULLSONG_DEVICE="$MERT_V2_FULLSONG_DEVICE" \
+  MERT_V2_FULLSONG_REQUEST_TIMEOUT="$MERT_V2_FULLSONG_REQUEST_TIMEOUT" \
+  HOST="$MERT_V2_FULLSONG_HOST" PORT="$MERT_V2_FULLSONG_PORT" \
+  setsid uv run --no-sync --project "$MERT_V2_FULLSONG_PROJECT_DIR" \
+  python "$MERT_V2_FULLSONG_PROJECT_DIR/main.py" &
+mert_v2_fullsong_pid=$!
 # Qwen3-TTS uv 服务：使用最终约定的 8321 端口和克隆路由。
 HOST="$QWEN3_TTS_HOST" PORT="$QWEN3_TTS_PORT" setsid uv run --no-sync --project "$QWEN3_TTS_PROJECT_DIR" python "$QWEN3_TTS_PROJECT_DIR/main.py" &
 qwen3_tts_pid=$!
@@ -760,4 +860,4 @@ FIRERED_TTS3_MODE="clone" FIRERED_TTS3_HOST="$FIRERED_TTS3_CLONE_HOST" \
   python "$FIRERED_TTS3_PROJECT_DIR/main.py" &
 firered_tts3_clone_pid=$!
 
-wait -n "$main_pid" "$mimo_tts_pid" "$soundeffect_pid" "$stable_audio_3_medium_pid" "$acestep_pid" "$qwen3_tts_pid" "$qwen_voicedesign_pid" "$tiger_dnr_pid" "$moss_voicegenerator_pid" "$moss_audio_4b_thinking_pid" "$moss_audio_4b_instruct_pid" "$confucius4_tts_pid" "$qwen3_asr_pid" "$seed_vc_pid" "$soulx_flashhead_pid" "$ditto_pid" "$index_echo_s2st_pid" "$index_homura_pid" "$index_nailong_pid" "$index_translate_pid" "$step_audio_editx_pid" "$voxcpm2_pid" "$longcat_audiodit_pid" "$dots_tts_soar_pid" "$firered_tts3_timbre_pid" "$firered_tts3_clone_pid"
+wait -n "$main_pid" "$mimo_tts_pid" "$soundeffect_pid" "$stable_audio_3_medium_pid" "$acestep_pid" "$yue2_3b_pid" "$sheetsage2_pid" "$yue2_vae_pid" "$mert_v2_fullsong_pid" "$qwen3_tts_pid" "$qwen_voicedesign_pid" "$tiger_dnr_pid" "$moss_voicegenerator_pid" "$moss_audio_4b_thinking_pid" "$moss_audio_4b_instruct_pid" "$confucius4_tts_pid" "$qwen3_asr_pid" "$seed_vc_pid" "$soulx_flashhead_pid" "$ditto_pid" "$index_echo_s2st_pid" "$index_homura_pid" "$index_nailong_pid" "$index_translate_pid" "$step_audio_editx_pid" "$voxcpm2_pid" "$longcat_audiodit_pid" "$dots_tts_soar_pid" "$firered_tts3_timbre_pid" "$firered_tts3_clone_pid"
