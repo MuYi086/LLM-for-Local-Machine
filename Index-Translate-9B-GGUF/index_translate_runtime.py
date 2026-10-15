@@ -24,7 +24,7 @@ def terminate_process_group(
     kill_timeout: float = 5,
 ) -> None:
     """终止一次性 worker 及其 llama-server 子进程。"""
-    if process is None or process.poll() is not None:
+    if process is None:
         return
 
     pid = process.pid
@@ -38,7 +38,7 @@ def terminate_process_group(
 
     try:
         process.wait(timeout=terminate_timeout)
-        return
+        # 主进程退出后子进程仍可能存活，继续回收整个进程组。
     except subprocess.TimeoutExpired:
         print(f"[{label}] worker 未及时退出，强制终止进程组")
 

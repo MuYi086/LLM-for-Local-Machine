@@ -1,4 +1,4 @@
-"""使用 Index-Translate 官方多语种文本翻译 API 运行 Demo。"""
+"""调用 8385 的 Index-Translate 原生接口，保存 TXT 译文。"""
 
 from __future__ import annotations
 
@@ -10,15 +10,14 @@ from index_translate_demo_common import run_text_model_demo  # noqa: E402
 
 
 def main() -> None:
-    """调用官方 translate.py，原样保存模型文本输出。"""
+    """保持模型原生文本输入和输出，先检查运行环境。"""
     run_text_model_demo(
         demo_name="Index-Translate",
         env_prefix="INDEX_TRANSLATE",
-        script_relative_path="inference/llm/translate.py",
-        model_name="IndexTeam/Index-Translate-9B",
+        port=8385,
+        route="translate",
         output_name="index_translate_zh_to_en.txt",
         demo_dir=Path(__file__).resolve().parent,
-        model_arguments=["--source", "zh", "--target", "en"],
     )
 
 

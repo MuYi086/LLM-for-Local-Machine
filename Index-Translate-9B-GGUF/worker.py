@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""启动一次性 llama-server，并调用 Index-Translate GGUF 翻译语音转写文本。"""
+"""启动一次性 llama-server，并调用 Index-Translate GGUF 翻译原生输入文本。"""
 
 from __future__ import annotations
 
@@ -106,55 +106,100 @@ def build_translation_prompt(
     hard_constraints: list[str],
     soft_constraints: list[str],
     genre: str,
+    source_language_name: str = "",
+    instruction: str = "",
 ) -> str:
-    """按 Index-Translate 模型卡格式生成普通或 instTrans 翻译提示。"""
+    """复现官方 translate.py 的普通翻译、instTrans 和 JSON 保持模板。
+
+    来源：https://github.com/bilibili/Index-Translate/blob/main/inference/llm/translate.py
+    """
     if not text.strip() or not target_language_name.strip():
         raise ValueError("源文本和目标语言不能为空。")
-
     constraints = []
-    for constraint in hard_constraints:
-        item = constraint.strip()
-        if item:
-            prefix = "【硬性要求】"
-            constraints.append(item if item.startswith(prefix) else f"{prefix}{item}")
-    if glossary:
-        glossary_text = "、".join(
-            f"{term}：{translation}" for term, translation in glossary.items()
-        )
-        constraints.append(f"【硬性要求】术语对照表：{glossary_text}")
-    for constraint in soft_constraints:
-        item = constraint.strip()
-        if item:
-            prefixes = ("【注意】", "【软性要求】")
-            constraints.append(item if item.startswith(prefixes) else f"【注意】{item}")
-
+    for values, prefixes, default_prefix in (
+        (hard_constraints, ("〖硬性要求〗",), "〖硬性要求〗"),
+        (soft_constraints, ("〖注意〗", "〖软性要求〗"), "〖注意〗"),
+    ):
+        if default_prefix == "〖注意〗" and glossary:
+            terms = "、".join(f"{term}→{translation}" for term, translation in glossary.items())
+            constraints.append(f"〖硬性要求〗专名/术语对照: {terms}")
+        for value in values:
+            for line in value.splitlines():
+                line = line.strip().lstrip("0123456789. ")
+                if line:
+                    constraints.append(
+                        line if line.startswith(prefixes) else f"{default_prefix}{line}"
+                    )
+    for line in instruction.splitlines():
+        line = line.strip().lstrip("0123456789. ")
+        if line:
+            prefixes = ("〖硬性要求〗", "〖注意〗", "〖软性要求〗")
+            constraints.append(line if line.startswith(prefixes) else f"〖注意〗{line}")
+    source = source_language_name.strip()
     if not constraints:
-        return (
-            f"请将以下文本翻译为{target_language_name}，"
-            f"直接输出翻译结果，不要进行任何解释。\n\n{text.strip()}"
-        )
-
-    genre_name = genre.strip() or "文本"
-    numbered_constraints = "\n".join(
-        f"{index}. {constraint}" for index, constraint in enumerate(constraints, start=1)
-    )
+        return f"请将以下{source}文本翻译为{target_language_name}，直接输出翻译结果，不要进行任何解释。\n\n{text.strip()}"
+    suffix = "只输出译文，不要有任何额外说明。"
+    if any("json" in value.lower() for value in constraints):
+        try:
+            if isinstance(json.loads(text), dict):
+                suffix = "请以相同的 JSON 格式输出翻译结果，key 保持不变，value 为对应译文。只输出 JSON，不要有任何额外说明。"
+        except ValueError:
+            pass
+    numbered = "\n".join(f"{index}. {value}" for index, value in enumerate(constraints, 1))
     return (
-        f"请将以下{genre_name}翻译为{target_language_name}，并严格遵循所有约束要求。\n\n"
-        f"【源文】{text.strip()}\n\n"
-        f"{numbered_constraints}\n\n"
-        "请直接输出译文，不要进行任何解释。"
+        f"请将以下{source}{genre}翻译成{target_language_name}，并且严格遵循所有约束要求。\n\n"
+        f"〖源文〗\n{text.strip()}\n\n〖约束要求〗\n{numbered}\n\n{suffix}"
     )
+
+
+def build_messages(request: dict[str, Any]) -> list[dict]:
+    """保持官方文本或图片消息结构，不执行外部 OCR。"""
+    text = str(request.get("text") or "").strip()
+    source = str(request.get("source_language_name") or "")
+    target = str(request.get("target_language_name") or "").strip()
+    if not target:
+        raise ValueError("目标语言不能为空。")
+    image = request.get("image")
+    if image:
+        prompt = f"请将图片中的{source}文本翻译为{target}，直接输出翻译结果，不要进行任何解释。"
+        extras = []
+        if text:
+            extras.append(f"〖参考文本/关注内容〗\n{text}")
+        if request.get("instruction"):
+            extras.append(f"〖指令要求〗{request['instruction']}")
+        extras.extend(f"〖硬性要求〗{value}" for value in request.get("hard_constraints", []))
+        extras.extend(f"〖注意〗{value}" for value in request.get("soft_constraints", []))
+        if request.get("glossary"):
+            terms = "、".join(f"{key}→{value}" for key, value in request["glossary"].items())
+            extras.append(f"〖专名/术语对照〗{terms}")
+        if extras:
+            prompt += "\n\n" + "\n\n".join(extras) + "\n\n只输出翻译结果，不要进行任何解释。"
+        content = [
+            {"type": "text", "text": prompt},
+            {"type": "image_url", "image_url": {"url": image}},
+        ]
+    elif request.get("raw_prompt"):
+        if not text:
+            raise ValueError("原始提示词不能为空。")
+        content = text
+    else:
+        content = build_translation_prompt(
+            text,
+            target,
+            request.get("glossary") or {},
+            request.get("hard_constraints") or [],
+            request.get("soft_constraints") or [],
+            str(request.get("genre") or "文本"),
+            source,
+            str(request.get("instruction") or ""),
+        )
+    return [{"role": "user", "content": content}]
 
 
 def translate(request: dict[str, Any]) -> str:
     """运行本地 OpenAI 兼容服务并提取纯译文。"""
     model_path = require_file(str(request.get("model_path") or ""), "Index-Translate GGUF 模型")
     server_bin = require_file(str(request.get("llama_server_bin") or ""), "llama-server")
-    text = str(request.get("text") or "").strip()
-    target_language = str(request.get("target_language") or "").strip()
-    target_name = str(request.get("target_language_name") or "").strip()
-    if not text or not target_name or not target_language:
-        raise ValueError("源文本、目标语言和目标语言名称不能为空。")
 
     port = find_free_port()
     startup_timeout = float(request.get("startup_timeout_seconds", 300))
@@ -175,37 +220,24 @@ def translate(request: dict[str, Any]) -> str:
         str(int(request.get("n_gpu_layers", 99))),
         "--ctx-size",
         str(int(request.get("context_size", 32768))),
+        "--parallel",
+        "1",
+        "--no-context-shift",
         "--jinja",
         "--chat-template-kwargs",
         '{"enable_thinking":false}',
     ]
 
-    glossary = request.get("glossary") or {}
-    if not isinstance(glossary, dict) or not all(
-        isinstance(term, str) and isinstance(translation, str)
-        for term, translation in glossary.items()
-    ):
-        raise ValueError("glossary 必须是术语到译名的对象。")
-    hard_constraints = request.get("hard_constraints") or []
-    soft_constraints = request.get("soft_constraints") or []
-    if not isinstance(hard_constraints, list) or not isinstance(soft_constraints, list):
-        raise ValueError("hard_constraints 和 soft_constraints 必须是字符串列表。")
-    if not all(isinstance(item, str) for item in [*hard_constraints, *soft_constraints]):
-        raise ValueError("hard_constraints 和 soft_constraints 必须是字符串列表。")
-    prompt = build_translation_prompt(
-        text,
-        target_name,
-        glossary,
-        hard_constraints,
-        soft_constraints,
-        str(request.get("genre") or "口语"),
-    )
+    if request.get("image"):
+        projector = require_file(str(request.get("mmproj_path") or ""), "Index-Translate mmproj")
+        command.extend(["--mmproj", str(projector)])
     payload = {
         "model": "index-translate-9b",
-        "messages": [{"role": "user", "content": prompt}],
+        "messages": build_messages(request),
         "temperature": float(request.get("temperature", 0)),
         "max_tokens": int(request.get("max_new_tokens", 1024)),
         "stream": False,
+        "chat_template_kwargs": {"enable_thinking": False},
     }
 
     process: subprocess.Popen | None = None

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""启动一次性 llama-server，并调用 Index-Nailong GGUF 翻译语音转写文本。"""
+"""启动一次性 llama-server，并调用 Index-Nailong GGUF 翻译原生输入文本。"""
 
 from __future__ import annotations
 
@@ -16,6 +16,8 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Any
+
+from gguf_tokens import load_stop_tokens
 
 
 def parse_args() -> argparse.Namespace:
@@ -99,53 +101,31 @@ def wait_for_server(
     )
 
 
-def build_translation_prompt(
-    text: str,
-    target_language_name: str,
-    source_language_name: str,
-    glossary: dict[str, str],
-    hard_constraints: list[str],
-    soft_constraints: list[str],
-    genre: str,
-) -> str:
-    """生成符合 Index-Translate 官方格式的普通或约束翻译提示。"""
-    if not text.strip() or not target_language_name.strip():
-        raise ValueError("源文本和目标语言不能为空。")
+def build_translation_prompt(text: str, direction: str) -> str:
+    """复现官方 inference/llm/prompts/nailong_*.txt 的四个固定模板。
 
-    constraints = []
-    for constraint in hard_constraints:
-        item = constraint.strip()
-        if item:
-            constraints.append(item if item.startswith("〖硬性要求〗") else f"〖硬性要求〗{item}")
-    if glossary:
-        glossary_text = "、".join(f"{term}→{translation}" for term, translation in glossary.items())
-        constraints.append(f"〖硬性要求〗专名/术语对照: {glossary_text}")
-    for constraint in soft_constraints:
-        item = constraint.strip()
-        if item:
-            constraints.append(
-                item if item.startswith(("〖注意〗", "〖软性要求〗")) else f"〖注意〗{item}"
-            )
-
-    if not constraints:
-        source_name = f"{source_language_name.strip()}" if source_language_name.strip() else ""
-        source_prefix = f"{source_name}文本" if source_name else "文本"
-        return (
-            f"请将以下{source_prefix}翻译为{target_language_name}，"
-            f"直接输出翻译结果，不要进行任何解释。\n\n{text.strip()}"
-        )
-
-    genre_name = genre.strip() or "文本"
-    source_prefix = f"{source_language_name.strip()}" if source_language_name.strip() else ""
-    header_source = f"{source_prefix}{genre_name}"
-    numbered_constraints = "\n".join(
-        f"{index}. {constraint}" for index, constraint in enumerate(constraints, start=1)
-    )
+    来源：https://github.com/bilibili/Index-Translate/tree/main/inference/llm/prompts
+    整篇处理，不分段，不使用普通 instTrans 模板。
+    """
+    directions = {
+        "zh-en": ("中文", "英语"),
+        "en-zh": ("英文", "中文"),
+        "zh-ja": ("中文", "日语"),
+        "ja-zh": ("日文", "中文"),
+    }
+    if direction not in directions or not text.strip():
+        raise ValueError("NativeLong 需要非空文本以及 zh-en/en-zh/zh-ja/ja-zh 方向。")
+    source, target = directions[direction]
+    text = text.replace("\r\n", "\n").strip()
     return (
-        f"请将以下{header_source}翻译成{target_language_name}，并且严格遵循所有约束要求。\n\n"
-        f"〖源文〗\n{text.strip()}\n\n"
-        f"〖约束要求〗\n{numbered_constraints}\n\n"
-        "只输出译文，不要有任何额外说明。"
+        f"请将以下{source}小说翻译成{target}，并且严格遵循所有约束要求。\n\n"
+        "这是一段长篇连续文本，请完整处理全部内容，并在全文范围内保持译名和表达一致。\n\n"
+        "〖约束要求〗\n\n"
+        "1. 完整翻译所有内容，不要遗漏、概括、合并或添加内容。\n"
+        "2. 保持人名、地名、称谓和术语在全文中一致。\n"
+        "3. 保持原文的章节、段落和内容顺序。\n\n"
+        "只输出译文，不要有任何额外说明。\n\n〖源文〗\n\n"
+        f"{text}\n"
     )
 
 
@@ -154,11 +134,7 @@ def translate(request: dict[str, Any]) -> str:
     model_path = require_file(str(request.get("model_path") or ""), "Index-Nailong GGUF 模型")
     server_bin = require_file(str(request.get("llama_server_bin") or ""), "llama-server")
     text = str(request.get("text") or "").strip()
-    target_language = str(request.get("target_language") or "").strip()
-    target_name = str(request.get("target_language_name") or "").strip()
-    source_name = str(request.get("source_language_name") or "").strip()
-    if not text or not target_name or not target_language:
-        raise ValueError("源文本、目标语言和目标语言名称不能为空。")
+    direction = str(request.get("direction") or "zh-en")
 
     port = find_free_port()
     startup_timeout = float(request.get("startup_timeout_seconds", 300))
@@ -178,42 +154,33 @@ def translate(request: dict[str, Any]) -> str:
         "--n-gpu-layers",
         str(int(request.get("n_gpu_layers", 99))),
         "--ctx-size",
-        str(int(request.get("context_size", 32768))),
+        str(int(request.get("context_size", 229376))),
+        "--parallel",
+        "1",
+        "--no-context-shift",
         "--jinja",
         "--chat-template-kwargs",
         '{"enable_thinking":false}',
     ]
 
-    glossary = request.get("glossary") or {}
-    if not isinstance(glossary, dict) or not all(
-        isinstance(term, str) and isinstance(translation, str)
-        for term, translation in glossary.items()
-    ):
-        raise ValueError("glossary 必须是术语到译名的对象。")
-    hard_constraints = request.get("hard_constraints") or []
-    soft_constraints = request.get("soft_constraints") or []
-    if not isinstance(hard_constraints, list) or not isinstance(soft_constraints, list):
-        raise ValueError("hard_constraints 和 soft_constraints 必须是字符串列表。")
-    if not all(isinstance(item, str) for item in [*hard_constraints, *soft_constraints]):
-        raise ValueError("hard_constraints 和 soft_constraints 必须是字符串列表。")
-    prompt = build_translation_prompt(
-        text,
-        target_name,
-        source_name,
-        glossary,
-        hard_constraints,
-        soft_constraints,
-        str(request.get("genre") or "口语"),
-    )
+    prompt = build_translation_prompt(text, direction)
     payload = {
         "model": "index-nailong-9b",
         "messages": [{"role": "user", "content": prompt}],
-        "temperature": float(request.get("temperature", 0)),
+        "temperature": 0,
         "top_p": 1,
+        "top_k": -1,
+        "min_p": 0,
         "seed": 42,
-        "max_tokens": int(request.get("max_new_tokens", 1024)),
+        "presence_penalty": 0,
+        "repeat_penalty": 1,
+        "ignore_eos": False,
+        "stop": load_stop_tokens(model_path),
         "stream": False,
+        "chat_template_kwargs": {"enable_thinking": False},
     }
+    if request.get("max_new_tokens") is not None:
+        payload["max_tokens"] = int(request["max_new_tokens"])
 
     process: subprocess.Popen | None = None
     with tempfile.TemporaryFile() as log_file:
@@ -243,20 +210,17 @@ def translate(request: dict[str, Any]) -> str:
                 detail = exc.read(4_000).decode("utf-8", errors="replace")
                 raise RuntimeError(f"llama-server 返回 HTTP {exc.code}: {detail}") from exc
 
+            if result.get("choices", [{}])[0].get("finish_reason") == "length":
+                raise RuntimeError(
+                    "NativeLong 输出达到上下文或生成预算上限，未完成整篇翻译；请增大预算。"
+                )
             try:
                 translated = result["choices"][0]["message"]["content"]
             except (KeyError, IndexError, TypeError) as exc:
                 raise RuntimeError("llama-server 返回了无法识别的聊天完成结果。") from exc
             if not isinstance(translated, str) or not translated.strip():
                 raise RuntimeError("Index-Nailong GGUF 未生成译文。")
-            cleaned = translated.strip()
-            if "</think>" in cleaned:
-                cleaned = cleaned.split("</think>", 1)[1].strip()
-            if cleaned.startswith("<think>"):
-                cleaned = cleaned.removeprefix("<think>").strip()
-            if not cleaned:
-                raise RuntimeError("Index-Nailong GGUF 未生成译文。")
-            return cleaned
+            return translated
         finally:
             stop_server(process)
 

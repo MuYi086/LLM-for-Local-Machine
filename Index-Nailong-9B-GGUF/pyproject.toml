@@ -1,13 +1,12 @@
 [project]
-name = "index-nailong-speech-translation-service"
+name = "index-nailong-document-translation-service"
 version = "0.1.0"
-description = "Unitale Index-Nailong constrained speech translation API"
+description = "Unitale Index-Nailong constrained native translation API"
 requires-python = "==3.12.13"
 dependencies = [
     "fastapi==0.136.3",
     "uvicorn==0.49.0",
     "pydantic==2.13.4",
-    "httpx==0.28.1",
     "unitale-runtime",
 ]
 

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Index-Translate 多语种语音翻译 HTTP 服务。"""
+"""Index-Translate 原生文本翻译 HTTP 服务，仅启动该模型的一次性 worker。"""
 
 from __future__ import annotations
 
-import importlib.util
+import base64
+import binascii
 import json
 import logging
 import os
@@ -13,15 +14,13 @@ import tempfile
 import threading
 import time
 from pathlib import Path
-from urllib.parse import urlsplit
 
-import httpx
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
-from pydantic import BaseModel, ConfigDict, Field, field_validator
-from unitale_runtime import AudioReferenceStore, GpuLockTimeoutError
+from fastapi.responses import PlainTextResponse
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from unitale_runtime import GpuLockTimeoutError
 from unitale_runtime import gpu_runtime_lock as shared_gpu_runtime_lock
 
 from index_translate_runtime import resolve_executable, terminate_process_group
@@ -29,68 +28,14 @@ from index_translate_runtime import resolve_executable, terminate_process_group
 LOGGER = logging.getLogger(__name__)
 PROJECT_DIR = Path(__file__).resolve().parent
 REPOSITORY_DIR = PROJECT_DIR.parent
-SUPPORTED_TARGET_LANGUAGES = (
-    "zh",
-    "en",
-    "ja",
-    "ko",
-    "de",
-    "fr",
-    "th",
-    "id",
-    "vi",
-    "es",
-    "pt",
-    "it",
-    "ru",
-    "ms",
-)
-LANGUAGE_NAMES = {
-    "zh": "中文",
-    "en": "英语",
-    "ja": "日语",
-    "ko": "韩语",
-    "de": "德语",
-    "fr": "法语",
-    "th": "泰语",
-    "id": "印尼语",
-    "vi": "越南语",
-    "es": "西班牙语",
-    "pt": "葡萄牙语",
-    "it": "意大利语",
-    "ru": "俄语",
-    "ms": "马来语",
-}
-ASR_LANGUAGE_NAMES = {
-    "zh": "Chinese",
-    "en": "English",
-    "ja": "Japanese",
-    "ko": "Korean",
-    "de": "German",
-    "fr": "French",
-    "th": "Thai",
-    "id": "Indonesian",
-    "vi": "Vietnamese",
-    "es": "Spanish",
-    "pt": "Portuguese",
-    "it": "Italian",
-    "ru": "Russian",
-    "ms": "Malay",
-}
 
 
 def expand_path(path: str) -> str:
-    """展开用户目录和环境变量，统一使用绝对路径。"""
+    """展开配置路径，所有本地模型文件都由运维配置。"""
     return os.path.abspath(os.path.expandvars(os.path.expanduser(path)))
 
 
 STORAGE_DIR = Path(expand_path(os.getenv("STORAGE_DIR", str(REPOSITORY_DIR / "storage"))))
-PROMPTS_DIR = Path(
-    expand_path(
-        os.getenv("PROMPTS_DIR", os.getenv("CLONE_STORAGE_DIR", str(STORAGE_DIR / "clone")))
-    )
-)
-TIMBRE_STORAGE_DIR = Path(expand_path(os.getenv("TIMBRE_STORAGE_DIR", str(STORAGE_DIR / "timbre"))))
 RUNTIME_CACHE_DIR = Path(
     expand_path(os.getenv("RUNTIME_CACHE_DIR", str(STORAGE_DIR / ".cache/runtime")))
 )
@@ -115,19 +60,9 @@ MODEL_PATH = Path(
     )
 )
 LLAMA_SERVER_CONFIG = os.getenv("INDEX_TRANSLATE_LLAMA_SERVER_BIN", "llama-server")
-ASR_URL = os.getenv("INDEX_TRANSLATE_ASR_URL", "http://127.0.0.1:8371/v1/qwen3/asr").rstrip("/")
-TTS_URL = os.getenv(
-    "INDEX_TRANSLATE_TTS_URL", "http://127.0.0.1:8361/v1/confucius4TTS/generate"
-).rstrip("/")
-LOCAL_FILES_ONLY = os.getenv("LOCAL_FILES_ONLY", "1").strip().lower() in {
-    "1",
-    "true",
-    "yes",
-    "on",
-}
 REQUEST_TIMEOUT = float(os.getenv("INDEX_TRANSLATE_REQUEST_TIMEOUT", "900"))
 STARTUP_TIMEOUT = float(os.getenv("INDEX_TRANSLATE_STARTUP_TIMEOUT", "300"))
-WORKER_TIMEOUT = REQUEST_TIMEOUT + STARTUP_TIMEOUT + 30
+WORKER_TIMEOUT = STARTUP_TIMEOUT + REQUEST_TIMEOUT
 CUDA_RELEASE_DELAY = float(os.getenv("CUDA_RELEASE_DELAY", "2.0"))
 N_GPU_LAYERS = int(os.getenv("INDEX_TRANSLATE_N_GPU_LAYERS", "99"))
 CONTEXT_SIZE = int(os.getenv("INDEX_TRANSLATE_CONTEXT_SIZE", "32768"))
@@ -136,94 +71,147 @@ TEMPERATURE = float(os.getenv("INDEX_TRANSLATE_TEMPERATURE", "0"))
 API_HOST = os.getenv("INDEX_TRANSLATE_HOST", os.getenv("HOST", "0.0.0.0"))
 API_PORT = int(os.getenv("INDEX_TRANSLATE_PORT", os.getenv("PORT", "8385")))
 WORKER_SCRIPT = PROJECT_DIR / "worker.py"
+MMPROJ_PATH = Path(
+    expand_path(
+        os.getenv(
+            "INDEX_TRANSLATE_MMPROJ_PATH", str(MODEL_DIR / "Index-Translate-9B.mmproj-Q8_0.gguf")
+        )
+    )
+)
+IMAGE_MAX_BYTES = int(os.getenv("UPLOAD_MAX_BYTES", str(64 * 1024 * 1024)))
 
-if REQUEST_TIMEOUT <= 0 or STARTUP_TIMEOUT <= 0:
-    raise ValueError("Index-Translate 请求与模型启动超时必须大于零。")
-if CONTEXT_SIZE < 512 or MAX_NEW_TOKENS < 1 or not 0 <= TEMPERATURE <= 2:
-    raise ValueError("Index-Translate 上下文长度、最大生成 token 或温度配置无效。")
-
-for directory in (WORKER_TMP_DIR, RUNTIME_CACHE_DIR, Path(GPU_LOCK_FILE).parent):
+if (
+    REQUEST_TIMEOUT <= 0
+    or STARTUP_TIMEOUT <= 0
+    or float(os.getenv("GPU_LOCK_WAIT_TIMEOUT", "900")) <= 0
+):
+    raise ValueError("请求、启动及 GPU 排队超时必须大于零。")
+if CONTEXT_SIZE < 512:
+    raise ValueError("上下文长度必须至少为 512。")
+for directory in (WORKER_TMP_DIR, Path(GPU_LOCK_FILE).parent):
     directory.mkdir(parents=True, exist_ok=True)
 
-reference_store = AudioReferenceStore(PROMPTS_DIR, TIMBRE_STORAGE_DIR)
-app = FastAPI(title="Unitale Index-Translate Speech Translation API")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["X-Source-Language", "X-Target-Language"],
-)
+LANGUAGE_NAMES = {
+    "en": "英语",
+    "zh": "中文",
+    "de": "德语",
+    "fr": "法语",
+    "es": "西班牙语",
+    "ja": "日语",
+    "ko": "韩语",
+    "pt": "葡萄牙语",
+    "ru": "俄语",
+    "ar": "阿拉伯语",
+    "it": "意大利语",
+    "nl": "荷兰语",
+    "pl": "波兰语",
+    "ro": "罗马尼亚语",
+    "sv": "瑞典语",
+    "tr": "土耳其语",
+    "hi": "印地语",
+    "vi": "越南语",
+    "th": "泰语",
+    "id": "印尼语",
+    "ms": "马来语",
+    "fil": "菲律宾语",
+    "ukr_cyrl": "乌克兰语",
+    "fas_arab": "波斯语",
+    "ces_latn": "捷克语",
+    "ell_grek": "希腊语",
+    "dan_latn": "丹麦语",
+    "hun_latn": "匈牙利语",
+    "fin_latn": "芬兰语",
+    "nob_latn": "书面挪威语",
+    "slk_latn": "斯洛伐克语",
+    "bul_cyrl": "保加利亚语",
+}
+
+app = FastAPI(title="Unitale Index-Translate Native Translation API")
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 
 class TranslateRequest(BaseModel):
-    """待翻译音频、目标语言和可选的翻译约束。"""
+    """Index-Translate 官方原生任务参数；不接受语音引用或 TTS 参数。"""
 
     model_config = ConfigDict(extra="forbid")
 
-    audio_path: str = Field(min_length=1, max_length=1024)
-    target_language: str = Field(
-        default="en", pattern="^(zh|en|ja|ko|de|fr|th|id|vi|es|pt|it|ru|ms)$"
-    )
-    source_language: str | None = Field(default=None, min_length=1, max_length=64)
+    text: str = Field(default="", max_length=1_000_000)
+    image: str | None = Field(default=None, max_length=IMAGE_MAX_BYTES * 4 // 3 + 128)
+    source_language: str = Field(default="auto", min_length=1, max_length=128)
+    target_language: str = Field(default="en", min_length=1, max_length=128)
     glossary: dict[str, str] = Field(default_factory=dict, max_length=128)
-    hard_constraints: list[str] = Field(default_factory=list, max_length=32)
-    soft_constraints: list[str] = Field(default_factory=list, max_length=32)
-    genre: str = Field(default="口语", min_length=1, max_length=64)
-    max_new_tokens: int | None = Field(default=None, ge=1, le=MAX_NEW_TOKENS)
+    hard_constraints: list[str] = Field(default_factory=list, max_length=128)
+    soft_constraints: list[str] = Field(default_factory=list, max_length=128)
+    genre: str = Field(default="文本", min_length=1, max_length=128)
+    instruction: str = Field(default="", max_length=32_768)
+    raw_prompt: bool = False
+    max_new_tokens: int | None = Field(default=None, ge=1)
     temperature: float = Field(default=TEMPERATURE, ge=0, le=2)
 
     @field_validator("glossary")
     @classmethod
-    def normalize_glossary(cls, glossary: dict[str, str]) -> dict[str, str]:
-        """在 ASR 获取 GPU 前验证术语表，避免无效请求消耗推理资源。"""
-        normalized = {}
-        for term, translation in glossary.items():
-            source_term = term.strip()
-            target_term = translation.strip()
-            if (
-                not source_term
-                or not target_term
-                or len(source_term) > 256
-                or len(target_term) > 256
-            ):
-                raise ValueError("glossary 的术语和译名必须为 1–256 个字符。")
-            normalized[source_term] = target_term
-        return normalized
-
-    @field_validator("source_language")
-    @classmethod
-    def normalize_source_language(cls, language: str | None) -> str | None:
-        """清理源语言提示，并拒绝看似非空但只有空格的值。"""
-        if language is None:
-            return None
-        normalized = language.strip()
-        if not normalized:
-            raise ValueError("source_language 不能为空白字符串。")
-        return normalized
+    def validate_glossary(cls, values: dict[str, str]) -> dict[str, str]:
+        """预先拒绝空术语，避免无效约束占用 GPU。"""
+        if any(not key.strip() or not value.strip() for key, value in values.items()):
+            raise ValueError("术语和译名不能为空。")
+        return {key.strip(): value.strip() for key, value in values.items()}
 
     @field_validator("hard_constraints", "soft_constraints")
     @classmethod
-    def normalize_constraints(cls, constraints: list[str]) -> list[str]:
-        """在 ASR 获取 GPU 前验证约束数量和长度。"""
-        normalized = []
-        for constraint in constraints:
-            item = constraint.strip()
-            if not item or len(item) > 512:
-                raise ValueError("每条翻译约束必须为 1–512 个字符。")
-            normalized.append(item)
-        return normalized
+    def validate_constraints(cls, values: list[str]) -> list[str]:
+        """拒绝空约束，完整保留多行约束内容。"""
+        if any(not value.strip() for value in values):
+            raise ValueError("翻译约束不能为空白字符串。")
+        return values
+
+    @field_validator("target_language", "source_language", "genre")
+    @classmethod
+    def validate_label(cls, value: str) -> str:
+        """校验官方模板使用的语言和文体标签。"""
+        if not value.strip():
+            raise ValueError("语言和文体不能为空白字符串。")
+        return value.strip()
+
+    @field_validator("image")
+    @classmethod
+    def validate_image(cls, value: str | None) -> str | None:
+        """验证原生多模态 data URL，禁止用客户端字符串读取服务端文件。"""
+        if value is None:
+            return None
+        header, separator, encoded = value.partition(",")
+        if not separator or header not in {
+            "data:image/png;base64",
+            "data:image/jpeg;base64",
+            "data:image/webp;base64",
+            "data:image/gif;base64",
+            "data:image/bmp;base64",
+        }:
+            raise ValueError("image 必须为 PNG/JPEG/WebP/GIF/BMP 的 base64 data URL。")
+        try:
+            image_bytes = base64.b64decode(encoded, validate=True)
+        except (ValueError, binascii.Error) as exc:
+            raise ValueError("图片 base64 无效。") from exc
+        if not image_bytes or len(image_bytes) > IMAGE_MAX_BYTES:
+            raise ValueError("图片为空或超过 UPLOAD_MAX_BYTES 限制。")
+        return value
+
+    @model_validator(mode="after")
+    def validate_input(self):
+        """图片翻译可不含参考文字；普通翻译必须有非空文本。"""
+        if not self.text.strip() and self.image is None:
+            raise ValueError("请提供非空 text 或 image。")
+        return self
 
 
 class IndexTranslateWorkerManager:
-    """管理一次性 llama worker 及其临时 JSON 生命周期。"""
+    """管理该模型独立 worker、临时 JSON 和子进程组。"""
 
     def __init__(self) -> None:
         self.lock = threading.RLock()
         self.last_error: str | None = None
 
-    def check_runtime_ready(self) -> None:
-        """在调用其他 GPU 服务前完成 GGUF、worker 和 llama.cpp 文件预检。"""
+    def build_worker_payload(self, request: TranslateRequest) -> dict:
+        """在获取 GPU 锁前检查本地依赖并保留模型原生输入。"""
         executable = resolve_executable(LLAMA_SERVER_CONFIG)
         if executable is None:
             raise FileNotFoundError(
@@ -232,31 +220,27 @@ class IndexTranslateWorkerManager:
         if not MODEL_PATH.is_file() or MODEL_PATH.suffix.lower() != ".gguf":
             raise FileNotFoundError(f"Index-Translate GGUF 权重不存在: {MODEL_PATH}")
         if not WORKER_SCRIPT.is_file():
-            raise FileNotFoundError(f"Index-Translate worker 脚本不存在: {WORKER_SCRIPT}")
-
-    def build_worker_payload(self, request: TranslateRequest, text: str) -> dict:
-        """检查推理文件并构造 Translate 翻译 worker 输入。"""
-        executable = resolve_executable(LLAMA_SERVER_CONFIG)
-        if executable is None:
-            raise FileNotFoundError(
-                "未找到 llama-server，请安装 llama.cpp 并配置 INDEX_TRANSLATE_LLAMA_SERVER_BIN。"
-            )
-        if not MODEL_PATH.is_file() or MODEL_PATH.suffix.lower() != ".gguf":
-            raise FileNotFoundError(f"Index-Translate GGUF 权重不存在: {MODEL_PATH}")
-        if not WORKER_SCRIPT.is_file():
-            raise FileNotFoundError(f"Index-Translate worker 脚本不存在: {WORKER_SCRIPT}")
-
-        max_new_tokens = request.max_new_tokens or MAX_NEW_TOKENS
+            raise FileNotFoundError(f"worker 脚本不存在: {WORKER_SCRIPT}")
+        if request.image and not MMPROJ_PATH.is_file():
+            raise FileNotFoundError(f"图片翻译需要官方 mmproj：{MMPROJ_PATH}")
         return {
-            "text": text,
-            "target_language": request.target_language,
-            "target_language_name": LANGUAGE_NAMES[request.target_language],
+            "text": request.text.strip(),
+            "image": request.image,
+            "source_language_name": ""
+            if request.source_language.lower() == "auto"
+            else LANGUAGE_NAMES.get(request.source_language.lower(), request.source_language),
+            "target_language_name": LANGUAGE_NAMES.get(
+                request.target_language.lower(), request.target_language
+            ),
             "glossary": request.glossary,
             "hard_constraints": request.hard_constraints,
             "soft_constraints": request.soft_constraints,
             "genre": request.genre,
-            "max_new_tokens": max_new_tokens,
+            "instruction": request.instruction,
+            "raw_prompt": request.raw_prompt,
+            "max_new_tokens": request.max_new_tokens or MAX_NEW_TOKENS,
             "temperature": request.temperature,
+            "mmproj_path": str(MMPROJ_PATH) if request.image else None,
             "model_path": str(MODEL_PATH),
             "llama_server_bin": executable,
             "n_gpu_layers": N_GPU_LAYERS,
@@ -345,265 +329,69 @@ manager = IndexTranslateWorkerManager()
 
 
 def gpu_runtime_lock(label: str):
-    """使用仓库共享的有界 GPU 队列执行 GGUF 推理。"""
+    """只在该 Index 模型执行期间获取共享 GPU 锁。"""
     return shared_gpu_runtime_lock(GPU_LOCK_FILE, label)
 
 
 def wait_after_cuda_release() -> None:
-    """worker 退出后短暂保留 GPU 锁，让 llama.cpp 释放 CUDA 显存。"""
+    """持锁等待一次性 worker 释放 CUDA 资源。"""
     if CUDA_RELEASE_DELAY > 0:
         time.sleep(CUDA_RELEASE_DELAY)
 
 
-def service_health_url(endpoint: str) -> str:
-    """从业务接口 URL 推导同服务的健康检查 URL。"""
-    parsed = urlsplit(endpoint)
-    prefix = parsed.path.split("/v1/", 1)[0]
-    return f"{parsed.scheme}://{parsed.netloc}{prefix}/v1/health"
-
-
-def remote_service_available(endpoint: str, required_fields: tuple[str, ...]) -> bool:
-    """检查依赖健康响应中的模型和运行时状态，而不只看 HTTP 状态码。"""
-    try:
-        response = httpx.get(service_health_url(endpoint), timeout=2)
-        if not response.is_success:
-            return False
-        payload = response.json()
-        available = payload.get("available") if isinstance(payload, dict) else None
-        return isinstance(available, dict) and all(
-            available.get(field) is True for field in required_fields
-        )
-    except (httpx.HTTPError, ValueError):
-        return False
-
-
-def audio_upload_metadata(audio_path: str) -> tuple[str, str]:
-    """从逻辑路径后缀推导上传给 ASR 的文件名和 MIME。"""
-    suffix = Path(audio_path).suffix.lower()
-    media_types = {
-        ".wav": "audio/wav",
-        ".mp3": "audio/mpeg",
-        ".m4a": "audio/mp4",
-        ".flac": "audio/flac",
-        ".ogg": "audio/ogg",
-        ".aac": "audio/aac",
-        ".webm": "audio/webm",
-    }
-    if suffix not in media_types:
-        raise ValueError("audio_path 必须带受支持的音频扩展名。")
-    return f"source{suffix}", media_types[suffix]
-
-
-def remote_error_detail(response: httpx.Response) -> str:
-    """提取依赖服务的紧凑错误信息。"""
-    try:
-        payload = response.json()
-        detail = payload.get("detail") if isinstance(payload, dict) else None
-        if detail:
-            return str(detail)[:1_000]
-    except (ValueError, json.JSONDecodeError):
-        pass
-    return response.text.strip()[:1_000] or f"HTTP {response.status_code}"
-
-
-def transcribe_audio(audio_path: Path, logical_path: str, source_language: str | None) -> dict:
-    """把本地参考音频流式转发给 Qwen3-ASR。"""
-    filename, mime_type = audio_upload_metadata(logical_path)
-    language = source_language.strip() if source_language else None
-    data = (
-        {"language": ASR_LANGUAGE_NAMES.get(language.lower(), language)}
-        if language and language.lower() != "auto"
-        else {}
-    )
-    try:
-        with httpx.Client(timeout=REQUEST_TIMEOUT) as client, audio_path.open("rb") as audio_file:
-            response = client.post(
-                ASR_URL,
-                data=data,
-                files={"audio": (filename, audio_file, mime_type)},
-            )
-        if not response.is_success:
-            status_code = 422 if response.status_code in {400, 422} else 503
-            raise HTTPException(
-                status_code=status_code,
-                detail=f"Qwen3-ASR 返回 HTTP {response.status_code}: {remote_error_detail(response)}",
-            )
-        result = response.json()
-    except (httpx.HTTPError, OSError) as exc:
-        raise ConnectionError(f"无法调用 Qwen3-ASR 服务: {exc}") from exc
-    if (
-        not isinstance(result, dict)
-        or not isinstance(result.get("text"), str)
-        or not result["text"].strip()
-    ):
-        raise ValueError("Qwen3-ASR 未识别出有效文本。")
-    if not isinstance(result.get("language"), str):
-        result["language"] = None
-    return result
-
-
-def synthesize_audio(text: str, target_language: str, audio_path: str) -> bytes:
-    """调用 Confucius4-TTS，以原始音频作为音色参考合成译文。"""
-    try:
-        response = httpx.post(
-            TTS_URL,
-            json={"text": text, "lang": target_language, "audio_path": audio_path},
-            timeout=REQUEST_TIMEOUT,
-        )
-    except httpx.HTTPError as exc:
-        raise ConnectionError(f"无法调用 Confucius4-TTS 服务: {exc}") from exc
-    if not response.is_success:
-        status_code = 422 if response.status_code in {400, 422} else 503
-        raise HTTPException(
-            status_code=status_code,
-            detail=f"Confucius4-TTS 返回 HTTP {response.status_code}: {remote_error_detail(response)}",
-        )
-    if not response.content.startswith(b"RIFF"):
-        raise RuntimeError("Confucius4-TTS 返回的内容不是 WAV 音频。")
-    return response.content
-
-
 @app.get("/v1/health")
 def health() -> dict:
-    """报告本地 GGUF/llama.cpp 与 ASR、TTS 编排依赖状态。"""
-    llama_server_bin = resolve_executable(LLAMA_SERVER_CONFIG)
+    """仅检查本地文件与可执行文件，不导入模型或访问其他服务。"""
+    available = {
+        "model": MODEL_PATH.is_file(),
+        "llama_server": resolve_executable(LLAMA_SERVER_CONFIG) is not None,
+        "worker_script": WORKER_SCRIPT.is_file(),
+    }
+    ready = all(available.values())
     return {
         "code": 200,
+        "ready": ready,
+        "available": available,
+        "image_ready": ready and MMPROJ_PATH.is_file(),
         "paths": {
-            "model_dir": str(MODEL_DIR),
             "model_path": str(MODEL_PATH),
-            "llama_server_bin": llama_server_bin or LLAMA_SERVER_CONFIG,
             "worker_script": str(WORKER_SCRIPT),
-            "worker_tmp_dir": str(WORKER_TMP_DIR),
             "gpu_lock_file": GPU_LOCK_FILE,
         },
-        "available": {
-            "model": MODEL_PATH.is_file() and MODEL_PATH.suffix.lower() == ".gguf",
-            "llama_server": llama_server_bin is not None,
-            "worker_script": WORKER_SCRIPT.is_file(),
-            "httpx": importlib.util.find_spec("httpx") is not None,
-            "qwen3_asr": remote_service_available(
-                ASR_URL, ("qwen3_asr_model", "qwen_asr", "torch", "transformers", "cuda")
-            ),
-            "confucius4_tts": remote_service_available(
-                TTS_URL,
-                (
-                    "confucius4_tts_model",
-                    "confucius4_tts_code",
-                    "w2v_bert_model",
-                    "vocoder_model",
-                    "style_encoder_checkpoint",
-                    "torch",
-                    "torchaudio",
-                    "transformers",
-                    "cuda",
-                ),
-            ),
-        },
         "runtime": {
-            "backend": "llama.cpp Index-Translate GGUF text backbone + Qwen3-ASR + Confucius4-TTS",
-            "target_languages": SUPPORTED_TARGET_LANGUAGES,
+            "backend": "Index-Translate GGUF native translation",
+            "output": "text/plain",
+            "context_size": CONTEXT_SIZE,
             "request_timeout": REQUEST_TIMEOUT,
             "startup_timeout": STARTUP_TIMEOUT,
-            "n_gpu_layers": N_GPU_LAYERS,
-            "context_size": CONTEXT_SIZE,
-            "temperature": TEMPERATURE,
-            "local_files_only": LOCAL_FILES_ONLY,
-            "asr_url": ASR_URL,
-            "tts_url": TTS_URL,
-            "model_lifecycle": "one request -> one llama-server worker -> process exit releases VRAM",
-            "gpu_scheduling": "shared exclusive file lock for GGUF inference",
+            "model_lifecycle": "one request -> one worker -> process exit",
         },
-        "last_errors": {"index_translate": manager.last_error},
+        "last_errors": {"worker": manager.last_error},
     }
 
 
-@app.post("/v1/indexTranslate/translate")
-def translate_speech(request: TranslateRequest):
-    """转写输入音频、按 Translate 约束翻译并以源音频音色合成 WAV。"""
+@app.post("/v1/indexTranslate/translate", response_class=PlainTextResponse)
+def translate_text(request: TranslateRequest):
+    """直接翻译文本，原生译文返回 UTF-8；不调用 ASR 或 TTS。"""
     try:
-        reference_audio_path = reference_store.prompt_audio_path(request.audio_path)
-        if not reference_audio_path.is_file():
-            raise HTTPException(status_code=404, detail=f"参考音频不存在: {request.audio_path}")
-        audio_upload_metadata(request.audio_path)
-        try:
-            manager.check_runtime_ready()
-        except FileNotFoundError as exc:
-            raise HTTPException(status_code=503, detail=str(exc)) from exc
-
-        asr_result = transcribe_audio(
-            reference_audio_path,
-            request.audio_path,
-            request.source_language,
-        )
-        source_text = asr_result["text"].strip()
-        if len(source_text) > 12_000:
-            raise HTTPException(
-                status_code=422,
-                detail="转写文本超过 Confucius4-TTS 的 12000 字符上限，请缩短输入音频。",
-            )
-        try:
-            payload = manager.build_worker_payload(request, source_text)
-        except FileNotFoundError as exc:
-            raise HTTPException(status_code=503, detail=str(exc)) from exc
-
-        try:
-            with gpu_runtime_lock("index_translate/translate"):
-                try:
-                    with manager.lock:
-                        translated_text = manager.run_worker(payload)
-                finally:
-                    wait_after_cuda_release()
-        except GpuLockTimeoutError as exc:
-            raise HTTPException(status_code=503, detail=str(exc)) from exc
-        except TimeoutError as exc:
-            raise HTTPException(status_code=504, detail=str(exc)) from exc
-        except Exception as exc:
-            LOGGER.exception("Index-Translate GGUF translation failed")
-            raise HTTPException(status_code=500, detail=str(exc)) from exc
-
-        if len(translated_text) > 12_000:
-            raise HTTPException(
-                status_code=422,
-                detail="译文超过 Confucius4-TTS 的 12000 字符上限，请缩短输入音频。",
-            )
-        wav_bytes = synthesize_audio(translated_text, request.target_language, request.audio_path)
-        source_language = asr_result.get("language") or request.source_language or "auto"
-        if not source_language.isascii():
-            source_language = "auto"
-        return Response(
-            content=wav_bytes,
-            media_type="audio/wav",
-            headers={
-                "X-Source-Language": source_language,
-                "X-Target-Language": request.target_language,
-            },
-        )
-    except HTTPException:
-        raise
+        payload = manager.build_worker_payload(request)
+        with gpu_runtime_lock("index_translate/translate"):
+            try:
+                with manager.lock:
+                    translated = manager.run_worker(payload)
+            finally:
+                wait_after_cuda_release()
+        return PlainTextResponse(translated)
     except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-    except ConnectionError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except GpuLockTimeoutError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except TimeoutError as exc:
+        raise HTTPException(status_code=504, detail=str(exc)) from exc
     except Exception as exc:
-        LOGGER.exception("Index-Translate speech translation request failed")
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        LOGGER.exception("Index-Translate 原生翻译失败")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 if __name__ == "__main__":
-    print("==================================================")
-    print("   Unitale AI local backend Index-Translate")
-    print("==================================================")
-    print(f"[配置] 模型: {MODEL_PATH}")
-    print(f"[配置] llama-server: {resolve_executable(LLAMA_SERVER_CONFIG) or LLAMA_SERVER_CONFIG}")
-    print(f"[配置] ASR: {ASR_URL}")
-    print(f"[配置] TTS: {TTS_URL}")
-    print(f"[配置] GPU 锁文件: {GPU_LOCK_FILE}")
-    print(
-        f"[配置] host={API_HOST}, port={API_PORT}, n_gpu_layers={N_GPU_LAYERS}, "
-        f"context_size={CONTEXT_SIZE}, request_timeout={REQUEST_TIMEOUT}, "
-        f"temperature={TEMPERATURE}"
-    )
     uvicorn.run(app, host=API_HOST, port=API_PORT)

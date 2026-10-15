@@ -108,7 +108,7 @@ def build_translation_prompt(
     """按官方 Homura 模板拼接目标音节数和可选术语约束。"""
     if not text.strip() or not target_language_name.strip() or target_syllables < 1:
         raise ValueError("源文本、目标语言和正数目标音节数不能为空。")
-    glossary_text = "，".join(f"{term} -> {translation}" for term, translation in glossary.items())
+    glossary_text = ", ".join(f"{term} -> {translation}" for term, translation in glossary.items())
     prompt = f"请将以下文本翻译为{target_language_name}，译文严格控制在 {target_syllables} 个音节。"
     if glossary_text:
         prompt += f"要求：严格遵守术语映射表〖{glossary_text}〗。"
@@ -120,10 +120,9 @@ def translate(request: dict[str, Any]) -> str:
     model_path = require_file(str(request.get("model_path") or ""), "Index-Homura GGUF 模型")
     server_bin = require_file(str(request.get("llama_server_bin") or ""), "llama-server")
     text = str(request.get("text") or "").strip()
-    target_language = str(request.get("target_language") or "").strip()
     target_name = str(request.get("target_language_name") or "").strip()
     target_syllables = int(request.get("target_syllables", 0))
-    if not text or not target_name or not target_language or target_syllables < 1:
+    if not text or not target_name or target_syllables < 1:
         raise ValueError("源文本、目标语言和正数目标音节数不能为空。")
 
     port = find_free_port()
@@ -144,7 +143,10 @@ def translate(request: dict[str, Any]) -> str:
         "--n-gpu-layers",
         str(int(request.get("n_gpu_layers", 99))),
         "--ctx-size",
-        str(int(request.get("context_size", 4096))),
+        str(int(request.get("context_size", 32768))),
+        "--parallel",
+        "1",
+        "--no-context-shift",
         "--jinja",
         "--chat-template-kwargs",
         '{"enable_thinking":false}',

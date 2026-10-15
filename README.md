@@ -48,9 +48,10 @@ Steam Audio 对象级空间导出。MiMo 音色设计调用云端，其余模型
 | [Ditto `ditto/`](ditto/) | 8392 | `POST /v1/ditto/talkingHead` | 根据人像图片和驱动音频，通过运动空间扩散生成说话人像视频（[官方](https://github.com/antgroup/ditto-talkinghead)） | 视频帧 / 视频 |
 
 表格按服务项目归并；FireRedTTS3 与 MOSS-Audio 各由同一个 uv 项目启动两个模式进程。
-Echo 上述 S2ST 能力依赖官方完整语音模型包；本仓库现行 GGUF worker 仅运行它的文本主干。
-`tests/testIndexEchoS2ST/demo.py` 使用原生语音 API 保存 WAV；Homura、Nailong、Index-Translate
-的 Demo 使用各自官方文本脚本，保留 TXT 译文。
+四个 Index 端口直接提供模型原生任务：Echo 使用完整原生语音包，另外三个使用各自 GGUF。
+Demo 调用对应端口，Echo 保存 WAV，Homura、Nailong、Index-Translate 保存 TXT；
+都支持 `--check-only`，仅检查输入和原生服务健康状态。条件缺失时明确跳过，不写生成产物。
+实际环境、未满足条件和验证范围见 [环境检查报告](环境检查报告.md)。
 
 表中列出主业务入口。各 HTTP 进程还提供 `GET /v1/health`；FastAPI 的 `/docs` 和
 `/openapi.json` 可查看实际注册的字段与路由。部分服务另有音频/图片上传和检查接口。
@@ -58,14 +59,13 @@ Echo 上述 S2ST 能力依赖官方完整语音模型包；本仓库现行 GGUF 
 
 ## HTTP 响应与存储
 
-以下记录当前 HTTP 实现的响应与存储。四个 Index GGUF 接口目前额外编排 Qwen3-ASR 和
-Confucius4-TTS，返回合成 WAV；这是本仓库的服务实现流程。各模型原生输出见上表，
-接口实现细节见后文的 Index 章节。
+以下记录当前 HTTP 实现的响应与存储。Index 接口直接返回各模型原生输出，具体请求见后文。
 
 | HTTP 服务 | 成功响应 | 服务端保存行为 |
 | --- | --- | --- |
 | 克隆、音色设计、编辑、音效、BGM、音色转换 | `audio/wav` | 按用途保存 WAV |
-| Index GGUF 组合接口（8382–8385） | `audio/wav` | Confucius4-TTS 保存服务编排产生的 WAV；源音频使用已上传引用 |
+| Index-Echo 原生接口（8382） | `audio/wav`；`return_info=true` 时为 WAV/info ZIP | 输入与 worker 输出只暂存，请求结束后清理；Demo 在本地保存响应 |
+| Index-Homura、Nailong、Index-Translate（8383–8385） | UTF-8 `text/plain` | 原生译文直接响应，Demo 在本地保存 TXT；worker JSON 请求后清理 |
 | MOSS-Audio Thinking/Instruct、Qwen3-ASR | JSON 文本及上传摘要 | 请求结束后删除上传暂存和 worker 结果，不保留输入音频 |
 | TIGER-DnR | `application/zip`，含 `dialog.wav`、`effects.wav`、`music.wav` | 原子保存三路 Stem 与 ZIP 批次 |
 | SoulX-FlashHead、Ditto | 带声音的 `video/mp4` | 原子保存 MP4 |
@@ -99,10 +99,10 @@ VoxCPM2 可控克隆使用 `control_instruction`。
 main/                         8300 控制面，不包含模型推理
 steam_audio_renderer/         独立 C++17 Steam Audio CPU renderer
 qwen3_tts/                    Qwen3-TTS Base 的 HTTP 服务和 worker
-Index-Echo-S2ST-9B-GGUF/      Index-Echo GGUF 编排 API 和一次性 llama.cpp worker
-Index-Homura-9B-GGUF/         Homura GGUF 音节约束语音翻译 API 和一次性 llama.cpp worker
-Index-Nailong-9B-GGUF/        Nailong GGUF 多语种约束语音翻译 API 和一次性 llama.cpp worker
-Index-Translate-9B-GGUF/      Index-Translate GGUF 语音翻译 API 和一次性 llama.cpp worker
+Index-Echo-S2ST-9B-GGUF/      Index-Echo 完整原生语音 API 和一次性 Python worker（历史目录名）
+Index-Homura-9B-GGUF/         Homura GGUF 音节约束文本翻译 API 和一次性 llama.cpp worker
+Index-Nailong-9B-GGUF/        Nailong GGUF 原生长文档翻译 API 和一次性 llama.cpp worker
+Index-Translate-9B-GGUF/      Index-Translate GGUF 原生文本/图片翻译 API 和一次性 llama.cpp worker
 voxcpm2/                      VoxCPM2 的 HTTP 服务和克隆 worker
 LongCat_AudioDiT_3.5B_bf16/  LongCat-AudioDiT 服务和 worker
 dots_tts_soar/                dots.tts-soar 服务和 worker
@@ -177,7 +177,8 @@ cd LLM-for-Local-Machine
 
 统一启动和 GPU 锁使用 Linux 的 `setsid`、进程组信号与 `fcntl.flock`，部署目标为 Linux。
 运行要求：Python `3.12.13`、`uv`、FFmpeg/ffprobe、可用的 CUDA/NVIDIA 驱动（本地模型服务），
-以及下方列出的模型权重和外部源码目录。Index-Echo、Index-Homura、Index-Nailong 与 Index-Translate 还需要 llama.cpp 的 `llama-server`；
+以及下方列出的模型权重和外部源码目录。Index-Homura、Index-Nailong 与 Index-Translate 还需要支持 Qwen3.5 的 llama.cpp `llama-server`；
+Index-Echo 需要完整原生语音包、官方 CUDA 12.9 依赖和单卡至少 24 GB 显存；
 Step-Audio-EditX 需要系统 `sox`，Ditto 需要
 GCC 编译上游 Cython 扩展；正式 Steam Audio renderer 需要 CMake 3.17+、C++17 编译器和本地 SDK。
 不同模型锁定不同 Torch/CUDA 组合，必须使用各自环境。权重与第三方源码不放进本仓库。
@@ -309,10 +310,10 @@ Python 3.12 环境采用 ONNX Runtime CUDA 后端；配置映射和三维采样�
 | Confucius4-TTS | `$HF_MIRROR_DIR/netease-youdao/Confucius4-TTS` | `CONFUCIUS4_TTS_MODEL_DIR`、`CONFUCIUS4_TTS_CODE_PATH`、`CONFUCIUS4_TTS_W2V_BERT_MODEL_DIR`、`CONFUCIUS4_TTS_VOCODER_MODEL_DIR`、`CONFUCIUS4_TTS_STYLE_ENCODER_CHECKPOINT` |
 | Qwen3-ASR-1.7B | `$HF_MIRROR_DIR/Qwen/Qwen3-ASR-1.7B` | `QWEN3_ASR_MODEL_DIR` |
 | Seed-VC | `$HF_MIRROR_DIR/Plachta/Seed-VC` | `SEED_VC_MODEL_DIR`、`SEED_VC_CODE_PATH`、`SEED_VC_WHISPER_MODEL_DIR`、`SEED_VC_VOCODER_MODEL_DIR`、`SEED_VC_STYLE_ENCODER_CHECKPOINT`；F0 模式另需 `SEED_VC_F0_VOCODER_MODEL_DIR`、`SEED_VC_RMVPE_CHECKPOINT` |
-| Index-Echo S2ST | `$HF_MIRROR_DIR/IndexTeam/Index-Echo-S2ST-9B-GGUF/Index-Echo-S2ST-9B.Q8_0.gguf` | `INDEX_ECHO_S2ST_PROJECT_DIR`、`INDEX_ECHO_S2ST_MODEL_DIR`、`INDEX_ECHO_S2ST_MODEL_PATH`、`INDEX_ECHO_S2ST_LLAMA_SERVER_BIN`、`INDEX_ECHO_S2ST_N_GPU_LAYERS`、`INDEX_ECHO_S2ST_CONTEXT_SIZE` |
+| Index-Echo S2ST | `$HF_MIRROR_DIR/IndexTeam/Index-Echo-S2ST-9B/` 完整原生包 | `INDEX_ECHO_S2ST_PROJECT_DIR`、`INDEX_ECHO_S2ST_MODEL_DIR`、`INDEX_ECHO_S2ST_DEVICE`、`INDEX_ECHO_S2ST_REQUEST_TIMEOUT` |
 | Index-Homura | `$HF_MIRROR_DIR/IndexTeam/Index-Homura-9B-GGUF/Index-Homura-9B.Q8_0.gguf` | `INDEX_HOMURA_PROJECT_DIR`、`INDEX_HOMURA_MODEL_DIR`、`INDEX_HOMURA_MODEL_PATH`、`INDEX_HOMURA_LLAMA_SERVER_BIN`、`INDEX_HOMURA_N_GPU_LAYERS`、`INDEX_HOMURA_CONTEXT_SIZE`、`INDEX_HOMURA_TEMPERATURE` |
-| Index-Nailong | `$HF_MIRROR_DIR/IndexTeam/Index-Nailong-9B-GGUF/Index-Nailong-9B.Q8_0.gguf` | `INDEX_NAILONG_PROJECT_DIR`、`INDEX_NAILONG_MODEL_DIR`、`INDEX_NAILONG_MODEL_PATH`、`INDEX_NAILONG_LLAMA_SERVER_BIN`、`INDEX_NAILONG_N_GPU_LAYERS`、`INDEX_NAILONG_CONTEXT_SIZE`、`INDEX_NAILONG_TEMPERATURE` |
-| Index-Translate | `$HF_MIRROR_DIR/IndexTeam/Index-Translate-9B-GGUF/Index-Translate-9B.Q8_0.gguf` | `INDEX_TRANSLATE_PROJECT_DIR`、`INDEX_TRANSLATE_MODEL_DIR`、`INDEX_TRANSLATE_MODEL_PATH`、`INDEX_TRANSLATE_LLAMA_SERVER_BIN`、`INDEX_TRANSLATE_N_GPU_LAYERS`、`INDEX_TRANSLATE_CONTEXT_SIZE`、`INDEX_TRANSLATE_MAX_NEW_TOKENS`、`INDEX_TRANSLATE_TEMPERATURE` |
+| Index-Nailong | `$HF_MIRROR_DIR/IndexTeam/Index-Nailong-9B-GGUF/Index-Nailong-9B.Q8_0.gguf` | `INDEX_NAILONG_PROJECT_DIR`、`INDEX_NAILONG_MODEL_DIR`、`INDEX_NAILONG_MODEL_PATH`、`INDEX_NAILONG_LLAMA_SERVER_BIN`、`INDEX_NAILONG_N_GPU_LAYERS`、`INDEX_NAILONG_CONTEXT_SIZE` |
+| Index-Translate | `$HF_MIRROR_DIR/IndexTeam/Index-Translate-9B-GGUF/Index-Translate-9B.Q8_0.gguf` | `INDEX_TRANSLATE_PROJECT_DIR`、`INDEX_TRANSLATE_MODEL_DIR`、`INDEX_TRANSLATE_MODEL_PATH`、`INDEX_TRANSLATE_LLAMA_SERVER_BIN`、`INDEX_TRANSLATE_N_GPU_LAYERS`、`INDEX_TRANSLATE_CONTEXT_SIZE`、`INDEX_TRANSLATE_MAX_NEW_TOKENS`、`INDEX_TRANSLATE_TEMPERATURE`、`INDEX_TRANSLATE_MMPROJ_PATH` |
 | SoulX-FlashHead | `$HF_MIRROR_DIR/Soul-AILab/SoulX-FlashHead-1_3B` | `SOULX_FLASHHEAD_MODEL_DIR`、`SOULX_FLASHHEAD_CODE_PATH`、`SOULX_FLASHHEAD_WAV2VEC_DIR`（默认 `$HF_MIRROR_DIR/facebook/wav2vec2-base-960h`） |
 | Ditto | `$HF_MIRROR_DIR/thewintersun/ditto-talkinghead` | `DITTO_MODEL_DIR`、`DITTO_CODE_PATH`、`DITTO_DATA_ROOT`（`$DITTO_MODEL_DIR/ditto_onnx`）、`DITTO_CONFIG_PATH`（`$DITTO_MODEL_DIR/ditto_cfg/v0.4_hubert_cfg_trt.pkl`） |
 | MOSS-SoundEffect | `$HF_MIRROR_DIR/OpenMOSS-Team/MOSS-SoundEffect-v2.0` | `MOSS_SOUNDEFFECT_CODE_PATH`、`MOSS_SOUNDEFFECT_MODEL_DIR` |
@@ -446,103 +447,102 @@ worker 使用官方 S2A 的 `target_feat_len` 指定 Mel 帧数，完整保留 T
 `runtime.native_vocalization_duration=true` 表示已加载支持此字段的 HTTP 版本；更新后需要
 重新运行 `bash start.sh`，仅修改 worker 文件不能更新已启动的接口校验。
 
-## Index-Echo 语音翻译
+## Index-Echo 原生语音翻译
 
-本地 `Index-Echo-S2ST-9B-GGUF` 目录只包含文本 LLM 主干。8382 服务组合 Qwen3-ASR 转写、
-llama.cpp 调用 GGUF 翻译文本，再把原始参考音频和译文交给 Confucius4-TTS 合成，输出沿用
-源说话人的音色。它需要 Qwen3-ASR、Confucius4-TTS 和 `llama-server` 都已就绪；模型目录、
-llama.cpp 可执行文件及 GPU offload 参数可通过 `INDEX_ECHO_S2ST_*` 配置。默认权重是
-`$HF_MIRROR_DIR/IndexTeam/Index-Echo-S2ST-9B-GGUF/Index-Echo-S2ST-9B.Q8_0.gguf`，默认从
-`PATH` 查找 `llama-server`。服务 `/v1/health` 会逐项检查 GGUF、可执行文件及 ASR/TTS
-健康响应中的模型依赖。缺少 llama.cpp 时服务仍能启动，但该路由返回 `503`。
-
-先按共享上传接口保存音频，再提交它的逻辑 `audio_path`。源语言支持中文或英文自动识别，
-也可用 `source_language` 明确指定；目标语言支持 `zh`、`en`、`es`、`ja`，不能与源语言相同。
-请求返回 `audio/wav`，并在响应头给出 `X-Source-Language` 和 `X-Target-Language`。
+8382 直接调用完整 [Index-Echo-S2ST-9B 原生包](https://huggingface.co/IndexTeam/Index-Echo-S2ST-9B)
+的 `DubbingBridgeModel.from_pretrained()` / `model.dub()`。源语音支持中文或英文；目标语言
+`target_language` 支持 `en`、`es`、`ja`、`zh`，源目标必须不同，源语言由原生包判断。
+接收 multipart `audio`，无需共享上传或 `audio_path`，成功返回原生 24 kHz WAV。
+可选 `return_info=true` 返回 ZIP，包含 `audio.wav` 和原生诊断 `info.json`（转写、译文等）；
+`mode` 只支持 `h2cv`，`chunk` 只能为 `false`。输入遵循共享上传容量限制；官方建议每句约 30 秒以内。
+输入、worker JSON/WAV 在成功、失败和超时后清理，模型每次请求加载后退出。
 
 ```bash
-curl -fsS http://127.0.0.1:8300/v1/upload_audio \
-  -F 'audio=@reference.wav;type=audio/wav' -F 'full_path=reference.wav'
 curl -fsS http://127.0.0.1:8382/v1/indexTranslate/echoS2ST \
-  -H 'Content-Type: application/json' \
-  -d '{"audio_path":"reference.wav","target_language":"en"}' \
-  -o translated-speech.wav
+  -F 'audio=@tests/testIndexTranslate/speech.wav;type=audio/wav' \
+  -F 'target_language=en' -o translated-speech.wav
 ```
 
-部署前执行 `uv sync --project Index-Echo-S2ST-9B-GGUF --locked`，并安装与本机硬件匹配的 llama.cpp；
-如可执行文件不在 `PATH`，设置 `INDEX_ECHO_S2ST_LLAMA_SERVER_BIN` 为完整路径。`INDEX_ECHO_S2ST_N_GPU_LAYERS`
-默认 `99`，`INDEX_ECHO_S2ST_CONTEXT_SIZE` 默认 `4096`。每次翻译启动独立 `llama-server`
-worker，退出后清理进程组并释放 GPU 锁。
-
-## Index-Homura 音节约束语音翻译
-
-8383 服务串接 Qwen3-ASR、Index-Homura GGUF 和 Confucius4-TTS：ASR 转写上传音频，Homura 按目标
-音节数生成译文，TTS 使用原始音频作为参考合成 WAV。Homura 的音节数是近似控制目标，不能保证
-每次恰好命中；可选 `glossary` 用于提供必须遵守的术语映射。请求字段包含共享存储的逻辑
-`audio_path`、`target_syllables`（1–1024）和 `target_language`。
-
-模型文本翻译覆盖更多语种，但语音合成目标受 Confucius4-TTS 限制为 `zh`、`en`、`ja`、`ko`、
-`de`、`fr`、`th`、`id`、`vi`、`es`、`pt`、`it`、`ru`、`ms`。`source_language` 可选，用作
-Qwen3-ASR 的语言提示；支持上述常见语言代码，其他值按原文传递。
+项目目录保留历史名称 `Index-Echo-S2ST-9B-GGUF/`，运行权重必须为完整原生包，默认目录为
+`$HF_MIRROR_DIR/IndexTeam/Index-Echo-S2ST-9B`。文本 GGUF 不能替代该包。官方要求 CUDA 单卡
+至少 24 GB，CPU 路径未经验证。`INDEX_ECHO_S2ST_DEVICE` 默认 `cuda`，请求超时默认 900 秒。
+在满足条件的主机上安装已锁定的完整官方依赖：
 
 ```bash
-curl -fsS http://127.0.0.1:8300/v1/upload_audio \
-  -F 'audio=@reference.wav;type=audio/wav' -F 'full_path=reference.wav'
+uv sync --project Index-Echo-S2ST-9B-GGUF --locked --extra native
+```
+
+不带 `--extra native` 只准备轻量 HTTP 环境；健康接口检查完整包、官方依赖版本、FFmpeg 和
+所选 GPU 显存，未就绪时推理返回 `503`。不会降级成其他模型或 ASR/TTS 服务链。
+
+## Index-Homura 原生音节约束翻译
+
+8383 接收 JSON `text`、正整数 `target_syllables`，可选 `target_language`（默认 `en`）、
+`glossary`、`max_new_tokens`、`temperature`（默认 `0.3`），返回 UTF-8 `text/plain`。
+使用 [官方音节控制模板](https://github.com/bilibili/Index-Translate/blob/main/inference/llm/syllable_translate.py)，
+目标音节数属于近似控制，需检查模型实际输出。常见语言代码会映射为语言名称，其他语种可直接
+填写完整语言名称，范围由模型自身决定。默认输出预算为官方的 `max(512, 3 * len(text))`；`INDEX_HOMURA_MAX_NEW_TOKENS` 默认 `0`
+表示使用该公式，请求显式 `max_new_tokens` 时直接采用该值。
+
+```bash
 curl -fsS http://127.0.0.1:8383/v1/indexTranslate/homura \
   -H 'Content-Type: application/json' \
-  -d '{"audio_path":"reference.wav","target_language":"en","target_syllables":12,"glossary":{"电影":"cinema"}}' \
-  -o homura-translation.wav
+  -d '{"text":"我们今天去看电影吧","target_language":"en","target_syllables":8,"glossary":{"电影":"cinema"}}' \
+  -o homura-translation.txt
 ```
 
-部署前执行 `uv sync --project Index-Homura-9B-GGUF --locked`，并安装本机可用的 llama.cpp。
-`INDEX_HOMURA_LLAMA_SERVER_BIN` 默认从 `PATH` 查找 `llama-server`；默认温度为 `0.3`，默认
-上下文长度为 `4096`。每次请求使用一次性 worker，GPU 锁在 llama-server 退出并经过释放延迟后归还。
+默认使用已有 Q8_0 权重、32768 上下文、关闭 thinking。执行
+`uv sync --project Index-Homura-9B-GGUF --locked` 并准备 `llama-server`；每次请求仅运行 Homura。
 
-## Index-Nailong 语音翻译
+## Index-Nailong 原生长文档翻译
 
-8384 服务串接 Qwen3-ASR、Index-Nailong GGUF 和 Confucius4-TTS：ASR 转写共享存储中的参考音频，
-Nailong 翻译文本，再使用原始音频参考合成 WAV。Nailong 支持多语种翻译和 instTrans 术语/格式约束；
-接口可选传入 `glossary`、`hard_constraints`、`soft_constraints` 和 `genre`。长文档 NativeLong 的固定方向模板
-不用于此语音路由。语音合成目标受 Confucius4-TTS 限制为 `zh`、`en`、`ja`、`ko`、`de`、`fr`、`th`、
-`id`、`vi`、`es`、`pt`、`it`、`ru`、`ms`。
+8384 接收 JSON `text`（整篇原文），可选 `direction`（默认 `zh-en`）和 `max_new_tokens`。
+方向限定为 `zh-en`、`en-zh`、`zh-ja`、`ja-zh`，返回保留段落的 UTF-8 `text/plain`。
+采用 [官方 NativeLong 固定方向模板](https://github.com/bilibili/Index-Translate/tree/main/inference/llm/prompts)，
+原文一次送入模型，不分段、不摘要、不套用普通翻译模板。不接受从其他模型借来的术语/风格字段。
 
 ```bash
-curl -fsS http://127.0.0.1:8300/v1/upload_audio \
-  -F 'audio=@reference.wav;type=audio/wav' -F 'full_path=reference.wav'
 curl -fsS http://127.0.0.1:8384/v1/indexTranslate/naiLong \
   -H 'Content-Type: application/json' \
-  -d '{"audio_path":"reference.wav","target_language":"en","glossary":{"电影":"cinema"},"soft_constraints":["译文使用自然口语"]}' \
-  -o nailong-translation.wav
+  -d '{"text":"第一章\n\n这里是需要完整翻译的原文。","direction":"zh-en"}' \
+  -o nailong-translation.txt
 ```
 
-请求目标语种字段默认 `en`；`source_language` 可选，支持常见语言代码并作为 Qwen3-ASR 提示。
-部署前执行 `uv sync --project Index-Nailong-9B-GGUF --locked`，并安装 llama.cpp 的 `llama-server`。
-默认权重为 `$HF_MIRROR_DIR/IndexTeam/Index-Nailong-9B-GGUF/Index-Nailong-9B.Q8_0.gguf`，
-默认温度为 `0`、上下文长度为 `32768`；每次请求运行独立 worker，退出后清理进程组并释放共享 GPU 锁。
+采样固定为温度 0、top-p 1、禁用 top-k/min-p、seed 42、重复惩罚 1、关闭 thinking，使用官方
+停止 token；worker 从实际 GGUF 词表把 token ID 映射成 llama.cpp 支持的停止字符串。
+默认不额外限制生成 token 数，上下文按 [官方 9B 预设](https://github.com/bilibili/Index-Translate/blob/main/inference/llm/serve_vllm.sh)
+设为 229376；输入和输出必须共同放入实际配置的上下文。达到长度上限时明确失败，不返回
+截断文档作为完整结果。长上下文 KV cache 需要更多显存，运维可显式调整
+`INDEX_NAILONG_CONTEXT_SIZE`。执行 `uv sync --project Index-Nailong-9B-GGUF --locked` 并准备
+`llama-server`；每次请求仅运行 Nailong。
 
-## Index-Translate 语音翻译
+## Index-Translate 原生文本/图片翻译
 
-8385 服务使用本地 `Index-Translate-9B.Q8_0.gguf` 翻译 Qwen3-ASR 的转写结果，再把原始参考音频
-和译文交给 Confucius4-TTS 合成 WAV。普通翻译使用模型 README 推荐的直接翻译提示；也可通过
-`glossary`、`hard_constraints`、`soft_constraints` 和 `genre` 设置 instTrans 术语、格式和风格约束。
-GGUF 是文本模型，不包含 ASR 或语音合成模块，因此需要 Qwen3-ASR、Confucius4-TTS 与 llama.cpp
-的 `llama-server`。语音合成目标限 Confucius4-TTS 当前支持的 `zh`、`en`、`ja`、`ko`、`de`、
-`fr`、`th`、`id`、`vi`、`es`、`pt`、`it`、`ru`、`ms`。
+8385 接收 JSON `text` 或图片 `image`，返回 UTF-8 `text/plain`。模型提供 150 语种翻译，常见
+代码映射为语言名称，其他语种使用完整语言名称。支持 [官方 instTrans 参数](https://github.com/bilibili/Index-Translate/blob/main/inference/llm/translate.py)：
+`source_language`（默认 `auto`）、`target_language`（默认 `en`）、`glossary`、`hard_constraints`、
+`soft_constraints`、`genre`（默认 `文本`）、`instruction`、`raw_prompt`、`max_new_tokens`、
+`temperature`。硬软约束、JSON 格式保持和原始提示词均保留官方模板行为。
 
 ```bash
-curl -fsS http://127.0.0.1:8300/v1/upload_audio \
-  -F 'audio=@reference.wav;type=audio/wav' -F 'full_path=reference.wav'
 curl -fsS http://127.0.0.1:8385/v1/indexTranslate/translate \
   -H 'Content-Type: application/json' \
-  -d '{"audio_path":"reference.wav","target_language":"en","glossary":{"电影":"cinema"}}' \
-  -o translated-speech.wav
+  -d '{"text":"碳纤维的好处就是它抗裂缝。","source_language":"zh","target_language":"en","glossary":{"碳纤维":"carbon fiber"}}' \
+  -o translation.txt
 ```
 
-请求默认目标语种为 `en`，可选 `source_language` 用作 Qwen3-ASR 识别提示。默认模型路径为
-`$HF_MIRROR_DIR/IndexTeam/Index-Translate-9B-GGUF/Index-Translate-9B.Q8_0.gguf`，上下文长度为
-`32768`、最大生成长度为 `1024`、温度为 `0` 并关闭 thinking。部署前执行
-`uv sync --project Index-Translate-9B-GGUF --locked`，并安装与本机硬件匹配的 `llama-server`。
-每次请求启动一次性模型 worker；服务完成后清理进程组和临时 JSON，并释放共享 GPU 锁。
+图片 `image` 使用 `data:image/png;base64,...` 等 PNG/JPEG/WebP/GIF/BMP data URL，可附带文本
+作为参考。图片字节受 `UPLOAD_MAX_BYTES` 限制；不接受客户端服务器文件路径，不调用外部 OCR。
+需要官方配套 `Index-Translate-9B.mmproj-Q8_0.gguf`，默认位于同一模型目录，可通过
+`INDEX_TRANSLATE_MMPROJ_PATH` 配置。缺失时图片请求返回 `503`；文本仍可独立运行。
+`GET /v1/health` 的 `ready` 表示文本依赖检查结果，`image_ready` 单独报告图片条件。
+
+默认 Q8_0、32768 上下文、1024 输出 token、温度 0，关闭 thinking。执行
+`uv sync --project Index-Translate-9B-GGUF --locked` 并准备支持 Qwen3.5/多模态的 `llama-server`。
+
+四个服务都保留一次性 worker、共享 GPU 排队锁与进程组清理。新契约不再接收旧 `audio_path`
+请求，未提供兼容别名。更新已运行的服务需先停止旧 `start.sh` 并重新启动；健康 200 需结合
+`ready` / `available` 判断模型能否实际推理。
 
 ## Qwen3-ASR 语音识别
 
@@ -1045,7 +1045,7 @@ adapter、数据集和预测都写入 `storage/training/`，不提交到 Git。
   找不到参考音频通常返回 `404`，但 Confucius4-TTS 的现有文件预检统一返回 `503`。
 - GPU 排队超时返回 `503`。本地依赖缺失按服务返回 `503` 或 `500`；模型执行失败通常为
   `500`。Index-Echo、Index-Homura、Index-Nailong、Index-Translate、SoulX 和 Ditto 的 worker 超时返回 `504`；
-  Index-Echo、Index-Homura、Index-Nailong 和 Index-Translate 上游 ASR/TTS 不可用时返回 `503`。
+  Index-Echo 原生环境、三个文本模型运行时或图片 mmproj 未就绪时返回 `503`。
   Steam Audio 的非法 Manifest 返回 `422`、重复 `job_id` 返回 `409`、未知任务返回 `404`。
 - 模型 worker 失败或超时会清理临时文件和进程组，再返回服务错误；共享 GPU 锁在
   `finally` 中释放。

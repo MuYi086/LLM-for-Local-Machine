@@ -45,13 +45,14 @@
   `FIRERED_TTS3_MODE=timbre|clone`，每个进程只注册其模式对应的业务路由。
 - `main/main.py` 只处理健康/控制、共享上传/检查、MiMo 代理和 CPU 导出，不加载模型包或推理。
   空间任务进度为 `GET /v1/audio/spatial/render/progress/{job_id}`，是进程内状态。
-- 四个 Index GGUF 项目的当前 HTTP 实现使用一次性 `llama-server` 文本 worker，编排
-  Qwen3-ASR 与 Confucius4-TTS；ASR、翻译、TTS 各阶段分别使用共享 GPU 锁。
-  Echo GGUF 不含原生音频塔、连接器或语音合成栈；Nailong 的 NativeLong 固定模板不用于
-  当前语音路由；Index-Translate 当前 worker 未接入配套视觉组件。推理默认值见 README。
-- `tests/testIndex*` Demo 必须调用各自 Index 官方 API/推理脚本，保留原始输出：Echo 为 WAV，
-  Homura、Nailong、Index-Translate 为 TXT。不得混入 Confucius4-TTS 等额外模型流程。
+- 8382–8385 必须保持对应 Index 模型的原生输入输出，不编排 Qwen3-ASR、Confucius4-TTS 或其他模型。
+  Echo 项目保留历史 `-GGUF` 目录名，worker 直接调用完整原生包的 `DubbingBridgeModel`；
+  文本 GGUF 不能替代完整语音包。三个文本服务各启动自己的单次 llama-server worker。
+  Nailong 使用官方 NativeLong 固定方向模板；Index-Translate 图片输入使用官方配套 mmproj。
+- `tests/testIndex*` Demo 调用各自端口的原生接口，保留原始响应：Echo 为 WAV，
+  Homura、Nailong、Index-Translate 为 TXT。不得混入额外模型流程。
   Echo 默认读取 `tests/testIndexTranslate/speech.wav`，三个文本 Demo 默认读取同目录 `subtitles.md`。
+  均支持 `--check-only`，缺失条件时明确跳过；实际模型效果不能用无模型测试代替。
 - `unitale_runtime/` 是共享轻量包，负责流式上传、引用、原子提交、GPU 队列及存储容量/保留策略；
   不得导入 FastAPI、Torch 或模型包。它是其他项目的 editable 依赖，没有独立 `uv.lock`。
 - `steam_audio_renderer/` 是 C++17 Steam Audio CPU renderer，不获取 GPU 锁；SDK 和动态库在仓库外。
@@ -121,11 +122,15 @@ uv run --project qa --locked python -m unittest discover -s tests -v
 - MOSS-Audio、Qwen3-ASR、TIGER 直接接收 multipart `audio`，输入只暂存；前两者返回 JSON，
   TIGER 返回 ZIP 并原子保存分离批次。SoulX/Ditto 返回带声音 MP4，不使用 WAV 响应约定。
   两个人像视频服务提供 `POST /v1/upload_image` 和 `GET /v1/check/image`，同样使用逻辑标识。
-- 四个 Index GGUF HTTP 接口接收共享 `AudioReferenceStore` 的 `audio_path`，以原始音频作为
-  TTS 音色参考，返回编排产生的 `audio/wav`；需要 `llama-server` 与已启动的 ASR/TTS 服务。
-  Echo 源语言支持中文/英文，目标支持 zh/en/es/ja；其他三者的语音目标语种限定为 TTS 支持的
-  zh/en/ja/ko/de/fr/th/id/vi/es/pt/it/ru/ms。Homura 要求 `target_syllables`，可选 `glossary`；
-  Nailong/Index-Translate 支持 `glossary`、`hard_constraints`、`soft_constraints` 和 `genre`。
+- Echo 8382 直接接收 multipart `audio`，返回原生 `audio/wav`；可选 `return_info=true` 返回
+  WAV/info ZIP。源语言为中/英，目标 zh/en/es/ja，原生包判断源语言；只支持 h2cv、chunk=false，
+  官方建议约 30 秒以内短句。输入与 worker JSON/WAV 请求后清理，官方单卡至少 24 GB，完整依赖使用
+  `uv sync --project Index-Echo-S2ST-9B-GGUF --locked --extra native`；不带 extra 仅准备 HTTP。
+- Homura 8383 接收 `text`、`target_syllables` 及可选目标语言/术语/生成参数；Nailong 8384 接收
+  整篇 `text`、四个官方 `direction` 及可选输出预算，保留固定贪心采样，不增添普通 instTrans 字段。
+  Index-Translate 8385 接收文本或图片 data URL，保留源/目标语言、术语、硬软约束、文体、指令和
+  raw_prompt。三个服务均返回 UTF-8 `text/plain`，不得套用 TTS 语种或 12000 字符上限。
+  图片缺少 mmproj 时返回 503；Echo 原生包、依赖或显存不满足时也应返回 503，不回退成编排链路。
 - 正式 `balanced`/`immersive` 必须保留对象边界，走 `/v1/audio/spatial/render` 的 Manifest v1
   与重复 `assets` 字段，不在浏览器预混、不获取 GPU 锁。Steam Audio pre-master 后只能
   loudnorm/编码，禁止再叠加 Haas/aecho。`/v1/audio/export` 调用只用于显式 `profile=standard`

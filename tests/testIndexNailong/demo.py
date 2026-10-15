@@ -1,4 +1,4 @@
-"""使用 Index-NativeLong（Index-Nailong）官方长文翻译 API 运行 Demo。"""
+"""调用 8384 的 Index-Nailong 原生接口，保存 TXT 译文。"""
 
 from __future__ import annotations
 
@@ -10,16 +10,14 @@ from index_translate_demo_common import run_text_model_demo  # noqa: E402
 
 
 def main() -> None:
-    """调用官方 doc_translate.py，原样保存模型文本输出。"""
+    """保持模型原生文本输入和输出，先检查运行环境。"""
     run_text_model_demo(
-        demo_name="Index-NativeLong (Index-Nailong)",
+        demo_name="Index-Nailong",
         env_prefix="INDEX_NAILONG",
-        script_relative_path="inference/llm/doc_translate.py",
-        model_name="IndexTeam/Index-Nailong-9B",
+        port=8384,
+        route="naiLong",
         output_name="index_nailong_zh_to_en.txt",
         demo_dir=Path(__file__).resolve().parent,
-        model_arguments=["--direction", "zh-en"],
-        stdin_input=True,
     )
 
 
