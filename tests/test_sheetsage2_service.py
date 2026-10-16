@@ -52,7 +52,7 @@ def load_service(name: str, path: Path):
     with (
         patch.dict(os.environ, service_environment, clear=True),
         patch.object(sys, "path", source_path),
-        patch.dict(sys.modules, {"sheetsage2_runtime": runtime_module}),
+        patch.dict(sys.modules, {"runtime": runtime_module}),
     ):
         runtime_spec.loader.exec_module(runtime_module)
         spec.loader.exec_module(module)

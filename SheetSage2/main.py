@@ -22,7 +22,7 @@ import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, Response, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
-from sheetsage2_runtime import cuda_status, terminate_process_group
+from runtime import cuda_status, terminate_process_group
 from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware
 from unitale_runtime import AudioUploadError, GpuLockTimeoutError, stage_audio_upload
