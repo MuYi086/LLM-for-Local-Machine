@@ -22,11 +22,12 @@ import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, Response, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
-from runtime import cuda_status, terminate_process_group
 from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware
 from unitale_runtime import AudioUploadError, GpuLockTimeoutError, stage_audio_upload
 from unitale_runtime import gpu_runtime_lock as shared_gpu_runtime_lock
+
+from runtime import cuda_status, terminate_process_group
 
 LOGGER = logging.getLogger(__name__)
 PROJECT_DIR = Path(__file__).resolve().parent
@@ -146,6 +147,8 @@ REQUIRED_DEPENDENCIES = (
     "mir_eval",
     "mido",
     "numpy",
+    # pretty_midi 的传递导入依赖，不能仅检查 pretty_midi 自身是否已安装。
+    "pkg_resources",
     "pretty_midi",
     "safetensors",
     "scipy",

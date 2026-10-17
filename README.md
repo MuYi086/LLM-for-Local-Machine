@@ -1081,6 +1081,11 @@ adapter 还要求配置指定 commit 的 MERT-v2-FullSong 权重和代码，加�
 GPU；请求音频临时文件会删除，生成 ZIP 保留在 `SHEETSAGE2_OUTPUT_DIR`，当前保留策略工具
 不会自动清理这些 ZIP。
 
+SheetSage2 固定 `pretty-midi==0.2.10`，其运行时依赖 `pkg_resources`，因此同时固定
+`setuptools==80.10.2`。更新环境时使用 `uv sync --project SheetSage2 --locked`，
+避免仅安装新版 setuptools 导致转谱阶段出现 `No module named 'pkg_resources'`。
+健康检查会报告该传递依赖是否可用；更改服务代码后需重启对应 HTTP 进程使检查生效。
+
 ## YuE2-Vae latent 编码与解码
 
 YuE2-Vae 在 `8316` 提供官方 VAE 编码和解码能力。解码接收 YuE2 acoustic latent 的 NPY 文件，

@@ -208,6 +208,33 @@ class SheetSage2ServiceTests(unittest.TestCase):
         gpu_lock.assert_not_called()
         self.assertEqual(list(self.main.UPLOAD_STAGING_DIR.iterdir()), [])
 
+    def test_missing_pkg_resources_is_reported_before_starting_worker(self) -> None:
+        """pretty_midi 可被找到但传递依赖缺失时，应在健康检查与 CPU 预检中阻止推理。"""
+        with (
+            patch.object(self.main, "model_status", return_value=self.complete_models()),
+            patch.object(
+                self.main, "module_available", side_effect=lambda name: name != "pkg_resources"
+            ),
+            patch.object(self.main.shutil, "which", return_value="/usr/bin/ffmpeg"),
+            patch.object(self.main, "cuda_status", return_value={"available": True}),
+            patch.object(self.main, "gpu_runtime_lock") as gpu_lock,
+            patch.object(self.main.manager, "run_worker") as run_worker,
+        ):
+            health = self.client.get("/v1/health")
+            response = self.client.post(
+                "/v1/m-a-p/SheetSage2",
+                files={"audio": ("song.mp3", b"audio", "audio/mpeg")},
+            )
+
+        self.assertFalse(health.json()["ready"])
+        self.assertTrue(health.json()["available"]["dependencies"]["pretty_midi"])
+        self.assertFalse(health.json()["available"]["dependencies"]["pkg_resources"])
+        self.assertEqual(response.status_code, 503)
+        self.assertIn("pkg_resources", response.json()["detail"])
+        gpu_lock.assert_not_called()
+        run_worker.assert_not_called()
+        self.assertEqual(list(self.main.UPLOAD_STAGING_DIR.iterdir()), [])
+
     def test_worker_cleans_request_and_archive_files_on_success_and_timeout(self) -> None:
         process = Mock(returncode=0)
         popen = Mock(return_value=process)
