@@ -7,6 +7,8 @@ API 进程保持轻量。每次生成都会获取共享 GPU 锁、启动一个 w
 
 from __future__ import annotations
 
+import io
+
 # 学习入口：BGM 请求走“校验 -> GPU 文件锁 -> 一次性 worker -> WAV 落盘”流程。
 import logging
 import os
@@ -17,6 +19,15 @@ from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Response
+from inference_gateway import (
+    BackendQuarantinedError,
+    LocalAIClient,
+    LocalAIRequestError,
+    LocalAIUnavailableError,
+    UnsupportedCapabilityError,
+    load_gateway_config,
+)
+from inference_gateway.execution import execute_localai_operation
 from pydantic import BaseModel, Field, field_validator
 from starlette.middleware.base import BaseHTTPMiddleware
 from unitale_runtime import GpuLockTimeoutError
@@ -86,6 +97,14 @@ ACESTEP_DEFAULT_STEPS = int(os.getenv("ACESTEP_DEFAULT_STEPS", "8"))
 ACESTEP_DEFAULT_SEED = int(os.getenv("ACESTEP_DEFAULT_SEED", "-1"))
 ACESTEP_REQUEST_TIMEOUT = float(os.getenv("ACESTEP_REQUEST_TIMEOUT", "1800"))
 CUDA_RELEASE_DELAY = float(os.getenv("CUDA_RELEASE_DELAY", "2.0"))
+LOCALAI_PROVIDER_ENV = "UNITALE_ACESTEP_PROVIDER"
+LOCALAI_MODEL_ID = "unitale.ace-step15.xl-turbo.q8dit"
+GATEWAY_CONFIG = load_gateway_config(
+    service_provider_env=LOCALAI_PROVIDER_ENV,
+    default_model=LOCALAI_MODEL_ID,
+    request_timeout=ACESTEP_REQUEST_TIMEOUT,
+)
+LAST_LOCALAI_ERROR: str | None = None
 API_HOST = os.getenv("HOST", "0.0.0.0")
 API_PORT = int(os.getenv("PORT", "8313"))
 WORKER_SCRIPT = PROJECT_DIR / "worker.py"
@@ -174,6 +193,67 @@ def wait_after_cuda_release() -> None:
         time.sleep(CUDA_RELEASE_DELAY)
 
 
+def validate_localai_request(request: AceStepBgmRequest) -> None:
+    """拒绝 SoundGeneration HTTP 合同当前无法传递的 ACE-Step 参数。"""
+    if request.steps != ACESTEP_DEFAULT_STEPS:
+        raise UnsupportedCapabilityError(
+            "LocalAI SoundGeneration 当前没有逐请求 num_inference_steps 字段；"
+            f"ACE-Step XL Turbo 只能使用当前服务默认 steps={ACESTEP_DEFAULT_STEPS}。"
+        )
+    if request.seed >= 0:
+        raise UnsupportedCapabilityError(
+            "LocalAI SoundGeneration HTTP 合同当前不能传递 ACE-Step seed；"
+            "请使用 seed=-1 进行随机生成，或切回 native provider。"
+        )
+
+
+def validate_localai_wav(audio_bytes: bytes) -> tuple[int, int]:
+    """完整解码返回音频并检查 Unitale 的 48 kHz 双声道 WAV 合同。"""
+    try:
+        import soundfile as sf
+
+        with sf.SoundFile(io.BytesIO(audio_bytes), mode="r") as wav_file:
+            sample_rate = wav_file.samplerate
+            channels = wav_file.channels
+            frame_count = wav_file.frames
+            if frame_count <= 0:
+                raise LocalAIRequestError("LocalAI ACE-Step 返回了空 WAV。")
+            if sample_rate != SAMPLE_RATE or channels != CHANNELS:
+                raise LocalAIRequestError(
+                    "LocalAI ACE-Step WAV 格式与当前接口不同："
+                    f"期望 {SAMPLE_RATE} Hz/{CHANNELS} 声道，得到 {sample_rate} Hz/{channels} 声道。"
+                )
+            decoded_frames = sum(
+                len(block)
+                for block in wav_file.blocks(blocksize=65_536, dtype="float32", always_2d=True)
+            )
+    except LocalAIRequestError:
+        raise
+    except (ImportError, OSError, RuntimeError, ValueError) as exc:
+        raise LocalAIRequestError(f"LocalAI ACE-Step 返回的 WAV 无效：{exc}") from exc
+    if decoded_frames != frame_count:
+        raise LocalAIRequestError(
+            f"LocalAI ACE-Step WAV 不完整：头部声明 {frame_count} 帧，实际解码 {decoded_frames} 帧。"
+        )
+    return sample_rate, channels
+
+
+def generate_localai(request: AceStepBgmRequest) -> tuple[bytes, float]:
+    """在共享 LocalAI GPU 租约内执行不含歌词字段的 BGM 请求。"""
+    audio_bytes, elapsed = execute_localai_operation(
+        config=GATEWAY_CONFIG,
+        operation=lambda client: client.generate_sound(
+            text=request.prompt,
+            duration_seconds=request.seconds,
+            bpm=request.bpm,
+            keyscale=request.keyscale,
+            timesignature=request.timesignature,
+        ),
+    )
+    validate_localai_wav(audio_bytes)
+    return audio_bytes, elapsed
+
+
 ACESTEP_WORKER = WorkerConfig(
     worker_script=WORKER_SCRIPT,
     temp_dir=WORKER_TMP_DIR,
@@ -239,6 +319,11 @@ manager = AceStepWorkerManager()
 def health() -> dict[str, object]:
     """返回 BGM 服务的依赖、模型、GPU 和运行参数状态。"""
     cuda = cuda_status()
+    localai_client = LocalAIClient(GATEWAY_CONFIG) if GATEWAY_CONFIG.provider == "localai" else None
+    localai_healthy = bool(localai_client and localai_client.health())
+    localai_model_registered = bool(
+        localai_client and localai_healthy and localai_client.model_ready()
+    )
     return {
         "code": 200,
         "paths": {
@@ -259,6 +344,12 @@ def health() -> dict[str, object]:
             "cuda": cuda["available"],
             "model_complete": model_status()["complete"],
             "worker_script": WORKER_SCRIPT.is_file(),
+            "selected_provider": GATEWAY_CONFIG.provider,
+            "selected_provider_ready": (
+                localai_model_registered if localai_client else model_status()["complete"]
+            ),
+            "localai_healthy": localai_healthy,
+            "localai_model_registered": localai_model_registered,
         },
         "model": model_status(),
         "cuda": cuda,
@@ -279,15 +370,21 @@ def health() -> dict[str, object]:
             "request_timeout": ACESTEP_REQUEST_TIMEOUT,
             "model_lifecycle": "one request -> one worker -> process exit releases VRAM",
             "local_files_only": LOCAL_FILES_ONLY,
-            "contract": "pure instrumental BGM; lyrics are fixed to an empty string",
+            "provider": GATEWAY_CONFIG.provider,
+            "localai_model": GATEWAY_CONFIG.model if localai_client else None,
+            "contract": "BGM request without lyrics; backend receives its empty-lyrics default",
         },
-        "last_errors": {"ace_step_1_5": manager.last_error},
+        "last_errors": {
+            "ace_step_1_5": manager.last_error,
+            "localai": LAST_LOCALAI_ERROR,
+        },
     }
 
 
 @app.post("/v1/aceStep/bgm")
 def generate_bgm(request: AceStepBgmRequest) -> Response:
     """串行执行一次 ACE-Step 生成，并将 WAV 保存到 BGM 目录。"""
+    global LAST_LOCALAI_ERROR
     try:
         payload = manager.build_worker_payload(request)
     except HTTPException:
@@ -295,6 +392,36 @@ def generate_bgm(request: AceStepBgmRequest) -> Response:
     except Exception as exc:
         LOGGER.exception("ACE-Step request preflight failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    if GATEWAY_CONFIG.provider == "localai":
+        try:
+            validate_localai_request(request)
+            audio, _elapsed = generate_localai(request)
+            saved_output_path = persist_audio_bytes(audio, "ace_step_1_5", ACESTEP_OUTPUT_DIR)
+            manager.last_error = None
+            LAST_LOCALAI_ERROR = None
+            print(f"[ACE-Step] 已保存 LocalAI BGM: {saved_output_path}")
+            headers = {
+                "X-ACE-Step-Model": MODEL_NAME,
+                # SoundGeneration 不返回随机 seed；-1 表示后端负责生成随机值。
+                "X-ACE-Step-Seed": str(request.seed),
+                "X-ACE-Step-Sample-Rate": str(SAMPLE_RATE),
+            }
+            return Response(content=audio, media_type="audio/wav", headers=headers)
+        except UnsupportedCapabilityError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except GpuLockTimeoutError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except BackendQuarantinedError as exc:
+            LAST_LOCALAI_ERROR = str(exc)
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except (LocalAIRequestError, LocalAIUnavailableError) as exc:
+            LAST_LOCALAI_ERROR = str(exc)
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except Exception as exc:
+            LAST_LOCALAI_ERROR = str(exc)
+            LOGGER.exception("LocalAI ACE-Step request failed")
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     try:
         with gpu_runtime_lock(GPU_LOCK_FILE, "ace_step_1_5/generate"):

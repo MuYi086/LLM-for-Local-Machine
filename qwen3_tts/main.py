@@ -8,6 +8,7 @@ from __future__ import annotations
 
 # 学习入口：上传参考音频后，API 解析 prompt，持有 GPU 锁，再启动一次性 worker。
 import importlib.util
+import io
 import json
 import logging
 import os
@@ -17,6 +18,7 @@ import sys
 import tempfile
 import threading
 import time
+from pathlib import Path
 from typing import Literal
 
 os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True,max_split_size_mb:128")
@@ -25,6 +27,15 @@ os.environ.setdefault("CUDA_MODULE_LOADING", "LAZY")
 import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, Response, UploadFile
 from fastapi.responses import JSONResponse
+from inference_gateway import (
+    BackendQuarantinedError,
+    LocalAIClient,
+    LocalAIRequestError,
+    LocalAIUnavailableError,
+    UnsupportedCapabilityError,
+    load_gateway_config,
+)
+from inference_gateway.execution import execute_localai_operation
 from pydantic import Field
 from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -42,6 +53,7 @@ from unitale_runtime import (
 from audio_output import persist_audio_bytes
 from gpu_runtime import cuda_status, terminate_process_group
 from synthesis_request import CloneSynthesisRequest
+from worker import split_text, trim_leading_silence
 
 LOGGER = logging.getLogger(__name__)
 
@@ -210,6 +222,11 @@ QWEN3_TTS_TRIM_LEADING_SILENCE_MAX_MS = int(
 QWEN3_TTS_REQUEST_TIMEOUT = float(
     os.getenv("QWEN3_TTS_REQUEST_TIMEOUT", str(QWEN3_TTS_REQUEST_TIMEOUT_DEFAULT))
 )
+GATEWAY_CONFIG = load_gateway_config(
+    service_provider_env="UNITALE_QWEN3_TTS_PROVIDER",
+    default_model="unitale.qwen3-tts.1p7b-base",
+    request_timeout=QWEN3_TTS_REQUEST_TIMEOUT,
+)
 QWEN3_TTS_WORKER_SCRIPT = os.path.join(SERVICE_DIR, "worker.py")
 QWEN3_TTS_WORKER_TMP_DIR = os.path.join(RUNTIME_CACHE_DIR, "qwen3_tts_worker")
 QWEN3_TTS_OUTPUT_DIR = expand_path(
@@ -245,6 +262,7 @@ if gpu_lock_dir:
 reference_store = AudioReferenceStore(PROMPTS_DIR, TIMBRE_STORAGE_DIR)
 
 app = FastAPI(title="Unitale Qwen3-TTS Voice Clone API")
+LAST_LOCALAI_ERROR: str | None = None
 
 
 class ForceCORS(BaseHTTPMiddleware):
@@ -550,10 +568,96 @@ class Qwen3TtsWorkerManager:
 manager = Qwen3TtsWorkerManager()
 
 
+def validate_localai_request(
+    request: Qwen3TtsSynthesizeRequest,
+    payload: dict,
+) -> None:
+    """在排队前拒绝 audio.cpp 当前不能保留的 Qwen3-TTS 请求语义。"""
+    hardware_fields = {
+        "device_map": request.device_map,
+        "dtype": request.dtype,
+        "attn_implementation": request.attn_implementation,
+    }
+    requested_hardware_fields = [
+        name for name, value in hardware_fields.items() if value is not None
+    ]
+    if requested_hardware_fields:
+        fields = ", ".join(requested_hardware_fields)
+        raise UnsupportedCapabilityError(
+            f"LocalAI audio-cpp 不支持逐请求设置 PyTorch 参数：{fields}。"
+        )
+
+    chunks = split_text(payload["text"], int(payload["max_chars_per_chunk"]))
+    if len(chunks) > 1:
+        raise UnsupportedCapabilityError(
+            "LocalAI Qwen3-TTS 当前不保留原 worker 的文本切段与片段停顿；"
+            "请缩短文本或设置 max_chars_per_chunk=0 后再选择 LocalAI。"
+        )
+    if request.temperature is not None and request.temperature <= 0:
+        raise UnsupportedCapabilityError(
+            "audio.cpp Qwen3-TTS 在采样开启时要求 temperature 大于 0。"
+        )
+
+
+def postprocess_localai_wav(audio_bytes: bytes, payload: dict) -> bytes:
+    """校验 LocalAI WAV 并应用与原 worker 一致的单声道和前导静音处理。"""
+    try:
+        import numpy as np
+        import soundfile as sf
+
+        waveform, sample_rate = sf.read(io.BytesIO(audio_bytes), dtype="float32", always_2d=True)
+        if waveform.size == 0 or not np.isfinite(waveform).all():
+            raise ValueError("LocalAI WAV 没有有限音频样本。")
+        mono_waveform = waveform.mean(axis=1, dtype=np.float32)
+        processed, _trimmed_samples = trim_leading_silence(
+            mono_waveform,
+            sample_rate=int(sample_rate),
+            enabled=bool(payload["trim_leading_silence"]),
+            threshold_db=float(payload["trim_leading_silence_threshold_db"]),
+            min_silence_ms=int(payload["trim_leading_silence_min_ms"]),
+            analysis_window_ms=int(payload["trim_leading_silence_analysis_window_ms"]),
+            pre_roll_ms=int(payload["trim_leading_silence_pre_roll_ms"]),
+            max_trim_ms=int(payload["trim_leading_silence_max_ms"]),
+            np=np,
+        )
+        output = io.BytesIO()
+        sf.write(output, processed, int(sample_rate), format="WAV")
+    except (ImportError, OSError, RuntimeError, ValueError) as exc:
+        raise LocalAIRequestError(f"LocalAI Qwen3-TTS 返回的 WAV 无效：{exc}") from exc
+    return output.getvalue()
+
+
+def synthesize_localai(payload: dict) -> tuple[bytes, float]:
+    """复用共享 GPU 租约运行 LocalAI Qwen3-TTS，再执行 CPU WAV 后处理。"""
+
+    def run(client: LocalAIClient) -> tuple[bytes, float]:
+        return client.synthesize_speech(
+            text=payload["text"],
+            voice_path=Path(payload["ref_audio_path"]),
+            language=payload["language"],
+            reference_text=payload["ref_text"],
+            x_vector_only=bool(payload["x_vector_only"]) or payload["ref_text"] is None,
+            max_new_tokens=int(payload["max_new_tokens"]),
+            top_p=payload["top_p"],
+            temperature=payload["temperature"],
+        )
+
+    audio_bytes, elapsed = execute_localai_operation(
+        config=GATEWAY_CONFIG,
+        operation=run,
+    )
+    return postprocess_localai_wav(audio_bytes, payload), elapsed
+
+
 @app.get("/v1/health")
 def health():
     """返回服务配置和依赖状态，不加载 Qwen3-TTS 模型。"""
     cuda = cuda_status()
+    localai_client = LocalAIClient(GATEWAY_CONFIG) if GATEWAY_CONFIG.provider == "localai" else None
+    localai_healthy = bool(localai_client and localai_client.health())
+    localai_model_registered = bool(
+        localai_client and localai_healthy and localai_client.model_ready()
+    )
     return {
         "code": 200,
         "paths": {
@@ -573,11 +677,19 @@ def health():
             "qwen_libs_path": os.path.isdir(QWEN_LIBS_PATH),
             "torch": module_available("torch"),
             "cuda": cuda["available"],
+            "selected_provider": GATEWAY_CONFIG.provider,
+            "selected_provider_ready": (
+                localai_model_registered if localai_client else os.path.isdir(QWEN3_TTS_MODEL_DIR)
+            ),
+            "localai_healthy": localai_healthy,
+            "localai_model_registered": localai_model_registered,
         },
         "cuda": cuda,
         "runtime": {
             "worker_runtime": "uv",
             "worker_python": sys.executable,
+            "provider": GATEWAY_CONFIG.provider,
+            "localai_model": GATEWAY_CONFIG.model if localai_client else None,
             "model_lifecycle": "one request -> one worker -> process exit releases VRAM",
             "local_files_only": LOCAL_FILES_ONLY,
             "request_timeout": QWEN3_TTS_REQUEST_TIMEOUT,
@@ -602,6 +714,7 @@ def health():
         },
         "last_errors": {
             "qwen3_tts": manager.last_error,
+            "localai": LAST_LOCALAI_ERROR,
         },
     }
 
@@ -634,6 +747,7 @@ def check_audio_exists(file_name: str):
 @app.post("/v1/qwen/clone")
 def synthesize_v2(request: Qwen3TtsSynthesizeRequest):
     """串行执行一次 Qwen3-TTS 克隆，并返回生成 WAV。"""
+    global LAST_LOCALAI_ERROR
     try:
         payload = manager.build_worker_payload(request)
     except HTTPException:
@@ -641,6 +755,37 @@ def synthesize_v2(request: Qwen3TtsSynthesizeRequest):
     except Exception as exc:
         LOGGER.exception("Qwen3-TTS request preflight failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    if GATEWAY_CONFIG.provider == "localai":
+        try:
+            validate_localai_request(request, payload)
+            # FastAPI 已在线程池运行同步路由；直接调用以覆盖整个同步生命周期。
+            audio_bytes, _elapsed = synthesize_localai(payload)
+            saved_output_path = persist_audio_bytes(
+                audio_bytes,
+                "qwen3_tts",
+                QWEN3_TTS_OUTPUT_DIR,
+            )
+            manager.last_error = None
+            manager.last_output_path = str(saved_output_path)
+            LAST_LOCALAI_ERROR = None
+            return Response(content=audio_bytes, media_type="audio/wav")
+        except HTTPException:
+            raise
+        except UnsupportedCapabilityError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except GpuLockTimeoutError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except BackendQuarantinedError as exc:
+            LAST_LOCALAI_ERROR = str(exc)
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except (LocalAIRequestError, LocalAIUnavailableError) as exc:
+            LAST_LOCALAI_ERROR = str(exc)
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except Exception as exc:
+            LAST_LOCALAI_ERROR = str(exc)
+            LOGGER.exception("LocalAI Qwen3-TTS request failed")
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     try:
         with gpu_runtime_lock("qwen3_tts/synthesize"):

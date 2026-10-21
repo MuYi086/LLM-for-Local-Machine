@@ -21,6 +21,13 @@ from typing import Literal
 import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, Response, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
+from inference_gateway import (
+    BackendQuarantinedError,
+    LocalAIRequestError,
+    LocalAIUnavailableError,
+    execute_localai_worker_file,
+    load_gateway_config,
+)
 from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware
 from unitale_runtime import AudioUploadError, GpuLockTimeoutError, stage_audio_upload
@@ -74,6 +81,11 @@ WORKER_SCRIPT = PROJECT_DIR / "worker.py"
 LOCAL_FILES_ONLY = env_bool("LOCAL_FILES_ONLY", True)
 DEVICE = os.getenv("MERT_V2_FULLSONG_DEVICE", "cuda:0")
 REQUEST_TIMEOUT = float(os.getenv("MERT_V2_FULLSONG_REQUEST_TIMEOUT", "900"))
+GATEWAY_CONFIG = load_gateway_config(
+    service_provider_env="UNITALE_MERT_V2_FULLSONG_PROVIDER",
+    default_model="unitale.mert-v2-fullsong.worker.v1",
+    request_timeout=REQUEST_TIMEOUT,
+)
 GPU_LOCK_WAIT_TIMEOUT = float(os.getenv("GPU_LOCK_WAIT_TIMEOUT", "900"))
 CUDA_RELEASE_DELAY = float(os.getenv("CUDA_RELEASE_DELAY", "2.0"))
 MIN_AUDIO_SECONDS = float(os.getenv("MERT_V2_FULLSONG_MIN_AUDIO_SECONDS", "30"))
@@ -375,6 +387,27 @@ class MertV2FullSongWorkerManager:
 
 def execute_worker(payload: dict[str, object]) -> Path:
     """持有共享 GPU 锁执行 worker，并在解锁前等待 CUDA 资源归还。"""
+    if GATEWAY_CONFIG.provider == "localai":
+        output = str(payload["output"])
+        suffix, media_type = (
+            (".json", "application/json")
+            if output == "embedding"
+            else (".npz", "application/x-npz")
+        )
+        try:
+            artifact, _ = execute_localai_worker_file(
+                config=GATEWAY_CONFIG,
+                operation="run",
+                payload={"worker_input": payload},
+                output_dir=Path(WORKER_TMP_DIR),
+                suffix=suffix,
+                media_type=media_type,
+            )
+            manager.last_error = None
+            return artifact
+        except Exception as exc:
+            manager.last_error = str(exc)
+            raise
     with shared_gpu_runtime_lock(
         GPU_LOCK_FILE,
         "mert_v2_fullsong/extract",
@@ -465,6 +498,10 @@ def health() -> dict[str, object]:
             "gpu_lock_wait_timeout": GPU_LOCK_WAIT_TIMEOUT,
         },
         "last_errors": {"mert_v2_fullsong": manager.last_error},
+        "inference": {
+            "provider": GATEWAY_CONFIG.provider,
+            "localai_model": GATEWAY_CONFIG.model if GATEWAY_CONFIG.provider == "localai" else None,
+        },
     }
 
 
@@ -501,6 +538,10 @@ async def extract_features_route(
             saved_path = await run_in_threadpool(persist_output, result_path, output)
         except GpuLockTimeoutError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except (BackendQuarantinedError, LocalAIUnavailableError) as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except LocalAIRequestError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
         except TimeoutError as exc:
             LOGGER.exception("MERT-v2-FullSong request timed out")
             raise HTTPException(status_code=504, detail=str(exc)) from exc

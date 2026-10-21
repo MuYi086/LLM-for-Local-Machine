@@ -9,7 +9,9 @@ import importlib
 import json
 import os
 import sys
+import tempfile
 import traceback
+import zipfile
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -20,12 +22,14 @@ RUNTIME_PACKAGE = "_unitale_tiger_dnr"
 
 
 def parse_args():
-    """解析一次性 worker 的 JSON 输入和三 Stem 输出目录。"""
+    """解析一次性 worker 的 JSON 输入和三 Stem 输出方式。"""
     import argparse
 
     parser = argparse.ArgumentParser(description="One-shot TIGER-DnR worker")
     parser.add_argument("--input-json", required=True)
-    parser.add_argument("--output-dir", required=True)
+    output = parser.add_mutually_exclusive_group(required=True)
+    output.add_argument("--output-dir")
+    output.add_argument("--output-zip")
     return parser.parse_args()
 
 
@@ -182,7 +186,23 @@ def main() -> int:
     """运行一次三 Stem 分离并返回适合父进程判定的退出码。"""
     args = parse_args()
     try:
-        separate(load_request(args.input_json), Path(args.output_dir).expanduser().resolve())
+        request = load_request(args.input_json)
+        if args.output_dir:
+            separate(request, Path(args.output_dir).expanduser().resolve())
+        else:
+            output_zip = Path(args.output_zip).expanduser().resolve()
+            output_zip.parent.mkdir(parents=True, exist_ok=True)
+            with tempfile.TemporaryDirectory(prefix="tiger-dnr-stems-") as temporary:
+                output_dir = Path(temporary)
+                separate(request, output_dir)
+                with zipfile.ZipFile(
+                    output_zip, mode="w", compression=zipfile.ZIP_STORED
+                ) as archive:
+                    for stem_name in STEM_NAMES:
+                        stem_path = output_dir / f"{stem_name}.wav"
+                        if not stem_path.is_file() or stem_path.stat().st_size == 0:
+                            raise RuntimeError(f"TIGER-DnR 缺少有效 {stem_name}.wav。")
+                        archive.write(stem_path, arcname=stem_path.name)
     except Exception as exc:
         print(f"error: {exc}", file=sys.stderr)
         traceback.print_exc()

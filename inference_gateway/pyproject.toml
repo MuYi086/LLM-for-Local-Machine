@@ -1,0 +1,32 @@
+[project]
+name = "unitale-inference-gateway"
+version = "0.1.0"
+description = "轻量 LocalAI 接入与 GPU 执行边界"
+requires-python = ">=3.12"
+dependencies = ["unitale-runtime"]
+
+[tool.uv]
+package = true
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/inference_gateway"]
+
+[tool.uv.sources]
+unitale-runtime = { path = "../unitale_runtime", editable = true }
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["B008", "E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"

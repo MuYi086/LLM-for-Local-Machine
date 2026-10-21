@@ -633,6 +633,17 @@ wheels = [
 ]
 
 [[package]]
+name = "unitale-inference-gateway"
+version = "0.1.0"
+source = { editable = "../inference_gateway" }
+dependencies = [
+    { name = "unitale-runtime" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "unitale-runtime", editable = "../unitale_runtime" }]
+
+[[package]]
 name = "unitale-runtime"
 version = "0.1.0"
 source = { editable = "../unitale_runtime" }
@@ -673,6 +684,7 @@ dependencies = [
     { name = "soundfile" },
     { name = "torch" },
     { name = "transformers" },
+    { name = "unitale-inference-gateway" },
     { name = "unitale-runtime" },
     { name = "uvicorn" },
 ]
@@ -693,6 +705,7 @@ requires-dist = [
     { name = "soundfile", specifier = "==0.13.1" },
     { name = "torch", specifier = "==2.10.0+cu128", index = "https://mirrors.aliyun.com/pytorch-wheels/cu128/" },
     { name = "transformers", specifier = "==4.57.6" },
+    { name = "unitale-inference-gateway", editable = "../inference_gateway" },
     { name = "unitale-runtime", editable = "../unitale_runtime" },
     { name = "uvicorn", specifier = "==0.46.0" },
 ]

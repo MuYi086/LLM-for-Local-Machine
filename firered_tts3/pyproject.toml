@@ -19,6 +19,7 @@ dependencies = [
     "fasttext==0.9.3",
     "faster-whisper==1.2.0",
     "unitale-runtime",
+    "unitale-inference-gateway",
 ]
 
 [dependency-groups]
@@ -43,6 +44,7 @@ explicit = true
 
 [tool.uv.sources]
 unitale-runtime = { path = "../unitale_runtime", editable = true }
+unitale-inference-gateway = { path = "../inference_gateway", editable = true }
 torch = { index = "pytorch-cu128-aliyun" }
 torchaudio = { index = "pytorch-cu128-aliyun" }
 

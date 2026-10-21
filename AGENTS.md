@@ -9,7 +9,8 @@
 
 ## 项目结构与服务速查
 
-当前有 27 个服务 uv 项目与一个轻量控制面，`start.sh` 合计启动 30 个 HTTP 进程。
+当前维护 23 个服务 uv 项目与一个轻量控制面，`start.sh` 合计启动 26 个 HTTP 进程；
+`unitale_localai_bridge/` 是额外的非 HTTP uv 包，不计入服务数，也不常驻导入 Torch。
 原生能力/输出的官方依据见 [README 服务总览](README.md#服务总览)；端口、方法及路径以源码为准。
 区分原生能力、已接入接口与服务编排，额外模型流程不得写成单模型能力；各进程提供 `GET /v1/health`。
 
@@ -22,7 +23,7 @@
 | `firered_tts3/` | 8304 Instruct / 8325 Base | `POST /v1/FireRedTTS3/timbre`；`POST /v1/FireRedTTS3/clone` | Base 克隆；Instruct 克隆/设计/内容与声学编辑 | 语音波形；部分 Instruct API 另返回规划/编辑文本 |
 | `stable_audio_3_medium/` | 8311 | `POST /v1/stableAudio/soundEffect` | 音乐/音效生成与局部补全/编辑/续写 | 音频波形 |
 | `moss_soundEffect/` | 8312 | `POST /v1/moss/soundEffect` | 中英文非语音音效生成，最长 30 秒 | 音效波形 |
-| `ace_step_1_5/` | 8313 | `POST /v1/aceStep/bgm` | 纯音乐/歌词条件歌曲生成 | 音乐波形 |
+| `ace_step_1_5/` | 8313 | `POST /v1/aceStep/bgm` | 按提示词生成 BGM；当前接口不接收歌词 | 音乐波形 |
 | `YuE2-3B/` | 8314 | `POST /v1/m-a-p/YuE2` | 根据风格、歌词与可选 ABC 乐谱生成带歌声和伴奏的歌曲 | 48 kHz 立体声音频 |
 | `SheetSage2/` | 8315 | `POST /v1/m-a-p/SheetSage2` | 音乐转录为可编辑乐谱、MIDI、和弦/节拍/调性/结构与时间标注 | 可用时的 ABC、MIDI 与 JSON/LAB ZIP |
 | `YuE2-Vae/` | 8316 | `POST /v1/m-a-p/YuE2-Vae` | YuE2 acoustic latent 编码与分块解码 | `[T,64]` NPY latent 或 48 kHz 立体声 WAV |
@@ -35,12 +36,8 @@
 | `moss_audio_4b_thinking/` | 8341 Thinking / 8342 Instruct | 两端口均为 `POST /v1/mossAudioThinking/understand` | 语音/环境声/音乐理解、时间问答/推理 | 文本 |
 | `TIGER-DnR/` | 8351 | `POST /v1/tigerDnr/separate` | 对白/音效/音乐三路 Stem 分离 | 三路音频波形 |
 | `Confucius4_TTS/` | 8361 | `POST /v1/confucius4TTS/generate` | 14 语种跨语言零样本 TTS 克隆，无需参考转写 | 语音波形 |
-| `Qwen3_ASR_1.7B/` | 8371 | `POST /v1/qwen3/asr` | 语种识别与转写（30 语种、22 中文方言） | 转写文本与语种 |
+| `Qwen3_ASR_1.7B/` | 8371 | `POST /v1/qwen3/asr` | 语种识别与转写（30 语种、22 中文方言）；LocalAI/audio.cpp 试接入尚未验收，默认 native | 转写文本与语种 |
 | `seed-vc/` | 8381 | `POST /v1/seedVc/voiceConversion` | 零样本语音转换及 F0 条件歌声转换 | 转换后的音频波形 |
-| `Index-Echo-S2ST-9B-GGUF/` | 8382 | `POST /v1/indexTranslate/echoS2ST` | 完整包 S2ST，源音色条件；中/英源语言 | 目标语种语音波形，可保存 WAV |
-| `Index-Homura-9B-GGUF/` | 8383 | `POST /v1/indexTranslate/homura` | 目标音节数/术语约束文本翻译，音节控制近似 | 译文文本 |
-| `Index-Nailong-9B-GGUF/` | 8384 | `POST /v1/indexTranslate/naiLong` | NativeLong 整篇长文档翻译（中英/中日双向） | 长文档译文文本 |
-| `Index-Translate-9B-GGUF/` | 8385 | `POST /v1/indexTranslate/translate` | 150 语种文本/图片翻译、硬软约束（图片需视觉组件） | 译文文本 |
 | `SoulX-FlashHead-1_3B/` | 8391 | `POST /v1/soulX/flashHead` | 人像图+音频→说话视频（Lite/Pro） | 视频帧 / 视频 |
 | `ditto/` | 8392 | `POST /v1/ditto/talkingHead` | 人像图+音频→运动空间扩散说话视频 | 视频帧 / 视频 |
 
@@ -49,22 +46,29 @@
   `FIRERED_TTS3_MODE=timbre|clone`，每个进程只注册其模式对应的业务路由。
 - `main/main.py` 只处理健康/控制、共享上传/检查、MiMo 代理和 CPU 导出，不加载模型包或推理。
   空间任务进度为 `GET /v1/audio/spatial/render/progress/{job_id}`，是进程内状态。
-- 8382–8385 必须保持对应 Index 模型的原生输入输出，不编排 Qwen3-ASR、Confucius4-TTS 或其他模型。
-  Echo 项目保留历史 `-GGUF` 目录名，worker 直接调用完整原生包的 `DubbingBridgeModel`；
-  文本 GGUF 不能替代完整语音包。三个文本服务各启动自己的单次 llama-server worker。
-  Nailong 使用官方 NativeLong 固定方向模板；Index-Translate 图片输入使用官方配套 mmproj。
-- `tests/testIndex*` Demo 调用各自端口的原生接口，保留原始响应：Echo 为 WAV，
-  Homura、Nailong、Index-Translate 为 TXT。不得混入额外模型流程。
-  Echo 默认读取 `tests/testIndexTranslate/speech.wav`，三个文本 Demo 默认读取同目录 `subtitles.md`。
-  均支持 `--check-only`，缺失条件时明确跳过；实际模型效果不能用无模型测试代替。
 - `unitale_runtime/` 是共享轻量包，负责流式上传、引用、原子提交、GPU 队列及存储容量/保留策略；
   不得导入 FastAPI、Torch 或模型包。它是其他项目的 editable 依赖，没有独立 `uv.lock`。
+- `inference_gateway/` 是共享 LocalAI provider 包，只能依赖标准库与 `unitale_runtime`；服务侧 provider
+  通过 `UNITALE_*_PROVIDER` 显式选择，默认 `native`。LocalAI backend 停止无法确认时，共享 GPU 锁旁的
+  `.quarantine` 标记必须保留，`unitale_runtime.gpu_runtime_lock` 会拒绝所有后续 GPU 请求。
+  运维需通过 `scripts/localai/recover_quarantine.py` 解除隔离；受管 LocalAI API 失联时还需确认宿主机
+  进程组已退出且 loopback API 端口关闭，不得手动删除标记。
+- `scripts/localai/manager.py` 按 `localai/manifests/versions.json` 校验固定源码版本的宿主机 LocalAI
+  二进制与 audio-cpp backend 文件指纹；不使用 Docker。`UNITALE_LOCALAI_MANAGED=true` 仅在
+  `UNITALE_LOCALAI_ENABLED=true` 时由 `start.sh` 托管 LocalAI 进程组，固定绑定 loopback 并限制一个活动
+  backend。Qwen 候选权重按锁定 size/hash 预检；真实 audio.cpp 推理与进程回收仍需本机 GPU smoke。
+  更新服务 API 后须同步 `localai/manifests/capabilities.json`，
+  并运行 `uv run --project qa --locked python scripts/localai/validate_capabilities.py` 核对源码路由及字段映射。
+- `unitale_localai_bridge/` 是 LocalAI 外部 gRPC 适配后端，只依赖轻量 gateway/runtime 与 gRPC；
+  按 `localai/manifests/worker-bridge.json` 的固定模型 ID、项目和 `worker.py` 入口启动一次性 worker，
+  只监听 loopback，不导入 FastAPI、Torch 或模型包。新增 worker 必须固定输入/输出合同、超时、结果大小、
+  环境白名单和异常退出回收测试；服务侧持有共享 GPU 锁，bridge 不得递归调用服务 HTTP 路由。
 - `steam_audio_renderer/` 是 C++17 Steam Audio CPU renderer，不获取 GPU 锁；SDK 和动态库在仓库外。
 - `qa/` 是无模型测试/Ruff 项目；`scripts/quality_gate.sh` 与 GitHub Actions 使用同一质量门禁。
   `tests/` 为根目录回归，ACE-Step 和 Stable Audio 的服务内测试须从各自目录执行。
 - `scripts/training/`、`training/configs/` 是纯文本润色 LoRA 实验，不是语音训练或 HTTP 服务。
   模型训练需要独立外部环境；数据、adapter、预测保存到 `storage/training/`。
-- `soundEffect/` 和 `tests/testConfucius4TTS/`、`tests/testSoulX_FlashHead/`、`tests/testDitto/`、`tests/testIndex*/`
+- `soundEffect/` 和 `tests/testConfucius4TTS/`、`tests/testSoulX_FlashHead/`、`tests/testDitto/`
   含真实模型演示，不能纳入自动无模型推理测试。`流行*模型功能简介.md`、`task*.md` 和
   `special-audio-effect/` 是调研/任务/方案资料，不能据此推断已实现能力。
 
@@ -108,8 +112,8 @@ bash scripts/quality_gate.sh
 curl -fsS http://127.0.0.1:8300/v1/control
 ```
 
-质量门禁包含无 SDK 的三个 C++ 核心测试、28 个项目的锁检查、Ruff 与格式检查及三组无模型
-测试。锁校验可能读取 Git/wheel 元数据；已有完整缓存时可设置 `UV_OFFLINE=1` 运行。
+质量门禁包含无 SDK 的三个 C++ 核心测试、全部服务/bridge/QA 锁检查、Ruff 与格式检查及三组无模型测试。缺失任何当前维护项目都会使门禁失败。
+锁校验可能读取 Git/wheel 元数据；已有完整缓存时可设置 `UV_OFFLINE=1` 运行。
 单独执行测试必须用 QA，不能通过模型环境安装依赖来运行根目录回归：
 
 ```bash
@@ -142,15 +146,6 @@ uv run --project qa --locked python -m unittest discover -s tests -v
 - MOSS-Audio、Qwen3-ASR、TIGER 直接接收 multipart `audio`，输入只暂存；前两者返回 JSON，
   TIGER 返回 ZIP 并原子保存分离批次。SoulX/Ditto 返回带声音 MP4，不使用 WAV 响应约定。
   两个人像视频服务提供 `POST /v1/upload_image` 和 `GET /v1/check/image`，同样使用逻辑标识。
-- Echo 8382 直接接收 multipart `audio`，返回原生 `audio/wav`；可选 `return_info=true` 返回
-  WAV/info ZIP。源语言为中/英，目标 zh/en/es/ja，原生包判断源语言；只支持 h2cv、chunk=false，
-  官方建议约 30 秒以内短句。输入与 worker JSON/WAV 请求后清理，官方单卡至少 24 GB，完整依赖使用
-  `uv sync --project Index-Echo-S2ST-9B-GGUF --locked --extra native`；不带 extra 仅准备 HTTP。
-- Homura 8383 接收 `text`、`target_syllables` 及可选目标语言/术语/生成参数；Nailong 8384 接收
-  整篇 `text`、四个官方 `direction` 及可选输出预算，保留固定贪心采样，不增添普通 instTrans 字段。
-  Index-Translate 8385 接收文本或图片 data URL，保留源/目标语言、术语、硬软约束、文体、指令和
-  raw_prompt。三个服务均返回 UTF-8 `text/plain`，不得套用 TTS 语种或 12000 字符上限。
-  图片缺少 mmproj 时返回 503；Echo 原生包、依赖或显存不满足时也应返回 503，不回退成编排链路。
 - 正式 `balanced`/`immersive` 必须保留对象边界，走 `/v1/audio/spatial/render` 的 Manifest v1
   与重复 `assets` 字段，不在浏览器预混、不获取 GPU 锁。Steam Audio pre-master 后只能
   loudnorm/编码，禁止再叠加 Haas/aecho。`/v1/audio/export` 调用只用于显式 `profile=standard`

@@ -24,6 +24,7 @@ dependencies = [
     "torch==2.9.0+cu128",
     "torchaudio==2.9.0+cu128",
     "unitale-runtime",
+    "unitale-inference-gateway",
 ]
 
 [dependency-groups]
@@ -47,6 +48,7 @@ format = "flat"
 explicit = true
 
 [tool.uv.sources]
+unitale-inference-gateway = { path = "../inference_gateway", editable = true }
 unitale-runtime = { path = "../unitale_runtime", editable = true }
 torch = { index = "aliyun-pytorch-cu128" }
 torchaudio = { index = "aliyun-pytorch-cu128" }

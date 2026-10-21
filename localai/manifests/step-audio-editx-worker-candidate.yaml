@@ -1,0 +1,4 @@
+name: unitale.step-audio-editx.worker.v1
+backend: unitale-worker
+parameters:
+  model: unitale.step-audio-editx.worker.v1

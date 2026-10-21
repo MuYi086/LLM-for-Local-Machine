@@ -1,0 +1,4 @@
+name: unitale.sheetsage2.worker.v1
+backend: unitale-worker
+parameters:
+  model: unitale.sheetsage2.worker.v1

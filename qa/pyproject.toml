@@ -5,12 +5,15 @@ description = "Unitale 无模型回归与静态检查环境"
 requires-python = "==3.12.13"
 dependencies = [
     "fastapi==0.141.1",
+    "grpcio>=1.70,<2",
     "httpx==0.28.1",
     "httpx2>=0.28",
     "pydantic==2.13.4",
+    "protobuf>=5,<7",
     "python-multipart==0.0.32",
     "pyyaml==6.0.3",
     "starlette==1.6.0",
+    "unitale-localai-worker-bridge",
     "unitale-runtime",
     "uvicorn==0.52.1",
 ]
@@ -24,4 +27,5 @@ dev = [
 package = false
 
 [tool.uv.sources]
+unitale-localai-worker-bridge = { path = "../unitale_localai_bridge", editable = true }
 unitale-runtime = { path = "../unitale_runtime", editable = true }

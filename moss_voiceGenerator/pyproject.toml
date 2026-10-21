@@ -17,6 +17,7 @@ dependencies = [
     "soundfile==0.14.0",
     "moss-tts",
     "unitale-runtime",
+    "unitale-inference-gateway",
 ]
 
 [dependency-groups]
@@ -43,6 +44,7 @@ explicit = true
 # editable so deployment can use its preinstalled source without network access.
 moss-tts = { path = "/home/muyi086/tts-depency/MOSS-TTS", editable = true }
 unitale-runtime = { path = "../unitale_runtime", editable = true }
+unitale-inference-gateway = { path = "../inference_gateway", editable = true }
 torch = { index = "pytorch-cu130" }
 torchaudio = { index = "pytorch-cu130" }
 

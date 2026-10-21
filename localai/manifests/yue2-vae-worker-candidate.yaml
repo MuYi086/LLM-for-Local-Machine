@@ -1,0 +1,4 @@
+name: unitale.yue2-vae.worker.v1
+backend: unitale-worker
+parameters:
+  model: unitale.yue2-vae.worker.v1

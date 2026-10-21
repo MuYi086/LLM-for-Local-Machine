@@ -40,6 +40,8 @@ CODE_DIR.mkdir(parents=True, exist_ok=True)
 def load_service(mode: str, port: int):
     """按模式加载一次 HTTP 模块，测试两个端口的路由隔离。"""
     storage_dir = TEST_ROOT / mode / "storage"
+    os.environ.pop("UNITALE_FIRERED_TTS3_CLONE_MODEL", None)
+    os.environ.pop("UNITALE_FIRERED_TTS3_TIMBRE_MODEL", None)
     os.environ.update(
         {
             "FIRERED_TTS3_MODE": mode,
@@ -56,9 +58,14 @@ def load_service(mode: str, port: int):
             "LOCAL_FILES_ONLY": "1",
             "CUDA_RELEASE_DELAY": "0",
             "FIRERED_TTS3_REQUEST_TIMEOUT": "5",
+            "UNITALE_LOCALAI_ENABLED": "false",
+            "UNITALE_INFERENCE_PROVIDER": "native",
+            "UNITALE_FIRERED_TTS3_CLONE_PROVIDER": "native",
+            "UNITALE_FIRERED_TTS3_TIMBRE_PROVIDER": "native",
         }
     )
     sys.path.insert(0, str(SERVICE_DIR))
+    sys.path.insert(0, str(REPOSITORY_DIR / "inference_gateway/src"))
     module_name = f"firered_tts3_service_{mode}_{port}"
     spec = importlib.util.spec_from_file_location(module_name, SERVICE_DIR / "main.py")
     assert spec and spec.loader
@@ -116,6 +123,10 @@ class FireRedTTS3MigrationTests(unittest.TestCase):
         self.assertEqual(timbre_health.json()["runtime"]["service_mode"], "timbre")
         self.assertTrue(clone_health.json()["available"]["model_required_files"])
 
+    def test_default_localai_model_ids_match_registered_q8_candidates(self) -> None:
+        self.assertEqual(clone_main.GATEWAY_CONFIG.model, "unitale.fireredtts3.base.q8-0")
+        self.assertEqual(timbre_main.GATEWAY_CONFIG.model, "unitale.fireredtts3.instruct.q8-0")
+
     def test_clone_upload_and_request_payload(self) -> None:
         from fastapi.testclient import TestClient
 
@@ -139,6 +150,97 @@ class FireRedTTS3MigrationTests(unittest.TestCase):
         self.assertEqual(payload["text"], "目标台词")
         self.assertEqual(payload["prompt_text"], "准确参考文本。")
         self.assertEqual(payload["model_path"], str(MODEL_DIR))
+
+    def test_localai_mapping_keeps_clone_reference_and_design_instruction_separate(self) -> None:
+        from inference_gateway import UnsupportedCapabilityError
+
+        clone_payload = clone_main.manager.build_payload(
+            clone_main.CloneRequest(
+                text="目标台词",
+                audio_path=self.filename,
+                prompt_text="准确参考文本。",
+            )
+        )
+        clone_request = clone_main.build_localai_request(clone_payload)
+        self.assertEqual(clone_request["text"], "目标台词")
+        self.assertEqual(clone_request["language"], "Chinese")
+        self.assertEqual(clone_request["reference_text"], "准确参考文本。")
+        self.assertEqual(
+            clone_request["voice_path"], Path(clone_main.prompt_audio_path(self.filename))
+        )
+        self.assertIsNone(clone_request["template_name"])
+
+        design_payload = timbre_main.manager.build_payload(
+            timbre_main.TimbreRequest(voice_description="年轻女性，温柔清晰。", text="你好。")
+        )
+        design_request = timbre_main.build_localai_request(design_payload)
+        self.assertEqual(design_request["instruction"], "年轻女性，温柔清晰。")
+        self.assertEqual(design_request["template_name"], "voice_design")
+        self.assertIsNone(design_request["voice_path"])
+
+        with patch.object(clone_main, "DO_TN", False):
+            with self.assertRaises(UnsupportedCapabilityError):
+                clone_main.build_localai_request(clone_payload)
+
+    def test_localai_routes_preserve_mode_storage_and_skip_native_worker(self) -> None:
+        from fastapi.testclient import TestClient
+
+        from inference_gateway import load_gateway_config
+
+        wav = b"RIFF" + b"\0" * 40
+        clone_config = load_gateway_config(
+            service_provider_env=clone_main.LOCALAI_PROVIDER_ENV,
+            default_model=clone_main.LOCALAI_MODEL_ID,
+            request_timeout=5,
+            environ={
+                "UNITALE_LOCALAI_ENABLED": "true",
+                "UNITALE_FIRERED_TTS3_CLONE_PROVIDER": "localai",
+                "UNITALE_LOCALAI_BASE_URL": "http://127.0.0.1:8400",
+            },
+        )
+        with (
+            patch.object(clone_main, "GATEWAY_CONFIG", clone_config),
+            patch.object(clone_main, "run_localai", return_value=wav) as run_localai,
+            patch.object(clone_main.manager, "run_worker") as native_worker,
+        ):
+            clone_response = TestClient(clone_main.app).post(
+                "/v1/FireRedTTS3/clone",
+                json={
+                    "text": "目标台词",
+                    "audio_path": self.filename,
+                    "prompt_text": "准确参考文本。",
+                },
+            )
+        self.assertEqual(clone_response.status_code, 200)
+        self.assertEqual(clone_response.content, wav)
+        run_localai.assert_called_once()
+        native_worker.assert_not_called()
+        self.assertTrue(list(Path(clone_main.OUTPUT_DIR).glob("fireredtts3_clone_*.wav")))
+
+        timbre_config = load_gateway_config(
+            service_provider_env=timbre_main.LOCALAI_PROVIDER_ENV,
+            default_model=timbre_main.LOCALAI_MODEL_ID,
+            request_timeout=5,
+            environ={
+                "UNITALE_LOCALAI_ENABLED": "true",
+                "UNITALE_FIRERED_TTS3_TIMBRE_PROVIDER": "localai",
+                "UNITALE_LOCALAI_BASE_URL": "http://127.0.0.1:8400",
+            },
+        )
+        with (
+            patch.object(timbre_main, "GATEWAY_CONFIG", timbre_config),
+            patch.object(timbre_main, "run_localai", return_value=wav),
+            patch.object(timbre_main.manager, "run_worker") as native_worker,
+            patch.object(timbre_main.reference_store, "register_timbre_file") as register_timbre,
+        ):
+            timbre_response = TestClient(timbre_main.app).post(
+                "/v1/FireRedTTS3/timbre",
+                json={"voice_description": "年轻女性，温柔清晰。", "text": "你好。"},
+            )
+        self.assertEqual(timbre_response.status_code, 200)
+        self.assertEqual(timbre_response.content, wav)
+        native_worker.assert_not_called()
+        register_timbre.assert_called_once()
 
     def test_clone_route_returns_wav_and_saves_to_clone(self) -> None:
         from fastapi.testclient import TestClient

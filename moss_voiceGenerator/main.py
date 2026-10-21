@@ -8,6 +8,8 @@ import importlib.util
 import json
 import logging
 import os
+import re
+import secrets
 import subprocess
 import sys
 import tempfile
@@ -18,6 +20,15 @@ from typing import Any
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Response
+from inference_gateway import (
+    BackendQuarantinedError,
+    LocalAIClient,
+    LocalAIRequestError,
+    LocalAIUnavailableError,
+    UnsupportedCapabilityError,
+    load_gateway_config,
+)
+from inference_gateway.execution import execute_localai_operation
 from pydantic import BaseModel, Field
 from starlette.middleware.base import BaseHTTPMiddleware
 from unitale_runtime import (
@@ -91,6 +102,12 @@ AUDIO_TOP_K = int(os.getenv("MOSS_VOICEGENERATOR_AUDIO_TOP_K", "50"))
 AUDIO_REPETITION_PENALTY = float(os.getenv("MOSS_VOICEGENERATOR_AUDIO_REPETITION_PENALTY", "1.1"))
 DTYPE = os.getenv("MOSS_VOICEGENERATOR_DTYPE", "auto")
 ATTN_IMPLEMENTATION = os.getenv("MOSS_VOICEGENERATOR_ATTN_IMPLEMENTATION", "auto")
+GATEWAY_CONFIG = load_gateway_config(
+    service_provider_env="UNITALE_MOSS_VOICEGENERATOR_PROVIDER",
+    default_model="unitale.moss-voicegenerator.bf16",
+    request_timeout=REQUEST_TIMEOUT,
+)
+LAST_LOCALAI_ERROR: str | None = None
 
 os.environ.setdefault("HF_HOME", HF_MIRROR_DIR)
 os.environ.setdefault("HF_MODULES_CACHE", os.path.join(RUNTIME_CACHE_DIR, "hf_modules"))
@@ -316,6 +333,17 @@ manager = MossVoiceGeneratorWorkerManager()
 def health():
     """返回 MOSS 模型、tokenizer、worker 和 GPU 的状态。"""
     cuda = cuda_status()
+    localai_client = LocalAIClient(GATEWAY_CONFIG) if GATEWAY_CONFIG.provider == "localai" else None
+    localai_healthy = bool(localai_client and localai_client.health())
+    localai_model_registered = bool(
+        localai_client and localai_healthy and localai_client.model_ready()
+    )
+    native_ready = (
+        os.path.isfile(WORKER_SCRIPT)
+        and os.path.isdir(MOSS_VOICEGENERATOR_MODEL_DIR)
+        and is_moss_codec_path_ready(MOSS_AUDIO_TOKENIZER_PATH)
+        and cuda["available"]
+    )
     return {
         "code": 200,
         "paths": {
@@ -337,10 +365,19 @@ def health():
             "soundfile": module_available("soundfile"),
             "flash_attn": module_available("flash_attn"),
             "cuda": cuda["available"],
+            "selected_provider": GATEWAY_CONFIG.provider,
+            "selected_provider_ready": (
+                localai_model_registered if localai_client else native_ready
+            ),
+            "localai_healthy": localai_healthy,
+            "localai_model_registered": localai_model_registered,
         },
         "cuda": cuda,
         "runtime": {
             "worker_runtime": "uv",
+            "provider": GATEWAY_CONFIG.provider,
+            "localai_model": GATEWAY_CONFIG.model if localai_client else None,
+            "localai_scope": "MOSS-VoiceGenerator single-segment voice design; native long-text chunking and PyTorch overrides are unsupported",
             "worker_python": sys.executable,
             "model_lifecycle": "one request -> one worker -> process exit releases VRAM",
             "local_files_only": LOCAL_FILES_ONLY,
@@ -353,7 +390,7 @@ def health():
             "pause_ms": PAUSE_MS,
             "gpu_scheduling": "shared exclusive file lock",
         },
-        "last_errors": {"moss_voicegenerator": manager.last_error},
+        "last_errors": {"moss_voicegenerator": manager.last_error, "localai": LAST_LOCALAI_ERROR},
     }
 
 
@@ -367,6 +404,39 @@ def moss_design(request: MossDesignRequest):
     except Exception as exc:
         LOGGER.exception("MOSS VoiceGenerator request preflight failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    if GATEWAY_CONFIG.provider == "localai":
+        global LAST_LOCALAI_ERROR
+        try:
+            localai_request = build_localai_request(request, payload)
+            audio_bytes, _elapsed = execute_localai_operation(
+                config=GATEWAY_CONFIG,
+                operation=lambda client: client.design_moss_voice(**localai_request),
+            )
+            saved_output_path = persist_audio_bytes(
+                audio_bytes,
+                "moss_voicegenerator",
+                TIMBRE_STORAGE_DIR,
+            )
+            reference_store.register_timbre_file(saved_output_path)
+            manager.last_error = None
+            LAST_LOCALAI_ERROR = None
+            print(f"[MOSS VoiceGenerator] 已保存 LocalAI 音色音频: {saved_output_path}")
+            return Response(content=audio_bytes, media_type="audio/wav")
+        except UnsupportedCapabilityError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except GpuLockTimeoutError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except BackendQuarantinedError as exc:
+            LAST_LOCALAI_ERROR = str(exc)
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except (LocalAIRequestError, LocalAIUnavailableError) as exc:
+            LAST_LOCALAI_ERROR = str(exc)
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except Exception as exc:
+            LAST_LOCALAI_ERROR = str(exc)
+            LOGGER.exception("LocalAI MOSS VoiceGenerator request failed")
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     try:
         with gpu_runtime_lock("moss/design"):
@@ -393,6 +463,49 @@ def moss_design(request: MossDesignRequest):
                     wait_after_cuda_release("after MOSS VoiceGenerator worker")
     except GpuLockTimeoutError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+def build_localai_request(
+    request: MossDesignRequest,
+    worker_payload: dict[str, Any],
+) -> dict[str, object]:
+    """映射 MOSS-VoiceGenerator 参数并拒绝长文本分段和 PyTorch 专用覆盖。"""
+    text = re.sub(r"(?m)^\s{0,3}#{1,6}\s*", "", request.text.strip())
+    instruction = re.sub(r"(?m)^\s{0,3}#{1,6}\s*", "", request.voice_description.strip())
+    if not text:
+        raise UnsupportedCapabilityError("清理 Markdown 标题后 text 不能为空。")
+    if not instruction:
+        raise UnsupportedCapabilityError("清理 Markdown 标题后 voice_description 不能为空。")
+
+    max_chars_per_chunk = int(worker_payload["max_chars_per_chunk"])
+    if max_chars_per_chunk > 0 and len(text) > max_chars_per_chunk:
+        raise UnsupportedCapabilityError(
+            "LocalAI MOSS-VoiceGenerator 试点仅支持单段文本；原生 Python 分段及 pause_ms 拼接请求请切回 native。"
+        )
+    native_default_tokens = int(MossDesignRequest.model_fields["max_new_tokens"].default)
+    if int(worker_payload["max_new_tokens"]) != native_default_tokens:
+        raise UnsupportedCapabilityError(
+            "固定 audio.cpp MOSS-VoiceGenerator 没有 max_new_tokens 等价选项；非默认 token 上限请切回 native。"
+        )
+    if str(worker_payload["dtype"] or "auto").lower() != "auto":
+        raise UnsupportedCapabilityError(
+            "LocalAI MOSS-VoiceGenerator 使用候选 GGUF 的固定权重类型，不接受请求级 dtype 覆盖。"
+        )
+    if str(worker_payload["attn_implementation"] or "auto").lower() != "auto":
+        raise UnsupportedCapabilityError(
+            "LocalAI MOSS-VoiceGenerator 不接受 PyTorch attn_implementation 覆盖。"
+        )
+
+    return {
+        "text": text,
+        "instruction": instruction,
+        "audio_temperature": float(worker_payload["audio_temperature"] or 1.5),
+        "audio_top_p": float(worker_payload["audio_top_p"] or 0.6),
+        "audio_top_k": int(worker_payload["audio_top_k"] or 50),
+        "audio_repetition_penalty": float(worker_payload["audio_repetition_penalty"] or 1.1),
+        "seed": secrets.randbits(32),
+        "text_chunk_size": len(text) + 1,
+    }
 
 
 if __name__ == "__main__":

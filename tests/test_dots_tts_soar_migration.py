@@ -10,6 +10,7 @@ import os
 import sys
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
@@ -40,6 +41,7 @@ os.environ.update(
 # 该服务特意采用扁平 uv 应用结构；先加载本服务的辅助模块，避免误用
 # 其他独立服务中同名的模块。
 sys.path.insert(0, str(SERVICE_DIR))
+sys.path.insert(0, str(REPOSITORY_DIR / "inference_gateway/src"))
 for module_name in ("runtime", "synthesis_request", "audio_trim"):
     sys.modules.pop(module_name, None)
 spec = importlib.util.spec_from_file_location(
@@ -173,6 +175,117 @@ class DotsTtsSoarMigrationTests(unittest.TestCase):
                     "style_prompt": "不能用于克隆",
                 }
             )
+
+    def test_localai_mapping_preserves_supported_fields_and_rejects_native_only_controls(
+        self,
+    ) -> None:
+        from inference_gateway import UnsupportedCapabilityError
+
+        request = main.DotsTtsSoarSynthesizeRequest(
+            text="目标台词",
+            audio_path=self.filename,
+            num_steps=12,
+            guidance_scale=1.4,
+            speaker_scale=1.7,
+            max_generate_length=700,
+            template_name="instruction_tts",
+        )
+        worker_payload = main.manager.build_worker_payload(request)
+        mapped = main.build_localai_request(request, worker_payload)
+        self.assertEqual(mapped["text"], "目标台词")
+        self.assertEqual(mapped["voice_path"], Path(main.prompt_audio_path(self.filename)))
+        self.assertEqual(mapped["reference_text"], self.prompt_text)
+        self.assertEqual(mapped["num_inference_steps"], 12)
+        self.assertEqual(mapped["sampler_mode"], main.DOTS_TTS_SOAR_ODE_METHOD)
+        self.assertEqual(mapped["max_tokens"], 700)
+        self.assertEqual(mapped["template_name"], "instruction_tts")
+        self.assertEqual(mapped["text_chunk_size"], len("目标台词") + 1)
+
+        too_long = main.DotsTtsSoarSynthesizeRequest(
+            text="超长文本" * 40,
+            audio_path=self.filename,
+        )
+        with self.assertRaises(UnsupportedCapabilityError):
+            main.build_localai_request(too_long, main.manager.build_worker_payload(too_long))
+
+        unsupported = main.DotsTtsSoarSynthesizeRequest(
+            text="目标台词",
+            audio_path=self.filename,
+            precision="float16",
+        )
+        with self.assertRaisesRegex(UnsupportedCapabilityError, "precision"):
+            main.build_localai_request(
+                unsupported,
+                main.manager.build_worker_payload(unsupported),
+            )
+
+    def test_localai_route_saves_result_without_starting_native_worker(self) -> None:
+        from fastapi.testclient import TestClient
+
+        wav = b"RIFF" + b"\0" * 40
+        fake_config = replace(main.GATEWAY_CONFIG, provider="localai", localai_enabled=True)
+        request_capture: dict[str, object] = {}
+
+        def execute(*, config, operation):
+            request_capture["config"] = config
+            request_capture["audio"] = operation(
+                type(
+                    "FakeClient",
+                    (),
+                    {
+                        "synthesize_dots_speech": lambda _self, **kwargs: (
+                            request_capture.update(kwargs) or (wav, 0.1)
+                        )
+                    },
+                )()
+            )
+            return request_capture["audio"]
+
+        with (
+            patch.object(main, "GATEWAY_CONFIG", fake_config),
+            patch.object(main, "execute_localai_operation", side_effect=execute),
+            patch.object(main.manager, "run_worker") as run_worker,
+        ):
+            response = TestClient(main.app).post(
+                "/v1/dotsTTS/clone",
+                json={"text": "目标台词", "audio_path": self.filename},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["content-type"], "audio/wav")
+        self.assertEqual(response.content, wav)
+        self.assertEqual(request_capture["config"], fake_config)
+        self.assertEqual(request_capture["text"], "目标台词")
+        run_worker.assert_not_called()
+
+    def test_localai_long_text_is_rejected_before_execution_without_native_fallback(self) -> None:
+        from fastapi.testclient import TestClient
+
+        fake_config = replace(main.GATEWAY_CONFIG, provider="localai", localai_enabled=True)
+        with (
+            patch.object(main, "GATEWAY_CONFIG", fake_config),
+            patch.object(main, "execute_localai_operation") as execute,
+            patch.object(main.manager, "run_worker") as run_worker,
+        ):
+            response = TestClient(main.app).post(
+                "/v1/dotsTTS/clone",
+                json={"text": "超过单段长度。" * 30, "audio_path": self.filename},
+            )
+
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("一个原生文本片段", response.json()["detail"])
+        execute.assert_not_called()
+        run_worker.assert_not_called()
+
+    def test_startup_and_health_keep_native_default_and_register_dots_preflight(self) -> None:
+        self.assertEqual(main.GATEWAY_CONFIG.provider, "native")
+        start_script = (REPOSITORY_DIR / "start.sh").read_text(encoding="utf-8")
+        preflight = (REPOSITORY_DIR / "scripts/localai/preflight.py").read_text(encoding="utf-8")
+        manager = (REPOSITORY_DIR / "scripts/localai/manager.py").read_text(encoding="utf-8")
+        self.assertIn("UNITALE_DOTS_TTS_SOAR_PROVIDER", start_script)
+        self.assertIn('"UNITALE_DOTS_TTS_SOAR_PROVIDER"', preflight)
+        self.assertIn("register-dots-tts-soar-candidate", manager)
+        self.assertIn("verify-dots-tts-soar-candidate", manager)
 
     def test_synthesize_returns_wav_without_loading_model(self) -> None:
         from fastapi.testclient import TestClient

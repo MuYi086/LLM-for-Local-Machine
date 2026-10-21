@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-# 配置测试确保各 uv 项目有锁文件、统一 Ruff 基线且不在启动时同步依赖。
 import tomllib
 import unittest
 from pathlib import Path
+
+# 配置测试确保各 uv 项目有锁文件、统一 Ruff 基线且不在启动时同步依赖。
 
 REPOSITORY_DIR = Path(__file__).resolve().parents[1]
 MODEL_PROJECTS = (
@@ -31,7 +32,6 @@ MODEL_PROJECTS = (
     "Step_Audio_EditX",
     "firered_tts3",
     "TIGER-DnR",
-    "Index-Translate-9B-GGUF",
 )
 EXPECTED_RUFF_RULES = {"E", "F", "I", "UP", "B"}
 
@@ -81,7 +81,7 @@ class PythonQualityConfigurationTests(unittest.TestCase):
     def test_startup_uses_locked_environments_without_runtime_sync(self) -> None:
         start_script = (REPOSITORY_DIR / "start.sh").read_text(encoding="utf-8")
 
-        self.assertEqual(start_script.count("setsid uv run --no-sync --project"), 30)
+        self.assertEqual(start_script.count("setsid uv run --no-sync --project"), 26)
         self.assertNotIn("setsid uv run --project", start_script)
         self.assertEqual(start_script.count('for pid in "${pids[@]}"; do'), 3)
         self.assertNotIn('wait "$qwen3_tts_pid"', start_script)

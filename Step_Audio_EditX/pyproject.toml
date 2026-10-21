@@ -35,6 +35,7 @@ dependencies = [
     "tokenizers==0.22.2",
     "vllm",
     "unitale-runtime",
+    "unitale-inference-gateway",
 ]
 
 [dependency-groups]
@@ -62,6 +63,7 @@ format = "flat"
 explicit = true
 
 [tool.uv.sources]
+unitale-inference-gateway = { path = "../inference_gateway", editable = true }
 unitale-runtime = { path = "../unitale_runtime", editable = true }
 torch = { index = "pytorch-cu128-aliyun" }
 torchaudio = { index = "pytorch-cu128-aliyun" }

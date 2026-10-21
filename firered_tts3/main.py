@@ -25,6 +25,15 @@ from typing import Literal
 import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, Response, UploadFile
 from fastapi.responses import JSONResponse
+from inference_gateway import (
+    BackendQuarantinedError,
+    LocalAIClient,
+    LocalAIRequestError,
+    LocalAIUnavailableError,
+    UnsupportedCapabilityError,
+    load_gateway_config,
+)
+from inference_gateway.execution import execute_localai_operation
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -140,6 +149,18 @@ if FIRERED_TTS3_ATTN_IMPLEMENTATION not in {"auto", "flash_attention_2", "sdpa",
     raise ValueError(
         "FIRERED_TTS3_ATTN_IMPLEMENTATION 必须是 auto、flash_attention_2、sdpa 或 eager。"
     )
+LOCALAI_PROVIDER_ENV = f"UNITALE_FIRERED_TTS3_{SERVICE_MODE.upper()}_PROVIDER"
+LOCALAI_MODEL_ID = (
+    "unitale.fireredtts3.instruct.q8-0"
+    if SERVICE_MODE == "timbre"
+    else "unitale.fireredtts3.base.q8-0"
+)
+GATEWAY_CONFIG = load_gateway_config(
+    service_provider_env=LOCALAI_PROVIDER_ENV,
+    default_model=LOCALAI_MODEL_ID,
+    request_timeout=REQUEST_TIMEOUT,
+)
+LAST_LOCALAI_ERROR: str | None = None
 
 os.environ.setdefault("HF_HOME", HF_MIRROR_DIR)
 os.environ.setdefault("HF_MODULES_CACHE", str(Path(RUNTIME_CACHE_DIR) / "hf_modules"))
@@ -463,6 +484,12 @@ manager = FireRedWorkerManager()
 def health() -> dict[str, object]:
     """返回当前模式、权重、源码、worker 和 GPU 就绪状态。"""
     cuda = cuda_status()
+    localai_client = LocalAIClient(GATEWAY_CONFIG) if GATEWAY_CONFIG.provider == "localai" else None
+    localai_healthy = bool(localai_client and localai_client.health())
+    localai_model_registered = bool(
+        localai_client and localai_healthy and localai_client.model_ready()
+    )
+    native_ready = model_is_ready() and os.path.isdir(CODE_PATH) and cuda["available"]
     return {
         "code": 200,
         "paths": {
@@ -489,11 +516,19 @@ def health() -> dict[str, object]:
             "flash_attn": module_available("flash_attn"),
             "fasttext": module_available("fasttext"),
             "cuda": cuda["available"],
+            "selected_provider": GATEWAY_CONFIG.provider,
+            "selected_provider_ready": (
+                localai_model_registered if localai_client else native_ready
+            ),
+            "localai_healthy": localai_healthy,
+            "localai_model_registered": localai_model_registered,
         },
         "cuda": cuda,
         "runtime": {
             "port": API_PORT,
             "service_mode": SERVICE_MODE,
+            "provider": GATEWAY_CONFIG.provider,
+            "localai_model": GATEWAY_CONFIG.model if localai_client else None,
             "worker_runtime": "uv",
             "worker_python": sys.executable,
             "model": "FireRedTTS3-Instruct" if SERVICE_MODE == "timbre" else "FireRedTTS3-Base",
@@ -513,8 +548,58 @@ def health() -> dict[str, object]:
             if SERVICE_MODE == "timbre"
             else "/v1/FireRedTTS3/clone",
         },
-        "last_errors": {"firered_tts3": manager.last_error},
+        "last_errors": {"firered_tts3": manager.last_error, "localai": LAST_LOCALAI_ERROR},
     }
+
+
+def build_localai_request(payload: dict[str, object]) -> dict[str, object]:
+    """把当前 FireRed 模式映射到固定 audio.cpp 请求字段。"""
+    if USE_FASTTEXT or not USE_WETEXT or not DO_TN:
+        raise UnsupportedCapabilityError(
+            "固定 audio.cpp FireRedTTS3 未暴露 fasttext/WeText/DO_TN 开关；"
+            "LocalAI 仅支持服务默认的文本规范化配置。"
+        )
+    if FIRERED_TTS3_ATTN_IMPLEMENTATION != "auto":
+        raise UnsupportedCapabilityError(
+            "LocalAI audio.cpp 不接受 FireRedTTS3 的 PyTorch attn_implementation 覆盖。"
+        )
+
+    request: dict[str, object] = {
+        "text": str(payload["text"]),
+        "language": str(payload["language"]),
+        "n_timesteps": int(payload["n_timesteps"]),
+        "inference_cfg": float(payload["inference_cfg"]),
+        "stop_threshold": float(payload["stop_threshold"]),
+        "seed": int(payload["seed"]),
+        "template_name": "voice_design" if SERVICE_MODE == "timbre" else None,
+    }
+    if SERVICE_MODE == "clone":
+        request.update(
+            {
+                "voice_path": Path(str(payload["ref_audio_path"])),
+                "reference_text": str(payload["prompt_text"]),
+                "instruction": None,
+            }
+        )
+    else:
+        request.update(
+            {
+                "voice_path": None,
+                "reference_text": None,
+                "instruction": str(payload["instruction"]),
+            }
+        )
+    return request
+
+
+def run_localai(payload: dict[str, object]) -> bytes:
+    """在共享 GPU 租约内执行请求，并在释放租约前确认 backend 停止。"""
+    localai_request = build_localai_request(payload)
+    audio_bytes, _elapsed = execute_localai_operation(
+        config=GATEWAY_CONFIG,
+        operation=lambda client: client.synthesize_fireredtts3(**localai_request),
+    )
+    return audio_bytes
 
 
 if SERVICE_MODE == "clone":
@@ -548,6 +633,33 @@ if SERVICE_MODE == "clone":
     @app.post("/v1/FireRedTTS3/clone")
     def clone(request: CloneRequest):
         """串行运行 FireRedTTS3 Base 克隆并保存到 clone 目录。"""
+        if GATEWAY_CONFIG.provider == "localai":
+            global LAST_LOCALAI_ERROR
+            try:
+                payload = manager.build_payload(request)
+                audio_bytes = run_localai(payload)
+                output_path = persist_audio_bytes(audio_bytes, "fireredtts3_clone", OUTPUT_DIR)
+                manager.last_error = None
+                LAST_LOCALAI_ERROR = None
+                print(f"[FireRedTTS3] 已保存 LocalAI 克隆音频: {output_path}")
+                return Response(content=audio_bytes, media_type="audio/wav")
+            except UnsupportedCapabilityError as exc:
+                raise HTTPException(status_code=422, detail=str(exc)) from exc
+            except GpuLockTimeoutError as exc:
+                raise HTTPException(status_code=503, detail=str(exc)) from exc
+            except BackendQuarantinedError as exc:
+                LAST_LOCALAI_ERROR = str(exc)
+                raise HTTPException(status_code=503, detail=str(exc)) from exc
+            except (LocalAIRequestError, LocalAIUnavailableError) as exc:
+                LAST_LOCALAI_ERROR = str(exc)
+                raise HTTPException(status_code=503, detail=str(exc)) from exc
+            except HTTPException:
+                raise
+            except Exception as exc:
+                LAST_LOCALAI_ERROR = str(exc)
+                LOGGER.exception("LocalAI FireRedTTS3 clone request failed")
+                raise HTTPException(status_code=500, detail=str(exc)) from exc
+
         try:
             payload = manager.build_payload(request)
             with gpu_runtime_lock("firered_tts3/clone"):
@@ -574,6 +686,34 @@ else:
     @app.post("/v1/FireRedTTS3/timbre")
     def timbre(request: TimbreRequest):
         """串行运行 FireRedTTS3 Instruct 音色设计并只保存到 timbre 目录。"""
+        if GATEWAY_CONFIG.provider == "localai":
+            global LAST_LOCALAI_ERROR
+            try:
+                payload = manager.build_payload(request)
+                audio_bytes = run_localai(payload)
+                output_path = persist_audio_bytes(audio_bytes, "fireredtts3_timbre", OUTPUT_DIR)
+                reference_store.register_timbre_file(output_path)
+                manager.last_error = None
+                LAST_LOCALAI_ERROR = None
+                print(f"[FireRedTTS3] 已保存 LocalAI 设计音色: {output_path}")
+                return Response(content=audio_bytes, media_type="audio/wav")
+            except UnsupportedCapabilityError as exc:
+                raise HTTPException(status_code=422, detail=str(exc)) from exc
+            except GpuLockTimeoutError as exc:
+                raise HTTPException(status_code=503, detail=str(exc)) from exc
+            except BackendQuarantinedError as exc:
+                LAST_LOCALAI_ERROR = str(exc)
+                raise HTTPException(status_code=503, detail=str(exc)) from exc
+            except (LocalAIRequestError, LocalAIUnavailableError) as exc:
+                LAST_LOCALAI_ERROR = str(exc)
+                raise HTTPException(status_code=503, detail=str(exc)) from exc
+            except HTTPException:
+                raise
+            except Exception as exc:
+                LAST_LOCALAI_ERROR = str(exc)
+                LOGGER.exception("LocalAI FireRedTTS3 voice design request failed")
+                raise HTTPException(status_code=500, detail=str(exc)) from exc
+
         try:
             payload = manager.build_payload(request)
             with gpu_runtime_lock("firered_tts3/timbre"):

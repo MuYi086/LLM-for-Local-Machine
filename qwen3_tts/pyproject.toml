@@ -15,6 +15,7 @@ dependencies = [
     "numpy==2.4.6",
     "soundfile==0.14.0",
     "unitale-runtime",
+    "unitale-inference-gateway",
 ]
 
 [dependency-groups]
@@ -40,6 +41,7 @@ explicit = true
 
 [tool.uv.sources]
 unitale-runtime = { path = "../unitale_runtime", editable = true }
+unitale-inference-gateway = { path = "../inference_gateway", editable = true }
 torch = { index = "pytorch-cu130" }
 torchaudio = { index = "pytorch-cu130" }
 

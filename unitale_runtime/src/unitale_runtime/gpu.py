@@ -27,6 +27,24 @@ class GpuLockTimeoutError(RuntimeError):
         self.timeout_seconds = timeout_seconds
 
 
+class GpuQuarantinedError(GpuLockTimeoutError):
+    """上一次 GPU 请求没有确认模型进程退出，需要人工恢复。"""
+
+    def __init__(self, marker_path: str | Path) -> None:
+        RuntimeError.__init__(
+            self,
+            f"GPU 已隔离，需先确认遗留模型进程退出并检查标记：{marker_path}",
+        )
+        self.label = "GPU quarantine"
+        self.timeout_seconds = 0
+        self.marker_path = Path(marker_path)
+
+
+def gpu_quarantine_path(lock_path: str | Path) -> Path:
+    """返回与共享 GPU 锁配套的崩溃隔离标记路径。"""
+    return Path(f"{lock_path}.quarantine")
+
+
 @dataclass
 class GpuRuntimeMetrics:
     """一次 GPU 请求的排队、执行和显存观测指标。"""
@@ -138,6 +156,10 @@ def gpu_runtime_lock(
                 time.sleep(min(0.1, max((timeout or 0.1) - waited, 0.01)))
 
         metrics.queue_wait_seconds = time.perf_counter() - started
+        quarantine = gpu_quarantine_path(path)
+        if quarantine.exists():
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+            raise GpuQuarantinedError(quarantine)
         execution_started = time.perf_counter()
         sampler = _VramSampler(metrics)
         sampler.start()

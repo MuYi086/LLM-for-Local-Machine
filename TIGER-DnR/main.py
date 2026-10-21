@@ -26,6 +26,13 @@ from typing import Any, Literal
 import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response
+from inference_gateway import (
+    BackendQuarantinedError,
+    LocalAIRequestError,
+    LocalAIUnavailableError,
+    execute_localai_worker_file_reference,
+    load_gateway_config,
+)
 from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware
 from unitale_runtime import (
@@ -90,6 +97,19 @@ API_HOST = os.getenv("TIGER_DNR_HOST", os.getenv("HOST", "0.0.0.0"))
 API_PORT = int(os.getenv("TIGER_DNR_PORT", os.getenv("PORT", "8351")))
 REQUEST_TIMEOUT = float(os.getenv("TIGER_DNR_REQUEST_TIMEOUT", "900"))
 DEFAULT_DEVICE = os.getenv("TIGER_DNR_DEVICE", "cuda")
+GATEWAY_CONFIG = load_gateway_config(
+    service_provider_env="UNITALE_TIGER_DNR_PROVIDER",
+    default_model="unitale.tiger-dnr.worker.v1",
+    request_timeout=REQUEST_TIMEOUT,
+)
+LOCALAI_ARTIFACT_DIR = Path(
+    expand_path(
+        os.getenv(
+            "UNITALE_LOCALAI_ARTIFACT_DIR",
+            str(RUNTIME_CACHE_DIR / "localai_artifacts"),
+        )
+    )
+)
 
 os.environ.setdefault("HF_HOME", HF_MIRROR_DIR)
 os.environ.setdefault("HF_MODULES_CACHE", str(RUNTIME_CACHE_DIR / "hf_modules"))
@@ -280,6 +300,45 @@ class TigerDnrWorkerManager:
             if not succeeded:
                 shutil.rmtree(output_dir, ignore_errors=True)
 
+    def run_localai_worker(self, payload: dict[str, Any]) -> dict[str, Path]:
+        """经 file_ref 传输取回三 Stem ZIP，并校验后解包到私有任务目录。"""
+        archive, _ = execute_localai_worker_file_reference(
+            config=GATEWAY_CONFIG,
+            operation="run",
+            payload={"worker_input": payload},
+            output_dir=WORKER_TMP_DIR,
+            artifact_dir=LOCALAI_ARTIFACT_DIR,
+            suffix=".zip",
+            media_type="application/zip",
+        )
+        output_dir = Path(tempfile.mkdtemp(dir=WORKER_TMP_DIR, prefix="tiger_dnr_ref_"))
+        try:
+            with zipfile.ZipFile(archive) as worker_archive:
+                expected = {f"{stem}.wav" for stem in STEM_NAMES}
+                infos = worker_archive.infolist()
+                names = [info.filename for info in infos]
+                if len(names) != len(expected) or set(names) != expected:
+                    raise LocalAIRequestError("TIGER-DnR worker ZIP 必须且只能包含三个命名 Stem。")
+                if any(info.is_dir() or info.file_size <= 0 for info in infos):
+                    raise LocalAIRequestError("TIGER-DnR worker ZIP 含空 Stem 或目录项。")
+                if sum(info.file_size for info in infos) > 4 * 1024 * 1024 * 1024:
+                    raise LocalAIRequestError("TIGER-DnR worker ZIP 解压后超过 4 GiB。")
+                for info in infos:
+                    destination = output_dir / info.filename
+                    with worker_archive.open(info) as source, destination.open("xb") as target:
+                        shutil.copyfileobj(source, target, length=1024 * 1024)
+                    if destination.stat().st_size != info.file_size:
+                        raise LocalAIRequestError("TIGER-DnR worker Stem 解压后大小不一致。")
+            outputs = {stem: output_dir / f"{stem}.wav" for stem in STEM_NAMES}
+            self.last_error = None
+            return outputs
+        except Exception as exc:
+            self.last_error = str(exc)
+            shutil.rmtree(output_dir, ignore_errors=True)
+            raise
+        finally:
+            archive.unlink(missing_ok=True)
+
     @staticmethod
     def cleanup_worker_outputs(outputs: dict[str, Path]) -> None:
         """在生成内容完成原子提交后删除一次性 worker 输出目录。"""
@@ -338,6 +397,17 @@ def persist_stem_outputs(outputs: dict[str, Path]) -> SeparationResult:
 def execute_separation_payload(payload: dict[str, Any]) -> SeparationResult:
     """持有共享 GPU 锁运行 worker 并持久化三 Stem；在线程池中调用。"""
     outputs: dict[str, Path] = {}
+    if GATEWAY_CONFIG.provider == "localai":
+        try:
+            with manager.lock:
+                try:
+                    outputs = manager.run_localai_worker(payload)
+                    return persist_stem_outputs(outputs)
+                finally:
+                    manager.cleanup_worker_outputs(outputs)
+        except Exception as exc:
+            manager.last_error = str(exc)
+            raise
     try:
         with gpu_runtime_lock(GPU_LOCK_FILE, "tiger-dnr/separate"):
             with manager.lock:
@@ -417,6 +487,10 @@ async def separate(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except GpuLockTimeoutError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except (BackendQuarantinedError, LocalAIUnavailableError) as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except LocalAIRequestError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
     except Exception as exc:
         LOGGER.exception("TIGER-DnR separation request failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc

@@ -1,0 +1,9 @@
+name: unitale.stable-audio3-medium.q8-0
+backend: audio-cpp
+parameters:
+  model: Stable-Audio-3-Medium-GGUF/stable-audio-3-medium-q8_0.gguf
+options:
+  - family:stable_audio
+  - task:gen
+  - backend:cuda
+  - device:0

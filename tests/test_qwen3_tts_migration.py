@@ -36,6 +36,7 @@ os.environ.update(
 )
 (TEST_ROOT / "model").mkdir(parents=True, exist_ok=True)
 sys.path.insert(0, str(QWEN3_TTS_DIR))
+sys.path.insert(0, str(REPOSITORY_DIR / "inference_gateway/src"))
 
 import main  # noqa: E402
 
@@ -68,6 +69,8 @@ class Qwen3TtsMigrationTests(unittest.TestCase):
             {"code", "paths", "available", "cuda", "runtime", "last_errors"},
         )
         self.assertTrue(payload["available"]["worker_script"])
+        self.assertEqual(payload["available"]["selected_provider"], "native")
+        self.assertFalse(payload["available"]["localai_model_registered"])
         self.assertEqual(payload["runtime"]["worker_runtime"], "uv")
         self.assertEqual(payload["available"]["python"], sys.executable)
 
@@ -221,6 +224,66 @@ class Qwen3TtsMigrationTests(unittest.TestCase):
         self.assertNotIn("conda", command)
         self.assertTrue(audio_bytes.startswith(b"RIFF"))
         self.assertTrue(list((TEST_ROOT / "output").glob("qwen3_tts_*.wav")))
+
+    def test_localai_preflight_rejects_unmapped_hardware_fields_and_long_text(self) -> None:
+        request = main.Qwen3TtsSynthesizeRequest(
+            text="你好。",
+            audio_path="reference.wav",
+            dtype="float16",
+        )
+        payload = {
+            "text": "你好。",
+            "max_chars_per_chunk": 120,
+        }
+        with self.assertRaises(main.UnsupportedCapabilityError):
+            main.validate_localai_request(request, payload)
+
+        long_request = main.Qwen3TtsSynthesizeRequest(
+            text="a" * 121,
+            audio_path="reference.wav",
+        )
+        with self.assertRaisesRegex(main.UnsupportedCapabilityError, "文本切段"):
+            main.validate_localai_request(
+                long_request,
+                {"text": "a" * 121, "max_chars_per_chunk": 120},
+            )
+
+    def test_localai_clone_route_returns_and_persists_wav_without_native_worker(self) -> None:
+        from dataclasses import replace
+
+        from fastapi.testclient import TestClient
+
+        reference_name = "localai-clone-reference.wav"
+        reference_path = Path(main.prompt_audio_path(reference_name))
+        reference_path.parent.mkdir(parents=True, exist_ok=True)
+        reference_path.write_bytes(b"reference audio")
+        response_wav = b"RIFF\x04\x00\x00\x00WAVE"
+        localai_config = replace(
+            main.GATEWAY_CONFIG,
+            provider="localai",
+            localai_enabled=True,
+            model="unitale.qwen3-tts.1p7b-base",
+        )
+
+        with (
+            patch.object(main, "GATEWAY_CONFIG", localai_config),
+            patch.object(
+                main, "synthesize_localai", return_value=(response_wav, 0.1)
+            ) as synthesize,
+            patch.object(
+                main.manager, "run_worker", side_effect=AssertionError("native worker called")
+            ),
+        ):
+            response = TestClient(main.app).post(
+                "/v1/qwen/clone",
+                json={"text": "你好。", "audio_path": reference_name},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["content-type"], "audio/wav")
+        self.assertEqual(response.content, response_wav)
+        self.assertTrue(list((TEST_ROOT / "output").glob("qwen3_tts_*.wav")))
+        synthesize.assert_called_once()
 
 
 if __name__ == "__main__":

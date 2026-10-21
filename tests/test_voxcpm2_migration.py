@@ -34,11 +34,14 @@ os.environ.update(
         "LOCAL_FILES_ONLY": "1",
         "CUDA_RELEASE_DELAY": "0",
         "VOXCPM2_REQUEST_TIMEOUT": "5",
+        "UNITALE_LOCALAI_ENABLED": "false",
+        "UNITALE_VOXCPM2_PROVIDER": "native",
     }
 )
 
 # 确保扁平目录下的本地导入解析到本服务，而不是其他独立项目中的同名辅助模块。
 sys.path.insert(0, str(SERVICE_DIR))
+sys.path.insert(0, str(REPOSITORY_DIR / "inference_gateway/src"))
 for module_name in (
     "audio_output",
     "audio_trim",
@@ -96,6 +99,7 @@ class VoxCpm2MigrationTests(unittest.TestCase):
         self.assertEqual(payload["available"]["python"], sys.executable)
         self.assertTrue(payload["available"]["worker_script"])
         self.assertIn("not required", payload["runtime"]["flash_attention_policy"])
+        self.assertEqual(payload["available"]["selected_provider"], "native")
 
     def test_upload_and_check_audio_keep_webui_contract(self) -> None:
         from fastapi.testclient import TestClient
@@ -175,6 +179,119 @@ class VoxCpm2MigrationTests(unittest.TestCase):
                 prompt_text="不应同时出现",
             )
 
+    def test_localai_request_maps_ultimate_and_controllable_clone(self) -> None:
+        ultimate = main.VoxCpm2SynthesizeRequest(
+            text=" 你好。 ",
+            audio_path=self.filename,
+            prompt_text="显式参考转写",
+            clone_mode="ultimate",
+            cfg_value=1.7,
+            inference_timesteps=12,
+            retry_badcase=False,
+        )
+        ultimate_payload = main.manager.build_worker_payload(ultimate)
+        mapped = main.build_localai_request(ultimate, ultimate_payload)
+        self.assertEqual(mapped["text"], "你好。")
+        self.assertEqual(mapped["reference_text"], "显式参考转写")
+        self.assertEqual(mapped["guidance_scale"], 1.7)
+        self.assertEqual(mapped["num_inference_steps"], 12)
+        self.assertEqual(mapped["text_chunk_size"], len("你好。") + 1)
+        self.assertEqual(mapped["voice_path"], Path(ultimate_payload["ref_audio_path"]))
+
+        controllable = main.VoxCpm2SynthesizeRequest(
+            text="台词",
+            audio_path=self.filename,
+            clone_mode="controllable",
+            control_instruction="轻快地说",
+            retry_badcase=False,
+        )
+        controllable_payload = main.manager.build_worker_payload(controllable)
+        mapped_control = main.build_localai_request(controllable, controllable_payload)
+        self.assertEqual(mapped_control["text"], "(轻快地说)台词")
+        self.assertIsNone(mapped_control["reference_text"])
+
+        sidecar_request = main.VoxCpm2SynthesizeRequest(
+            text="旁白",
+            audio_path=self.filename,
+            clone_mode="ultimate",
+            retry_badcase=False,
+        )
+        sidecar_payload = main.manager.build_worker_payload(sidecar_request)
+        self.assertEqual(sidecar_payload["prompt_text"], "准确的参考转写。")
+        self.assertEqual(
+            main.build_localai_request(sidecar_request, sidecar_payload)["reference_text"],
+            "准确的参考转写。",
+        )
+
+    def test_localai_request_rejects_nonverbal_tags_postprocessing_retry_and_long_chunks(
+        self,
+    ) -> None:
+        cases = (
+            main.VoxCpm2SynthesizeRequest(
+                text="台词",
+                audio_path=self.filename,
+                clone_mode="controllable",
+                control_instruction="轻快地说",
+                nonverbal_tags=["laughing"],
+                retry_badcase=False,
+            ),
+            main.VoxCpm2SynthesizeRequest(
+                text="台词", audio_path=self.filename, retry_badcase=True
+            ),
+            main.VoxCpm2SynthesizeRequest(
+                text="台词", audio_path=self.filename, normalize=True, retry_badcase=False
+            ),
+            main.VoxCpm2SynthesizeRequest(
+                text="台词", audio_path=self.filename, denoise=True, retry_badcase=False
+            ),
+            main.VoxCpm2SynthesizeRequest(
+                text="台词", audio_path=self.filename, load_denoiser=True, retry_badcase=False
+            ),
+            main.VoxCpm2SynthesizeRequest(
+                text="台词", audio_path=self.filename, optimize=True, retry_badcase=False
+            ),
+            main.VoxCpm2SynthesizeRequest(
+                text="台词", audio_path=self.filename, seed=123, retry_badcase=False
+            ),
+            main.VoxCpm2SynthesizeRequest(
+                text="台词", audio_path=self.filename, device="cuda:1", retry_badcase=False
+            ),
+            main.VoxCpm2SynthesizeRequest(
+                text="这是一个超过分片长度的请求。",
+                audio_path=self.filename,
+                max_chars_per_chunk=3,
+                retry_badcase=False,
+            ),
+        )
+        for request in cases:
+            with self.subTest(request=request):
+                payload = main.manager.build_worker_payload(request)
+                with self.assertRaises(main.UnsupportedCapabilityError):
+                    main.build_localai_request(request, payload)
+
+    def test_localai_route_uses_gateway_and_keeps_wav_response(self) -> None:
+        from dataclasses import replace
+
+        wav = b"RIFF" + b"\0" * 40
+        with (
+            patch.object(main, "GATEWAY_CONFIG", replace(main.GATEWAY_CONFIG, provider="localai")),
+            patch.object(main, "execute_localai_operation", return_value=(wav, 0.1)) as execute,
+            patch.object(main, "persist_generated_audio_bytes", return_value="stored.wav"),
+        ):
+            response = main.synthesize_voxcpm2_payload(
+                {
+                    "text": "你好。",
+                    "audio_path": self.filename,
+                    "retry_badcase": False,
+                }
+            )
+        self.assertEqual(response.media_type, "audio/wav")
+        self.assertEqual(response.body, wav)
+        self.assertEqual(
+            execute.call_args.kwargs["config"].model,
+            "unitale.voxcpm2.q8-0",
+        )
+
     def test_clone_route_returns_wav_without_model(self) -> None:
         from fastapi.testclient import TestClient
 
@@ -238,6 +355,8 @@ class VoxCpm2MigrationTests(unittest.TestCase):
 
     def test_start_script_uses_uv_without_legacy_voxcpm2_fallback(self) -> None:
         script = (REPOSITORY_DIR / "start.sh").read_text(encoding="utf-8")
+        self.assertIn('"${UNITALE_VOXCPM2_PROVIDER,,}" == "localai"', script)
+        self.assertIn('"$PROJECT_DIR/scripts/localai/preflight.py"', script)
         self.assertIn('uv run --no-sync --project "$VOXCPM2_PROJECT_DIR"', script)
         self.assertIn('python "$VOXCPM2_PROJECT_DIR/main.py"', script)
         self.assertNotIn("VOXCPM2_RUNTIME", script)

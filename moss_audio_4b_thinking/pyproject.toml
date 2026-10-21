@@ -20,6 +20,7 @@ dependencies = [
     "einops>=0.8.0",
     "scipy>=1.12.0",
     "unitale-runtime",
+    "unitale-inference-gateway",
 ]
 
 [dependency-groups]
@@ -42,6 +43,7 @@ url = "https://download.pytorch.org/whl/cu130"
 explicit = true
 
 [tool.uv.sources]
+unitale-inference-gateway = { path = "../inference_gateway", editable = true }
 unitale-runtime = { path = "../unitale_runtime", editable = true }
 torch = { index = "pytorch-cu130" }
 torchaudio = { index = "pytorch-cu130" }

@@ -17,6 +17,13 @@ from typing import Any, Literal
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Response
+from inference_gateway import (
+    BackendQuarantinedError,
+    LocalAIRequestError,
+    LocalAIUnavailableError,
+    execute_localai_worker_file,
+    load_gateway_config,
+)
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from starlette.middleware.base import BaseHTTPMiddleware
 from unitale_runtime import GpuLockTimeoutError
@@ -75,6 +82,11 @@ QUANTIZATION = os.getenv("YUE2_3B_QUANTIZATION", "none")
 OFFLOAD_AR = env_bool("YUE2_3B_OFFLOAD_AR", False)
 API_HOST = os.getenv("YUE2_3B_HOST", os.getenv("HOST", "0.0.0.0"))
 API_PORT = int(os.getenv("YUE2_3B_PORT", os.getenv("PORT", "8314")))
+GATEWAY_CONFIG = load_gateway_config(
+    service_provider_env="UNITALE_YUE2_3B_PROVIDER",
+    default_model="unitale.yue2-3b.worker.v1",
+    request_timeout=REQUEST_TIMEOUT,
+)
 
 if not math.isfinite(REQUEST_TIMEOUT) or REQUEST_TIMEOUT <= 0:
     raise ValueError("YUE2_3B_REQUEST_TIMEOUT 必须大于 0。")
@@ -364,6 +376,28 @@ class YuE2WorkerManager:
                 except OSError as exc:
                     LOGGER.warning("清理 YuE2-3B worker 文件失败 %s: %s", path, exc)
 
+    def run_localai_worker(self, payload: dict[str, Any]) -> bytes:
+        """通过版本化 worker bridge 执行歌曲生成并读取 WAV 成品。"""
+        artifact, _ = execute_localai_worker_file(
+            config=GATEWAY_CONFIG,
+            operation="run",
+            payload={"worker_input": payload},
+            output_dir=WORKER_TMP_DIR,
+            suffix=".wav",
+            media_type="audio/wav",
+        )
+        try:
+            audio = artifact.read_bytes()
+            if not audio:
+                raise RuntimeError("LocalAI YuE2-3B worker 返回空 WAV。")
+            self.last_error = None
+            return audio
+        except Exception as exc:
+            self.last_error = str(exc)
+            raise
+        finally:
+            artifact.unlink(missing_ok=True)
+
 
 app = FastAPI(title="Unitale YuE2-3B Music API")
 app.add_middleware(ForceCORS)
@@ -441,31 +475,40 @@ def generate_music(request: YuE2MusicRequest) -> Response:
 
     payload = manager.build_worker_payload(request)
     try:
-        with gpu_runtime_lock(GPU_LOCK_FILE, "yue2_3b/music"):
-            with manager.lock:
-                try:
-                    audio_bytes = manager.run_worker(payload)
-                    saved_path = persist_audio_bytes(audio_bytes, OUTPUT_DIR)
-                    LOGGER.info("YuE2-3B 生成 WAV 已保存: %s", saved_path)
-                    return Response(
-                        content=audio_bytes,
-                        media_type="audio/wav",
-                        headers={
-                            "X-YuE2-3B-Seed": str(request.seed),
-                            "X-YuE2-3B-Sample-Rate": "48000",
-                            "X-YuE2-3B-Model": "m-a-p/YuE2-3B",
-                        },
-                    )
-                except TimeoutError as exc:
-                    LOGGER.exception("YuE2-3B request timed out")
-                    raise HTTPException(status_code=504, detail=str(exc)) from exc
-                except Exception as exc:
-                    LOGGER.exception("YuE2-3B request failed")
-                    raise HTTPException(status_code=500, detail=str(exc)) from exc
-                finally:
-                    wait_after_cuda_release(CUDA_RELEASE_DELAY, "after YuE2-3B worker")
+        if GATEWAY_CONFIG.provider == "localai":
+            audio_bytes = manager.run_localai_worker(payload)
+        else:
+            with gpu_runtime_lock(GPU_LOCK_FILE, "yue2_3b/music"):
+                with manager.lock:
+                    try:
+                        audio_bytes = manager.run_worker(payload)
+                    finally:
+                        wait_after_cuda_release(CUDA_RELEASE_DELAY, "after YuE2-3B worker")
+        saved_path = persist_audio_bytes(audio_bytes, OUTPUT_DIR)
+        LOGGER.info("YuE2-3B 生成 WAV 已保存: %s", saved_path)
+        return Response(
+            content=audio_bytes,
+            media_type="audio/wav",
+            headers={
+                "X-YuE2-3B-Seed": str(request.seed),
+                "X-YuE2-3B-Sample-Rate": "48000",
+                "X-YuE2-3B-Model": "m-a-p/YuE2-3B",
+            },
+        )
     except GpuLockTimeoutError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except (BackendQuarantinedError, LocalAIUnavailableError) as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except LocalAIRequestError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except TimeoutError as exc:
+        LOGGER.exception("YuE2-3B request timed out")
+        raise HTTPException(status_code=504, detail=str(exc)) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        LOGGER.exception("YuE2-3B request failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 if __name__ == "__main__":

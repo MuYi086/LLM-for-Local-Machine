@@ -1,0 +1,10 @@
+name: unitale.confucius4-tts.orig
+backend: audio-cpp
+parameters:
+  model: Confucius4-TTS-GGUF/confucius4-tts-orig.gguf
+options:
+  - family:confucius4_tts
+  - task:clon
+  - backend:cuda
+  - device:0
+  - confucius4_tts.mem_saver:true

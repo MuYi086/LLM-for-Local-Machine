@@ -14,16 +14,19 @@ import tempfile
 import unittest
 import wave
 from contextlib import contextmanager, nullcontext
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
 
-from unitale_runtime import GpuLockTimeoutError
-
 REPOSITORY_DIR = Path(__file__).resolve().parents[1]
 SERVICE_DIR = REPOSITORY_DIR / "seed-vc"
+sys.path.insert(0, str(REPOSITORY_DIR / "inference_gateway/src"))
+sys.path.insert(0, str(REPOSITORY_DIR / "unitale_runtime/src"))
+
+from unitale_runtime import GpuLockTimeoutError  # noqa: E402
 
 
 def load_module(name: str, path: Path):
@@ -74,6 +77,9 @@ class SeedVcMigrationTests(unittest.TestCase):
             "GPU_LOCK_WAIT_TIMEOUT": "1",
             "LOCAL_FILES_ONLY": "1",
             "CUDA_RELEASE_DELAY": "0",
+            "UNITALE_LOCALAI_ENABLED": "false",
+            "UNITALE_INFERENCE_PROVIDER": "native",
+            "UNITALE_SEED_VC_PROVIDER": "native",
         }
         with (
             patch.dict(
@@ -245,6 +251,161 @@ class SeedVcMigrationTests(unittest.TestCase):
         self.assertEqual(len(saved), 1)
         self.assertEqual(saved[0].read_bytes(), self.audio_bytes)
         self.assertEqual(self.main.manager.last_metrics["worker_seconds"], 0.1)
+
+    def test_localai_voice_conversion_maps_v2_and_keeps_response_contract(self) -> None:
+        vc_config = replace(
+            self.main.GATEWAY_CONFIG,
+            provider="localai",
+            localai_enabled=True,
+            model="seed-vc-vc-test",
+        )
+        self.main.GATEWAY_CONFIG = vc_config
+        self.main.LOCALAI_SVC_CONFIG = replace(vc_config, model="seed-vc-svc-test")
+        captured: dict[str, object] = {}
+
+        class FakeClient:
+            def transform_audio(self, **kwargs: object):
+                captured.update(kwargs)
+                return self_audio, 0.25
+
+        self_audio = self.audio_bytes
+
+        def execute(*, config, operation):
+            captured["model"] = config.model
+            return operation(FakeClient())
+
+        with (
+            patch.object(
+                self.main.manager,
+                "resolve_audio_paths",
+                return_value=(
+                    self.main.reference_store.clone_path("source.wav"),
+                    self.main.reference_store.clone_path("target.wav"),
+                ),
+            ),
+            patch.object(self.main, "execute_localai_operation", side_effect=execute),
+        ):
+            response = self.client.post(
+                "/v1/seedVc/voiceConversion",
+                json={**self.request_data, "inference_cfg_rate": 0.4},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["content-type"], "audio/wav")
+        self.assertEqual(response.content, self.audio_bytes)
+        self.assertEqual(captured["model"], "seed-vc-vc-test")
+        self.assertEqual(captured["audio_path"], self.main.reference_store.clone_path("source.wav"))
+        self.assertEqual(
+            captured["reference_path"], self.main.reference_store.clone_path("target.wav")
+        )
+        self.assertEqual(
+            captured["params"],
+            {
+                "num_inference_steps": "30",
+                "length_adjust": "1.0",
+                "route": "v2_vc",
+                "intelligibility_guidance_scale": "0.4",
+                "similarity_guidance_scale": "0.4",
+            },
+        )
+        self.assertTrue(Path(self.main.manager.last_output_path).is_file())
+
+    def test_localai_svc_maps_f0_controls_and_rejects_precision_override(self) -> None:
+        vc_config = replace(
+            self.main.GATEWAY_CONFIG,
+            provider="localai",
+            localai_enabled=True,
+            model="seed-vc-vc-test",
+        )
+        self.main.GATEWAY_CONFIG = vc_config
+        self.main.LOCALAI_SVC_CONFIG = replace(vc_config, model="seed-vc-svc-test")
+        captured: dict[str, object] = {}
+
+        class FakeClient:
+            def transform_audio(self, **kwargs: object):
+                captured.update(kwargs)
+                return self_audio, 0.3
+
+        self_audio = self.audio_bytes
+
+        def execute(*, config, operation):
+            captured["model"] = config.model
+            return operation(FakeClient())
+
+        with (
+            patch.object(
+                self.main.manager,
+                "resolve_audio_paths",
+                return_value=(
+                    self.main.reference_store.clone_path("source.wav"),
+                    self.main.reference_store.clone_path("target.wav"),
+                ),
+            ),
+            patch.object(self.main, "execute_localai_operation", side_effect=execute),
+        ):
+            response = self.client.post(
+                "/v1/seedVc/voiceConversion",
+                json={
+                    **self.request_data,
+                    "f0_condition": True,
+                    "auto_f0_adjust": True,
+                    "semi_tone_shift": 3,
+                    "inference_cfg_rate": 0.5,
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(captured["model"], "seed-vc-svc-test")
+        self.assertEqual(
+            captured["params"],
+            {
+                "num_inference_steps": "30",
+                "length_adjust": "1.0",
+                "route": "v1_svc",
+                "inference_guidance_scale": "0.5",
+                "f0_condition": "true",
+                "auto_f0_adjust": "true",
+                "semitone_shift": "3",
+            },
+        )
+        with patch.object(self.main, "execute_localai_operation") as execute_localai:
+            response = self.client.post(
+                "/v1/seedVc/voiceConversion",
+                json={**self.request_data, "fp16": False},
+            )
+        self.assertEqual(response.status_code, 422)
+        execute_localai.assert_not_called()
+
+    def test_localai_failures_are_exposed_in_health(self) -> None:
+        self.main.GATEWAY_CONFIG = replace(
+            self.main.GATEWAY_CONFIG,
+            provider="localai",
+            localai_enabled=True,
+            model="seed-vc-vc-test",
+        )
+        errors = (
+            (self.main.LocalAIRequestError("LocalAI rejected the transform"), 502),
+            (self.main.LocalAIUnavailableError("LocalAI is unavailable"), 503),
+            (self.main.BackendQuarantinedError("backend exit is unconfirmed"), 503),
+        )
+        for error, expected_status in errors:
+            with (
+                self.subTest(error=type(error).__name__),
+                patch.object(
+                    self.main.manager,
+                    "resolve_audio_paths",
+                    return_value=(
+                        self.main.reference_store.clone_path("source.wav"),
+                        self.main.reference_store.clone_path("target.wav"),
+                    ),
+                ),
+                patch.object(self.main, "execute_localai_operation", side_effect=error),
+            ):
+                response = self.client.post("/v1/seedVc/voiceConversion", json=self.request_data)
+            self.assertEqual(response.status_code, expected_status)
+            self.assertEqual(
+                self.client.get("/v1/health").json()["last_errors"]["seed_vc"], str(error)
+            )
 
     def test_invalid_parameters_and_missing_inputs_fail_before_gpu_queue(self) -> None:
         invalid = (
@@ -494,6 +655,11 @@ class SeedVcMigrationTests(unittest.TestCase):
             'SEED_VC_MODEL_DIR="${SEED_VC_MODEL_DIR:-$HF_MIRROR_DIR/Plachta/Seed-VC}"', source
         )
         self.assertIn('setsid uv run --no-sync --project "$SEED_VC_PROJECT_DIR"', source)
+        self.assertIn(
+            'UNITALE_SEED_VC_PROVIDER="${UNITALE_SEED_VC_PROVIDER:-$UNITALE_INFERENCE_PROVIDER}"',
+            source,
+        )
+        self.assertIn("inference_gateway/src", source)
         self.assertIn('python "$SEED_VC_PROJECT_DIR/main.py"', source)
         self.assertIn("'/v1/seedVc/voiceConversion'", source)
         self.assertIn(

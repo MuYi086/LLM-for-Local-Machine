@@ -2851,6 +2851,7 @@ dependencies = [
     { name = "torchvision", version = "0.24.1+cu128", source = { registry = "https://mirrors.aliyun.com/pytorch-wheels/cu128/" }, marker = "platform_machine != 'aarch64' or platform_python_implementation != 'CPython' or sys_platform != 'linux'" },
     { name = "transformers" },
     { name = "triton" },
+    { name = "unitale-inference-gateway" },
     { name = "unitale-runtime" },
     { name = "uvicorn" },
     { name = "vllm" },
@@ -2891,6 +2892,7 @@ requires-dist = [
     { name = "torchvision", specifier = "==0.24.1", index = "https://mirrors.aliyun.com/pytorch-wheels/cu128/" },
     { name = "transformers", specifier = "==4.57.3" },
     { name = "triton", specifier = "==3.5.1" },
+    { name = "unitale-inference-gateway", editable = "../inference_gateway" },
     { name = "unitale-runtime", editable = "../unitale_runtime" },
     { name = "uvicorn", specifier = "==0.52.1" },
     { name = "vllm", url = "https://wheels.vllm.ai/c826c72a9633454679871fcb81fbc31fe03fb150/vllm-0.14.0rc2.dev125%2Bgc826c72a9-cp38-abi3-manylinux_2_31_x86_64.whl" },
@@ -3220,6 +3222,17 @@ sdist = { url = "https://files.pythonhosted.org/packages/02/ee/af4171241117f85c7
 wheels = [
     { url = "https://files.pythonhosted.org/packages/1b/98/f63318ccbe75c810011fe9233884c5d348d94d90005de1b79e5f93bef9c0/umap_learn-0.5.12-py3-none-any.whl", hash = "sha256:f2a85d2a2adcb52b541bed9b27a23ca169b56bb1b23283abeebfb8dfb8a42fe5", size = 91849, upload-time = "2026-04-08T20:03:52.561Z" },
 ]
+
+[[package]]
+name = "unitale-inference-gateway"
+version = "0.1.0"
+source = { editable = "../inference_gateway" }
+dependencies = [
+    { name = "unitale-runtime" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "unitale-runtime", editable = "../unitale_runtime" }]
 
 [[package]]
 name = "unitale-runtime"

@@ -7,10 +7,13 @@ import os
 import sys
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
+from types import ModuleType
 from unittest.mock import patch
 
 SERVICE_DIR = Path(__file__).resolve().parents[1]
+REPOSITORY_DIR = SERVICE_DIR.parent
 TEST_RUNTIME = tempfile.TemporaryDirectory(prefix="ace-step-1-5-tests-")
 TEST_ROOT = Path(TEST_RUNTIME.name)
 os.environ.update(
@@ -28,6 +31,8 @@ os.environ.update(
     }
 )
 sys.path.insert(0, str(SERVICE_DIR))
+sys.path.insert(0, str(REPOSITORY_DIR / "inference_gateway/src"))
+sys.path.insert(0, str(REPOSITORY_DIR / "unitale_runtime/src"))
 
 from fastapi.testclient import TestClient  # noqa: E402
 
@@ -108,6 +113,7 @@ class AceStepApiContractTests(unittest.TestCase):
 
     def test_mocked_generation_returns_wav_and_seed_headers(self) -> None:
         result = WorkerResult(audio=FAKE_WAV, metadata={"seed": 123, "sample_rate": 48000})
+        saved_before = len(list(main.ACESTEP_OUTPUT_DIR.glob("ace_step_1_5_*.wav")))
         with patch.object(main.manager, "run_worker", return_value=result):
             response = self.client.post(
                 "/v1/aceStep/bgm",
@@ -119,7 +125,95 @@ class AceStepApiContractTests(unittest.TestCase):
         self.assertEqual(response.headers["x-ace-step-seed"], "123")
         self.assertEqual(response.headers["x-ace-step-sample-rate"], "48000")
         saved = list(main.ACESTEP_OUTPUT_DIR.glob("ace_step_1_5_*.wav"))
-        self.assertEqual(len(saved), 1)
+        self.assertEqual(len(saved), saved_before + 1)
+
+    def test_localai_provider_returns_audio_and_preserves_bgm_storage(self) -> None:
+        localai_config = replace(
+            main.GATEWAY_CONFIG,
+            provider="localai",
+            localai_enabled=True,
+            model=main.LOCALAI_MODEL_ID,
+        )
+        saved_before = len(list(main.ACESTEP_OUTPUT_DIR.glob("ace_step_1_5_*.wav")))
+        with (
+            patch.object(main, "GATEWAY_CONFIG", localai_config),
+            patch.object(main, "generate_localai", return_value=(FAKE_WAV, 0.1)) as generate,
+            patch.object(main, "validate_localai_wav", return_value=(48000, 2)),
+        ):
+            response = self.client.post(
+                "/v1/aceStep/bgm",
+                json={
+                    "prompt": "warm instrumental underscore",
+                    "seconds": 30,
+                    "bpm": 82,
+                    "keyscale": "D minor",
+                    "timesignature": "4",
+                    "seed": -1,
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["content-type"], "audio/wav")
+        self.assertEqual(response.headers["x-ace-step-seed"], "-1")
+        self.assertEqual(response.content, FAKE_WAV)
+        generate.assert_called_once()
+        self.assertEqual(
+            len(list(main.ACESTEP_OUTPUT_DIR.glob("ace_step_1_5_*.wav"))), saved_before + 1
+        )
+
+    def test_localai_rejects_unmappable_steps_and_seed(self) -> None:
+        localai_config = replace(
+            main.GATEWAY_CONFIG,
+            provider="localai",
+            localai_enabled=True,
+            model=main.LOCALAI_MODEL_ID,
+        )
+        with (
+            patch.object(main, "GATEWAY_CONFIG", localai_config),
+            patch.object(main, "generate_localai") as generate,
+        ):
+            steps_response = self.client.post(
+                "/v1/aceStep/bgm", json={"prompt": "music", "steps": 9}
+            )
+            seed_response = self.client.post(
+                "/v1/aceStep/bgm", json={"prompt": "music", "seed": 123}
+            )
+
+        self.assertEqual(steps_response.status_code, 422)
+        self.assertIn("num_inference_steps", steps_response.json()["detail"])
+        self.assertEqual(seed_response.status_code, 422)
+        self.assertIn("seed", seed_response.json()["detail"])
+        generate.assert_not_called()
+
+    def test_localai_wav_validation_streams_all_frames(self) -> None:
+        class FakeSoundFile:
+            samplerate = 48000
+            channels = 2
+            frames = 4
+            block_sizes = [2, 2]
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return None
+
+            def blocks(self, **_kwargs):
+                for block_size in self.block_sizes:
+                    yield [0] * block_size
+
+        soundfile_module = ModuleType("soundfile")
+
+        def open_soundfile(*_args, **_kwargs):
+            return FakeSoundFile()
+
+        soundfile_module.SoundFile = open_soundfile
+        with patch.dict(sys.modules, {"soundfile": soundfile_module}):
+            self.assertEqual(main.validate_localai_wav(b"fake wav"), (48000, 2))
+
+            FakeSoundFile.block_sizes = [2]
+            with self.assertRaisesRegex(main.LocalAIRequestError, "不完整"):
+                main.validate_localai_wav(b"truncated wav")
 
 
 if __name__ == "__main__":

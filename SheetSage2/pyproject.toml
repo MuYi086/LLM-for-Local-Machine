@@ -21,6 +21,7 @@ dependencies = [
     "torchaudio==2.8.0+cu128",
     "transformers==4.45.2",
     "unitale-runtime",
+    "unitale-inference-gateway",
     "uvicorn==0.49.0",
 ]
 
@@ -45,6 +46,7 @@ explicit = true
 
 [tool.uv.sources]
 unitale-runtime = { path = "../unitale_runtime", editable = true }
+unitale-inference-gateway = { path = "../inference_gateway", editable = true }
 torch = { index = "pytorch-cu128" }
 torchaudio = { index = "pytorch-cu128" }
 

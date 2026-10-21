@@ -1,0 +1,9 @@
+name: unitale.fireredtts3.instruct.q8-0
+backend: audio-cpp
+parameters:
+  model: FireRedTTS3-Instruct-GGUF/fireredtts3-instruct-q8_0.gguf
+options:
+  - family:fireredtts3
+  - task:vdes
+  - backend:cuda
+  - device:0

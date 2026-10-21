@@ -17,6 +17,8 @@ from typing import Any
 import numpy as np
 import soundfile as sf
 
+from voicedesign_runtime import split_text
+
 
 def parse_args():
     """解析 VoiceDesign 请求文件和输出 WAV 路径。"""
@@ -40,61 +42,6 @@ def normalize_text(value: Any, label: str) -> str:
     if not text:
         raise ValueError(f"{label} 不能为空。")
     return text
-
-
-def split_long_sentence(text: str, max_chars: int) -> list[str]:
-    """没有足够标点时按字符上限切开长句。"""
-    parts = re.findall(r".+?[，,、：:]|.+$", text, flags=re.S)
-    chunks: list[str] = []
-    current = ""
-    for part in parts:
-        part = part.strip()
-        if not part:
-            continue
-        if len(part) > max_chars:
-            if current:
-                chunks.append(current)
-                current = ""
-            chunks.extend(
-                part[index : index + max_chars] for index in range(0, len(part), max_chars)
-            )
-            continue
-        candidate = current + part
-        if current and len(candidate) > max_chars:
-            chunks.append(current)
-            current = part
-        else:
-            current = candidate
-    if current:
-        chunks.append(current)
-    return chunks
-
-
-def split_text(text: str, max_chars: int) -> list[str]:
-    """优先按中文/英文标点切分，保证每段适合模型上下文。"""
-    if max_chars <= 0 or len(text) <= max_chars:
-        return [text]
-    chunks: list[str] = []
-    current = ""
-    for sentence in re.findall(r".+?[。！？；;!?]|.+$", text, flags=re.S):
-        sentence = sentence.strip()
-        if not sentence:
-            continue
-        if len(sentence) > max_chars:
-            if current:
-                chunks.append(current)
-                current = ""
-            chunks.extend(split_long_sentence(sentence, max_chars))
-            continue
-        candidate = current + sentence
-        if current and len(candidate) > max_chars:
-            chunks.append(current)
-            current = sentence
-        else:
-            current = candidate
-    if current:
-        chunks.append(current)
-    return chunks
 
 
 def resolve_dtype(torch, value: str):

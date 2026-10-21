@@ -30,11 +30,14 @@ os.environ.update(
         "CUDA_RELEASE_DELAY": "0",
         "MOSS_VOICEGENERATOR_REQUEST_TIMEOUT": "5",
         "MOSS_VOICEGENERATOR_PORT": "8302",
+        "UNITALE_MOSS_VOICEGENERATOR_PROVIDER": "native",
+        "UNITALE_LOCALAI_ENABLED": "false",
     }
 )
 (TEST_ROOT / "model").mkdir(parents=True, exist_ok=True)
 (TEST_ROOT / "codec").mkdir(parents=True, exist_ok=True)
 sys.path.insert(0, str(SERVICE_DIR))
+sys.path.insert(0, str(REPOSITORY_DIR / "inference_gateway/src"))
 
 spec = importlib.util.spec_from_file_location(
     "moss_voicegenerator_service_main",
@@ -90,6 +93,101 @@ class MossVoiceGeneratorMigrationTests(unittest.TestCase):
         self.assertEqual(payload["codec_path"], str(TEST_ROOT / "codec"))
         self.assertEqual(payload["max_new_tokens"], 4096)
         self.assertEqual(payload["local_files_only"], True)
+
+    def test_localai_mapping_preserves_voice_design_and_rejects_python_only_options(self) -> None:
+        from inference_gateway import UnsupportedCapabilityError
+
+        request = main.MossDesignRequest(
+            voice_description="成年女性，清晰自然。",
+            text="你好。",
+        )
+        payload = main.manager.build_worker_payload(request)
+        mapped = main.build_localai_request(request, payload)
+
+        self.assertEqual(mapped["text"], "你好。")
+        self.assertEqual(mapped["instruction"], "成年女性，清晰自然。")
+        self.assertEqual(mapped["audio_temperature"], 1.5)
+        self.assertEqual(mapped["audio_top_p"], 0.6)
+        self.assertEqual(mapped["audio_top_k"], 50)
+        self.assertEqual(mapped["audio_repetition_penalty"], 1.1)
+        self.assertGreaterEqual(mapped["seed"], 0)
+        self.assertLess(mapped["seed"], 2**32)
+        self.assertEqual(mapped["text_chunk_size"], len("你好。") + 1)
+
+        native_fallbacks = main.MossDesignRequest(
+            voice_description="成年女性，清晰自然。",
+            text="你好。",
+            audio_temperature=0,
+            dtype="",
+            attn_implementation="",
+        )
+        fallback_mapping = main.build_localai_request(
+            native_fallbacks,
+            main.manager.build_worker_payload(native_fallbacks),
+        )
+        self.assertEqual(fallback_mapping["audio_temperature"], 1.5)
+
+        unsupported = (
+            {"text": "很长的文本" * 30, "max_chars_per_chunk": 10},
+            {"max_new_tokens": 512},
+            {"dtype": "float16"},
+            {"attn_implementation": "flash_attention_2"},
+        )
+        for overrides in unsupported:
+            with self.subTest(overrides=overrides):
+                invalid = main.MossDesignRequest(
+                    voice_description="成年女性，清晰自然。", **overrides
+                )
+                with self.assertRaises(UnsupportedCapabilityError):
+                    main.build_localai_request(
+                        invalid,
+                        main.manager.build_worker_payload(invalid),
+                    )
+
+    def test_localai_route_uses_gateway_and_keeps_timbre_registration(self) -> None:
+        from fastapi.testclient import TestClient
+
+        from inference_gateway import load_gateway_config
+
+        localai_config = load_gateway_config(
+            service_provider_env="UNITALE_MOSS_VOICEGENERATOR_PROVIDER",
+            default_model="unitale.moss-voicegenerator.bf16",
+            request_timeout=5,
+            environ={
+                "UNITALE_LOCALAI_ENABLED": "true",
+                "UNITALE_MOSS_VOICEGENERATOR_PROVIDER": "localai",
+                "UNITALE_LOCALAI_BASE_URL": "http://127.0.0.1:8400",
+                "GPU_LOCK_FILE": str(TEST_ROOT / "cache" / "localai.lock"),
+                "CUDA_RELEASE_DELAY": "0",
+            },
+        )
+        wav = b"RIFF\x04\x00\x00\x00WAVE"
+
+        def fake_execute(*, config, operation):
+            from unittest.mock import Mock
+
+            client = Mock()
+            client.design_moss_voice.return_value = (wav, 0.01)
+            result = operation(client)
+            self.assertEqual(config.model, "unitale.moss-voicegenerator.bf16")
+            return result
+
+        with (
+            patch.object(main, "GATEWAY_CONFIG", localai_config),
+            patch.object(main, "execute_localai_operation", side_effect=fake_execute),
+            patch.object(main.manager, "run_worker") as native_worker,
+            patch.object(main.reference_store, "register_timbre_file") as register_timbre,
+        ):
+            response = TestClient(main.app).post(
+                "/v1/moss/timbre",
+                json={"voice_description": "成年女性，清晰自然。", "text": "你好。"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, wav)
+        self.assertEqual(response.headers["content-type"], "audio/wav")
+        native_worker.assert_not_called()
+        register_timbre.assert_called_once()
 
     def test_design_route_returns_wav_without_loading_model(self) -> None:
         from fastapi.testclient import TestClient

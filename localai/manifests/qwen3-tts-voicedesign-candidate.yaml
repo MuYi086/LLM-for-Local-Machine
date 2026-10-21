@@ -1,0 +1,9 @@
+name: unitale.qwen3-tts.1p7b-voicedesign
+backend: audio-cpp
+parameters:
+  model: __QWEN3_VOICEDESIGN_MODEL_PATH__
+options:
+  - family:qwen3_tts
+  - task:vdes
+  - backend:cuda
+  - device:0

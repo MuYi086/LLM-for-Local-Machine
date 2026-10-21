@@ -337,7 +337,7 @@ class MertV2FullSongServiceTests(unittest.TestCase):
         self.assertIn("MERT-v2-FullSong", quality_gate)
         self.assertIn("/v1/m-a-p/MERT-v2-FullSong", readme)
         self.assertIn("MERT-v2-FullSong/` | 8317", agent_guide)
-        self.assertEqual(startup.count("setsid uv run --no-sync --project"), 30)
+        self.assertEqual(startup.count("setsid uv run --no-sync --project"), 26)
         self.assertIn('requires-python = "==3.12.13"', project)
         self.assertIn('name = "mert-v2-fullsong-service"', project)
         self.assertIn('name = "mert-v2-fullsong-service"', lock)

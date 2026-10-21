@@ -1,0 +1,10 @@
+name: unitale.ace-step15.xl-turbo.q8dit
+backend: audio-cpp
+parameters:
+  model: ACE-Step1.5-GGUF/xl-turbo-q8dit/ace-step-1.5-xl-turbo-q8dit.gguf
+options:
+  - family:ace_step
+  - task:gen
+  - backend:cuda
+  - device:0
+  - load_option:ace_step.dit_model_path=acestep-v15-xl-turbo

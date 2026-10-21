@@ -1,0 +1,9 @@
+name: unitale.fireredtts3.base.q8-0
+backend: audio-cpp
+parameters:
+  model: FireRedTTS3-Base-GGUF/fireredtts3-base-q8_0.gguf
+options:
+  - family:fireredtts3
+  - task:clon
+  - backend:cuda
+  - device:0

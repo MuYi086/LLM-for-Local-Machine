@@ -1,0 +1,10 @@
+name: unitale.seed-vc.svc.f16
+backend: audio-cpp
+parameters:
+  model: SeedVC-MLX
+options:
+  - family:seed_vc
+  - task:svc
+  - backend:cuda
+  - device:0
+  - seed_vc.weight_type:f16

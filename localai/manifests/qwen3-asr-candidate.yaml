@@ -1,0 +1,10 @@
+name: unitale.qwen3-asr.1p7b
+backend: audio-cpp
+parameters:
+  model: Qwen3-ASR-1.7B-GGUF/qwen3-asr-1.7b-q8_0.gguf
+options:
+  - family:qwen3_asr
+  - task:asr
+  - backend:cuda
+  - device:0
+  - busy_timeout_ms:120000

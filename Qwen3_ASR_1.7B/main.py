@@ -19,10 +19,25 @@ from typing import Any
 import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, Response, UploadFile
 from fastapi.responses import JSONResponse
+from inference_gateway import (
+    BackendQuarantinedError,
+    LocalAIClient,
+    LocalAIRequestError,
+    LocalAIUnavailableError,
+    UnsupportedCapabilityError,
+    load_gateway_config,
+)
+from inference_gateway.execution import execute_localai_transcription
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware
-from unitale_runtime import AudioUploadError, GpuLockTimeoutError, stage_audio_upload
+from unitale_runtime import (
+    AudioUploadError,
+    GpuLockTimeoutError,
+    GpuQuarantinedError,
+    gpu_quarantine_path,
+    stage_audio_upload,
+)
 from unitale_runtime import gpu_runtime_lock as shared_gpu_runtime_lock
 
 from qwen3_asr_runtime import cuda_status, terminate_process_group
@@ -55,6 +70,7 @@ RUNTIME_CACHE_DIR = Path(
     expand_path(os.getenv("RUNTIME_CACHE_DIR", str(STORAGE_DIR / ".cache/runtime")))
 )
 GPU_LOCK_FILE = expand_path(os.getenv("GPU_LOCK_FILE", str(RUNTIME_CACHE_DIR / "gpu-runtime.lock")))
+GPU_QUARANTINE_FILE = str(gpu_quarantine_path(GPU_LOCK_FILE))
 WORKER_TMP_DIR = expand_path(
     os.getenv("QWEN3_ASR_WORKER_TMP_DIR", str(RUNTIME_CACHE_DIR / "qwen3_asr_worker"))
 )
@@ -69,6 +85,11 @@ DEVICE = os.getenv("QWEN3_ASR_DEVICE", "cuda:0")
 DTYPE = os.getenv("QWEN3_ASR_DTYPE", "bfloat16")
 MAX_INFERENCE_BATCH_SIZE = int(os.getenv("QWEN3_ASR_MAX_INFERENCE_BATCH_SIZE", "1"))
 DEFAULT_MAX_NEW_TOKENS = int(os.getenv("QWEN3_ASR_MAX_NEW_TOKENS", "256"))
+GATEWAY_CONFIG = load_gateway_config(
+    service_provider_env="UNITALE_QWEN3_ASR_PROVIDER",
+    default_model="unitale.qwen3-asr.1p7b",
+    request_timeout=REQUEST_TIMEOUT,
+)
 
 os.environ.setdefault("HF_HOME", HF_MIRROR_DIR)
 os.environ.setdefault("HF_MODULES_CACHE", str(RUNTIME_CACHE_DIR / "hf_modules"))
@@ -309,6 +330,13 @@ class Qwen3AsrWorkerManager:
 
 
 manager = Qwen3AsrWorkerManager()
+LAST_LOCALAI_ERROR: str | None = None
+
+
+def set_last_localai_error(error: str | None) -> None:
+    """更新健康检查暴露的最近一次 LocalAI 错误。"""
+    global LAST_LOCALAI_ERROR
+    LAST_LOCALAI_ERROR = error
 
 
 def execute_transcription_payload(payload: dict[str, Any]) -> dict[str, Any]:
@@ -325,6 +353,20 @@ def execute_transcription_payload(payload: dict[str, Any]) -> dict[str, Any]:
 def health():
     """返回模型文件、运行环境与 GPU 状态，不加载权重。"""
     cuda = cuda_status()
+    gpu_quarantined = Path(GPU_QUARANTINE_FILE).is_file()
+    localai_client = LocalAIClient(GATEWAY_CONFIG) if GATEWAY_CONFIG.provider == "localai" else None
+    localai_healthy = bool(localai_client and localai_client.health())
+    localai_model_registered = bool(
+        localai_client and localai_healthy and localai_client.model_ready()
+    )
+    localai_ready = localai_model_registered and not gpu_quarantined
+    native_ready = (
+        os.path.isfile(WORKER_SCRIPT)
+        and required_model_files_ready()
+        and module_available("qwen_asr")
+        and module_available("torch")
+        and not gpu_quarantined
+    )
     return {
         "code": 200,
         "paths": {
@@ -334,6 +376,7 @@ def health():
             "worker_tmp_dir": WORKER_TMP_DIR,
             "upload_staging_dir": str(UPLOAD_STAGING_DIR),
             "gpu_lock_file": GPU_LOCK_FILE,
+            "gpu_quarantine_file": GPU_QUARANTINE_FILE,
         },
         "available": {
             "python": sys.executable,
@@ -342,13 +385,22 @@ def health():
             "qwen_asr": module_available("qwen_asr"),
             "torch": module_available("torch"),
             "transformers": module_available("transformers"),
+            "selected_provider": GATEWAY_CONFIG.provider,
+            "selected_provider_ready": localai_ready if localai_client else native_ready,
+            "localai_healthy": localai_healthy,
+            "localai_model_registered": localai_model_registered,
+            "gpu_quarantined": gpu_quarantined,
             "cuda": cuda["available"],
         },
         "cuda": cuda,
         "runtime": {
             "worker_runtime": "uv",
             "worker_python": sys.executable,
-            "model_lifecycle": "one request -> one worker -> process exit releases VRAM",
+            "model_lifecycle": (
+                "LocalAI backend shutdown confirmation before GPU lock release"
+                if localai_client
+                else "one request -> one native worker -> process exit releases VRAM"
+            ),
             "local_files_only": LOCAL_FILES_ONLY,
             "request_timeout": REQUEST_TIMEOUT,
             "device": DEVICE,
@@ -356,8 +408,10 @@ def health():
             "max_inference_batch_size": MAX_INFERENCE_BATCH_SIZE,
             "default_max_new_tokens": DEFAULT_MAX_NEW_TOKENS,
             "gpu_scheduling": "shared exclusive file lock",
+            "provider": GATEWAY_CONFIG.provider,
+            "localai_model": GATEWAY_CONFIG.model if localai_client else None,
         },
-        "last_errors": {"qwen3_asr": manager.last_error},
+        "last_errors": {"qwen3_asr": manager.last_error, "localai": LAST_LOCALAI_ERROR},
     }
 
 
@@ -388,13 +442,28 @@ async def transcribe(
         # 暂存器以 .part 结尾；恢复真实后缀，供 Transformers 音频解码器识别格式。
         audio_path = staged.path.with_suffix("")
         os.replace(staged.path, audio_path)
-        payload = manager.build_worker_payload(request, audio_path)
-        result = await run_in_threadpool(execute_transcription_payload, payload)
+        if GATEWAY_CONFIG.provider == "localai":
+            validate_localai_request(request)
+            result, elapsed_seconds = await run_in_threadpool(
+                execute_localai_transcription,
+                config=GATEWAY_CONFIG,
+                audio_path=audio_path,
+                filename=audio.filename or f"audio{staged.suffix}",
+                content_type=audio.content_type or "application/octet-stream",
+                language=request.language,
+            )
+            if request.language is None and not result.get("language"):
+                raise LocalAIRequestError("LocalAI 未返回自动识别语种，不能满足当前 ASR 响应合同。")
+            set_last_localai_error(None)
+        else:
+            payload = manager.build_worker_payload(request, audio_path)
+            result = await run_in_threadpool(execute_transcription_payload, payload)
+            elapsed_seconds = result.get("elapsed_seconds")
         return {
             "code": 200,
             "text": result["text"].strip(),
             "language": result.get("language"),
-            "elapsed_seconds": result.get("elapsed_seconds"),
+            "elapsed_seconds": elapsed_seconds,
             "audio": {
                 "sha256": staged.sha256,
                 "size_bytes": staged.size_bytes,
@@ -405,13 +474,35 @@ async def transcribe(
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except GpuLockTimeoutError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except (BackendQuarantinedError, GpuQuarantinedError) as exc:
+        set_last_localai_error(str(exc))
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except UnsupportedCapabilityError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except (LocalAIRequestError, LocalAIUnavailableError) as exc:
+        set_last_localai_error(str(exc))
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
+        if GATEWAY_CONFIG.provider == "localai":
+            set_last_localai_error(str(exc))
         LOGGER.exception("Qwen3-ASR request failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     finally:
         staged.path.unlink(missing_ok=True)
         if audio_path is not None:
             audio_path.unlink(missing_ok=True)
+
+
+def validate_localai_request(request: Qwen3AsrRequest) -> None:
+    """拒绝当前 OpenAI 音频接口无法完整保留的 Qwen3-ASR 参数。"""
+    if request.context:
+        raise UnsupportedCapabilityError(
+            "当前 audio-cpp transcription API 没有已验证的 Qwen3-ASR context 映射。"
+        )
+    if request.max_new_tokens != DEFAULT_MAX_NEW_TOKENS:
+        raise UnsupportedCapabilityError(
+            "当前 audio-cpp transcription API 没有已验证的 max_new_tokens 映射。"
+        )
 
 
 if __name__ == "__main__":

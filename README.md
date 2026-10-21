@@ -4,7 +4,7 @@
 生成、音频理解与转写、音乐转谱、三路音源分离、音色转换、音频驱动人像视频，以及 CPU 音频母带和
 Steam Audio 对象级空间导出。MiMo 音色设计调用云端，其余模型使用本地权重。
 
-仓库包含 **27 个独立服务 uv 项目，统一启动 30 个 HTTP 进程**：FireRedTTS3 和 MOSS-Audio
+仓库包含 **23 个独立服务 uv 项目，统一启动 26 个 HTTP 进程**：FireRedTTS3 和 MOSS-Audio
 各启动两个模式进程，另有一个轻量控制面。HTTP 进程不加载重型模型，模型推理由对应目录
 中的一次性 worker 完成；共享运行时和无模型 QA 环境分别位于 `unitale_runtime/`、`qa/`。
 接口、路径和默认值以当前 `main.py`、`worker.py`、`pyproject.toml` 与 `start.sh` 为准。
@@ -15,7 +15,11 @@ Steam Audio 对象级空间导出。MiMo 音色设计调用云端，其余模型
 [训练实验](#文本润色训练实验) · [测试与开发](#测试与开发)。
 
 后续升级设计见 [LocalAI 与 audio.cpp 分阶段升级方案](docs/localai-audiocpp-upgrade.md)：
-包含现有服务迁移矩阵、P0–P8 执行步骤、验收和回滚要求；该方案尚未接入当前运行代码。
+包含现有服务迁移矩阵、P0–P8 执行步骤、验收和回滚要求。LocalAI 已有 P1/P2 宿主机管理与
+Qwen3-ASR 试点、P3 语音 provider、P4 音乐候选 provider、P5 Seed-VC AudioTransform 候选，以及
+十个服务项目的 P7 一次性 worker bridge（含 YuE2-3B、MOSS-SoundEffect、Step-Audio-EditX、MOSS-Audio Thinking/Instruct 与 TIGER-DnR）。
+固定 CUDA audio-cpp backend 已在本机编译、打包并通过无模型安装/启停检查。provider 默认仍是
+native；本次升级没有主动下载权重，LocalAI 真实模型请求、输出质量和加载后 GPU 生命周期未验收。当前 HF 镜像中的原生模型目录通过只读就绪检查，缺失的直接 GGUF 候选见[手动模型准备状态](reports/localai/manual-model-readiness.md)。TIGER-DnR 的三 Stem ZIP 通过受控共享目录的随机文件引用传输，仍保留原 ZIP 合同。
 
 ## 服务总览
 
@@ -30,9 +34,9 @@ Steam Audio 对象级空间导出。MiMo 音色设计调用云端，其余模型
 | [MOSS-VoiceGenerator `moss_voiceGenerator/`](moss_voiceGenerator/) | 8302 | `POST /v1/moss/timbre` | 根据音色/风格描述合成中英文语音，无需参考音频（[官方](https://huggingface.co/OpenMOSS-Team/MOSS-VoiceGenerator)） | 语音波形 |
 | [MiMo-V2.5-TTS-VoiceDesign `mimo_tts/`](mimo_tts/) | 8303 | `POST /v1/mimo/timbre` | 云端根据文本描述设计音色，并朗读指定文本（[官方](https://mimo.mi.com/docs/en-US/quick-start/usage-guide/audio/speech-synthesis-v2.5)） | 语音音频 |
 | [FireRedTTS3 `firered_tts3/`](firered_tts3/) | 8304 Instruct / 8325 Base | `POST /v1/FireRedTTS3/timbre`；`POST /v1/FireRedTTS3/clone` | Base：多语言、多方言零样本克隆；Instruct：克隆、音色设计、内容编辑与模板式声学编辑（[官方](https://huggingface.co/FireRedTeam/FireRedTTS3)） | 语音波形；部分 Instruct API 另返回规划/编辑文本 |
-| [Stable Audio 3 Medium `stable_audio_3_medium/`](stable_audio_3_medium/) | 8311 | `POST /v1/stableAudio/soundEffect` | 文本生成音乐和音效；音频局部补全、编辑与续写（[官方](https://huggingface.co/stabilityai/stable-audio-3-medium)） | 音频波形 |
+| [Stable Audio 3 Medium `stable_audio_3_medium/`](stable_audio_3_medium/) | 8311 | `POST /v1/stableAudio/soundEffect` | 文本生成音乐和音效（[官方](https://huggingface.co/stabilityai/stable-audio-3-medium)） | 音频波形 |
 | [MOSS-SoundEffect v2.0 `moss_soundEffect/`](moss_soundEffect/) | 8312 | `POST /v1/moss/soundEffect` | 中英文提示生成环境、动物、动作等非语音音效，时长可控，单次最长 30 秒（[官方](https://huggingface.co/OpenMOSS-Team/MOSS-SoundEffect-v2.0)） | 音效波形 |
-| [ACE-Step 1.5 XL Turbo `ace_step_1_5/`](ace_step_1_5/) | 8313 | `POST /v1/aceStep/bgm` | 按风格描述、可选歌词与音乐元数据生成音乐，包含纯音乐与带歌声歌曲（[官方](https://huggingface.co/ACE-Step/acestep-v15-xl-turbo-diffusers)） | 音乐波形 |
+| [ACE-Step 1.5 XL Turbo `ace_step_1_5/`](ace_step_1_5/) | 8313 | `POST /v1/aceStep/bgm` | 按风格描述和可选音乐元数据生成 BGM；当前接口不接收歌词（[官方](https://huggingface.co/ACE-Step/acestep-v15-xl-turbo-diffusers)） | 音乐波形 |
 | [YuE2-3B `YuE2-3B/`](YuE2-3B/) | 8314 | `POST /v1/m-a-p/YuE2` | 根据风格、歌词和可选 ABC 乐谱生成带歌声与伴奏的歌曲（[官方](https://huggingface.co/m-a-p/YuE2-3B)） | 48 kHz 立体声音乐波形 |
 | [SheetSage2 `SheetSage2/`](SheetSage2/) | 8315 | `POST /v1/m-a-p/SheetSage2` | 将音乐转为可编辑乐谱、MIDI、节拍/和弦/调性/结构与时间标注（[官方](https://huggingface.co/m-a-p/SheetSage2)） | ABC、MIDI 与 JSON/LAB 标注 ZIP |
 | [YuE2-Vae `YuE2-Vae/`](YuE2-Vae/) | 8316 | `POST /v1/m-a-p/YuE2-Vae` | 将 48 kHz 音频编码为 acoustic latent，或将 latent 解码为立体声音乐（[官方](https://huggingface.co/m-a-p/YuE2-Vae)） | `[T,64]` NPY latent 或 48 kHz WAV |
@@ -47,16 +51,11 @@ Steam Audio 对象级空间导出。MiMo 音色设计调用云端，其余模型
 | [Confucius4-TTS `Confucius4_TTS/`](Confucius4_TTS/) | 8361 | `POST /v1/confucius4TTS/generate` | 无需参考转写的零样本克隆与跨语言 TTS，支持 14 语种及参考音频的情感迁移（[官方](https://huggingface.co/netease-youdao/Confucius4-TTS)） | 语音波形 |
 | [Qwen3-ASR-1.7B `Qwen3_ASR_1.7B/`](Qwen3_ASR_1.7B/) | 8371 | `POST /v1/qwen3/asr` | 语种识别与语音转写，支持 30 种语言和 22 种中文方言（[官方](https://huggingface.co/Qwen/Qwen3-ASR-1.7B)） | 转写文本与语种 |
 | [Seed-VC `seed-vc/`](seed-vc/) | 8381 | `POST /v1/seedVc/voiceConversion` | 零样本语音音色转换；对应 F0 条件权重支持歌声音色转换（[官方](https://github.com/Plachtaa/seed-vc)） | 转换后的音频波形 |
-| [Index-Echo-S2ST-9B `Index-Echo-S2ST-9B-GGUF/`](Index-Echo-S2ST-9B-GGUF/) | 8382 | `POST /v1/indexTranslate/echoS2ST` | 原生语音到语音翻译，使用源说话人的音色条件；支持中→英/西/日、英→中/西/日六个方向（[官方完整包](https://huggingface.co/IndexTeam/Index-Echo-S2ST-9B)） | 目标语种语音波形，可保存 WAV |
-| [Index-Homura-9B `Index-Homura-9B-GGUF/`](Index-Homura-9B-GGUF/) | 8383 | `POST /v1/indexTranslate/homura` | 文本翻译，同时接受目标音节数与可选术语表；音节数为近似控制目标（[官方](https://huggingface.co/IndexTeam/Index-Homura-9B)） | 译文文本 |
-| [Index-NativeLong / Nailong 9B `Index-Nailong-9B-GGUF/`](Index-Nailong-9B-GGUF/) | 8384 | `POST /v1/indexTranslate/naiLong` | 整篇长文档一次生成译文，利用全文上下文保持内容、实体与术语连贯；官方文档模板支持中英、中日双向（[官方](https://huggingface.co/IndexTeam/Index-Nailong-9B)） | 长文档译文文本 |
-| [Index-Translate-9B `Index-Translate-9B-GGUF/`](Index-Translate-9B-GGUF/) | 8385 | `POST /v1/indexTranslate/translate` | 150 语种翻译，支持术语、格式、风格等硬软约束；配套视觉组件支持图片到译文的翻译（[官方](https://huggingface.co/IndexTeam/Index-Translate-9B)） | 译文文本 |
 | [SoulX-FlashHead-1_3B `SoulX-FlashHead-1_3B/`](SoulX-FlashHead-1_3B/) | 8391 | `POST /v1/soulX/flashHead` | 人像图片与音频驱动的说话人像视频生成，发布 Lite / Pro 两个变体（[官方](https://huggingface.co/Soul-AILab/SoulX-FlashHead-1_3B)） | 视频帧 / 视频 |
 | [Ditto `ditto/`](ditto/) | 8392 | `POST /v1/ditto/talkingHead` | 根据人像图片和驱动音频，通过运动空间扩散生成说话人像视频（[官方](https://github.com/antgroup/ditto-talkinghead)） | 视频帧 / 视频 |
 
 表格按服务项目归并；FireRedTTS3 与 MOSS-Audio 各由同一个 uv 项目启动两个模式进程。
-四个 Index 端口直接提供模型原生任务：Echo 使用完整原生语音包，另外三个使用各自 GGUF。
-Demo 调用对应端口，Echo 保存 WAV，Homura、Nailong、Index-Translate 保存 TXT；
+Demo 调用对应端口并保存服务原始输出；
 都支持 `--check-only`，仅检查输入和原生服务健康状态。条件缺失时明确跳过，不写生成产物。
 实际环境、未满足条件和验证范围见 [环境检查报告](环境检查报告.md)。
 
@@ -66,13 +65,11 @@ Demo 调用对应端口，Echo 保存 WAV，Homura、Nailong、Index-Translate �
 
 ## HTTP 响应与存储
 
-以下记录当前 HTTP 实现的响应与存储。Index 接口直接返回各模型原生输出，具体请求见后文。
+以下记录当前 HTTP 实现的响应与存储。
 
 | HTTP 服务 | 成功响应 | 服务端保存行为 |
 | --- | --- | --- |
 | 克隆、音色设计、编辑、音效、BGM、音色转换 | `audio/wav` | 按用途保存 WAV |
-| Index-Echo 原生接口（8382） | `audio/wav`；`return_info=true` 时为 WAV/info ZIP | 输入与 worker 输出只暂存，请求结束后清理；Demo 在本地保存响应 |
-| Index-Homura、Nailong、Index-Translate（8383–8385） | UTF-8 `text/plain` | 原生译文直接响应，Demo 在本地保存 TXT；worker JSON 请求后清理 |
 | SheetSage2（8315） | `application/zip`，含可用时的 ABC、MIDI、事件与窗口输出 | 原子保存到 `storage/sheetsage2/`；上传音频和 worker 临时文件请求后清理 |
 | YuE2-Vae（8316） | `audio/wav`（decode）或 `application/octet-stream`（encode NPY） | 原子保存到 `storage/yue2_vae/`；上传和 worker 临时文件请求后清理 |
 | MERT-v2-FullSong（8317） | JSON mean embedding 或 `application/octet-stream` NPZ 逐帧特征 | 原子保存到 `storage/mert_v2_fullsong/`；请求音频和 worker 临时文件请求后清理 |
@@ -109,10 +106,6 @@ VoxCPM2 可控克隆使用 `control_instruction`。
 main/                         8300 控制面，不包含模型推理
 steam_audio_renderer/         独立 C++17 Steam Audio CPU renderer
 qwen3_tts/                    Qwen3-TTS Base 的 HTTP 服务和 worker
-Index-Echo-S2ST-9B-GGUF/      Index-Echo 完整原生语音 API 和一次性 Python worker（历史目录名）
-Index-Homura-9B-GGUF/         Homura GGUF 音节约束文本翻译 API 和一次性 llama.cpp worker
-Index-Nailong-9B-GGUF/        Nailong GGUF 原生长文档翻译 API 和一次性 llama.cpp worker
-Index-Translate-9B-GGUF/      Index-Translate GGUF 原生文本/图片翻译 API 和一次性 llama.cpp worker
 voxcpm2/                      VoxCPM2 的 HTTP 服务和克隆 worker
 LongCat_AudioDiT_3.5B_bf16/  LongCat-AudioDiT 服务和 worker
 dots_tts_soar/                dots.tts-soar 服务和 worker
@@ -194,8 +187,7 @@ cd LLM-for-Local-Machine
 
 统一启动和 GPU 锁使用 Linux 的 `setsid`、进程组信号与 `fcntl.flock`，部署目标为 Linux。
 运行要求：Python `3.12.13`、`uv`、FFmpeg/ffprobe、可用的 CUDA/NVIDIA 驱动（本地模型服务），
-以及下方列出的模型权重和外部源码目录。Index-Homura、Index-Nailong 与 Index-Translate 还需要支持 Qwen3.5 的 llama.cpp `llama-server`；
-Index-Echo 需要完整原生语音包、官方 CUDA 12.9 依赖和单卡至少 24 GB 显存；
+以及下方列出的模型权重和外部源码目录。
 Step-Audio-EditX 需要系统 `sox`，Ditto 需要
 GCC 编译上游 Cython 扩展；正式 Steam Audio renderer 需要 CMake 3.17+、C++17 编译器和本地 SDK。
 不同模型锁定不同 Torch/CUDA 组合，必须使用各自环境。权重与第三方源码不放进本仓库。
@@ -207,7 +199,7 @@ test -d /home/muyi086/tts-depency/MOSS-TTS &&
 for project in qwen3_tts mimo_tts voxcpm2 LongCat_AudioDiT_3.5B_bf16 \
   dots_tts_soar moss_soundEffect stable_audio_3_medium ace_step_1_5 YuE2-3B SheetSage2 YuE2-Vae MERT-v2-FullSong \
   qwen3_voiceDesign moss_voiceGenerator moss_audio_4b_thinking Confucius4_TTS \
-  Qwen3_ASR_1.7B seed-vc Index-Echo-S2ST-9B-GGUF Index-Homura-9B-GGUF Index-Nailong-9B-GGUF Index-Translate-9B-GGUF SoulX-FlashHead-1_3B ditto Step_Audio_EditX \
+  Qwen3_ASR_1.7B seed-vc SoulX-FlashHead-1_3B ditto Step_Audio_EditX \
   firered_tts3 TIGER-DnR; do
   uv sync --project "$project" --locked
 done
@@ -254,7 +246,7 @@ bash start.sh
 ```
 
 `start.sh` 会启动 8300、8301、8302、8303、8304、8311、8312、8313、8314、8315、8316、8317、8321、8322、8323、
-8324、8325、8331、8341、8342、8351、8361、8371、8381、8382、8383、8384、8385、8391 和 8392 共 30 个进程；8300 使用 `qwen3_tts` uv 项目中的轻量 HTTP 依赖，其余服务使用
+8324、8325、8331、8341、8342、8351、8361、8371、8381、8391 和 8392 共 26 个进程；8300 使用 `qwen3_tts` uv 项目中的轻量 HTTP 依赖，其余服务使用
 各自的 uv 项目。启动命令统一使用 `uv run --no-sync`，不会在运行阶段联网解析依赖；
 本地 GPU 服务通过 `GPU_LOCK_FILE` 串行访问 GPU。默认最多排队 900 秒，超过时返回
 `503`；用正数 `GPU_LOCK_WAIT_TIMEOUT` 调整。共享锁实现仍兼容非正值无限等待，
@@ -265,12 +257,178 @@ bash start.sh
 更新代码后重新启动，应先在旧 `start.sh` 终端按 `Ctrl+C`，等待旧进程退出，再执行启动命令。
 可用 `ss -lntp` 查看占用端口的进程。
 
+#### LocalAI 裸机试接入
+
+LocalAI 试接入只使用宿主机 Linux 二进制和宿主机子进程，不部署 Docker 容器。当前固定
+LocalAI `v4.11.0` 源码 commit 与其内嵌 audio.cpp commit 见
+[`localai/manifests/versions.json`](localai/manifests/versions.json)。在仓库外准备兼容的
+LocalAI Linux amd64 二进制，以及固定版本的 CUDA 12 `audio-cpp` backend 包；将二进制路径设置到
+`UNITALE_LOCALAI_BINARY`，backend 放在 `UNITALE_LOCALAI_BACKENDS_DIR/audio-cpp/run.sh`。
+后端构建应使用 LocalAI v4.11.0 仓库内的 `backend/cpp/audio-cpp/Makefile` 和固定
+`AUDIO_CPP_VERSION`，先执行 `grpc-server`、再执行 `package` 目标；具体编译产物与部署路径须按该
+固定版本的 `package.sh` 核验。不要使用滚动版本的 Gallery 包或将滚动 backend 包作为运行时。
+
+管理器只校验本机二进制报告 `v4.11.0`、backend 启动入口及整棵 backend 文件树 hash，不下载或编译第三方源码：
+
+```bash
+export UNITALE_LOCALAI_ENABLED=true
+export UNITALE_LOCALAI_BINARY="$HOME/.local/opt/localai/bin/local-ai"
+export UNITALE_LOCALAI_BACKENDS_DIR="${STORAGE_DIR:-storage}/.cache/localai/backends"
+python3 scripts/localai/manager.py verify-install
+export UNITALE_LOCALAI_MANAGED=true
+export UNITALE_QWEN3_ASR_PROVIDER=localai
+# Qwen3-TTS Base 克隆可单独启用；启用前需手动准备模型目录并注册候选 YAML。
+# export UNITALE_QWEN3_TTS_PROVIDER=localai
+# Qwen3 VoiceDesign 使用独立 task:vdes 模型候选。
+# export UNITALE_QWEN3_VOICEDESIGN_PROVIDER=localai
+# dots.tts-soar 使用 audio.cpp DotTTS SOAR Q8 候选；仅映射单文本片段。
+# export UNITALE_DOTS_TTS_SOAR_PROVIDER=localai
+# VoxCPM2 Q8 候选仅支持无标签单段克隆；启用前需手动准备并注册候选 YAML。
+# export UNITALE_VOXCPM2_PROVIDER=localai
+# Confucius4-TTS original GGUF 候选；启用前需手动准备并注册候选 YAML。
+# export UNITALE_CONFUCIUS4_TTS_PROVIDER=localai
+# MOSS VoiceGenerator 自包含 BF16 + F16 codec GGUF 候选。
+# export UNITALE_MOSS_VOICEGENERATOR_PROVIDER=localai
+# FireRedTTS3 Base 克隆与 Instruct VoiceDesign 可分别切换。
+# export UNITALE_FIRERED_TTS3_CLONE_PROVIDER=localai
+# export UNITALE_FIRERED_TTS3_TIMBRE_PROVIDER=localai
+# Seed-VC 使用独立 vc/svc LocalAI 模型配置；注册前需手动准备模型目录。
+# export UNITALE_SEED_VC_PROVIDER=localai
+export UNITALE_LOCALAI_BASE_URL=http://127.0.0.1:8400
+bash start.sh
+```
+
+本机数据目录默认为 `${STORAGE_DIR}/.cache/localai`；模型配置/权重目录默认为
+`${UNITALE_LOCALAI_DATA_DIR}/models`。`start.sh` 启动前检查端口，随后以宿主机进程组启动 LocalAI、
+等待 `/readyz`，再验证所选 ASR/TTS/VoiceDesign/克隆候选权重、配置和模型注册。运行进程只绑定 loopback、最多加载一个
+backend、关闭自动 Gallery 加载及 WebUI。管理器将 boot ID、PID、进程启动 tick 和独立运行标识写入状态文件；
+停止时发出 TERM，超时后升级为 KILL，并在确认进程组退出且端口关闭后才删除状态。由 `start.sh`
+启动时还会启动 watcher，在父 shell 异常退出后回收所属进程组。关闭 Unitale 启动组时，先停止业务
+进程，再停止受管 LocalAI 进程组。
+
+Qwen3-ASR Q8 权重按 `versions.json` 中固定 revision/hash 单独准备到 models 目录，然后显式注册候选 YAML：
+
+```bash
+LOCALAI_MODELS_DIR="${UNITALE_LOCALAI_MODELS_DIR:-${STORAGE_DIR:-storage}/.cache/localai/models}"
+hf download audio-cpp/audio.cpp-gguf \
+  Qwen3-ASR-1.7B-GGUF/qwen3-asr-1.7b-q8_0.gguf \
+  --revision 09fe073ba154561f4474162e8bd4ab233a848eca \
+  --local-dir "$LOCALAI_MODELS_DIR"
+UNITALE_LOCALAI_MODELS_DIR="$LOCALAI_MODELS_DIR" \
+  python3 scripts/localai/manager.py register-qwen3-asr-candidate
+```
+
+ASR 注册命令按版本清单校验文件 SHA-256 和大小。Qwen3-TTS Base 与 VoiceDesign 注册命令检查各自官方模型目录所需文件，
+并把当前解析后的模型路径写入独立候选 YAML。VoiceDesign 使用 `QWEN_VOICEDESIGN_MODEL_DIR` 和
+`python3 scripts/localai/manager.py register-qwen3-voicedesign-candidate`，固定 YAML 使用 `family:qwen3_tts`、
+`task:vdes`，不与 Base 克隆的 `task:tts` 混用。这些命令只准备候选，不代表模型可运行或质量达标。LocalAI
+固定版本 LocalAI 二进制和 audio.cpp CUDA gRPC backend 已在本机编译、打包、安装并通过无模型启停检查；
+P7 worker bridge 已接入十个服务项目（十一个固定 model ID）。本次没有主动下载模型权重；原生实现仍是默认，无模型测试不能代替真实端到端验收。
+
+dots.tts-soar 候选固定为 audio.cpp `dots_tts` / `tts` 和独立 SOAR Q8 GGUF；请在模型升级工作完成后，
+按 `versions.json` 固定 revision 手动放入 `UNITALE_LOCALAI_MODELS_DIR/DotTTS-SOAR-GGUF/`，再运行
+`python3 scripts/localai/manager.py register-dots-tts-soar-candidate`。注册时生成本地 size/SHA-256 记录，
+之后启动预检会检查文件未变。该 hash 记录用于本机变更检测，不能替代上游 LFS hash 核验。当前 LocalAI 试点只接受
+一个原生文本片段；长文本分段、段间停顿、请求级 precision、文本规范化和 profiling 仍走 native，强制选 LocalAI 时
+返回明确的 422。模型配置和权重都由用户手动准备，管理命令不会下载模型。
+
+VoxCPM2 Q8 候选固定为 `family:voxcpm2`、`task:tts` 和 `VoxCPM2-GGUF/voxcpm2-q8_0.gguf`。
+按 `versions.json` 的固定 Hugging Face revision 手动准备文件，再运行
+`python3 scripts/localai/manager.py register-voxcpm2-candidate`。目前只映射参考音频、可选参考转写、
+控制指令文本格式、guidance scale 和 inference steps。`nonverbal_tags`、native 音频后处理/重试、固定 seed
+和会触发 native 长文本分片的请求明确返回 422。当前 native 默认 `retry_badcase=true`，选择 LocalAI 时须在请求中
+显式关闭该重试；没有请求级 seed 的固定文档证据，因此需保持随机种子默认值。Q8 文件在固定快照可见，
+但其 pinned revision LFS SHA-256 未取得；注册生成的本地 hash 只记录本机文件变化，模型兼容性仍为 E0。
+
+Confucius4-TTS 候选固定为 `family:confucius4_tts`、`task:clon` 和
+`Confucius4-TTS-GGUF/confucius4-tts-orig.gguf`。等软件升级完成后，按 `versions.json` 的固定 Hugging Face
+revision 手动放入 `UNITALE_LOCALAI_MODELS_DIR/Confucius4-TTS-GGUF/`，再运行
+`python3 scripts/localai/manager.py register-confucius4-tts-candidate`。候选映射参考音频、14 个文档语种及
+采样/切段/淡入淡出参数；Confucius4 原生默认语言仍为 `zh`，上传时保存的参考文本 sidecar 不参与推理。
+`raw`、`verbose`、感叹音时长控制及非 CUDA 0 设备在 LocalAI provider 下返回 422。候选权重没有固定 LFS hash，
+注册生成的本地 hash 只用于变更检测，当前仍是 E0。管理命令不会下载模型。
+
+MOSS VoiceGenerator 候选固定为 `family:moss_voicegen`、`task:vdes` 和自包含
+`MOSS-VoiceGenerator-GGUF/moss_voicegen_bf16_codec_f16_decode.gguf`。软件升级完成后，按固定 HF revision
+手动放入 `UNITALE_LOCALAI_MODELS_DIR/MOSS-VoiceGenerator-GGUF/`，再运行
+`python3 scripts/localai/manager.py register-moss-voicegenerator-candidate`。模型包包含 MOSS Audio Tokenizer v1
+解码组件，不需要另行准备 tokenizer 权重。voice description 映射到 `instructions`，采样参数映射到 `params`；
+原生 Python 长文本分段/停顿、非默认 `max_new_tokens`、`dtype` 或 `attn_implementation` 在 LocalAI 下返回 422。
+固定文件页显示约 6.02 GB，但没有固定文件 SHA-256；候选仍为 E0，管理命令不会下载模型。
+
+FireRedTTS3 两个 Unitale 模式使用独立 Q8 候选：Base 克隆固定为 `family:fireredtts3`、`task:clon`，Instruct
+音色设计固定为同 family 的 `task:vdes`。权重分别为
+`FireRedTTS3-Base-GGUF/fireredtts3-base-q8_0.gguf`（固定页约 4.18 GB）和
+`FireRedTTS3-Instruct-GGUF/fireredtts3-instruct-q8_0.gguf`（约 4.15 GB）；固定 revision 为
+`83c5d96c03023ff5a7712570d057ce26c8769f98`。用户手动准备后分别运行
+`python3 scripts/localai/manager.py register-fireredtts3-base-candidate` 和
+`python3 scripts/localai/manager.py register-fireredtts3-instruct-candidate`。Base 保留参考音频、准确转写、语言、seed、
+flow steps、guidance 与 stop threshold；Instruct 保留 voice design template、instruction 和对应生成参数。Native 的
+semantic/acoustic edit 路由没有在 Unitale API 暴露，本次不计入迁移。`fasttext`、WeText/DO_TN 环境覆盖和 PyTorch
+attention 覆盖在 LocalAI 下返回 422；固定文件页未提供可核验的 LFS SHA-256，当前仍为 E0，命令不会下载模型。
+
+#### LocalAI 一次性 worker bridge（P7）
+
+LocalAI v4.11.0 通过 `/v1/completions` 接收版本化的 `unitale.worker` v1 envelope，再转发到
+`unitale-worker` gRPC backend。backend 只允许 `localai/manifests/worker-bridge.json` 中登记的模型 ID、
+项目目录和 `worker.py` 入口；每个请求使用对应 uv 项目启动一次性 worker，返回 JSON 或白名单文件类型。
+LocalAI 与 gRPC bridge 默认只监听 `127.0.0.1`。受管启动会将 LocalAI 与 bridge 放进同一托管宿主机
+进程组，停止时核对进程组、端口并回收带请求标记的遗留 worker。
+
+当前接入的文件输出合同为：SheetSage2 ZIP；MERT embedding JSON / frame features NPZ；YuE2-Vae
+encode NPY / decode WAV；SoulX-FlashHead 与 Ditto 带声音 MP4。以下命令只登记和核验不含权重路径的
+bridge YAML，不下载模型或权重：
+
+另外，YuE2-3B、MOSS-SoundEffect v2 和 Step-Audio-EditX 经 bridge 返回 WAV；MOSS-Audio Thinking/Instruct
+使用各自固定 model ID 返回 JSON 文本；TIGER-DnR 使用随机文件引用安全取回三路 Stem ZIP。
+
+```bash
+python3 scripts/localai/manager.py register-worker-bridge-candidates
+python3 scripts/localai/manager.py verify-worker-bridge-candidates
+```
+
+在 `start.sh` 中受管运行时启用 bridge，并显式选择要切换的服务；各服务默认仍为 `native`：
+
+```bash
+export UNITALE_LOCALAI_ENABLED=true
+export UNITALE_LOCALAI_MANAGED=true
+export UNITALE_LOCALAI_WORKER_BRIDGE_ENABLED=true
+export UNITALE_SHEETSAGE2_PROVIDER=localai
+export UNITALE_MERT_V2_FULLSONG_PROVIDER=localai
+export UNITALE_YUE2_VAE_PROVIDER=localai
+export UNITALE_SOULX_FLASHHEAD_PROVIDER=localai
+export UNITALE_DITTO_PROVIDER=localai
+export UNITALE_YUE2_3B_PROVIDER=localai
+export UNITALE_MOSS_SOUNDEFFECT_PROVIDER=localai
+export UNITALE_STEP_AUDIO_EDITX_PROVIDER=localai
+export UNITALE_MOSS_AUDIO_4B_THINKING_PROVIDER=localai
+export UNITALE_MOSS_AUDIO_4B_INSTRUCT_PROVIDER=localai
+export UNITALE_TIGER_DNR_PROVIDER=localai
+```
+
+对应模型 ID 默认值见 `start.sh` 和 `localai/manifests/worker-bridge.json`。若 LocalAI 由其他进程托管，
+需单独以 `uv run --project unitale_localai_bridge --locked python -m unitale_localai_bridge.server`
+启动 bridge，并在 LocalAI 中配置 `LOCALAI_EXTERNAL_GRPC_BACKENDS=unitale-worker:127.0.0.1:50052`。
+
+这些接入已有 mock 路由与协议测试，状态为 `implemented_unverified`；尚未使用真实权重执行推理，
+因此不能据此判断音频/视频质量、模型资源峰值或 E2/E3。`UNITALE_LOCALAI_API_KEY` 可从环境提供内部鉴权。
+LocalAI 地址必须是本机 HTTP 回环地址。当前 ASR
+LocalAI 路径保留自动语言响应，拒绝非空 `context` 和非默认 `max_new_tokens`；默认 token 预算映射与自动
+语种响应仍需固定版本上的真实请求验证。健康响应的 `selected_provider_ready` 会同时检查 LocalAI 健康状态
+和模型注册。
+
+LocalAI 请求持有共享 `GPU_LOCK_FILE`，完成后请求 `/backend/shutdown`。backend 停止无法确认时，网关在锁文件旁
+留下 `.quarantine` 标记，所有 GPU 服务都会拒绝新的推理准入。修复或停止后端后，可用
+`UNITALE_LOCALAI_ENABLED=true` 运行 `scripts/localai/recover_quarantine.py`；该脚本持有 GPU 锁，先要求 LocalAI
+确认停止记录中的模型。若 API 不可用且 `UNITALE_LOCALAI_MANAGED=true`，脚本停止受管宿主机进程组，并确认进程组退出、
+状态文件消失且 loopback 端口关闭，再清除隔离标记。不要在模型仍运行时手动删除隔离标记。
+
 控制面诊断与 HTTP 健康检查：
 
 ```bash
 curl -fsS http://127.0.0.1:8300/v1/control
 for port in 8300 8301 8302 8303 8304 8311 8312 8313 8321 8322 8323 8324 \
-  8325 8331 8341 8342 8351 8361 8371 8381 8382 8383 8384 8385 8391 8392; do
+  8325 8331 8341 8342 8351 8361 8371 8381 8391 8392; do
   curl -fsS "http://127.0.0.1:${port}/v1/health" >/dev/null && echo "${port}: ok"
 done
 ```
@@ -346,10 +504,6 @@ Python 3.12 环境采用 ONNX Runtime CUDA 后端；配置映射和三维采样�
 | Confucius4-TTS | `$HF_MIRROR_DIR/netease-youdao/Confucius4-TTS` | `CONFUCIUS4_TTS_MODEL_DIR`、`CONFUCIUS4_TTS_CODE_PATH`、`CONFUCIUS4_TTS_W2V_BERT_MODEL_DIR`、`CONFUCIUS4_TTS_VOCODER_MODEL_DIR`、`CONFUCIUS4_TTS_STYLE_ENCODER_CHECKPOINT` |
 | Qwen3-ASR-1.7B | `$HF_MIRROR_DIR/Qwen/Qwen3-ASR-1.7B` | `QWEN3_ASR_MODEL_DIR` |
 | Seed-VC | `$HF_MIRROR_DIR/Plachta/Seed-VC` | `SEED_VC_MODEL_DIR`、`SEED_VC_CODE_PATH`、`SEED_VC_WHISPER_MODEL_DIR`、`SEED_VC_VOCODER_MODEL_DIR`、`SEED_VC_STYLE_ENCODER_CHECKPOINT`；F0 模式另需 `SEED_VC_F0_VOCODER_MODEL_DIR`、`SEED_VC_RMVPE_CHECKPOINT` |
-| Index-Echo S2ST | `$HF_MIRROR_DIR/IndexTeam/Index-Echo-S2ST-9B/` 完整原生包 | `INDEX_ECHO_S2ST_PROJECT_DIR`、`INDEX_ECHO_S2ST_MODEL_DIR`、`INDEX_ECHO_S2ST_DEVICE`、`INDEX_ECHO_S2ST_REQUEST_TIMEOUT` |
-| Index-Homura | `$HF_MIRROR_DIR/IndexTeam/Index-Homura-9B-GGUF/Index-Homura-9B.Q8_0.gguf` | `INDEX_HOMURA_PROJECT_DIR`、`INDEX_HOMURA_MODEL_DIR`、`INDEX_HOMURA_MODEL_PATH`、`INDEX_HOMURA_LLAMA_SERVER_BIN`、`INDEX_HOMURA_N_GPU_LAYERS`、`INDEX_HOMURA_CONTEXT_SIZE`、`INDEX_HOMURA_TEMPERATURE` |
-| Index-Nailong | `$HF_MIRROR_DIR/IndexTeam/Index-Nailong-9B-GGUF/Index-Nailong-9B.Q8_0.gguf` | `INDEX_NAILONG_PROJECT_DIR`、`INDEX_NAILONG_MODEL_DIR`、`INDEX_NAILONG_MODEL_PATH`、`INDEX_NAILONG_LLAMA_SERVER_BIN`、`INDEX_NAILONG_N_GPU_LAYERS`、`INDEX_NAILONG_CONTEXT_SIZE` |
-| Index-Translate | `$HF_MIRROR_DIR/IndexTeam/Index-Translate-9B-GGUF/Index-Translate-9B.Q8_0.gguf` | `INDEX_TRANSLATE_PROJECT_DIR`、`INDEX_TRANSLATE_MODEL_DIR`、`INDEX_TRANSLATE_MODEL_PATH`、`INDEX_TRANSLATE_LLAMA_SERVER_BIN`、`INDEX_TRANSLATE_N_GPU_LAYERS`、`INDEX_TRANSLATE_CONTEXT_SIZE`、`INDEX_TRANSLATE_MAX_NEW_TOKENS`、`INDEX_TRANSLATE_TEMPERATURE`、`INDEX_TRANSLATE_MMPROJ_PATH` |
 | SoulX-FlashHead | `$HF_MIRROR_DIR/Soul-AILab/SoulX-FlashHead-1_3B` | `SOULX_FLASHHEAD_MODEL_DIR`、`SOULX_FLASHHEAD_CODE_PATH`、`SOULX_FLASHHEAD_WAV2VEC_DIR`（默认 `$HF_MIRROR_DIR/facebook/wav2vec2-base-960h`） |
 | Ditto | `$HF_MIRROR_DIR/thewintersun/ditto-talkinghead` | `DITTO_MODEL_DIR`、`DITTO_CODE_PATH`、`DITTO_DATA_ROOT`（`$DITTO_MODEL_DIR/ditto_onnx`）、`DITTO_CONFIG_PATH`（`$DITTO_MODEL_DIR/ditto_cfg/v0.4_hubert_cfg_trt.pkl`） |
 | MOSS-SoundEffect | `$HF_MIRROR_DIR/OpenMOSS-Team/MOSS-SoundEffect-v2.0` | `MOSS_SOUNDEFFECT_CODE_PATH`、`MOSS_SOUNDEFFECT_MODEL_DIR` |
@@ -399,9 +553,7 @@ MOSS VoiceGenerator 的 editable 源码位置见安装章节，音频 tokenizer 
 `QWEN_VOICEDESIGN_*`、`MOSS_VOICEGENERATOR_*`、`MOSS_AUDIO_4B_THINKING_*`、
 `MOSS_AUDIO_4B_INSTRUCT_*` 和
 `CONFUCIUS4_TTS_*`、
-`FIRERED_TTS3_*`、`TIGER_DNR_*`、`SEED_VC_*`、`INDEX_ECHO_S2ST_*`、`INDEX_HOMURA_*`、`INDEX_TRANSLATE_*`、`SOULX_FLASHHEAD_*`、
-`DITTO_*`。每个服务的 `/v1/health` 会报告
-生效的路径、运行时和可用性。
+`DITTO_*`。每个服务的 `/v1/health` 会报告生效的路径、运行时和可用性。
 FireRedTTS3 的官方源码默认位于 `$HOME/tts-depency/FireRedTTS3`，通过
 `FIRERED_TTS3_CODE_PATH` 覆盖；8304 以 `timbre` 模式加载 Instruct，8325 以 `clone` 模式加载
 Base，两者不会同时在 worker 中常驻显存。
@@ -416,6 +568,54 @@ Base，两者不会同时在 worker 中常驻显存。
 | `UPLOAD_MAX_BYTES` | `67108864` | 参考音频、理解/转写/分离输入与人像图片的单文件上限 |
 | `GPU_LOCK_FILE` | `$RUNTIME_CACHE_DIR/gpu-runtime.lock` | 本地模型共用排他锁 |
 | `GPU_LOCK_WAIT_TIMEOUT` | `900` 秒 | GPU 排队时限；整套启动须为正数 |
+| `UNITALE_LOCALAI_ENABLED` | `false` | 显式允许内部 LocalAI provider |
+| `UNITALE_LOCALAI_MANAGED` | `false` | `start.sh` 是否启动并负责停止受管 LocalAI 宿主机进程组 |
+| `UNITALE_LOCALAI_BASE_URL` | `http://127.0.0.1:8400` | 必须绑定本机回环地址 |
+| `UNITALE_LOCALAI_DATA_DIR` | `$STORAGE_DIR/.cache/localai` | 本机模型、状态、日志与安装指纹目录 |
+| `UNITALE_LOCALAI_BINARY` | `$UNITALE_LOCALAI_DATA_DIR/bin/local-ai` | 固定版本的宿主机 LocalAI 可执行文件 |
+| `UNITALE_LOCALAI_BACKENDS_DIR` | `$UNITALE_LOCALAI_DATA_DIR/backends` | 宿主机 audio-cpp backend 包目录 |
+| `UNITALE_LOCALAI_MODELS_DIR` | `$UNITALE_LOCALAI_DATA_DIR/models` | LocalAI 的模型配置与权重目录 |
+| `UNITALE_LOCALAI_WORKER_BRIDGE_ENABLED` | `false` | 受管 LocalAI 启动时一并启动 loopback `unitale-worker` gRPC backend |
+| `UNITALE_LOCALAI_BRIDGE_ADDRESS` | `127.0.0.1:50052` | 外部 worker bridge 的 gRPC 回环监听地址 |
+| `UNITALE_INFERENCE_PROVIDER` | `native` | 服务 provider 缺省值；原生实现仍为默认 |
+| `UNITALE_QWEN3_ASR_PROVIDER` | `native` | Qwen3-ASR 可单独选 `native` 或 `localai` |
+| `UNITALE_QWEN3_TTS_PROVIDER` | `native` | Qwen3-TTS Base 克隆可单独选 `native` 或 `localai` |
+| `UNITALE_QWEN3_TTS_MODEL` | `unitale.qwen3-tts.1p7b-base` | LocalAI Qwen3-TTS Base 模型 ID |
+| `UNITALE_QWEN3_VOICEDESIGN_PROVIDER` | `native` | Qwen3 VoiceDesign 可单独选 `native` 或 `localai` |
+| `UNITALE_QWEN3_VOICEDESIGN_MODEL` | `unitale.qwen3-tts.1p7b-voicedesign` | LocalAI Qwen3-TTS VoiceDesign 模型 ID；YAML 固定为 `task:vdes` |
+| `UNITALE_DOTS_TTS_SOAR_PROVIDER` | `native` | dots.tts-soar 可单独选 `native` 或 `localai`；native 仍为默认 |
+| `UNITALE_DOTS_TTS_SOAR_MODEL` | `unitale.dots-tts-soar.q8-0` | LocalAI/audio.cpp DotTTS SOAR Q8 模型 ID |
+| `UNITALE_VOXCPM2_PROVIDER` | `native` | VoxCPM2 clone 可单独选 `native` 或 `localai`；native 仍为默认 |
+| `UNITALE_VOXCPM2_MODEL` | `unitale.voxcpm2.q8-0` | LocalAI/audio.cpp VoxCPM2 Q8 模型 ID |
+| `UNITALE_CONFUCIUS4_TTS_PROVIDER` | `native` | Confucius4-TTS 克隆可单独选 `native` 或 `localai`；native 仍为默认 |
+| `UNITALE_CONFUCIUS4_TTS_MODEL` | `unitale.confucius4-tts.orig` | LocalAI/audio.cpp Confucius4-TTS original GGUF 模型 ID |
+| `UNITALE_MOSS_VOICEGENERATOR_PROVIDER` | `native` | MOSS VoiceGenerator 可单独选 `native` 或 `localai`；native 仍为默认 |
+| `UNITALE_MOSS_VOICEGENERATOR_MODEL` | `unitale.moss-voicegenerator.bf16` | LocalAI/audio.cpp MOSS VoiceGenerator 自包含 BF16 模型 ID |
+| `UNITALE_FIRERED_TTS3_CLONE_PROVIDER` | `native` | FireRedTTS3 Base 克隆可单独选 `native` 或 `localai` |
+| `UNITALE_FIRERED_TTS3_CLONE_MODEL` | `unitale.fireredtts3.base.q8-0` | FireRedTTS3 Base Q8 模型 ID |
+| `UNITALE_FIRERED_TTS3_TIMBRE_PROVIDER` | `native` | FireRedTTS3 Instruct 音色设计可单独选 `native` 或 `localai` |
+| `UNITALE_FIRERED_TTS3_TIMBRE_MODEL` | `unitale.fireredtts3.instruct.q8-0` | FireRedTTS3 Instruct Q8 模型 ID |
+| `UNITALE_ACESTEP_PROVIDER` | `native` | ACE-Step BGM provider；可单独选择 `native` 或 `localai` |
+| `UNITALE_ACESTEP_MODEL` | `unitale.ace-step15.xl-turbo.q8dit` | LocalAI ACE-Step XL Turbo Q8 DiT 候选 ID |
+| `UNITALE_STABLE_AUDIO_3_MEDIUM_PROVIDER` | `native` | Stable Audio 3 Medium provider；可单独选择 `native` 或 `localai` |
+| `UNITALE_STABLE_AUDIO_3_MEDIUM_MODEL` | `unitale.stable-audio3-medium.q8-0` | LocalAI Stable Audio 3 Medium Q8 候选 ID |
+| `UNITALE_SEED_VC_PROVIDER` | `native` | Seed-VC provider；可单独选 `native` 或 `localai`，native 仍为默认 |
+| `UNITALE_SEED_VC_MODEL` | `unitale.seed-vc.vc.f16` | Seed-VC 语音 VC 的 LocalAI `task:vc` 模型 ID |
+| `UNITALE_SEED_VC_SVC_MODEL` | `unitale.seed-vc.svc.f16` | Seed-VC F0 歌声 SVC 的 LocalAI `task:svc` 模型 ID |
+| `UNITALE_SHEETSAGE2_PROVIDER` / `UNITALE_SHEETSAGE2_MODEL` | `native` / `unitale.sheetsage2.worker.v1` | SheetSage2 one-shot worker bridge；native 默认 |
+| `UNITALE_MERT_V2_FULLSONG_PROVIDER` / `UNITALE_MERT_V2_FULLSONG_MODEL` | `native` / `unitale.mert-v2-fullsong.worker.v1` | MERT 整曲/逐帧 worker bridge；native 默认 |
+| `UNITALE_YUE2_VAE_PROVIDER` / `UNITALE_YUE2_VAE_MODEL` | `native` / `unitale.yue2-vae.worker.v1` | YuE2-Vae encode/decode worker bridge；native 默认 |
+| `UNITALE_SOULX_FLASHHEAD_PROVIDER` / `UNITALE_SOULX_FLASHHEAD_MODEL` | `native` / `unitale.soulx-flashhead.worker.v1` | SoulX MP4 worker bridge；native 默认 |
+| `UNITALE_DITTO_PROVIDER` / `UNITALE_DITTO_MODEL` | `native` / `unitale.ditto.worker.v1` | Ditto MP4 worker bridge；native 默认 |
+| `UNITALE_YUE2_3B_PROVIDER` / `UNITALE_YUE2_3B_MODEL` | `native` / `unitale.yue2-3b.worker.v1` | YuE2-3B WAV worker bridge；native 默认 |
+| `UNITALE_MOSS_SOUNDEFFECT_PROVIDER` / `UNITALE_MOSS_SOUNDEFFECT_MODEL` | `native` / `unitale.moss-soundeffect-v2.worker.v1` | MOSS-SoundEffect v2 WAV worker bridge；native 默认 |
+| `UNITALE_STEP_AUDIO_EDITX_PROVIDER` / `UNITALE_STEP_AUDIO_EDITX_MODEL` | `native` / `unitale.step-audio-editx.worker.v1` | Step-Audio-EditX WAV worker bridge；native 默认 |
+| `UNITALE_MOSS_AUDIO_4B_THINKING_PROVIDER` / `UNITALE_MOSS_AUDIO_4B_THINKING_MODEL` | `native` / `unitale.moss-audio-4b.thinking.worker.v1` | MOSS-Audio Thinking JSON worker bridge；native 默认 |
+| `UNITALE_MOSS_AUDIO_4B_INSTRUCT_PROVIDER` / `UNITALE_MOSS_AUDIO_4B_INSTRUCT_MODEL` | `native` / `unitale.moss-audio-4b.instruct.worker.v1` | MOSS-Audio Instruct JSON worker bridge；native 默认 |
+| `UNITALE_TIGER_DNR_PROVIDER` / `UNITALE_TIGER_DNR_MODEL` | `native` / `unitale.tiger-dnr.worker.v1` | TIGER-DnR three-stem ZIP file-reference bridge；native 默认 |
+| `UNITALE_LOCALAI_CONNECT_TIMEOUT` | `5` 秒 | LocalAI 连接超时 |
+| `UNITALE_LOCALAI_CLEANUP_TIMEOUT` | `30` 秒 | backend 停止请求的有界超时 |
+| `UNITALE_LOCALAI_API_KEY` | 无 | 可选内部 API key，只从环境读取 |
 | `GPU_METRICS_SAMPLE_INTERVAL` | `0.5` 秒 | 显存采样间隔，实际不低于 0.1 秒 |
 | `CUDA_RELEASE_DELAY` | `2.0` 秒 | worker 退出后持锁等待显存回收 |
 | `LOCAL_FILES_ONLY` | `1` | 本地模型离线加载；不控制 MiMo 云端请求 |
@@ -486,103 +686,6 @@ worker 使用官方 S2A 的 `target_feat_len` 指定 Mel 帧数，完整保留 T
 生成长度，仍须对输出执行语义和时长验收。`GET /v1/health` 的
 `runtime.native_vocalization_duration=true` 表示已加载支持此字段的 HTTP 版本；更新后需要
 重新运行 `bash start.sh`，仅修改 worker 文件不能更新已启动的接口校验。
-
-## Index-Echo 原生语音翻译
-
-8382 直接调用完整 [Index-Echo-S2ST-9B 原生包](https://huggingface.co/IndexTeam/Index-Echo-S2ST-9B)
-的 `DubbingBridgeModel.from_pretrained()` / `model.dub()`。源语音支持中文或英文；目标语言
-`target_language` 支持 `en`、`es`、`ja`、`zh`，源目标必须不同，源语言由原生包判断。
-接收 multipart `audio`，无需共享上传或 `audio_path`，成功返回原生 24 kHz WAV。
-可选 `return_info=true` 返回 ZIP，包含 `audio.wav` 和原生诊断 `info.json`（转写、译文等）；
-`mode` 只支持 `h2cv`，`chunk` 只能为 `false`。输入遵循共享上传容量限制；官方建议每句约 30 秒以内。
-输入、worker JSON/WAV 在成功、失败和超时后清理，模型每次请求加载后退出。
-
-```bash
-curl -fsS http://127.0.0.1:8382/v1/indexTranslate/echoS2ST \
-  -F 'audio=@tests/testIndexTranslate/speech.wav;type=audio/wav' \
-  -F 'target_language=en' -o translated-speech.wav
-```
-
-项目目录保留历史名称 `Index-Echo-S2ST-9B-GGUF/`，运行权重必须为完整原生包，默认目录为
-`$HF_MIRROR_DIR/IndexTeam/Index-Echo-S2ST-9B`。文本 GGUF 不能替代该包。官方要求 CUDA 单卡
-至少 24 GB，CPU 路径未经验证。`INDEX_ECHO_S2ST_DEVICE` 默认 `cuda`，请求超时默认 900 秒。
-在满足条件的主机上安装已锁定的完整官方依赖：
-
-```bash
-uv sync --project Index-Echo-S2ST-9B-GGUF --locked --extra native
-```
-
-不带 `--extra native` 只准备轻量 HTTP 环境；健康接口检查完整包、官方依赖版本、FFmpeg 和
-所选 GPU 显存，未就绪时推理返回 `503`。不会降级成其他模型或 ASR/TTS 服务链。
-
-## Index-Homura 原生音节约束翻译
-
-8383 接收 JSON `text`、正整数 `target_syllables`，可选 `target_language`（默认 `en`）、
-`glossary`、`max_new_tokens`、`temperature`（默认 `0.3`），返回 UTF-8 `text/plain`。
-使用 [官方音节控制模板](https://github.com/bilibili/Index-Translate/blob/main/inference/llm/syllable_translate.py)，
-目标音节数属于近似控制，需检查模型实际输出。常见语言代码会映射为语言名称，其他语种可直接
-填写完整语言名称，范围由模型自身决定。默认输出预算为官方的 `max(512, 3 * len(text))`；`INDEX_HOMURA_MAX_NEW_TOKENS` 默认 `0`
-表示使用该公式，请求显式 `max_new_tokens` 时直接采用该值。
-
-```bash
-curl -fsS http://127.0.0.1:8383/v1/indexTranslate/homura \
-  -H 'Content-Type: application/json' \
-  -d '{"text":"我们今天去看电影吧","target_language":"en","target_syllables":8,"glossary":{"电影":"cinema"}}' \
-  -o homura-translation.txt
-```
-
-默认使用已有 Q8_0 权重、32768 上下文、关闭 thinking。执行
-`uv sync --project Index-Homura-9B-GGUF --locked` 并准备 `llama-server`；每次请求仅运行 Homura。
-
-## Index-Nailong 原生长文档翻译
-
-8384 接收 JSON `text`（整篇原文），可选 `direction`（默认 `zh-en`）和 `max_new_tokens`。
-方向限定为 `zh-en`、`en-zh`、`zh-ja`、`ja-zh`，返回保留段落的 UTF-8 `text/plain`。
-采用 [官方 NativeLong 固定方向模板](https://github.com/bilibili/Index-Translate/tree/main/inference/llm/prompts)，
-原文一次送入模型，不分段、不摘要、不套用普通翻译模板。不接受从其他模型借来的术语/风格字段。
-
-```bash
-curl -fsS http://127.0.0.1:8384/v1/indexTranslate/naiLong \
-  -H 'Content-Type: application/json' \
-  -d '{"text":"第一章\n\n这里是需要完整翻译的原文。","direction":"zh-en"}' \
-  -o nailong-translation.txt
-```
-
-采样固定为温度 0、top-p 1、禁用 top-k/min-p、seed 42、重复惩罚 1、关闭 thinking，使用官方
-停止 token；worker 从实际 GGUF 词表把 token ID 映射成 llama.cpp 支持的停止字符串。
-默认不额外限制生成 token 数，上下文按 [官方 9B 预设](https://github.com/bilibili/Index-Translate/blob/main/inference/llm/serve_vllm.sh)
-设为 229376；输入和输出必须共同放入实际配置的上下文。达到长度上限时明确失败，不返回
-截断文档作为完整结果。长上下文 KV cache 需要更多显存，运维可显式调整
-`INDEX_NAILONG_CONTEXT_SIZE`。执行 `uv sync --project Index-Nailong-9B-GGUF --locked` 并准备
-`llama-server`；每次请求仅运行 Nailong。
-
-## Index-Translate 原生文本/图片翻译
-
-8385 接收 JSON `text` 或图片 `image`，返回 UTF-8 `text/plain`。模型提供 150 语种翻译，常见
-代码映射为语言名称，其他语种使用完整语言名称。支持 [官方 instTrans 参数](https://github.com/bilibili/Index-Translate/blob/main/inference/llm/translate.py)：
-`source_language`（默认 `auto`）、`target_language`（默认 `en`）、`glossary`、`hard_constraints`、
-`soft_constraints`、`genre`（默认 `文本`）、`instruction`、`raw_prompt`、`max_new_tokens`、
-`temperature`。硬软约束、JSON 格式保持和原始提示词均保留官方模板行为。
-
-```bash
-curl -fsS http://127.0.0.1:8385/v1/indexTranslate/translate \
-  -H 'Content-Type: application/json' \
-  -d '{"text":"碳纤维的好处就是它抗裂缝。","source_language":"zh","target_language":"en","glossary":{"碳纤维":"carbon fiber"}}' \
-  -o translation.txt
-```
-
-图片 `image` 使用 `data:image/png;base64,...` 等 PNG/JPEG/WebP/GIF/BMP data URL，可附带文本
-作为参考。图片字节受 `UPLOAD_MAX_BYTES` 限制；不接受客户端服务器文件路径，不调用外部 OCR。
-需要官方配套 `Index-Translate-9B.mmproj-Q8_0.gguf`，默认位于同一模型目录，可通过
-`INDEX_TRANSLATE_MMPROJ_PATH` 配置。缺失时图片请求返回 `503`；文本仍可独立运行。
-`GET /v1/health` 的 `ready` 表示文本依赖检查结果，`image_ready` 单独报告图片条件。
-
-默认 Q8_0、32768 上下文、1024 输出 token、温度 0，关闭 thinking。执行
-`uv sync --project Index-Translate-9B-GGUF --locked` 并准备支持 Qwen3.5/多模态的 `llama-server`。
-
-四个服务都保留一次性 worker、共享 GPU 排队锁与进程组清理。新契约不再接收旧 `audio_path`
-请求，未提供兼容别名。更新已运行的服务需先停止旧 `start.sh` 并重新启动；健康 200 需结合
-`ready` / `available` 判断模型能否实际推理。
 
 ## Qwen3-ASR 语音识别
 
@@ -998,6 +1101,41 @@ curl -X POST http://127.0.0.1:8311/v1/stableAudio/soundEffect \
 MOSS 可按请求传 `device`、`torch_dtype`；Stable Audio 的设备/精度字段只允许
 `device=cuda`、`dtype=float16`，其他值返回 `422`。两者均不接收参考音频。
 
+Stable Audio 3 Medium 可用 `UNITALE_STABLE_AUDIO_3_MEDIUM_PROVIDER=localai` 显式切换到
+LocalAI；默认仍为 `native`。候选模型 ID 为 `unitale.stable-audio3-medium.q8-0`。用户需手动把
+`stable-audio-3-medium-q8_0.gguf` 放入
+`$UNITALE_LOCALAI_MODELS_DIR/Stable-Audio-3-Medium-GGUF/`，再注册和校验：
+
+```bash
+python scripts/localai/manager.py register-stable-audio-candidate
+python scripts/localai/manager.py verify-stable-audio-candidate
+```
+
+manager 不下载权重；登记的本机 hash 用于文件变更检测，不证明上游来源。LocalAI 可映射
+`prompt`→`text` 和时长→`duration_seconds`。SoundGeneration 没有逐请求 steps、guidance scale
+或 seed 字段，LocalAI provider 只接受默认 `steps=8`、`cfg_scale=1.0`、随机 `seed=-1`；明确
+`dtype` 请求也会返回 422，因为候选是 Q8 GGUF。输出 WAV 完整解码后须为非空 44.1 kHz 双声道。
+该候选的真实模型和 GPU 生命周期尚未验收。
+
+### Seed-VC AudioTransform 候选
+
+Seed-VC 保持 native 默认。可显式设置 `UNITALE_SEED_VC_PROVIDER=localai`，LocalAI AudioTransform
+分别把源音频送入 `audio`、目标音色送入 `reference`。`f0_condition=false` 选择固定
+`task:vc` / `v2_vc` 配置；`true` 选择固定 `task:svc` / `v1_svc` 配置，因此两个模型 ID
+必须同时注册。两份候选 YAML 使用同一个由用户准备的 `$UNITALE_LOCALAI_MODELS_DIR/SeedVC-MLX/`
+目录和 `seed_vc.weight_type:f16`。手动放好上游 C++ 包要求的完整资源目录后再执行：
+
+```bash
+python scripts/localai/manager.py register-seed-vc-candidate
+python scripts/localai/manager.py verify-seed-vc-candidate
+```
+
+manager 仅登记目录树 hash 和固定 YAML，不下载权重，也不证明模型目录的上游来源。LocalAI
+映射步骤数、时长调整和 guidance；SVC 还映射 F0、自动音高调整与半音偏移。VC 的单个
+`inference_cfg_rate` 同步用于 audio.cpp V2 的 intelligibility/similarity 两个 scale。请求
+`fp16=false` 返回 `422`，因为该候选固定为 F16。真实模型加载、两种路线的音质/输出规格和 GPU
+释放还未通过 E2/E3 验收。
+
 ## ACE-Step BGM 生成
 
 ACE-Step 独立监听 `8313`，只负责有声小说纯配乐；Stable Audio 继续承担 ambience /
@@ -1022,6 +1160,26 @@ uv sync --project ace_step_1_5 --locked
 ```
 
 本仓库的 `start.sh` 对 ACE-Step 使用 `uv run --no-sync`，不会在启动时安装依赖。
+
+可用 `UNITALE_ACESTEP_PROVIDER=localai` 显式选择 LocalAI；默认仍为 `native`。候选模型 ID
+为 `unitale.ace-step15.xl-turbo.q8dit`。用户需自行把
+`ace-step-1.5-xl-turbo-q8dit.gguf` 放到
+`$UNITALE_LOCALAI_MODELS_DIR/ACE-Step1.5-GGUF/xl-turbo-q8dit/`，随后登记并核对：
+
+```bash
+python scripts/localai/manager.py register-ace-step-candidate
+python scripts/localai/manager.py verify-ace-step-candidate
+```
+
+manager 不下载模型；登记时的本地 size/hash 只用于发现文件之后被替换，不能验证上游文件真实性。
+固定 Q8 DiT 候选及上游限制见[迁移报告](reports/localai/P4-ACE-Step.md)。启动 LocalAI provider
+前仍须先完成宿主机 LocalAI/audio-cpp 安装，并设置 `UNITALE_LOCALAI_ENABLED=true`。
+
+LocalAI SoundGeneration 只接收本服务 `prompt`、`seconds`、`bpm`、`keyscale` 和
+`timesignature` 的对应字段，并省略 `lyrics`，使用与 native worker 一致的空歌词默认值。固定 audio.cpp revision 虽接收 `instrumental` HTTP 字段，但没有读取该选项的模型代码，因此它不能作为强制无歌声保证；真实生成效果仍需模型 smoke 验收。它不提供逐请求 steps 或 seed：仅接受默认 `steps=8` 和
+`seed=-1`；其它值返回 422。当前路由不含歌词/edit 字段，不能通过提示词映射宣称这些模式已迁移。
+LocalAI WAV 必须完整解码且是非空 48 kHz 双声道，生成后仍写入原有 BGM 目录。该路径仍是未经过
+真实模型和显存生命周期验证的候选。
 
 ## YuE2-3B 歌曲生成
 
@@ -1204,8 +1362,8 @@ adapter、数据集和预测都写入 `storage/training/`，不提交到 Git。
 - 请求校验或媒体类型失败通常返回 `422`，上传超过大小上限返回 `413`；
   找不到参考音频通常返回 `404`，但 Confucius4-TTS 的现有文件预检统一返回 `503`。
 - GPU 排队超时返回 `503`。本地依赖缺失按服务返回 `503` 或 `500`；模型执行失败通常为
-  `500`。Index-Echo、Index-Homura、Index-Nailong、Index-Translate、SoulX 和 Ditto 的 worker 超时返回 `504`；
-  Index-Echo 原生环境、三个文本模型运行时或图片 mmproj 未就绪时返回 `503`。
+  `500`。SoulX 和 Ditto 的 worker 超时返回 `504`；
+  模型目录或运行时未就绪时返回 `503`。
   Steam Audio 的非法 Manifest 返回 `422`、重复 `job_id` 返回 `409`、未知任务返回 `404`。
 - 模型 worker 失败或超时会清理临时文件和进程组，再返回服务错误；共享 GPU 锁在
   `finally` 中释放。
@@ -1237,8 +1395,9 @@ bash -n start.sh
 bash scripts/quality_gate.sh
 ```
 
-统一质量门禁先执行 shell 语法和三个无 SDK 的 C++ 核心测试，再检查 27 个服务项目与 QA
-项目的锁文件、Ruff 和格式，最后执行根目录、ACE-Step、Stable Audio 的无模型测试。
+统一质量门禁先执行 shell 语法和三个无 SDK 的 C++ 核心测试，再检查工作区中存在的服务、
+`unitale_localai_bridge` 与 QA 锁文件、Ruff 和格式，最后执行根目录、ACE-Step、Stable Audio 的无模型测试。
+所有当前维护的 uv 项目都必须存在并通过锁检查；缺失项目会使门禁失败。
 GitHub Actions 使用同一脚本；需要 `uv` 和 `g++`，不需要 CUDA 或 Steam Audio SDK。
 锁文件检查仍可能访问 Git/wheel 元数据，初次运行需具备这些依赖来源的网络或本地缓存。
 已有完整缓存时可运行 `UV_OFFLINE=1 bash scripts/quality_gate.sh`。

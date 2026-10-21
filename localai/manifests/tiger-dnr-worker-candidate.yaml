@@ -1,0 +1,4 @@
+name: unitale.tiger-dnr.worker.v1
+backend: unitale-worker
+parameters:
+  model: unitale.tiger-dnr.worker.v1

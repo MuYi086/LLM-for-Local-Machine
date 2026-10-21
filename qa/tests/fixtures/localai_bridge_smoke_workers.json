@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "workers": {
+    "unitale.bridge.smoke": {
+      "project": "qa",
+      "script": "tests/fixtures/localai_bridge_smoke_worker.py",
+      "output_kind": "json",
+      "output_argument": "--output-json",
+      "timeout_seconds": 10
+    }
+  }
+}

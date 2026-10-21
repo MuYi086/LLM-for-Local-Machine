@@ -1,0 +1,441 @@
+{
+  "schema_version": 1,
+  "captured_on": "2026-10-20",
+  "updated_on": "2026-10-21",
+  "status": "candidate_incomplete",
+  "scope": "P0 版本基线；不改变现有运行行为，不安装 LocalAI，不下载模型权重",
+  "repository": {
+    "baseline_head": "2895c3d399b0771359db4519d8538d55a6b75750",
+    "baseline_commit_subject": "feat: 架构调整升级文档",
+    "plan_reference_head": "26d03f28184598ba6fe906843347794d8fc1832f",
+    "initial_worktree": "clean",
+    "branch_state": "main ahead of origin/main by 1 commit",
+    "note": "以上 git 状态在新增本次 P0 清单前采集。"
+  },
+  "localai": {
+    "version": "v4.11.0",
+    "source_commit": "58830f7ac508845a6f4efa32cfca06af422d4d82",
+    "source_url": "https://github.com/mudler/LocalAI/releases/tag/v4.11.0",
+    "distribution": "native-linux-amd64-binary",
+    "installation_status": "binary_and_audio_cpp_backend_staged_and_verified_no_model_smoke_passed",
+    "binary_path": "storage/.cache/localai/bin/local-ai",
+    "binary_sha256": "2211f0c5923db1cb9213006bbc34db1f8cddb68b6342026603d9128997920a74",
+    "source_archive_sha256": "abac59079d8ec8cecf1ca0202069773506e6d7e19f695adf481014295c7473cf",
+    "source_verification_boundary": "archive root matches the pinned commit label, but the tarball contains no .git metadata and GitHub access is unavailable for independent commit-tree verification",
+    "verification": "staged binary --version returned v4.11.0; fixed CUDA audio-cpp backend was built, packaged, copied to the host backend directory, and manager verify-install passed; LocalAI readiness/start/stop passed with an empty models directory; no model RPC or inference was run"
+  },
+  "audio_cpp": {
+    "repository": "https://github.com/0xShug0/audio.cpp",
+    "embedded_source_commit": "9a02e61326aaaf9d462b584ca5e0daba22c0abfc",
+    "embedded_source_commit_verified_at": "https://raw.githubusercontent.com/mudler/LocalAI/v4.11.0/backend/cpp/audio-cpp/Makefile",
+    "source_pin_variable": "AUDIO_CPP_VERSION",
+    "source_archive_sha256": "1f194dcc67f67bb241bf3c02cfa256b932b4eabac6e455ac1e28ef0fdbe00831",
+    "source_staging": "expanded from user-provided archive into LocalAI's pinned backend source directory; no Git fetch",
+    "source_verification_boundary": "archive root matches the LocalAI pin label, but the tarball contains no .git metadata and GitHub access is unavailable for independent commit-tree verification",
+    "standalone_release_candidate": {
+      "version": "v0.9.1",
+      "commit": "cf124a67cc55d8f65a9a15eec69edbff0fb212c8",
+      "relation": "仅作上游候选参考；LocalAI v4.11.0 实际嵌入提交以上述固定 commit 为准。"
+    }
+  },
+  "model_artifacts": {
+    "qwen3_tts_candidates": [
+      {
+        "capability": "Qwen3-TTS Base voice clone / 8321",
+        "model_repository": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+        "model_directory_env": "QWEN3_TTS_MODEL_DIR",
+        "default_directory": "~/hf-mirror/Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+        "required_files": [
+          "config.json",
+          "generation_config.json",
+          "model.safetensors",
+          "speech_tokenizer/config.json",
+          "speech_tokenizer/model.safetensors",
+          "tokenizer_config.json",
+          "vocab.json",
+          "merges.txt"
+        ],
+        "snapshot_revision": null,
+        "status": "candidate_e0_waiting_for_manual_model_download",
+        "note": "固定 audio.cpp 源码接受该官方 Base safetensors 目录；用户下载后须记录快照 revision、完整文件 hash 与 license sidecar，当前不下载权重。"
+      },
+      {
+        "capability": "Qwen3-TTS VoiceDesign / 8301",
+        "model_repository": "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign",
+        "model_directory_env": "QWEN_VOICEDESIGN_MODEL_DIR",
+        "default_directory": "~/hf-mirror/Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign",
+        "required_files": [
+          "config.json",
+          "generation_config.json",
+          "model.safetensors",
+          "speech_tokenizer/config.json",
+          "speech_tokenizer/model.safetensors",
+          "tokenizer_config.json",
+          "vocab.json",
+          "merges.txt"
+        ],
+        "audio_cpp_family": "qwen3_tts",
+        "audio_cpp_task": "vdes",
+        "snapshot_revision": null,
+        "status": "candidate_e0_waiting_for_manual_model_download",
+        "note": "固定 audio.cpp qwen3.md 声明官方 VoiceDesign safetensors 目录及 task:vdes；候选文件 hash/revision 和 LocalAI 请求运行仍未验证。用户手动准备权重，本次不下载。"
+      }
+    ],
+    "selected_localai_packages": [
+      {
+        "capability": "Qwen3-ASR-1.7B / 8371",
+        "package_repository": "audio-cpp/audio.cpp-gguf",
+        "repository_revision": "09fe073ba154561f4474162e8bd4ab233a848eca",
+        "revision_source": "https://huggingface.co/audio-cpp/audio.cpp-gguf/commit/09fe073ba154561f4474162e8bd4ab233a848eca",
+        "model_file": "Qwen3-ASR-1.7B-GGUF/qwen3-asr-1.7b-q8_0.gguf",
+        "model_file_size_bytes": 2473010048,
+        "model_file_sha256": "da4fc2ac7f24dee784d1684eb1f35836cdbf559519452ae11777670734c0a4f8",
+        "source_model": "Qwen/Qwen3-ASR-1.7B",
+        "license": "Apache-2.0 per the package repository model table; verify complete upstream license notices before distribution",
+        "status": "candidate_e0",
+        "upstream_declaration": {
+          "audio_cpp_source": "https://github.com/0xShug0/audio.cpp/blob/9a02e61326aaaf9d462b584ca5e0daba22c0abfc/README.md",
+          "package_snapshot_readme": "https://huggingface.co/audio-cpp/audio.cpp-gguf/blob/09fe073ba154561f4474162e8bd4ab233a848eca/README.md",
+          "status": "E1 family, 1.7B variant, GGUF Q8 filename, and package license are declared; exact artifact and runtime compatibility remain unverified"
+        },
+        "compatibility_status": "pinned_sources_declare_qwen3_asr_1p7b_gguf_q8; artifact_metadata_sidecars_and_runtime_unverified",
+        "component_inventory_status": "partial; only the GGUF artifact hash/size and package table row are pinned; runtime sidecars and full package requirements remain to verify",
+        "note": "固定 package revision 与 LFS SHA-256；固定 audio.cpp README 声明 Qwen3-ASR-1.7B-hf 与 GGUF 16/Q8，固定包 README 声明对应 Q8 文件和 Apache-2.0；未下载或检查 GGUF 元数据、内嵌 sidecar，也未在 LocalAI/backend 运行。"
+      }
+    ],
+    "revision_and_sha256_records": [],
+    "status": "candidate_incomplete",
+    "reason": "已登记 Qwen3-ASR、Qwen3-TTS Base/VoiceDesign、DotTTS SOAR、VoxCPM2、Confucius4-TTS、MOSS VoiceGenerator 与 FireRedTTS3 Base/Instruct 候选；权重均由用户手动准备，上游部分 LFS hash、ASR 全组件清单及运行证据仍待完成。 已新增 ACE-Step XL Turbo Q8 DiT 候选；文件由用户手动准备，未下载。 已登记 Stable Audio 3 Medium Q8 GGUF 候选；权重由用户手动准备，未下载。",
+    "local_model_directory_check": {
+      "configured_huggingface_cache_directories_present": 36,
+      "configured_huggingface_cache_directories_expected": 36,
+      "missing_projects": [],
+      "meaning": "2026-10-21 对 start.sh 默认 HF_MIRROR_DIR 路径的只读目录检查：36/36 目录存在；不代表权重文件齐全、revision 固定、内容 hash 已验证或模型推理通过。"
+    },
+    "dots_tts_candidates": [
+      {
+        "capability": "dots.tts-soar clone / 8324",
+        "package_repository": "audio-cpp/audio.cpp-gguf",
+        "repository_revision": "83c5d96c03023ff5a7712570d057ce26c8769f98",
+        "revision_source": "https://huggingface.co/audio-cpp/audio.cpp-gguf/tree/83c5d96c03023ff5a7712570d057ce26c8769f98/DotTTS-SOAR-GGUF",
+        "model_file": "DotTTS-SOAR-GGUF/dots-tts-soar-q8_0.gguf",
+        "model_file_size_bytes": null,
+        "model_file_sha256": null,
+        "source_model": "dots-studio/dots.tts-soar",
+        "audio_cpp_family": "dots_tts",
+        "audio_cpp_task": "tts",
+        "precision": "q8_0",
+        "license": "Apache-2.0 per the repository README at the pinned package revision; verify source model notices before redistribution",
+        "status": "candidate_e0_waiting_for_manual_download_and_hash_verification",
+        "upstream_declaration": {
+          "audio_cpp_source": "https://github.com/0xShug0/audio.cpp/blob/9a02e61326aaaf9d462b584ca5e0daba22c0abfc/backend/cpp/audio-cpp/audio.cpp/docs/models/dots_tts.md",
+          "package_snapshot_readme": "https://huggingface.co/audio-cpp/audio.cpp-gguf/blob/83c5d96c03023ff5a7712570d057ce26c8769f98/README.md",
+          "status": "fixed audio.cpp docs select the standalone SOAR Q8 package and document clone/request options; package file is present at the pinned HF revision, but exact file hash and LocalAI runtime compatibility remain unverified"
+        },
+        "note": "固定 HF revision 与相对路径；本地注册时会记录用户提供文件的 size/SHA-256 以检测后续变化，但上游 LFS hash 尚未取得，因此仍是 E0。"
+      }
+    ],
+    "voxcpm2_candidates": [
+      {
+        "capability": "VoxCPM2 clone and controllable clone / 8322",
+        "package_repository": "audio-cpp/audio.cpp-gguf",
+        "repository_revision": "09fe073ba154561f4474162e8bd4ab233a848eca",
+        "revision_source": "https://huggingface.co/audio-cpp/audio.cpp-gguf/tree/09fe073ba154561f4474162e8bd4ab233a848eca/VoxCPM2-GGUF",
+        "model_file": "VoxCPM2-GGUF/voxcpm2-q8_0.gguf",
+        "model_file_size_bytes": null,
+        "model_file_sha256": null,
+        "source_model": "OpenBMB/VoxCPM2",
+        "audio_cpp_family": "voxcpm2",
+        "audio_cpp_task": "tts",
+        "precision": "q8_0",
+        "license": "Apache-2.0 per the package README at the pinned revision; verify source model notices before redistribution",
+        "status": "candidate_e0_waiting_for_manual_download_and_hash_verification",
+        "upstream_declaration": {
+          "audio_cpp_source": "https://github.com/0xShug0/audio.cpp/blob/9a02e61326aaaf9d462b584ca5e0daba22c0abfc/backend/cpp/audio-cpp/audio.cpp/docs/tts.md",
+          "package_snapshot_readme": "https://huggingface.co/audio-cpp/audio.cpp-gguf/blob/09fe073ba154561f4474162e8bd4ab233a848eca/README.md",
+          "status": "pinned docs declare the voxcpm2 family, clone reference audio and transcript, control text format, guidance scale, and inference steps; file page shows the Q8 artifact at 2.96 GB but its pinned-revision LFS SHA-256 is unavailable"
+        },
+        "note": "User downloads this Q8 candidate manually. Local registration records a local SHA-256 only for later change detection; it does not prove source authenticity. The pinned revision confirms the file exists, while its exact LFS hash, component metadata, and runtime compatibility remain unverified."
+      }
+    ],
+    "confucius4_tts_candidates": [
+      {
+        "capability": "Confucius4-TTS clone / 8361",
+        "package_repository": "audio-cpp/audio.cpp-gguf",
+        "repository_revision": "83c5d96c03023ff5a7712570d057ce26c8769f98",
+        "revision_source": "https://huggingface.co/audio-cpp/audio.cpp-gguf/tree/83c5d96c03023ff5a7712570d057ce26c8769f98/Confucius4-TTS-GGUF",
+        "model_file": "Confucius4-TTS-GGUF/confucius4-tts-orig.gguf",
+        "model_file_size_bytes": null,
+        "model_file_sha256": null,
+        "source_model": "netease-youdao/Confucius4-TTS",
+        "audio_cpp_family": "confucius4_tts",
+        "audio_cpp_task": "clon",
+        "precision": "orig",
+        "license": "Apache-2.0 per audio.cpp model_licenses.md; verify source model notices before redistribution",
+        "status": "candidate_e0_waiting_for_manual_download_and_hash_verification",
+        "upstream_declaration": {
+          "audio_cpp_source": "https://github.com/0xShug0/audio.cpp/blob/9a02e61326aaaf9d462b584ca5e0daba22c0abfc/backend/cpp/audio-cpp/audio.cpp/docs/tts.md",
+          "package_snapshot_readme": "https://huggingface.co/audio-cpp/audio.cpp-gguf/blob/83c5d96c03023ff5a7712570d057ce26c8769f98/README.md",
+          "status": "pinned docs declare standalone original GGUF, required voice reference, language and generation parameters; pinned package revision contains the candidate, but exact file hash and LocalAI runtime compatibility remain unverified"
+        },
+        "note": "固定 HF revision 与相对路径；本地注册时只记录用户提供文件的 size/SHA-256 以检测后续变化，不证明上游制品来源，因此仍是 E0。"
+      }
+    ],
+    "moss_voicegenerator_candidates": [
+      {
+        "capability": "MOSS-VoiceGenerator voice design / 8302",
+        "package_repository": "audio-cpp/audio.cpp-gguf",
+        "repository_revision": "83c5d96c03023ff5a7712570d057ce26c8769f98",
+        "revision_source": "https://huggingface.co/audio-cpp/audio.cpp-gguf/tree/83c5d96c03023ff5a7712570d057ce26c8769f98/MOSS-VoiceGenerator-GGUF",
+        "model_file": "MOSS-VoiceGenerator-GGUF/moss_voicegen_bf16_codec_f16_decode.gguf",
+        "model_file_size_bytes": null,
+        "model_file_sha256": null,
+        "source_model": "OpenMOSS-Team/MOSS-VoiceGenerator + OpenMOSS-Team/MOSS-Audio-Tokenizer v1",
+        "audio_cpp_family": "moss_voicegen",
+        "audio_cpp_task": "vdes",
+        "precision": "bf16 backbone + f16 codec decode",
+        "license": "Apache-2.0 per fixed audio.cpp model docs; verify source model notices before redistribution",
+        "status": "candidate_e0_waiting_for_manual_download_and_hash_verification",
+        "upstream_declaration": {
+          "audio_cpp_source": "https://github.com/0xShug0/audio.cpp/blob/9a02e61326aaaf9d462b584ca5e0daba22c0abfc/backend/cpp/audio-cpp/audio.cpp/docs/community_models/moss_voicegen.md",
+          "package_snapshot_readme": "https://huggingface.co/audio-cpp/audio.cpp-gguf/blob/83c5d96c03023ff5a7712570d057ce26c8769f98/README.md",
+          "status": "fixed docs declare standalone BF16 backbone and F16 codec decode package, vdes task, instruction/language and sampling options; pinned file page shows a 6.02 GB package, but exact file SHA-256 and LocalAI runtime compatibility remain unverified"
+        },
+        "note": "该自包含 GGUF 包含 VoiceGenerator 与 MOSS-Audio-Tokenizer v1 解码组件，不需要另行准备音频 tokenizer 权重；本地登记 hash 仅检测文件变化，不证明上游来源。"
+      }
+    ],
+    "fireredtts3_candidates": [
+      {
+        "capability": "FireRedTTS3 Base clone / 8325",
+        "package_repository": "audio-cpp/audio.cpp-gguf",
+        "repository_revision": "83c5d96c03023ff5a7712570d057ce26c8769f98",
+        "revision_source": "https://huggingface.co/audio-cpp/audio.cpp-gguf/tree/83c5d96c03023ff5a7712570d057ce26c8769f98/FireRedTTS3-Base-GGUF",
+        "model_file": "FireRedTTS3-Base-GGUF/fireredtts3-base-q8_0.gguf",
+        "model_file_size_bytes": null,
+        "model_file_sha256": null,
+        "source_model": "FireRedTeam/FireRedTTS3",
+        "audio_cpp_family": "fireredtts3",
+        "audio_cpp_task": "clon",
+        "precision": "q8_0",
+        "license": "Apache-2.0 per the pinned package README; verify source model notices before redistribution",
+        "status": "candidate_e0_waiting_for_manual_download_and_hash_verification",
+        "upstream_declaration": {
+          "audio_cpp_source": "https://github.com/0xShug0/audio.cpp/blob/9a02e61326aaaf9d462b584ca5e0daba22c0abfc/backend/cpp/audio-cpp/audio.cpp/docs/models/fireredtts3.md",
+          "package_snapshot_readme": "https://huggingface.co/audio-cpp/audio.cpp-gguf/blob/83c5d96c03023ff5a7712570d057ce26c8769f98/README.md",
+          "status": "fixed docs declare Base zero-shot clone with language, reference audio/text, flow-step, guidance, stop-threshold and seed options; pinned tree lists original and Q8 artifacts, but exact Q8 LFS hash and LocalAI runtime remain unverified"
+        },
+        "note": "Base Q8 GGUF is shown as 4.18 GB at the pinned HF revision. User prepares this model manually; local registration hash only detects later changes and does not prove upstream authenticity."
+      },
+      {
+        "capability": "FireRedTTS3 Instruct voice design / 8304",
+        "package_repository": "audio-cpp/audio.cpp-gguf",
+        "repository_revision": "83c5d96c03023ff5a7712570d057ce26c8769f98",
+        "revision_source": "https://huggingface.co/audio-cpp/audio.cpp-gguf/tree/83c5d96c03023ff5a7712570d057ce26c8769f98/FireRedTTS3-Instruct-GGUF",
+        "model_file": "FireRedTTS3-Instruct-GGUF/fireredtts3-instruct-q8_0.gguf",
+        "model_file_size_bytes": null,
+        "model_file_sha256": null,
+        "source_model": "FireRedTeam/FireRedTTS3",
+        "audio_cpp_family": "fireredtts3",
+        "audio_cpp_task": "vdes",
+        "precision": "q8_0",
+        "license": "Apache-2.0 per the pinned package README; verify source model notices before redistribution",
+        "status": "candidate_e0_waiting_for_manual_download_and_hash_verification",
+        "upstream_declaration": {
+          "audio_cpp_source": "https://github.com/0xShug0/audio.cpp/blob/9a02e61326aaaf9d462b584ca5e0daba22c0abfc/backend/cpp/audio-cpp/audio.cpp/docs/models/fireredtts3.md",
+          "package_snapshot_readme": "https://huggingface.co/audio-cpp/audio.cpp-gguf/blob/83c5d96c03023ff5a7712570d057ce26c8769f98/README.md",
+          "status": "fixed docs declare Instruct voice design with voice_design template and instruction field; pinned tree lists original and Q8 artifacts, but exact Q8 LFS hash and LocalAI runtime remain unverified"
+        },
+        "note": "Instruct Q8 GGUF is shown as 4.15 GB at the pinned HF revision. This candidate covers voice design only; native Instruct clone, semantic edit and acoustic edit are outside the Unitale routes and are not represented as migrated."
+      }
+    ],
+    "ace_step_candidates": [
+      {
+        "capability": "ACE-Step 1.5 XL Turbo BGM / 8313",
+        "package_repository": "CaptainArni/audio.cpp-gguf",
+        "repository_revision": "ac4d11eda6855ddedb16e42632e1a9376bfcfa81",
+        "revision_source": "https://huggingface.co/CaptainArni/audio.cpp-gguf/commit/ac4d11eda6855ddedb16e42632e1a9376bfcfa81",
+        "model_file": "ACE-Step1.5-GGUF/xl-turbo-q8dit/ace-step-1.5-xl-turbo-q8dit.gguf",
+        "model_file_size_bytes": null,
+        "model_file_sha256": null,
+        "source_model": "ACE-Step/acestep-v15-xl-turbo",
+        "audio_cpp_family": "ace_step",
+        "audio_cpp_task": "gen",
+        "precision": "Q8_0 DiT + BF16 planner, text encoder and VAE",
+        "license": "MIT per pinned model package",
+        "status": "candidate_e0_waiting_for_manual_download_and_hash_verification",
+        "upstream_declaration": {
+          "audio_cpp_source": "https://github.com/0xShug0/audio.cpp/blob/9a02e61326aaaf9d462b584ca5e0daba22c0abfc/backend/cpp/audio-cpp/audio.cpp/docs/models/ace_step.md",
+          "package_snapshot_readme": "https://huggingface.co/CaptainArni/audio.cpp-gguf/blob/ac4d11eda6855ddedb16e42632e1a9376bfcfa81/README.md",
+          "status": "fixed audio.cpp docs declare XL Turbo and task gen; the pinned package README lists a self-contained 9.97 GiB q8dit GGUF, but marks it proposed and outside the path-test matrix; exact LFS SHA-256 is unavailable"
+        },
+        "note": "The current Unitale route omits lyrics; the pinned audio.cpp parser defaults absent lyrics to an empty string. LocalAI's instrumental field is forwarded but read by no model code in this pin, so it is not treated as a vocal-suppression guarantee. Prompt, duration, BPM, key scale and time signature map through SoundGeneration. The HTTP schema cannot carry request steps or seed: non-default steps and explicit seeds are rejected; seed=-1 stays random. User prepares the GGUF manually; local hash only detects subsequent file changes and does not prove upstream authenticity."
+      }
+    ],
+    "stable_audio_candidates": [
+      {
+        "capability": "Stable Audio 3 Medium generation / 8311",
+        "package_repository": "audio-cpp/audio.cpp-gguf",
+        "repository_revision": "09fe073ba154561f4474162e8bd4ab233a848eca",
+        "revision_source": "https://huggingface.co/audio-cpp/audio.cpp-gguf/commit/09fe073ba154561f4474162e8bd4ab233a848eca",
+        "model_file": "Stable-Audio-3-Medium-GGUF/stable-audio-3-medium-q8_0.gguf",
+        "model_file_size_bytes": null,
+        "model_file_sha256": null,
+        "source_model": "stabilityai/stable-audio-3-medium",
+        "audio_cpp_family": "stable_audio",
+        "audio_cpp_task": "gen",
+        "precision": "Q8_0 GGUF",
+        "license": "Stability AI Community License; verify current license terms before distribution",
+        "status": "candidate_e0_waiting_for_manual_download_and_hash_verification",
+        "upstream_declaration": {
+          "audio_cpp_source": "https://github.com/0xShug0/audio.cpp/blob/9a02e61326aaaf9d462b584ca5e0daba22c0abfc/backend/cpp/audio-cpp/audio.cpp/docs/models/stable_audio.md",
+          "package_snapshot_readme": "https://huggingface.co/audio-cpp/audio.cpp-gguf/blob/09fe073ba154561f4474162e8bd4ab233a848eca/README.md",
+          "status": "fixed audio.cpp docs declare Stable Audio 3 Medium text generation; pinned package README lists its Q8 GGUF and family. Exact LFS SHA-256, LocalAI load and runtime behavior remain unverified"
+        },
+        "note": "Unitale exposes prompt, duration, steps, cfg_scale and seed. LocalAI SoundGeneration maps text and duration; it has no per-request steps, guidance_scale or seed fields. The provider accepts only fixed service defaults steps=8, cfg_scale=1.0 and seed=-1. User prepares the GGUF manually; local hash detects only subsequent local file changes."
+      }
+    ],
+    "seed_vc_candidate": {
+      "capability": "Seed-VC voice conversion and singing conversion / 8381",
+      "model_directory": "SeedVC-MLX",
+      "model_source": "SeedVC-MLX package directory named by the fixed audio.cpp model documentation",
+      "model_source_revision": null,
+      "audio_cpp_family": "seed_vc",
+      "vc_task": "vc",
+      "vc_route": "v2_vc",
+      "svc_task": "svc",
+      "svc_route": "v1_svc",
+      "weight_type": "f16",
+      "audio_cpp_source_commit": "9a02e61326aaaf9d462b584ca5e0daba22c0abfc",
+      "status": "candidate_e0_waiting_for_user_model_directory_backend_build_and_runtime_verification",
+      "note": "The pinned source documents model directory SeedVC-MLX and Seed-VC routes/options. No package repository revision or file hashes are fixed for this model directory; user prepares the full directory manually. Manager records only a local tree hash. No model weights were downloaded."
+    }
+  },
+  "runtime_state": {
+    "localai_installed": false,
+    "localai_binary_staged": true,
+    "localai_binary": "storage/.cache/localai/bin/local-ai",
+    "localai_binary_sha256": "2211f0c5923db1cb9213006bbc34db1f8cddb68b6342026603d9128997920a74",
+    "localai_version_verified": true,
+    "audio_cpp_source_staged": true,
+    "audio_cpp_engine_configured": true,
+    "audio_cpp_engine_build": "passed",
+    "audio_cpp_engine_build_target": "grpc-server + package",
+    "audio_cpp_engine_build_configuration": "CUDA 12.0.140; CMake 3.28.3; GCC 13.3.0; CUDA_ARCHITECTURES=89-real; -j4",
+    "audio_cpp_engine_artifact": {
+      "name": "libengine_runtime.a",
+      "location": "outside the repository in the user-provided source staging area",
+      "size_bytes": 96781546,
+      "sha256": "c02b5391ebd744b4833137e39a4d52287644496f45a80d467d77971cbc82a604"
+    },
+    "audio_cpp_backend_built": true,
+    "go_toolchain_available": false,
+    "cmake_version": "3.28.3",
+    "cuda_toolkit_version": "12.0",
+    "nvidia_gpu": "NVIDIA GeForce RTX 4070 Ti SUPER, 16376 MiB",
+    "host_platform": "WSL2 Ubuntu 24.04 x86_64",
+    "github_source_access": "direct access unavailable; user-provided source archives staged and hashed; archive trees have no Git metadata, so commit tree identity is not independently verified",
+    "native_runtime_default": "unchanged: all services use native unless an explicit per-service provider is selected",
+    "model_weights_downloaded_during_p0": false,
+    "source_code_migrated_during_p0": false,
+    "model_weights_downloaded_during_host_build": false,
+    "audio_cpp_backend_package_staged": true,
+    "audio_cpp_backend_verify_install_passed": true,
+    "audio_cpp_backend_tree_sha256": "5408b33dbc79b9d7488461e75f3c486fd1b7819d8c6c1849219877952e07b209",
+    "audio_cpp_backend_build_status": "passed; user-provided offline deb dependencies unpacked into private prefix"
+  },
+  "evidence": [
+    {
+      "claim": "LocalAI release source tag and commit",
+      "url": "https://github.com/mudler/LocalAI/releases/tag/v4.11.0",
+      "level": "E1"
+    },
+    {
+      "claim": "LocalAI v4.11.0 audio.cpp source revision",
+      "url": "https://raw.githubusercontent.com/mudler/LocalAI/v4.11.0/backend/cpp/audio-cpp/Makefile",
+      "level": "E1"
+    },
+    {
+      "claim": "Qwen3-ASR-1.7B Q8 GGUF package revision, LFS SHA-256, size, and package model/license mapping",
+      "url": "https://huggingface.co/audio-cpp/audio.cpp-gguf/commit/09fe073ba154561f4474162e8bd4ab233a848eca",
+      "level": "E0"
+    },
+    {
+      "claim": "Pinned audio.cpp source declares qwen3_asr with the Qwen3-ASR-1.7B-hf variant and GGUF 16/Q8 support",
+      "url": "https://github.com/0xShug0/audio.cpp/blob/9a02e61326aaaf9d462b584ca5e0daba22c0abfc/README.md",
+      "level": "E1"
+    },
+    {
+      "claim": "Pinned package README declares the Qwen3-ASR-1.7B Q8 filename and Apache-2.0 package mapping; artifact and runtime compatibility remain unverified",
+      "url": "https://huggingface.co/audio-cpp/audio.cpp-gguf/blob/09fe073ba154561f4474162e8bd4ab233a848eca/README.md",
+      "level": "E1"
+    },
+    {
+      "claim": "LocalAI v4.11.0 audio-cpp backend pins its audio.cpp source commit and provides grpc-server/package build targets",
+      "url": "https://raw.githubusercontent.com/mudler/LocalAI/v4.11.0/backend/cpp/audio-cpp/Makefile",
+      "level": "E1"
+    },
+    {
+      "claim": "LocalAI v4.11.0 run command supports host paths and controlled environment configuration",
+      "url": "https://raw.githubusercontent.com/mudler/LocalAI/v4.11.0/core/cli/run.go",
+      "level": "E1"
+    },
+    {
+      "claim": "User-provided LocalAI v4.11.0 Linux amd64 binary reports v4.11.0; binary SHA-256 is recorded above",
+      "url": "",
+      "level": "E0"
+    },
+    {
+      "claim": "User-provided source archives were staged and hashed; CUDA sm_89 grpc-server and backend package builds passed, and manager verify-install passed; source archive commit trees cannot be independently verified without Git metadata.",
+      "url": "",
+      "level": "E0"
+    }
+  ],
+  "p0_open_items": [
+    "下载并验证固定 Qwen3-ASR Q8 GGUF 制品，确认完整文件、组件、sidecar 与许可；未完成前模型仍为 E0。",
+    "准备有授权参考文本的短/中/长及多语种样本，完成 native 重复基线与 quality metrics。",
+    "运行 LocalAI E2 请求、/backend/shutdown 进程回收、GPU 锁交替和异常路径实测。"
+  ],
+  "native_baseline": {
+    "service": "Qwen3_ASR_1.7B",
+    "date": "2026-10-20",
+    "sample": "workspace-only authorized ASR sample; local path omitted",
+    "sample_tracking": "workspace-only; not distributed with the repository",
+    "sample_duration_seconds": 11.008,
+    "sample_format": "48 kHz stereo WAV",
+    "calls": 1,
+    "http_status": 200,
+    "language": "Chinese",
+    "transcript_characters": 41,
+    "reference_text_available": false,
+    "cer_wer": null,
+    "api_elapsed_seconds": 3.863,
+    "worker_process_seconds": 8.62,
+    "gpu_lock_seconds_including_cuda_release_delay": 10.628,
+    "whole_visible_gpu_peak_mib": 6350,
+    "whole_visible_gpu_before_mib": 1640,
+    "whole_visible_gpu_after_mib": 1611,
+    "model_revision": "unknown_preexisting_cache",
+    "artifacts": {
+      "model-00001-of-00002.safetensors": "a4cd1f1a04d90b757dc7f7dd26254e69a013b19e80efe590a83c6a3bde8608d6",
+      "model-00002-of-00002.safetensors": "6e0b9d9e09e2e0238e7ef3cc8a484ab387e91b90f1900bedf88bc92d7929ccfc",
+      "config.json": "2e74a751548b8ad7d7526d29365ad8144c345d8b412b1152d25dc6698452712f",
+      "generation_config.json": "1da527824d81e07118facff437e03f2e24a23311e3bdeb2368973fe77e5f275c"
+    },
+    "quality_status": "single short sample; no reference text, no CER/WER, and no quality conclusion"
+  },
+  "audio_cpp_backend": {
+    "backend_name": "audio-cpp",
+    "source_repository": "https://github.com/0xShug0/audio.cpp",
+    "source_commit": "9a02e61326aaaf9d462b584ca5e0daba22c0abfc",
+    "localai_source_commit": "58830f7ac508845a6f4efa32cfca06af422d4d82",
+    "compute_variant": "CUDA 12",
+    "source_pin_variable": "AUDIO_CPP_VERSION",
+    "makefile_source": "https://raw.githubusercontent.com/mudler/LocalAI/v4.11.0/backend/cpp/audio-cpp/Makefile",
+    "build_targets": [
+      "grpc-server",
+      "package"
+    ],
+    "installation_status": "private_host_package_staged_and_verified_no_model_inference",
+    "required_runtime_entrypoint": "backends/audio-cpp/run.sh"
+  }
+}

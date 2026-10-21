@@ -9,11 +9,21 @@ import os
 import re
 import sys
 import threading
+from pathlib import Path
 from typing import Literal
 
 import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, Response, UploadFile
 from fastapi.responses import JSONResponse
+from inference_gateway import (
+    BackendQuarantinedError,
+    LocalAIClient,
+    LocalAIRequestError,
+    LocalAIUnavailableError,
+    UnsupportedCapabilityError,
+    load_gateway_config,
+)
+from inference_gateway.execution import execute_localai_operation
 from pydantic import Field
 from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -167,6 +177,11 @@ DOTS_TTS_SOAR_PROFILE_INFERENCE = env_bool(
 )
 DOTS_TTS_SOAR_REQUEST_TIMEOUT = float(
     os.getenv("DOTS_TTS_SOAR_REQUEST_TIMEOUT", str(DOTS_TTS_SOAR_REQUEST_TIMEOUT_DEFAULT))
+)
+GATEWAY_CONFIG = load_gateway_config(
+    service_provider_env="UNITALE_DOTS_TTS_SOAR_PROVIDER",
+    default_model="unitale.dots-tts-soar.q8-0",
+    request_timeout=DOTS_TTS_SOAR_REQUEST_TIMEOUT,
 )
 DOTS_TTS_SOAR_WORKER_SCRIPT = os.path.join(SERVICE_DIR, "worker.py")
 DOTS_TTS_SOAR_WORKER_TMP_DIR = os.path.join(RUNTIME_CACHE_DIR, "dots_tts_soar_worker")
@@ -390,12 +405,18 @@ class DotsTtsSoarWorkerManager:
 
 
 manager = DotsTtsSoarWorkerManager()
+LAST_LOCALAI_ERROR: str | None = None
 
 
 @app.get("/v1/health")
 def health():
     """返回 dots 模型、源码、worker 和 GPU 的就绪状态。"""
     cuda = cuda_status()
+    localai_client = LocalAIClient(GATEWAY_CONFIG) if GATEWAY_CONFIG.provider == "localai" else None
+    localai_healthy = bool(localai_client and localai_client.health())
+    localai_model_registered = bool(
+        localai_client and localai_healthy and localai_client.model_ready()
+    )
     required_files = {
         name: os.path.isfile(os.path.join(DOTS_TTS_SOAR_MODEL_DIR, name))
         for name in (
@@ -426,11 +447,21 @@ def health():
             "torch": module_available("torch"),
             "cuda": cuda["available"],
             "flash_attn": module_available("flash_attn"),
+            "selected_provider": GATEWAY_CONFIG.provider,
+            "selected_provider_ready": (
+                localai_model_registered
+                if localai_client
+                else all(required_files.values()) and cuda["available"]
+            ),
+            "localai_healthy": localai_healthy,
+            "localai_model_registered": localai_model_registered,
         },
         "cuda": cuda,
         "runtime": {
             "port": API_PORT,
             "worker_runtime": "uv",
+            "provider": GATEWAY_CONFIG.provider,
+            "localai_model": GATEWAY_CONFIG.model if localai_client else None,
             "worker_python": sys.executable,
             "model": "rednote-hilab/dots.tts-soar",
             "model_lifecycle": "one request -> one worker -> explicit CUDA cleanup -> process exit releases VRAM",
@@ -453,8 +484,9 @@ def health():
                 "not required; dots.tts uses native PyTorch flex_attention and does not import flash_attn"
             ),
             "clone_contract": "prompt_audio + optional exact prompt_text; 48 kHz mono output",
+            "localai_scope": "single-segment DotTTS SOAR only; request-time precision and Python-only controls are unsupported",
         },
-        "last_errors": {"dots_tts_soar": manager.last_error},
+        "last_errors": {"dots_tts_soar": manager.last_error, "localai": LAST_LOCALAI_ERROR},
     }
 
 
@@ -489,6 +521,8 @@ def check_audio_exists(file_name: str):
 @app.post("/v1/dotsTTS/clone")
 def synthesize(request: DotsTtsSoarSynthesizeRequest):
     """串行执行 dots.tts-soar 克隆并返回生成 WAV。"""
+    global LAST_LOCALAI_ERROR
+
     try:
         payload = manager.build_worker_payload(request)
     except HTTPException:
@@ -496,6 +530,37 @@ def synthesize(request: DotsTtsSoarSynthesizeRequest):
     except Exception as exc:
         LOGGER.exception("dots.tts-soar request preflight failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    if GATEWAY_CONFIG.provider == "localai":
+        try:
+            localai_request = build_localai_request(request, payload)
+            audio_bytes, _elapsed = execute_localai_operation(
+                config=GATEWAY_CONFIG,
+                operation=lambda client: client.synthesize_dots_speech(**localai_request),
+            )
+            saved_output_path = persist_audio_bytes(
+                audio_bytes,
+                "dots_tts_soar",
+                DOTS_TTS_SOAR_OUTPUT_DIR,
+            )
+            manager.last_error = None
+            LAST_LOCALAI_ERROR = None
+            print(f"[dots.tts-soar] 已保存 LocalAI 生成音频: {saved_output_path}")
+            return Response(content=audio_bytes, media_type="audio/wav")
+        except UnsupportedCapabilityError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except GpuLockTimeoutError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except BackendQuarantinedError as exc:
+            LAST_LOCALAI_ERROR = str(exc)
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except (LocalAIRequestError, LocalAIUnavailableError) as exc:
+            LAST_LOCALAI_ERROR = str(exc)
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except Exception as exc:
+            LAST_LOCALAI_ERROR = str(exc)
+            LOGGER.exception("LocalAI dots.tts-soar request failed")
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     try:
         with gpu_runtime_lock("dots_tts_soar/synthesize"):
@@ -518,6 +583,51 @@ def synthesize(request: DotsTtsSoarSynthesizeRequest):
                     wait_after_cuda_release("after dots.tts-soar worker")
     except GpuLockTimeoutError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+def build_localai_request(
+    request: DotsTtsSoarSynthesizeRequest,
+    worker_payload: dict[str, object],
+) -> dict[str, object]:
+    """映射固定 audio.cpp DotTTS SOAR 能力并拒绝多段或 Python 专用设置。"""
+    if request.precision is not None:
+        raise UnsupportedCapabilityError(
+            "LocalAI DotTTS 使用注册 GGUF 的固定量化精度，不接受请求级 precision。"
+        )
+    if request.normalize_text:
+        raise UnsupportedCapabilityError(
+            "固定 audio.cpp DotTTS 接口没有映射 normalize_text 的请求选项。"
+        )
+    if request.profile_inference:
+        raise UnsupportedCapabilityError(
+            "固定 audio.cpp DotTTS 接口不提供 profile_inference 输出。"
+        )
+
+    text = str(worker_payload["text"])
+    max_chars = (
+        request.max_chars_per_chunk
+        if request.max_chars_per_chunk is not None
+        else DOTS_TTS_SOAR_MAX_CHARS_PER_CHUNK
+    )
+    if max_chars > 0 and len(text) > max_chars:
+        raise UnsupportedCapabilityError(
+            "LocalAI DotTTS 试点仅接受一个原生文本片段；请切回 native 处理需要分段和停顿拼接的文本。"
+        )
+
+    return {
+        "text": text,
+        "voice_path": Path(str(worker_payload["ref_audio_path"])),
+        "language": worker_payload["language"],
+        "reference_text": worker_payload["prompt_text"],
+        "max_tokens": int(worker_payload["max_generate_length"]),
+        "seed": int(worker_payload["seed"]),
+        "guidance_scale": float(worker_payload["guidance_scale"]),
+        "num_inference_steps": int(worker_payload["num_steps"]),
+        "sampler_mode": str(worker_payload["ode_method"]),
+        "speaker_scale": float(worker_payload["speaker_scale"]),
+        "template_name": worker_payload["template_name"],
+        "text_chunk_size": max(len(text) + 1, 1),
+    }
 
 
 if __name__ == "__main__":

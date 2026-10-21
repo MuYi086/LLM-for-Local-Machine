@@ -19,6 +19,15 @@ from typing import Any
 import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, Response, UploadFile
 from fastapi.responses import JSONResponse
+from inference_gateway import (
+    BackendQuarantinedError,
+    LocalAIClient,
+    LocalAIRequestError,
+    LocalAIUnavailableError,
+    UnsupportedCapabilityError,
+    load_gateway_config,
+)
+from inference_gateway.execution import execute_localai_operation
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -127,6 +136,12 @@ DEFAULT_MAX_TEXT_TOKENS_PER_SEGMENT = int(
 DEFAULT_CROSS_FADE_DURATION = float(os.getenv("CONFUCIUS4_TTS_CROSS_FADE_DURATION", "0.3"))
 DEFAULT_EDGE_FADE_DURATION = float(os.getenv("CONFUCIUS4_TTS_EDGE_FADE_DURATION", "0.1"))
 DEFAULT_EDGE_PAD_DURATION = float(os.getenv("CONFUCIUS4_TTS_EDGE_PAD_DURATION", "0.1"))
+GATEWAY_CONFIG = load_gateway_config(
+    service_provider_env="UNITALE_CONFUCIUS4_TTS_PROVIDER",
+    default_model="unitale.confucius4-tts.orig",
+    request_timeout=REQUEST_TIMEOUT,
+)
+LAST_LOCALAI_ERROR: str | None = None
 
 os.environ.setdefault("HF_HOME", HF_MIRROR_DIR)
 os.environ.setdefault("HF_MODULES_CACHE", str(RUNTIME_CACHE_DIR / "hf_modules"))
@@ -286,11 +301,20 @@ class Confucius4TtsWorkerManager:
         self.last_error: str | None = None
         self.last_output_path: str | None = None
 
-    def build_worker_payload(self, request: Confucius4TtsRequest) -> dict[str, Any]:
-        """完成纯 CPU/文件预检，并将请求字段合成为 worker JSON。"""
+    def build_worker_payload(
+        self,
+        request: Confucius4TtsRequest,
+        *,
+        provider: str = "native",
+    ) -> dict[str, Any]:
+        """完成参考文件预检，并按 provider 准备请求输入。"""
         reference_path = prompt_audio_path(request.audio_path)
         if not os.path.isfile(reference_path):
             raise FileNotFoundError(f"参考音频不存在: {request.audio_path}")
+        payload = request.model_dump()
+        payload["reference_audio_path"] = reference_path
+        if provider == "localai":
+            return payload
         if not os.path.isfile(WORKER_SCRIPT):
             raise RuntimeError(f"Confucius4-TTS worker 脚本不存在: {WORKER_SCRIPT}")
         if not required_model_files_ready():
@@ -306,10 +330,8 @@ class Confucius4TtsWorkerManager:
         if not os.path.isfile(CONFIG_TEMPLATE_PATH):
             raise FileNotFoundError(f"Confucius4-TTS 配置模板不存在: {CONFIG_TEMPLATE_PATH}")
 
-        payload = request.model_dump()
         payload.update(
             {
-                "reference_audio_path": reference_path,
                 "model_dir": MODEL_DIR,
                 "code_path": CODE_PATH,
                 "w2v_bert_model_dir": W2V_BERT_MODEL_DIR,
@@ -418,6 +440,21 @@ manager = Confucius4TtsWorkerManager()
 def health():
     """返回服务、模型文件、源码和 GPU 状态，不加载任何权重。"""
     cuda = cuda_status()
+    localai_client = LocalAIClient(GATEWAY_CONFIG) if GATEWAY_CONFIG.provider == "localai" else None
+    localai_healthy = bool(localai_client and localai_client.health())
+    localai_model_registered = bool(
+        localai_client and localai_healthy and localai_client.model_ready()
+    )
+    native_ready = (
+        os.path.isfile(WORKER_SCRIPT)
+        and required_model_files_ready()
+        and confucius_code_is_ready()
+        and os.path.isdir(W2V_BERT_MODEL_DIR)
+        and os.path.isdir(VOCODER_MODEL_DIR)
+        and os.path.isfile(STYLE_ENCODER_CHECKPOINT)
+        and os.path.isfile(CONFIG_TEMPLATE_PATH)
+        and cuda["available"]
+    )
     return {
         "code": 200,
         "paths": {
@@ -446,11 +483,20 @@ def health():
             "torchaudio": module_available("torchaudio"),
             "transformers": module_available("transformers"),
             "cuda": cuda["available"],
+            "selected_provider": GATEWAY_CONFIG.provider,
+            "selected_provider_ready": (
+                localai_healthy and localai_model_registered if localai_client else native_ready
+            ),
+            "localai_healthy": localai_healthy,
+            "localai_model_registered": localai_model_registered,
         },
         "cuda": cuda,
         "runtime": {
             "native_vocalization_duration": True,
             "worker_runtime": "uv",
+            "provider": GATEWAY_CONFIG.provider,
+            "localai_model": GATEWAY_CONFIG.model if localai_client else None,
+            "localai_scope": "Confucius4-TTS single-request clone; sidecar, raw mode, verbose output, and vocalization duration are unsupported",
             "worker_python": sys.executable,
             "model_lifecycle": "one request -> one worker -> process exit releases VRAM",
             "local_files_only": LOCAL_FILES_ONLY,
@@ -459,7 +505,7 @@ def health():
             "output_dir": str(OUTPUT_DIR),
             "gpu_scheduling": "shared exclusive file lock",
         },
-        "last_errors": {"confucius4_tts": manager.last_error},
+        "last_errors": {"confucius4_tts": manager.last_error, "localai": LAST_LOCALAI_ERROR},
     }
 
 
@@ -492,12 +538,40 @@ def check_audio_exists(file_name: str):
 def generate(request: Confucius4TtsRequest):
     """串行执行一次 Confucius4-TTS 零样本克隆，并返回生成 WAV。"""
     try:
-        payload = manager.build_worker_payload(request)
+        payload = manager.build_worker_payload(request, provider=GATEWAY_CONFIG.provider)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
         LOGGER.exception("Confucius4-TTS request preflight failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    if GATEWAY_CONFIG.provider == "localai":
+        global LAST_LOCALAI_ERROR
+        try:
+            localai_request = build_localai_request(request, payload)
+            audio_bytes, _elapsed = execute_localai_operation(
+                config=GATEWAY_CONFIG,
+                operation=lambda client: client.synthesize_confucius4_speech(**localai_request),
+            )
+            saved_output_path = persist_audio_bytes(audio_bytes, OUTPUT_DIR)
+            manager.last_error = None
+            LAST_LOCALAI_ERROR = None
+            print(f"[Confucius4-TTS] 已保存 LocalAI 生成音频: {saved_output_path}")
+            return Response(content=audio_bytes, media_type="audio/wav")
+        except UnsupportedCapabilityError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except GpuLockTimeoutError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except BackendQuarantinedError as exc:
+            LAST_LOCALAI_ERROR = str(exc)
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except (LocalAIRequestError, LocalAIUnavailableError) as exc:
+            LAST_LOCALAI_ERROR = str(exc)
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except Exception as exc:
+            LAST_LOCALAI_ERROR = str(exc)
+            LOGGER.exception("LocalAI Confucius4-TTS request failed")
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     try:
         with gpu_runtime_lock("confucius4_tts/generate"):
@@ -514,6 +588,63 @@ def generate(request: Confucius4TtsRequest):
                     wait_after_cuda_release("after Confucius4-TTS worker")
     except GpuLockTimeoutError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+def build_localai_request(
+    request: Confucius4TtsRequest,
+    worker_payload: dict[str, Any],
+) -> dict[str, object]:
+    """映射固定 audio.cpp Confucius4-TTS 字段并拒绝 native-only 控制。"""
+    if request.raw:
+        raise UnsupportedCapabilityError("LocalAI Confucius4-TTS 不支持 native raw 文本模式。")
+    if request.verbose:
+        raise UnsupportedCapabilityError("LocalAI Confucius4-TTS 不提供 native verbose 推理信息。")
+    if request.vocalization_duration_seconds is not None:
+        raise UnsupportedCapabilityError(
+            "LocalAI Confucius4-TTS 没有原生感叹音时长控制；请切回 native。"
+        )
+    if DEVICE.lower() not in {"cuda", "cuda:0"}:
+        raise UnsupportedCapabilityError("当前 LocalAI Confucius4-TTS 候选固定使用 CUDA device 0。")
+
+    supported_languages = {
+        "zh",
+        "en",
+        "ja",
+        "ko",
+        "de",
+        "fr",
+        "es",
+        "id",
+        "it",
+        "th",
+        "pt",
+        "ru",
+        "ms",
+        "vi",
+    }
+    language = request.lang.strip().lower()
+    if language not in supported_languages:
+        raise UnsupportedCapabilityError(
+            f"固定 audio.cpp Confucius4-TTS 文档没有声明语言 {request.lang!r}。"
+        )
+
+    return {
+        "text": str(worker_payload["text"]),
+        "voice_path": Path(str(worker_payload["reference_audio_path"])),
+        "language": language,
+        "temperature": float(worker_payload["temperature"]),
+        "top_p": float(worker_payload["top_p"]),
+        "top_k": int(worker_payload["top_k"]),
+        "num_beams": int(worker_payload["num_beams"]),
+        "repetition_penalty": float(worker_payload["repetition_penalty"]),
+        "max_tokens": int(worker_payload["max_length"]),
+        "num_inference_steps": int(worker_payload["n_timesteps"]),
+        "guidance_scale": float(worker_payload["inference_cfg_rate"]),
+        "text_chunk_size": int(worker_payload["max_text_tokens_per_segment"]),
+        "cross_fade_duration_sec": float(worker_payload["cross_fade_duration"]),
+        "edge_fade_duration_sec": float(worker_payload["edge_fade_duration"]),
+        "edge_pad_duration_sec": float(worker_payload["edge_pad_duration"]),
+    }
 
 
 if __name__ == "__main__":

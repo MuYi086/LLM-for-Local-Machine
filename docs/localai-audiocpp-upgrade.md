@@ -1,9 +1,9 @@
 # LocalAI 与 audio.cpp 分阶段升级方案
 
-> 状态：实施设计，尚未接入运行代码。编写日期：2026-10-20。
+> 状态：软件侧升级已完成，进入权重准备后的模型验收。P0–P6 固定版本、候选筛选、LocalAI/audio.cpp 宿主机构建与 provider 代码已落地；LocalAI v4.11.0 CUDA `sm_89` backend 使用用户提供的离线 deb 依赖构建、打包，并通过安装指纹及无模型 readiness/启停检查。固定 `unitale.worker` v1 外部 gRPC bridge 已覆盖十个服务项目、十一个 model ID；TIGER-DnR 三路 ZIP 通过不透明文件引用传输到受控本机缓存，保留原请求范围与三路 WAV 合同。字段传递、产物类型、共享 GPU 锁和无模型故障清理有回归。四个 Index 服务已从仓库维护范围移除。本轮未主动下载模型；本机部分原生 HF 模型目录已通过只读就绪检查，直接 LocalAI 候选缺口见[手动模型准备状态](../reports/localai/manual-model-readiness.md)。真实推理、质量/资源验收和 P8 观察期仍未完成。更新日期：2026-10-21。
 > 仓库核对基线：`26d03f28184598ba6fe906843347794d8fc1832f`。
 > 读者：后续执行升级的开发者、编码模型与验收人员。
-> 本文中的新增目录、配置、状态字段和测试文件均为**拟新增**；不能据此声称已实现。
+> 本文中的新增目录、配置、状态字段和测试文件有一部分已实现；本阶段报告和验收清单会区分代码落地与真实模型验收。
 
 ## 1. 目标与讨论结论
 
@@ -27,7 +27,7 @@ audio.cpp。现有业务 API、音色引用、产物存储、CPU 空间渲染继
 
 ### 1.1 完成标准
 
-本次交付是升级文档，不执行安装、下载权重或迁移运行代码。未来实施完成应满足：
+本文件是执行手册。当前升级包含运行代码、配置、无模型测试、真实 smoke 与运维文档；完整交付应满足：
 
 1. 迁移范围内的推理经 LocalAI 调用，audio.cpp 支持且通过验证的能力使用 audio.cpp。
 2. 现有客户端合同、存储语义、错误边界与资源互斥通过回归；每项转换有精确版本和证据。
@@ -39,15 +39,18 @@ audio.cpp。现有业务 API、音色引用、产物存储、CPU 空间渲染继
 
 | 结论 | 证据 | 对方案的影响 |
 | --- | --- | --- |
-| 现有 27 个服务 uv 项目，启动 30 个 HTTP 进程 | [start.sh](../start.sh)、[README](../README.md)、各服务 main.py | 按服务接入，不能一开始合并 Python 环境 |
+| 现有 23 个服务 uv 项目，启动 26 个 HTTP 进程 | [start.sh](../start.sh)、[README](../README.md)、各服务 main.py | 按服务接入，不能一开始合并 Python 环境 |
 | 主进程与 worker 分离，GPU 用共享文件锁 | [ASR main.py](../Qwen3_ASR_1.7B/main.py)、[共享 GPU 实现](../unitale_runtime/src/unitale_runtime/gpu.py) | 迁移必须覆盖启动、退出与锁作用域 |
 | LocalAI 已提供 `audio-cpp` 后端，需显式指定 | [LocalAI audio.cpp 文档](https://localai.io/docs/features/audio-cpp/) | 优先评估现有后端，避免默认另建 HTTP 直连 |
-| Qwen3 ASR/TTS 是不同 family；GGUF 格式不能跨引擎想当然复用 | [audio.cpp Qwen3 文档](https://github.com/0xShug0/audio.cpp/blob/main/docs/models/qwen3.md) | 分开注册；核对主模型、tokenizer、音频组件和转换版本 |
+| 固定 audio.cpp commit 将 Qwen3 ASR、TTS 声明为不同 family；该 commit 列有 Qwen3-ASR-1.7B-hf 与 GGUF 16/Q8，固定模型包快照也列有 Q8 文件 | [固定 audio.cpp README](https://github.com/0xShug0/audio.cpp/blob/9a02e61326aaaf9d462b584ca5e0daba22c0abfc/README.md)、[固定 GGUF 包 README](https://huggingface.co/audio-cpp/audio.cpp-gguf/blob/09fe073ba154561f4474162e8bd4ab233a848eca/README.md) | 上游声明达到 E1；候选权重尚未下载，GGUF 元数据/内嵌 sidecar、LocalAI 固定 backend 加载和本机推理仍未验证，不能升为 E2/E3 |
 | LocalAI 支持外部 gRPC 后端接入 | [LocalAI advanced](https://localai.io/docs/advanced/) | 原生后端缺字段时可扩展协议/后端适配 |
 
-当前没有本仓库上的 LocalAI/audio.cpp 实测报告。上游公开页面可能领先或落后于安装版本。
-P0 必须固定 LocalAI commit/tag、后端镜像 digest、其内嵌 audio.cpp commit、权重 revision
-及 SHA-256。不得使用网站首页版本号、`latest` 或某个 GGUF 文件名替代版本锁定。
+截至本次更新，仍没有本仓库上的 LocalAI/audio.cpp 实测报告。Qwen3-ASR native worker 已对工作区
+中的 11.008 秒样本完成一次请求；该 WAV 被 `.gitignore` 忽略，同目录 `subtitles.md` 是文本 Demo 输入，
+没有证据证明其与音频对齐。量化候选、LocalAI 上传/响应/停止和完整音频语料尚未实测。
+上游公开页面可能领先或落后于安装版本。
+P0 必须固定 LocalAI commit/tag、audio.cpp 源码 commit、权重 revision 及 SHA-256。不得使用网站首页版本号、
+滚动 Gallery 包或某个 GGUF 文件名替代版本锁定。
 
 必须区分四级证据：E0=候选；E1=固定版本上游代码声明；E2=LocalAI 完整传参与产物通过；
 E3=本机质量、资源、异常场景通过。本文所有服务的迁移状态初始为 E0，不能直接标记生产可用。
@@ -81,6 +84,7 @@ flowchart TD
 | audio.cpp | 已验证模型的实际推理 | 使用固定版本模型包；不能仅因扩展名相同复用权重 |
 | 原生适配后端 | LocalAI 到现有一次性 Python/llama worker 的桥接 | 保留各 uv 环境和原生 I/O |
 | `unitale_runtime` | 文件引用、存储、轻量租约与指标 | 不导入 FastAPI、Torch、模型包；不得增加 HTTP SDK 依赖 |
+| `unitale_localai_bridge/` | loopback gRPC 外部 backend，通过固定协议启动 allowlisted one-shot worker | 只依赖轻量 gateway/runtime 与 gRPC；不导入 FastAPI、Torch 或模型包 |
 
 迁移期保留多个 HTTP 入口是合同兼容措施。完成后的**统一推理入口**是 LocalAI，
 业务端口数量是否减少属于后续独立 API 版本迁移，不作为本次成功条件。
@@ -89,7 +93,7 @@ MiMo 云端、Steam Audio CPU 后处理无需为了形式统一而通过 audio.c
 ### 3.2 推荐的新增代码布局
 
 ```text
-inference_gateway/                 拟新增：轻量内部 Python 包，非集中式 HTTP API
+inference_gateway/                 已新增：轻量内部 Python 包，当前接入 Qwen3-ASR 试点
   providers/                       native / localai provider 协议及转换
   localai_client.py                有界网络调用、错误分类、内部鉴权
   lifecycle.py                     请求退出确认、取消、异常隔离
@@ -99,12 +103,13 @@ localai/
   models/                          经验证的模型 YAML 模板
   backends/                        仅存自有适配代码，不提交第三方源码
   manifests/                       版本、权重 hash、能力与发布清单
-scripts/localai/                    安装预检、启动、停止、真实 smoke 工具
+scripts/localai/                    已有本机二进制校验、进程组启停、隔离恢复和候选制品预检；真实 smoke 待做
 reports/localai/                    仅提交脱敏的验收摘要和指标
 ```
 
-新增包是否独立建 uv 项目由 P1 决定并记录；如果作为 editable 共享包，不另建无用锁文件。
-引用它的服务更新依赖及各自 `uv.lock`。实际权重、下载缓存、临时音频、生成结果放在仓库外或
+`inference_gateway` 已作为 editable 共享包接入多个 audio.cpp provider，以及 SheetSage2、MERT、YuE2-Vae、
+SoulX 和 Ditto 的 LocalAI worker provider。`unitale_localai_bridge` 使用自己的 uv 环境承载 gRPC backend；
+manifest 固定模型 ID、工作目录、脚本、输出扩展名、超时与环境白名单。实际权重、下载缓存、临时音频、生成结果放在仓库外或
 已忽略的运行目录，报告不嵌入上传内容、密钥或机器专用路径。
 
 ## 4. 单卡资源与生命周期方案
@@ -130,7 +135,11 @@ LocalAI 原生后端与该适配后端是两种实施选项，不同时负责一
 LocalAI 后端不再次获取同一锁；迁移期的旧 worker 路径仍由原有服务持锁。
 P7 的原生 gRPC 桥接直接调用 worker，不能回调一个会重复获取锁的服务 HTTP 路由。
 
-- 所有服务与容器指向同一个锁文件 inode；相同字符串但不同容器文件系统不算共享锁。
+Qwen3-ASR 试接入使用 `/backend/shutdown` 收尾。LocalAI Backend Monitor 文档将成功响应定义为
+HTTP 200 确认、backend 错误或模型未加载返回 500；这只证明 API 收到成功停止结果，固定宿主机版本仍须通过
+进程与显存退出 smoke 才能把此行为升级为生命周期验收。
+
+- 所有服务与宿主机 LocalAI 指向同一个 GPU 锁文件 inode；只配置相同路径字符串但实际不是同一文件不算共享锁。
 - LocalAI 只绑定本机私有地址；管理/推理接口通过权限隔离，关闭自动预加载与非受控推理入口。
   WebUI 的试运行也会抢 GPU，测试时必须由同一受控入口获取租约。
 - 默认排队 900 秒，新增配置拒绝非正值；CPU 解码、格式检查、缺权重检查在排队前完成。
@@ -222,7 +231,7 @@ UNAVAILABLE、QUEUE_TIMEOUT、EXECUTION_TIMEOUT、BACKEND_FAILURE、INVALID_ARTI
 - 参考音色仍走 `AudioReferenceStore`，不复制到 clone 形成重复 WAV；sidecar 和 hash 仍原子更新。
 - 临时文件用 request_id 隔离，结果路径必须限制在任务目录内；拒绝路径穿越、外部 URL、越界符号链接。
 - LocalAI 返回文件引用时，验证固定版本的下载/读取契约及实际存在性；不能把响应头中的文件名
-  当作任意服务器文件读取授权。跨容器共享任务卷时保持两端可见路径映射。
+  当作任意服务器文件读取授权。LocalAI 与业务进程在同一宿主机运行，任务目录通过本机路径共享并限制在受控根目录内。
 - VAE latent、MERT NPZ、SheetSage ZIP、视频继续使用各自协议和保留策略；不归入 WAV 自动清理。
 
 ## 6. 全服务迁移矩阵
@@ -240,22 +249,18 @@ family 名称由固定版本 metadata/帮助信息读取，不能把服务目录
 | `firered_tts3` / 8304、8325 | P3 | Instruct/Base 两模式，设计/克隆及当前已接入输出字段 |
 | `LongCat_AudioDiT_3.5B_bf16` / 8323 | P3 | 准确参考转写、扩散参数 |
 | `dots_tts_soar` / 8324 | P3 | 跨语言克隆、参考约束 |
-| `Confucius4_TTS` / 8361 | P3 | 默认 zh、无需参考转写、原生时长行为 |
+| `Confucius4_TTS` / 8361 | P3 | 默认 zh、无需参考转写、sidecar 不参与推理、原生时长行为 |
 | `moss_soundEffect` / 8312 | P4 | 精确 v2.0，时长和声效语义 |
-| `ace_step_1_5` / 8313 | P4 | 当前 XL Turbo 变体、歌词/器乐及当前已实现编辑模式 |
-| `stable_audio_3_medium` / 8311 | P4 | Medium 精确型号，生成/补全/续写；不能用 Open/Small 替代 |
-| `YuE2-3B` / 8314 | P4 | 完整多组件包、歌词/ABC/cot/分阶段采样 |
+| `ace_step_1_5` / 8313 | P4 | 当前 XL Turbo BGM 路由；当前接口不接收歌词或编辑字段，空歌词不等于实测无歌声 |
+| `stable_audio_3_medium` / 8311 | P4 | Medium 精确型号文本生成；当前服务无源音频字段，不能迁移补全/续写；不能用 Open/Small 替代 |
+| `YuE2-3B` / 8314 | P4/P7 | 完整多组件包、歌词/ABC/cot/分阶段采样；已接入固定 one-shot worker bridge，字段与 WAV 输出的真实模型调用待验收 |
 | `Step_Audio_EditX` / 8331 | P5 | 迭代编辑、情绪/风格/副语言，不能降为普通 TTS |
 | `moss_audio_4b_thinking` / 8341、8342 | P5 | Thinking/Instruct 理解与推理输出；ASR 不等于理解 |
-| `TIGER-DnR` / 8351 | P5 | 原模型与三类 Stem；其他分离模型不能作为透明替换 |
+| `TIGER-DnR` / 8351 | P5/P7 | 原模型与三类 Stem；其他分离模型不能作为透明替换。P7 使用受控共享目录文件引用返回 ZIP，服务校验随机 ID、MIME、扩展名、大小及恰好三个 Stem 名称 |
 | `seed-vc` / 8381 | P5 | 语音 VC 与 F0 歌声 SVC 分开验证 |
-| `Index-Echo-S2ST-9B-GGUF` / 8382 | P5/P7 | 完整 DubbingBridgeModel 原生包；禁止 ASR→翻译→TTS 替换 |
 | `SheetSage2` / 8315 | P6/P7 | 乐谱/MIDI/标注 ZIP 与固定 revision 父模型 |
 | `YuE2-Vae` / 8316 | P6/P7 | 独立 encode/decode、`[T,64]`、FP32 与分块解码 |
 | `MERT-v2-FullSong` / 8317 | P6/P7 | 整曲/逐帧表征、30–360 秒、24 kHz；不是 speaker embedding |
-| `Index-Homura-9B-GGUF` / 8383 | P7 原生桥接 | 文本 llama.cpp；音节/术语约束，非 audio.cpp |
-| `Index-Nailong-9B-GGUF` / 8384 | P7 原生桥接 | NativeLong 固定模板/贪心，不丢长文预算 |
-| `Index-Translate-9B-GGUF` / 8385 | P7 原生桥接 | 文本/图片与 mmproj、硬软约束，text/plain |
 | `SoulX-FlashHead-1_3B` / 8391 | P7 原生桥接 | Lite/Pro、图像引用、带声音 MP4，离线单卡 |
 | `ditto` / 8392 | P7 原生桥接 | 原生依赖、图像引用、带声音 MP4，离线单卡 |
 | `mimo_tts` / 8303 | 保留云服务 | API key 环境读取；不迁移 audio.cpp |
@@ -265,6 +270,19 @@ LocalAI 的 audio-cpp 接口涵盖 speech、transcriptions、sound-generation �
 但独立 codec encode/decode、音频理解与表征不应套入这些接口。当前文档明确列出部分 RPC 未实现，
 所以 P6 应优先调查结构化扩展或原生桥接，而不是假定 YuE2 歌曲可生成就能提供独立 VAE。
 参见 [audio-cpp 能力边界](https://localai.io/docs/features/audio-cpp/)。
+
+### 6.1 固定 audio.cpp family 筛选
+
+已将固定 commit `9a02e61326aaaf9d462b584ca5e0daba22c0abfc` 的 README family、任务与变体声明
+逐项对照 24 个仓库入口：13 个服务有同族候选，9 个服务没有精确模型族，控制面/云端 2 个服务
+属于范围外。筛选和逐项缺口见[固定 family 报告](../reports/localai/audio-cpp-family-screen.md)，
+机器记录在 [`capabilities.json`](../localai/manifests/capabilities.json) 的
+`audio_cpp_family_screen`。能力校验器检查该筛选完整覆盖服务清单。
+
+这里的候选只达到 README 声明级 E1，不代表固定 LocalAI backend 可加载对应 family，也不证明
+字段、响应或质量等价。SheetSage2 的丰富转录产物和 Seed-VC 的 SVC 是部分能力候选；YuE2 VAE、
+MERT 表征、MOSS Audio 理解、三路 TIGER 分离与人像视频没有精确候选。
+相同任务标签下的其他模型不作透明替换，继续按模型合同评估 audio.cpp 移植或 P7 原生桥接。
 
 ## 7. 分阶段执行手册
 
@@ -282,9 +300,22 @@ LocalAI 的 audio-cpp 接口涵盖 speech、transcriptions、sound-generation �
 4. 固定 LocalAI/audio-cpp 版本组合；记录包内 audio.cpp revision，核对模型格式与组件清单。
 5. 准备脱敏或授权的短、中、长样本，分别运行现有模型基线；无法运行的服务注明原因。
 
-交付：`localai/manifests/versions.json`、`capabilities.json`、`reports/localai/baseline.md`。
+交付：`localai/manifests/versions.json`、`localai/manifests/capabilities.json`、
+`reports/localai/baseline.md`。
 验收：每个服务均有去向和缺口；版本值不能为 TODO/latest；现有质量门禁结果被记录。
 回滚：删除新增报告/模板即可；无运行配置改变。
+
+能力清单当前覆盖 24 个服务入口（23 个 uv 项目与控制面）、79 条路由、17 个请求 schema 和
+268 个请求字段，以及固定 audio.cpp source revision 的 family 筛选。`scripts/localai/validate_capabilities.py` 用 Python AST 对照 FastAPI 路由方法、
+路径和装饰器行号、路由参数名/类型/默认值/必填性，以及 Pydantic 字段名、类型、默认值、
+约束、必填性和源码行；同时核对请求模型字段与迁移映射。API 源码变更后需更新清单并运行：
+
+```bash
+uv run --project qa --locked python scripts/localai/validate_capabilities.py
+```
+
+该校验只证明静态源码盘点和字段映射快照保持一致；family 筛选只登记固定 README 的 E1 声明，
+两者都不提升任何模型的 LocalAI E2 或本机 E3 证据等级。
 
 ### P1：搭建隔离 LocalAI 与受控执行边界
 
@@ -302,6 +333,22 @@ LocalAI 的 audio-cpp 接口涵盖 speech、transcriptions、sound-generation �
 验收：原服务默认 native；无权重可跑 mock；成功/失败/超时/断连/父进程死亡均能清理；
 单卡互斥实测必须在 P2 默认切换前完成。回滚：关闭新增开关、停止整个 LocalAI 后端组。
 
+当前实现进度：`scripts/localai/manager.py` 已改为校验宿主机 LocalAI `v4.11.0` 二进制和 audio-cpp backend
+启动入口及整棵 backend 文件树的 SHA-256 指纹，通过 util-linux `setsid` 与 `posix_spawn` 建立并确认独立 session/process group 后启动 `local-ai run`；仅绑定 loopback、限制单活动
+backend、关闭 gallery 自动加载/API 和 WebUI，并执行有鉴权的 `/readyz` 检查。启动、停止与失败回收采用有限期限，
+owner watcher 在父 shell 异常退出后回收所记录的进程组；状态文件记录 PID、启动 tick 和随机运行标识，PID 身份不匹配时
+拒绝发送信号。Qwen3-ASR 候选注册和启动前预检继续校验权重 size/SHA-256 与 YAML 模板，按 4 MiB 分块读取。
+`start.sh` 仅在 `UNITALE_LOCALAI_ENABLED=true` 且 `UNITALE_LOCALAI_MANAGED=true` 时管理宿主机进程。2026-10-21
+已将用户提供的 LocalAI `v4.11.0` Linux amd64 二进制复制到忽略的运行目录，`--version` 返回 `v4.11.0`，SHA-256
+为 `2211f0c5923db1cb9213006bbc34db1f8cddb68b6342026603d9128997920a74`。用户提供的 LocalAI 与 audio.cpp 源码归档
+已按固定 commit 展开，归档 SHA-256 分别为 `abac59079d8ec8cecf1ca0202069773506e6d7e19f695adf481014295c7473cf` 和
+`1f194dcc67f67bb241bf3c02cfa256b932b4eabac6e455ac1e28ef0fdbe00831`；audio.cpp 源码已放入 LocalAI Makefile 预期目录，避免联网克隆。
+CUDA 12.0、CMake 3.28.3、GCC 13.3.0 与 `sm_89` 配置已通过。收到用户准备的 20 个 Ubuntu 24.04 amd64 `.deb` 后，逐一核对包名、版本和架构，并使用 `dpkg-deb -x` 解压到仓库外私有前缀；没有使用 `dpkg -i`、apt 安装或 sudo。c-ares 开发包的 CMake 导入目标还引用运行库文件，因此私有前缀内链接到本机已安装的同版本 `libcares.so.2.12.0`；系统目录未修改。配置时为固定写 `/usr` 的 RE2 pkg-config 文件设置 `PKG_CONFIG_SYSROOT_DIR`，Protobuf、gRPC、RE2、zlib、OpenSSL 和 `protoc` 均从私有依赖前缀解析。
+
+固定 LocalAI Makefile 对应的 CMake `grpc-server` 目标使用 CUDA `89-real` 编译并链接成功，`package.sh` 通过独立运行时依赖闭包检查，生成约 1.9 GiB CUDA backend 包。`grpc-server --help` 与包内 `run.sh --help` 均成功。backend 已复制到本机忽略目录并通过 `manager.py verify-install`，backend 文件树 SHA-256 为 `5408b33dbc79b9d7488461e75f3c486fd1b7819d8c6c1849219877952e07b209`。LocalAI 在模型目录为空时通过 `127.0.0.1:8400/readyz`，管理器停止后确认进程组退出、端口关闭；单独的 gRPC backend 也能监听回环端口并在 SIGTERM 后以退出码 0 结束。上述均为无权重进程与部署检查，不证明模型 RPC、推理或显存退出行为。模型权重未下载。
+
+fake-host 集成测试覆盖 readiness、启停以及 owner 被 SIGKILL 后 watcher 回收。LocalAI 无模型 readiness/启停和独立 gRPC server SIGTERM 收尾也已本机验证；已加载模型后的 backend 子进程回收、GPU 互斥、显存释放和异常故障注入仍待验收，因此 P1 尚未验收。
+
 ### P2：Qwen3-ASR 首个端到端试点
 
 依赖：P1。修改 `Qwen3_ASR_1.7B/main.py` 的 provider 调用与可用性检查，保留 worker。
@@ -318,9 +365,75 @@ LocalAI 的 audio-cpp 接口涵盖 speech、transcriptions、sound-generation �
 
 ### P3：语音合成与音色设计
 
-依赖：P2。顺序建议：Qwen Base → Qwen VoiceDesign → VoxCPM2 → 其他表内 TTS。
+依赖：P2。顺序建议：Qwen Base → Qwen VoiceDesign → VoxCPM2 → Confucius4-TTS → MOSS VoiceGenerator → 其他表内 TTS。
 每个模式单独模型 ID；把 clone/vdes 任务与参考音频/文本绑定，不能依赖模糊自动判断。
 逐项迁移采样、切段、停顿、设计音色同步引用、文本 sidecar、输出保留。
+
+当前代码进度：Qwen3-TTS Base 克隆已有独立 LocalAI model ID、候选 YAML 注册/预检、`/v1/audio/speech`
+字段映射、CPU WAV 校验与去静音、共享 GPU 租约及 shutdown 隔离。默认仍是 native。audio.cpp 可映射参考音频、
+sidecar/请求转写、语言、`max_tokens`、`top_p` 与 `temperature`；LocalAI gRPC backend 已通过无模型宿主机检查，
+因此没有 E2/E3 证据。多片段长文本和逐请求 `device_map`、`dtype`、`attn_implementation` 目前在 LocalAI provider
+明确返回 422，不静默丢弃。Qwen3 VoiceDesign 已独立接入 `/v1/audio/speech`，YAML 将同一 family 固定为
+`task:vdes`；`voice_description` 映射到 `instructions`，分段请求在一次 GPU 租约中顺序执行，并复用原 worker 的
+片段切分和停顿拼接。VoiceDesign 的逐请求 PyTorch 硬件覆盖非默认值返回 422。两个服务各用独立模型 ID 和模型目录，
+都没有 E2/E3 证据；详细字段表见 [P3 Qwen3-TTS 报告](../reports/localai/P3-Qwen3-TTS.md)。
+
+dots.tts-soar 单段克隆现有独立 provider、`unitale.dots-tts-soar.q8-0` 候选 YAML 和模型注册/预检，
+映射到固定 audio.cpp `family:dots_tts`、`task:tts` 及 SOAR Q8 GGUF。参考音频使用业务层解析后的本地 `voice`，
+sidecar/显式转写映射到 `params.reference_text`；语言、seed、引导强度、speaker scale、步数、采样器、token 上限和
+模板均使用固定 DotTTS 请求选项。当前仅接受不超过服务分段阈值的单段请求；需要原生分段/停顿、请求级 precision、
+文本规范化或 profiling 时返回 422。候选 package revision 固定为 `83c5d96c03023ff5a7712570d057ce26c8769f98`，
+但该 revision 的文件页虽列出 Q8 文件，README 的量化表述与其不完全一致；上游 LFS hash 尚未取得。注册时记录的本地
+SHA-256 只检测后续文件变化，不证明制品来源。无模型字段/生命周期测试已添加；LocalAI backend、权重、输出采样率和实际质量
+仍未验收，状态为 `implemented_unverified`，详见 [P3 DotTTS 报告](../reports/localai/P3-DotTTS.md)。
+
+VoxCPM2 已增加显式 `UNITALE_VOXCPM2_PROVIDER`，默认 native。单段 clone 将参考音频传入
+`voice`，sidecar/显式转写传入 `params.reference_text`，`cfg_value` 与 `inference_timesteps`
+映射到固定 audio.cpp 文档的 `guidance_scale` 与 `num_inference_steps`。可控克隆沿用官方括号指令文本格式，
+且保留“不传参考转写”的现有语义。`nonverbal_tags`、native 归一化/降噪/坏例重试、固定 seed、非 CUDA 0
+设备以及需要原生多段切分的请求均明确返回 422；原生 `retry_badcase` 默认值为 true，因此选择 LocalAI 时
+请求需显式关闭。候选模型 YAML、固定 HF revision 与人工注册/预检命令已添加；Q8 文件页显示 2.96 GB，
+但固定 revision 的 LFS SHA-256 尚不可核验，模型权重与运行时仍是 E0。无模型合同、候选登记和共享锁/shutdown
+测试已覆盖；真实 LocalAI backend 与模型 smoke 未运行。字段和模型边界见
+[P3 VoxCPM2 报告](../reports/localai/P3-VoxCPM2.md)。
+
+Confucius4-TTS 现有独立 `UNITALE_CONFUCIUS4_TTS_PROVIDER`，默认 native；候选固定为
+`unitale.confucius4-tts.orig`、audio.cpp `family:confucius4_tts` / `task:clon` 和 standalone original GGUF。
+业务层解析参考音频后传给 `voice`，`lang` 映射为目标 `language`；默认仍为 `zh`，不读取或发送上传时保存的
+参考文本 sidecar。温度、top-p/top-k、beam 数、重复惩罚、最大语义 token、流匹配步数、guidance、分段 token 数和三项
+淡入淡出/补静音参数均映射到固定文档字段。LocalAI provider 明确拒绝 `raw=true`、`verbose=true`、原生感叹音时长控制、
+未声明语言及非 CUDA 0 配置。候选 revision 固定为
+`83c5d96c03023ff5a7712570d057ce26c8769f98`；上游文件 SHA-256 不可得，权重由用户手动准备，仍为 E0。
+候选注册、启动前预检、无模型请求合同、WAV 响应存储、共享 GPU 锁和 backend shutdown 已接入；实际 backend、模型质量、
+输出格式参数和生命周期仍无 E2/E3 证据，详见 [P3 Confucius4-TTS 报告](../reports/localai/P3-Confucius4-TTS.md)。
+
+MOSS VoiceGenerator 现有独立 `UNITALE_MOSS_VOICEGENERATOR_PROVIDER`，默认 native；候选固定为
+`unitale.moss-voicegenerator.bf16`、audio.cpp `family:moss_voicegen` / `task:vdes` 和包含 v1 codec 解码器的
+BF16 + F16 self-contained GGUF。文字音色描述映射到 OpenAI-compatible `instructions`（固定 session 将其作为
+`instruction`）；文本、音频温度、top-p/top-k 和重复惩罚均显式映射。由于原生 Python 会逐段设计并插入静音，LocalAI
+仅接受一个文本片段；`max_chars_per_chunk` 触发多段时返回 422。`pause_ms` 在单段请求中无效果；非默认
+`max_new_tokens`、PyTorch `dtype` 或 `attn_implementation` 覆盖也明确返回 422。Native 默认语种选项不存在，因此
+provider 不伪造语言提示；固定 audio.cpp session 的默认 seed 为 0 会让相同输入重复得到同一 take，provider 每次请求生成
+新的 32-bit seed，以保留 native 未固定 seed 时的随机 take 行为。候选模型固定 HF revision 为
+`83c5d96c03023ff5a7712570d057ce26c8769f98`，但上游文件
+SHA-256 未取得，权重由用户手动准备，当前为 E0。候选注册/预检、WAV 音色保存与 `AudioReferenceStore` 注册、共享
+GPU 租约和 backend shutdown 已接入；实际 LocalAI backend、音质、格式及显存生命周期尚无 E2/E3 证据，详见
+[P3 MOSS VoiceGenerator 报告](../reports/localai/P3-MOSS-VoiceGenerator.md)。
+
+FireRedTTS3 Base clone 与 Instruct VoiceDesign 现分别使用 `UNITALE_FIRERED_TTS3_CLONE_PROVIDER`、
+`UNITALE_FIRERED_TTS3_TIMBRE_PROVIDER`，两个进程默认均为 native。候选是同一固定 audio.cpp family 的两种 Q8 制品，
+Base 固定 `task:clon`，Instruct 设计固定 `task:vdes`；模型 ID、注册配置和预检分别独立。Base 将业务层解析的参考 WAV、
+显式或 sidecar 转写映射到 `voice` 和 `params.reference_text`；Instruct 使用 `instructions` 加
+`template_name=voice_design`。两种模式保留 language、seed、steps、guidance、stop threshold。服务默认文本规范化参数
+和 attention 设置以外的 FireRed Python 专属覆盖在 LocalAI 下返回 422。audio.cpp 另列出的 semantic/acoustic edit
+没有 Unitale 路由，不纳入此次接入。两个候选均固定 HF revision
+`83c5d96c03023ff5a7712570d057ce26c8769f98`，Q8 文件页约 4.18/4.15 GB，但尚无上游 LFS SHA-256；用户手动准备权重，
+LocalAI backend、语言/音质和生命周期仍未 E2/E3 验收，详见
+[P3 FireRedTTS3 报告](../reports/localai/P3-FireRedTTS3.md)。
+
+LongCat AudioDiT 保留 native provider。固定 audio.cpp family 清单没有 LongCat AudioDiT；LocalAI 源码里的
+LongCat-Video 是视频生成 backend，与 Unitale 的扩散 TTS 无关，不能拿来替代。该服务不新增虚假的候选模型或
+请求映射，后续在 P7 评估专用原生桥接；即使桥接未完成，也不改变 native 默认和现有接口。
 
 交付：每模型一个字段矩阵和 E3 报告，参考音色上传→设计→跨服务引用→克隆的回归链。
 验收：原先拒绝的 style_prompt 仍拒绝；Vox 可控模式互斥不变；参考转写要求不变；
@@ -336,19 +449,66 @@ Stable Audio Medium → YuE2；实际顺序可由 E1/E2 覆盖度调整，记录
 禁止因只支持简单 prompt 就把歌词、初始音频、mask、BPM 或采样字段静默丢掉。
 验证模型包全部组件和各自 dtype，比较生成阶段与解码阶段峰值。
 
+#### ACE-Step BGM 当前进度
+
+`ace_step_1_5` 已增加显式 `UNITALE_ACESTEP_PROVIDER`，默认仍为 `native`。LocalAI provider
+只调用 `/v1/sound-generation`，将 `prompt`、`seconds`、`bpm`、`keyscale`、`timesignature`
+映射到 `text`、`duration_seconds` 和同名音乐元数据；请求省略 `lyrics`，让 audio.cpp 使用与 native worker 相同的空歌词默认值。LocalAI HTTP 虽接收 `instrumental`，但固定 audio.cpp revision 没有读取该选项的代码，故不发送并不宣称它能强制无歌声。返回 WAV 要通过完整解码、非空、48 kHz、
+双声道校验后，沿用原 BGM 存储和 `audio/wav` 响应。该路径是代码级候选，尚无 E2/E3 证据。
+
+LocalAI 的该 HTTP 请求不提供逐请求 `num_inference_steps` 或 `seed`。当前 provider 只接受
+原服务默认 steps=8 和随机 seed=-1；非默认 steps 或明确 seed 在获取 GPU 锁前返回 422，
+不会静默忽略。服务现有 API 没有 lyrics/edit 请求字段，因此本候选也不宣称迁移这些模式。
+
+固定 audio.cpp 源码声明 ACE-Step XL Turbo `family:ace_step`、`task:gen`，但 pinned 通用
+`audio.cpp-gguf` 包里没有对应 Q8 DiT 文件。另登记了 [CaptainArni/audio.cpp-gguf 的固定
+revision](https://huggingface.co/CaptainArni/audio.cpp-gguf/commit/ac4d11eda6855ddedb16e42632e1a9376bfcfa81)
+及[Q8 DiT 候选路径](https://huggingface.co/CaptainArni/audio.cpp-gguf/blob/ac4d11eda6855ddedb16e42632e1a9376bfcfa81/README.md)。该包 README 将 Q8 DiT 标为 proposed 且不在路径测试矩阵内，没有可核实的 LFS SHA-256；因此 revision 固定不等于制品来源或推理已验收。用户手动放置候选文件后，manager 仅记录本地 size/hash 以检测后续变化，不会下载，也不能验证上游真实性。
+
+无模型测试覆盖 SoundGeneration 字段组装、WAV/存储响应、unsupported 参数拒绝、候选配置登记和本地 hash 变化。真实模型、LocalAI backend 构建、随机 seed 语义、时长和音质验收仍待开发包与用户手动准备模型后完成。
+
+#### Stable Audio 3 Medium 当前进度
+
+`stable_audio_3_medium` 已增加独立 provider，默认仍为 `native`。当前 Unitale 路由只接受文本
+prompt 和目标时长，LocalAI 将两者映射到 SoundGeneration 的 `text` 与 `duration_seconds`。
+LocalAI family 在固定配置中使用 `stable_audio/gen`，Q8 GGUF 由用户手动准备。LocalAI 响应必须
+完整解码为非空 44.1 kHz 双声道 WAV，再沿用原 soundEffect 存储与响应合同。
+
+固定 LocalAI 所含 audio.cpp 文档声明 Stable Audio 3 Medium 文本生成；固定 `audio.cpp-gguf`
+revision `09fe073ba154561f4474162e8bd4ab233a848eca` 的 README 列出
+`Stable-Audio-3-Medium-GGUF/stable-audio-3-medium-q8_0.gguf`。文件 SHA-256 和大小没有登记，
+因此 manager 登记本地 hash 仅做后续变更检查。模型包使用 Stability AI Community License，
+商业分发前须自行核对许可条款。
+
+SoundGeneration HTTP 不提供逐请求 steps、guidance scale 或 seed 字段。当前 provider 只接受
+service defaults `steps=8`、`cfg_scale=1.0`、随机 `seed=-1`；显式 `dtype` 因 Q8 GGUF 精度
+不等价而返回 422。该路由不接收源音频，所以不迁移 init-audio/inpaint；此条也不代表 Stable
+Audio family 的其他能力缺失。无模型回归覆盖字段拒绝、WAV 响应/存储、完整帧解码、候选登记和
+本地 hash 变化，真实输出、Q8 音质、时长和 LocalAI GPU 生命周期仍未验证。
+
+#### YuE2-3B 与 MOSS-SoundEffect v2 的 RPC 适配
+
+固定 audio.cpp 声明 `yue2/gen`，但 Unitale SoundGeneration endpoint 与 pinned translator 无法传入
+必需的 YuE2 `style`，也没有 `cot`、seed、ABC 和分阶段采样选项；因此不能把“能返回 WAV”视为保留了
+YuE2 契约。现已通过 P7 `unitale.yue2-3b.worker.v1` 原样发送现有 worker payload 并返回 WAV；LocalAI 模式仍需显式选择，默认 native。MOSS-SoundEffect v2 在固定 family screen
+没有精确 family，现通过 P7 原生 worker bridge 返回 WAV，默认仍是 native。两个判断及字段证据记录在
+[P4 YuE2/MOSS-SFX 报告](../reports/localai/P4-YuE2-MOSS-SoundEffect.md)。
+
+MOSS-SoundEffect v2 在固定 audio.cpp family 清单中没有精确模型候选；worker bridge 保留 MOSS 原模型、字段和 I/O，不能用 Stable Audio 或其他 SFX family 作为近似替代。
+
 交付：音乐参数映射、15/30/60 秒及业务目标长度报告、产物可解码检查、歌词与盲听记录。
 验收：具体变体一致；当前实现的全部模式有清晰迁移状态；最长场景不过显存预算。
 回滚：按能力回 native；保留已生成产物，不自动改其采样率/编码。
 
-### P5：编辑、理解、分离、转换及 Echo
+### P5：编辑、理解、分离与转换
 
 依赖：P2 和对应基础能力验收。逐个处理表中模型：
 
 - 编辑：同输入多轮编辑，验证指令及目标内容；普通克隆结果不能算编辑通过。
 - 理解：需要文本回答/时间语义与变体输出，不使用转写结果代替回答。
 - 分离：同一次调用收集全部目标 Stem，核验名称、长度与同步，不重复推理三次。
-- Seed-VC：语音与歌声分别配置和验证，保留 F0 与采样参数。
-- Echo：只迁移完整原生 S2ST；验证源/目标语言、`return_info` ZIP 和临时清理。
+- Seed-VC：固定 LocalAI `AudioTransform` 可承载源/目标音频及所列参数，已接入显式 `vc`/`svc` 双模型候选；语音与歌声仍需分别做真实模型验收。
+当前合同核对已完成并记录在 [P5/P6 缺口评估](../reports/localai/P5-P6-gap-assessment.md)：Seed-VC 有显式 VC/SVC 候选 provider；Step-Audio-EditX、MOSS-Audio Thinking/Instruct 和 TIGER-DnR 已由 P7 原生 worker bridge 接入。TIGER 通过受控共享目录文件引用传递三路 ZIP。固定 family 不包含这些精确模型；通用 Edit、ASR、HTDemucs 标签不能替代其请求或输出合同。这里的“核对完成”仅指静态范围/字段判断，不代表 P5 的 E2/E3 验收完成。
 
 交付：逐能力 RPC 缺口单；必要时自有 LocalAI 后端扩展；每项 E3 报告。
 验收：输出语义与现有模型一致，无“近似模型替换”。回滚：该能力切回原生。
@@ -360,22 +520,69 @@ Stable Audio Medium → YuE2；实际顺序可由 E1/E2 覆盖度调整，记录
 检查 audio.cpp 是否暴露所需推理任务，再检查 LocalAI RPC；两个环节均无则登记待移植，
 通过 P7 原生后端纳入协调。若扩展协议，附 schema/version、客户端兼容和上下游测试。
 
+当前固定 family 与服务合同核对已完成并记录在 [P5/P6 缺口评估](../reports/localai/P5-P6-gap-assessment.md)：SheetSage2 仅为 ABC 的部分候选，不能代表 MIDI/分析 ZIP 全合同；YuE2-Vae 与 MERT-v2-FullSong 没有精确 family，已通过 P7 原生 worker bridge 接入。静态核对完成不代表结构化输出、父模型 revision 或真实推理已验收。
+
 验收：VAE `[T,64]` 与 FP32 分块行为；MERT 1024 维/25 Hz、掩码平均语义；
 SheetSage 固定父模型 revision 和 ZIP 内容全部通过。不能用 TTS codec 或 speaker embedding 替代。
 回滚：使用原 worker 与原输出目录。
 
 ### P7：统一协调剩余原生后端
 
-依赖：P1，及各能力的差距结论。为暂不能迁移 audio.cpp 的音频模型、Index 文本和视频模型
+依赖：P1，及各能力的差距结论。为暂不能迁移 audio.cpp 的音频模型和视频模型
 实现 LocalAI 外部适配。优先复用其 worker 输入/输出协议和独立 uv 解释器。
 自有后端仅转译和管理子进程，不在常驻进程导入 Torch。
 
 标准 RPC 无法承载结构化输出时，先交付经过版本化的后端/协议扩展；未实现前仍标 native-only，
 不能把模型挂在目录里就算“已统一协调”。不得回调会再次持锁的 HTTP 服务形成递归链路。
 
-验收：所有计划纳入的本地推理有 LocalAI 调用证据；Index 三个文本服务保留模板/原生 TXT；
-视频保留 MP4 和图片引用；MiMo/CPU 服务明确列为边界。锁、崩溃清理与观测覆盖所有后端。
+验收：所有计划纳入的本地推理有 LocalAI 调用证据；视频保留 MP4 和图片引用；MiMo/CPU 服务明确列为边界。锁、崩溃清理与观测覆盖所有后端。
 回滚：保留旧服务 provider=native 和旧 uv 环境，分服务退出桥接。
+
+#### P7 当前实现与未覆盖范围
+
+实现文件、定向命令、全量门禁结果、回滚方式与剩余验收条件见
+[P7 worker bridge 实施记录](../reports/localai/P7-worker-bridge.md)。
+当前缺少的 LocalAI 候选权重、固定下载版本和放置路径见
+[手动模型准备状态](../reports/localai/manual-model-readiness.md)。
+
+`unitale_localai_bridge` 实现 LocalAI v4.11 completion RPC 与 `unitale.worker` v1 JSON envelope：
+服务向 `/v1/completions` 发送固定模型 ID、operation、request ID 和 `worker_input`；LocalAI 将请求路由至
+`unitale-worker` loopback gRPC backend。backend 只接受 manifest 登记的模型 ID、仓库内项目路径、`worker.py`
+及 `--input-json`/固定输出参数，不按请求接受任意模块、命令或环境变量。每个请求以对应项目的
+`uv run --project <project> --no-sync python worker.py` 启动独立进程组；成功、失败、超时、取消均清理临时
+输入/产物并确认子进程退出。服务层持有共享 GPU 锁，LocalAI backend shutdown 确认后才释放锁；manager 停止时
+还会按 bridge request marker 回收 host 进程组之外的遗留 worker。
+
+已接入十个仍有源码的服务项目（十一个固定 model ID；MOSS-Audio 两个变体共用一个项目），LocalAI bridge model ID 与输出合同如下：
+
+| 服务 | 固定模型 ID | worker 成品 | 状态 |
+| --- | --- | --- | --- |
+| SheetSage2 | `unitale.sheetsage2.worker.v1` | ZIP，保留现有原子归档保存 | `implemented_unverified` |
+| MERT-v2-FullSong | `unitale.mert-v2-fullsong.worker.v1` | `embedding` → JSON；`frames` → NPZ | `implemented_unverified` |
+| YuE2-Vae | `unitale.yue2-vae.worker.v1` | `encode` → NPY；`decode` → WAV | `implemented_unverified` |
+| SoulX-FlashHead | `unitale.soulx-flashhead.worker.v1` | 校验后保存带声音 MP4 | `implemented_unverified` |
+| Ditto | `unitale.ditto.worker.v1` | 校验后保存带声音 MP4 | `implemented_unverified` |
+| YuE2-3B | `unitale.yue2-3b.worker.v1` | WAV；保留 style/tags/lyrics/cot/ABC/采样参数 | `implemented_unverified` |
+| MOSS-SoundEffect v2 | `unitale.moss-soundeffect-v2.worker.v1` | WAV | `implemented_unverified` |
+| Step-Audio-EditX | `unitale.step-audio-editx.worker.v1` | WAV；保留编辑类型和完整 worker payload | `implemented_unverified` |
+| MOSS-Audio Thinking | `unitale.moss-audio-4b.thinking.worker.v1` | 文本 JSON | `implemented_unverified` |
+| MOSS-Audio Instruct | `unitale.moss-audio-4b.instruct.worker.v1` | 文本 JSON | `implemented_unverified` |
+| TIGER-DnR | `unitale.tiger-dnr.worker.v1` | 受控共享文件引用 ZIP；固定 `dialog.wav`、`effects.wav`、`music.wav` | `implemented_unverified` |
+
+候选配置模板位于 `localai/manifests/*-worker-candidate.yaml`；使用
+`python3 scripts/localai/manager.py register-worker-bridge-candidates` 登记、
+`python3 scripts/localai/manager.py verify-worker-bridge-candidates` 核对。两条命令只写入/核验模型配置 YAML，
+不下载权重。受管运行需设置 `UNITALE_LOCALAI_ENABLED=true`、`UNITALE_LOCALAI_MANAGED=true`、
+`UNITALE_LOCALAI_WORKER_BRIDGE_ENABLED=true`；对应服务通过 `UNITALE_SHEETSAGE2_PROVIDER`、
+`UNITALE_MERT_V2_FULLSONG_PROVIDER`、`UNITALE_YUE2_VAE_PROVIDER`、
+`UNITALE_SOULX_FLASHHEAD_PROVIDER`、`UNITALE_DITTO_PROVIDER`、`UNITALE_YUE2_3B_PROVIDER`、
+`UNITALE_MOSS_SOUNDEFFECT_PROVIDER`、`UNITALE_STEP_AUDIO_EDITX_PROVIDER`、
+`UNITALE_MOSS_AUDIO_4B_THINKING_PROVIDER`、`UNITALE_MOSS_AUDIO_4B_INSTRUCT_PROVIDER` 和
+`UNITALE_TIGER_DNR_PROVIDER` 显式选择 `localai`，默认均为 `native`。
+默认 gRPC 地址为 `127.0.0.1:50052`；不受管运行时必须自行启动 bridge 并登记
+`LOCALAI_EXTERNAL_GRPC_BACKENDS=unitale-worker:127.0.0.1:50052`。
+
+固定 manifest、fake worker、manager 清理和 bridge service route 的无模型测试只证明代码路径与产物合同，不提供真实 LocalAI gRPC 模型请求证据。共享 artifact 仅通过随机请求 ID 定位，服务在 4 GiB 上限内验证文件属性和内容合同，读取后立即删除；异常中断留下的引用由后续 worker 请求清理 24 小时以上的临时文件。P7 真实模型验收仍需权重。
 
 ### P8：默认切换、观察与依赖收敛
 
@@ -393,14 +600,39 @@ SheetSage 固定父模型 revision 和 ZIP 内容全部通过。不能用 TTS co
 
 ## 8. 配置、部署与版本清单
 
-以下 `UNITALE_*` 均为**拟新增项目配置**，不是 LocalAI 原生参数；P1 实现解析与校验后才生效。
+以下 `UNITALE_*` 是 Unitale 项目配置，不是 LocalAI 原生参数。已接入服务的 provider、回环地址与有限超时由共享 gateway
+解析校验；固定源码版本的宿主机进程管理已有代码。未接入的服务仍保留 native；真实模型清单来源、模型请求质量和宿主机 GPU backend
+行为仍待验收。
 
 | 配置 | 初始建议 | 含义 |
 | --- | --- | --- |
 | `UNITALE_LOCALAI_ENABLED` | `false` | 启用内部平台接入 |
+| `UNITALE_LOCALAI_MANAGED` | `false` | `start.sh` 启动/停止固定版本 LocalAI 宿主机进程组 |
 | `UNITALE_LOCALAI_BASE_URL` | `http://127.0.0.1:8400` | 私有服务地址，部署时校验 |
+| `UNITALE_LOCALAI_DATA_DIR` | `$STORAGE_DIR/.cache/localai` | 本机模型、状态、日志及安装指纹目录 |
+| `UNITALE_LOCALAI_BINARY` | `$UNITALE_LOCALAI_DATA_DIR/bin/local-ai` | LocalAI 宿主机可执行文件 |
+| `UNITALE_LOCALAI_BACKENDS_DIR` | `$UNITALE_LOCALAI_DATA_DIR/backends` | audio-cpp 宿主机 backend 包目录 |
+| `UNITALE_LOCALAI_MODELS_DIR` | `$UNITALE_LOCALAI_DATA_DIR/models` | LocalAI 模型配置与权重目录 |
+| `UNITALE_LOCALAI_WORKER_BRIDGE_ENABLED` | `false` | 受管启动时注册并启动 loopback `unitale-worker` gRPC backend |
+| `UNITALE_LOCALAI_BRIDGE_ADDRESS` | `127.0.0.1:50052` | one-shot worker bridge gRPC 地址，仅允许 loopback |
+
 | `UNITALE_INFERENCE_PROVIDER` | `native` | 全局缺省，仅作为服务未指定时兜底 |
 | `UNITALE_QWEN3_ASR_PROVIDER` | `native` | 试点服务覆盖，其他服务按相同模式登记 |
+| `UNITALE_QWEN3_TTS_PROVIDER` | `native` | Qwen3-TTS Base 克隆覆盖；当前实现仍是候选能力 |
+| `UNITALE_QWEN3_TTS_MODEL` | `unitale.qwen3-tts.1p7b-base` | LocalAI Base safetensors 模型 ID |
+| `UNITALE_QWEN3_VOICEDESIGN_PROVIDER` | `native` | Qwen3 VoiceDesign 覆盖；固定 `task:vdes` |
+| `UNITALE_QWEN3_VOICEDESIGN_MODEL` | `unitale.qwen3-tts.1p7b-voicedesign` | LocalAI VoiceDesign safetensors 模型 ID |
+| `UNITALE_DOTS_TTS_SOAR_PROVIDER` | `native` | dots.tts-soar 单段克隆覆盖；native 仍为默认 |
+| `UNITALE_DOTS_TTS_SOAR_MODEL` | `unitale.dots-tts-soar.q8-0` | LocalAI DotTTS SOAR Q8 模型 ID |
+| `UNITALE_VOXCPM2_PROVIDER` | `native` | VoxCPM2 clone 可单独选择 `native` 或 `localai` |
+| `UNITALE_VOXCPM2_MODEL` | `unitale.voxcpm2.q8-0` | LocalAI/audio.cpp VoxCPM2 Q8 模型 ID |
+| `UNITALE_ACESTEP_PROVIDER` | `native` | ACE-Step BGM 可单独选择 `native` 或 `localai`；native 保持默认 |
+| `UNITALE_ACESTEP_MODEL` | `unitale.ace-step15.xl-turbo.q8dit` | ACE-Step XL Turbo Q8 DiT 候选模型 ID |
+| `UNITALE_SHEETSAGE2_PROVIDER` / `UNITALE_SHEETSAGE2_MODEL` | `native` / `unitale.sheetsage2.worker.v1` | SheetSage2 ZIP worker bridge；native 默认 |
+| `UNITALE_MERT_V2_FULLSONG_PROVIDER` / `UNITALE_MERT_V2_FULLSONG_MODEL` | `native` / `unitale.mert-v2-fullsong.worker.v1` | MERT JSON/NPZ worker bridge；native 默认 |
+| `UNITALE_YUE2_VAE_PROVIDER` / `UNITALE_YUE2_VAE_MODEL` | `native` / `unitale.yue2-vae.worker.v1` | VAE NPY/WAV worker bridge；native 默认 |
+| `UNITALE_SOULX_FLASHHEAD_PROVIDER` / `UNITALE_SOULX_FLASHHEAD_MODEL` | `native` / `unitale.soulx-flashhead.worker.v1` | SoulX MP4 worker bridge；native 默认 |
+| `UNITALE_DITTO_PROVIDER` / `UNITALE_DITTO_MODEL` | `native` / `unitale.ditto.worker.v1` | Ditto MP4 worker bridge；native 默认 |
 | `UNITALE_LOCALAI_CONNECT_TIMEOUT` | `5` 秒 | 连接超时；非推理总时限 |
 | `UNITALE_LOCALAI_CLEANUP_TIMEOUT` | `30` 秒 | 停止等待预算，超时进入隔离 |
 | `UNITALE_LOCALAI_API_KEY` | 无默认值 | 内部鉴权，环境读取、日志脱敏 |
@@ -425,9 +657,12 @@ options:
 ```
 
 上层 `backend` 是 LocalAI 后端，下层 option 是计算设备选择；精确可用值以固定版本为准。
-这些配置字段与显式安装 `local-ai backends install audio-cpp` 来自
-[LocalAI 后端文档](https://localai.io/docs/features/audio-cpp/)。生产安装脚本还必须固定下载来源与 digest，
-不能仅运行该未固定版本的安装命令。
+`scripts/localai/manager.py verify-install` 不下载或编译软件；它要求预先准备固定版本的 LocalAI 二进制和
+`backends/audio-cpp/run.sh`，检查版本、路径边界和整个 backend 文件树指纹后写入本机校验记录。LocalAI `v4.11.0` 源码内的
+`backend/cpp/audio-cpp/Makefile` 固定 audio.cpp commit，并提供 `grpc-server` / `package` 构建目标；部署前应核对
+`package.sh` 的实际产物结构并将包放入 `UNITALE_LOCALAI_BACKENDS_DIR/audio-cpp/`。运行 flags 和环境来自
+[固定版本 CLI 环境字段](https://raw.githubusercontent.com/mudler/LocalAI/v4.11.0/core/cli/run.go)与
+[CLI 配置文档](https://localai.io/docs/reference/cli-reference/)。宿主机安装和 flags 尚未本机验证。
 
 每个模型制品清单应包含：
 
@@ -439,7 +674,7 @@ options:
   "provider": "localai",
   "task": "asr",
   "localai_commit": "REQUIRED",
-  "backend_digest": "REQUIRED",
+  "audio_cpp_commit": "REQUIRED",
   "audiocpp_commit": "REQUIRED",
   "model_revision": "REQUIRED",
   "artifacts": [{"relative_path": "model.gguf", "sha256": "REQUIRED"}],
@@ -455,13 +690,30 @@ options:
 缺失文件、hash 不符、未允许任务或设备。清单同时记录模型/量化包许可来源与核验日期；
 讨论中的商业用途判断不代替精确制品的许可核对。
 
-容器部署时挂载只读模型卷、可写任务卷与同一个锁文件；默认不挂整个 home。
-WSL 模型和任务优先放 Linux 文件系统，P0 测量磁盘吞吐；容器 GPU 设备映射、驱动与后端 CUDA
-版本需要实际 smoke。部署离线模式时提前准备全部组件，缺文件直接报 unavailable，不请求时下载。
+LocalAI、backend、模型和业务服务共用宿主机路径及同一 GPU 锁文件；不将整个 home 暴露给 backend。
+WSL 模型和任务优先放 Linux 文件系统；CUDA 驱动、audio.cpp 编译结果、backend 子进程和显存回收
+需要实际 smoke。部署离线模式时提前准备全部组件，缺文件直接报 unavailable，不请求时下载。
 
 启动顺序：配置/端口/文件预检 → LocalAI 与轻量适配后端就绪 → 业务服务 → 综合健康。
 停止顺序：停止准入 → 有界等待/取消在途请求 → 回收模型进程 → 业务服务/LocalAI 退出。
 默认启用 LocalAI 的服务依赖失败时报告不可用；不能悄悄切换推理引擎掩盖部署故障。
+
+Qwen3-TTS Base 候选使用 `QWEN3_TTS_MODEL_DIR` 指定的官方
+`Qwen/Qwen3-TTS-12Hz-1.7B-Base` safetensors 目录。模型文件由运维手动准备；准备完成后运行
+`python3 scripts/localai/manager.py register-qwen3-tts-candidate` 注册 YAML。`start.sh` 会在显式设置
+`UNITALE_QWEN3_TTS_PROVIDER=localai` 时要求目录文件齐全、候选 YAML 与当前路径一致，且 LocalAI 健康并注册了模型。
+缺权重时不会尝试下载，也不会回退到 native。
+
+Qwen3 VoiceDesign 候选使用原服务的 `QWEN_VOICEDESIGN_MODEL_DIR`（默认官方
+`Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign` safetensors 目录），准备后运行
+`python3 scripts/localai/manager.py register-qwen3-voicedesign-candidate`。注册 YAML 固定 `family:qwen3_tts`、
+`task:vdes` 和独立模型 ID；请求通过 `instructions` 传音色描述，不附加 Base 克隆的参考音频。该候选同样只校验本地文件，
+不会下载模型；实际加载和输出仍待 backend 与模型验收。
+
+dots.tts-soar 使用固定 audio.cpp SOAR Q8 包，不复用原生 safetensors 目录。手动将固定 revision 的
+`DotTTS-SOAR-GGUF/dots-tts-soar-q8_0.gguf` 放到 LocalAI models 目录后，运行
+`python3 scripts/localai/manager.py register-dots-tts-soar-candidate`。管理器生成匹配 YAML 和本地 hash 记录，
+启动 preflight 会核对模型文件、注册配置及 hash。权重由用户手动准备；当前仍待取得上游 LFS SHA-256 并运行真实 backend。
 
 ## 9. 验证与发布门禁
 
@@ -493,9 +745,10 @@ ACE-Step、Stable Audio 服务内测试仍从各自目录使用 QA 执行。锁�
 | 部署 | 开关关闭不影响旧启动；新端口检查、依赖缺失和全组停止 |
 | 健康 | 无模型加载、可用性真实、最近错误和 provider 可追踪 |
 
-建议测试文件：`tests/test_localai_client.py`、`test_inference_provider_contract.py`、
-`test_localai_lifecycle.py`、`test_localai_config.py`，以及各服务现有 migration 测试。
-这些是待新增文件，不能引用为当前通过证据。自动测试不下载权重、不调用真实 MiMo、不需要 CUDA。
+当前无模型覆盖位于 `tests/test_localai_gateway.py`、`tests/test_localai_manager.py`、
+`tests/test_localai_capability_manifest.py` 和 `tests/test_qwen3_asr_migration.py`，包括配置、multipart、
+GPU 锁/隔离、管理器宿主机进程生命周期、路由与字段漂移。测试不下载权重、不调用真实 MiMo、不需要 CUDA；
+LocalAI/audio.cpp 构建、模型质量、真实并发与退出故障注入仍需按 9.2 执行，不能由这些测试代替。
 
 ### 9.2 真实模型与资源验证
 
@@ -539,7 +792,7 @@ ACE-Step、Stable Audio 服务内测试仍从各自目录使用 QA 执行。锁�
 5. 保留失败日志、配置/制品哈希和已提交用户产物；仅清理当前任务临时文件。
 6. 清单降级为 candidate/failed，登记原因和恢复条件；不要删去失败记录。
 
-版本回滚同时恢复 LocalAI core、backend digest、audio.cpp revision 和模型包的已验证组合。
+版本回滚同时恢复 LocalAI 二进制、宿主机 backend 文件、audio.cpp revision 和模型包的已验证组合。
 不能只回退 Python 代码而继续使用不兼容的新权重。
 
 ## 10. 后续模型的执行与交接约定
@@ -565,7 +818,7 @@ ACE-Step、Stable Audio 服务内测试仍从各自目录使用 QA 执行。锁�
 - 状态：planned / implementing / implemented_unverified / verified / rolled_back
 - 仓库基线与变更提交：
 - 前置报告与证据等级：
-- LocalAI / backend digest / audio.cpp / 权重 revision 与 hash：
+- LocalAI binary / audio-cpp backend / audio.cpp / 权重 revision 与 hash：
 - 设备、驱动、操作系统、内存和空闲显存：
 - 已迁移字段；未迁移字段及原因：
 - 变更文件与当前默认 provider：
@@ -592,11 +845,11 @@ ACE-Step、Stable Audio 服务内测试仍从各自目录使用 QA 执行。锁�
 
 - [原始分享讨论](https://chatgpt.com/share/6ad70c06-e030-83ec-a68f-56c3719f3fbf)：需求背景与设备假设。
 - [LocalAI audio.cpp](https://localai.io/docs/features/audio-cpp/)：后端配置、任务路由及未实现 RPC。
+- [LocalAI Backend Monitor](https://localai.io/docs/features/backend-monitor/)：后端状态与停止 API。
 - [LocalAI 外部后端](https://localai.io/docs/advanced/)：自有 gRPC 后端接入机制。
 - [LocalAI 模型配置](https://localai.io/docs/advanced/model-configuration/)：模型 YAML 与配置边界。
 - [audio.cpp 项目](https://github.com/0xShug0/audio.cpp)：引擎与模型 family 入口。
-- [audio.cpp Qwen3](https://github.com/0xShug0/audio.cpp/blob/main/docs/models/qwen3.md)：模型组件、GGUF 和量化注意点。
+- [audio.cpp 固定 commit README](https://github.com/0xShug0/audio.cpp/blob/9a02e61326aaaf9d462b584ca5e0daba22c0abfc/README.md)、[GGUF 包固定快照 README](https://huggingface.co/audio-cpp/audio.cpp-gguf/blob/09fe073ba154561f4474162e8bd4ab233a848eca/README.md)：Qwen3-ASR family、变体、GGUF Q8 文件和包许可证声明；不是本机兼容性证据。
 - [工程规范](python-engineering.md)、[仓库指南](../AGENTS.md)、[宪章](../CONSTITUTION.md)：本地实施边界。
 
-**下一项可执行工作：P0。** 先固定版本与全服务合同/基线清单，再进行 LocalAI 隔离接入；
-不要直接批量修改 27 个模型服务。
+**当前进度：软件侧 P0–P7、LocalAI/audio.cpp 宿主端、provider、版本化 worker bridge、受控大 artifact 引用、候选登记、manager 异常清理及无模型回归已实现。** P1 backend 已构建、打包并通过安装指纹和无模型启停；构建使用用户提供的 deb 依赖，无 Docker、无 apt/dpkg 系统安装。25 个有锁 uv 项目已离线同步，所有受检 HF 模型目录与外部源码路径通过必需文件检查；直接 LocalAI GGUF/SeedVC 候选缺口见[手动模型准备状态](../reports/localai/manual-model-readiness.md)。真实模型请求、加载后 shutdown、显存回落、质量验收与 P8 观察仍需要候选权重和用户提供的测试样本；本轮未主动下载模型。LocalAI/audio.cpp 源码归档没有 `.git` 元数据，固定 commit 标签和归档 hash 已记录，但无法独立核验 Git tree。ACE-Step Q8 DiT 候选仍为 E0：固定包 README 标注 proposed/不在路径测试矩阵，且没有可核实的上游文件 SHA-256。更新日期：2026-10-21。

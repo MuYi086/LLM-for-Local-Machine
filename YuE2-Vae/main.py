@@ -23,6 +23,13 @@ from typing import Literal
 import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response
+from inference_gateway import (
+    BackendQuarantinedError,
+    LocalAIRequestError,
+    LocalAIUnavailableError,
+    execute_localai_worker_file,
+    load_gateway_config,
+)
 from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware
 from unitale_runtime import AudioUploadError, GpuLockTimeoutError, stage_audio_upload
@@ -67,6 +74,11 @@ WORKER_SCRIPT = PROJECT_DIR / "worker.py"
 LOCAL_FILES_ONLY = env_bool("LOCAL_FILES_ONLY", True)
 DEVICE = os.getenv("YUE2_VAE_DEVICE", "cuda")
 REQUEST_TIMEOUT = float(os.getenv("YUE2_VAE_REQUEST_TIMEOUT", "900"))
+GATEWAY_CONFIG = load_gateway_config(
+    service_provider_env="UNITALE_YUE2_VAE_PROVIDER",
+    default_model="unitale.yue2-vae.worker.v1",
+    request_timeout=REQUEST_TIMEOUT,
+)
 GPU_LOCK_WAIT_TIMEOUT = float(os.getenv("GPU_LOCK_WAIT_TIMEOUT", "900"))
 CUDA_RELEASE_DELAY = float(os.getenv("CUDA_RELEASE_DELAY", "2.0"))
 MAX_AUDIO_SECONDS = float(os.getenv("YUE2_VAE_MAX_AUDIO_SECONDS", "600"))
@@ -440,6 +452,25 @@ class YuE2VaeWorkerManager:
 
 def execute_worker(payload: dict[str, object]) -> Path:
     """在共享 GPU 锁内运行 worker，并在释放锁前等待显存归还。"""
+    if GATEWAY_CONFIG.provider == "localai":
+        operation = str(payload["operation"])
+        suffix, media_type = (
+            (".wav", "audio/wav") if operation == "decode" else (".npy", "application/x-npy")
+        )
+        try:
+            artifact, _ = execute_localai_worker_file(
+                config=GATEWAY_CONFIG,
+                operation="run",
+                payload={"worker_input": payload},
+                output_dir=WORKER_TMP_DIR,
+                suffix=suffix,
+                media_type=media_type,
+            )
+            manager.last_error = None
+            return artifact
+        except Exception as exc:
+            manager.last_error = str(exc)
+            raise
     with shared_gpu_runtime_lock(
         GPU_LOCK_FILE,
         f"yue2_vae/{payload['operation']}",
@@ -525,6 +556,10 @@ def health() -> dict[str, object]:
             "request_timeout": REQUEST_TIMEOUT,
         },
         "last_errors": {"yue2_vae": manager.last_error},
+        "inference": {
+            "provider": GATEWAY_CONFIG.provider,
+            "localai_model": GATEWAY_CONFIG.model if GATEWAY_CONFIG.provider == "localai" else None,
+        },
     }
 
 
@@ -609,6 +644,10 @@ async def process_vae(
         )
     except GpuLockTimeoutError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except (BackendQuarantinedError, LocalAIUnavailableError) as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except LocalAIRequestError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
     except TimeoutError as exc:
         raise HTTPException(status_code=504, detail=str(exc)) from exc
     except HTTPException:

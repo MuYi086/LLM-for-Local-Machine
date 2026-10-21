@@ -19,6 +19,13 @@ from typing import Any, Literal
 import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse, Response
+from inference_gateway import (
+    BackendQuarantinedError,
+    LocalAIRequestError,
+    LocalAIUnavailableError,
+    execute_localai_worker,
+    load_gateway_config,
+)
 from pydantic import BaseModel, Field, ValidationError
 from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -94,6 +101,11 @@ CUDA_RELEASE_DELAY = float(os.getenv("CUDA_RELEASE_DELAY", "2.0"))
 API_HOST = variant_env("HOST", os.getenv("HOST", "0.0.0.0"))
 API_PORT = int(variant_env("PORT", os.getenv("PORT", "8341")))
 REQUEST_TIMEOUT = float(variant_env("REQUEST_TIMEOUT", "900"))
+GATEWAY_CONFIG = load_gateway_config(
+    service_provider_env=f"UNITALE_MOSS_AUDIO_4B_{MODEL_VARIANT.upper()}_PROVIDER",
+    default_model=f"unitale.moss-audio-4b.{MODEL_VARIANT}.worker.v1",
+    request_timeout=REQUEST_TIMEOUT,
+)
 DEVICE = variant_env("DEVICE", "cuda:0")
 DTYPE = variant_env("DTYPE", "auto")
 MAX_NEW_TOKENS = int(variant_env("MAX_NEW_TOKENS", "1024"))
@@ -337,6 +349,18 @@ manager = MossAudioThinkingWorkerManager()
 
 def execute_understanding_payload(payload: dict[str, Any]) -> dict[str, Any]:
     """持有共享 GPU 锁执行 worker；此函数在线程池中调用。"""
+    if GATEWAY_CONFIG.provider == "localai":
+        result, _ = execute_localai_worker(
+            config=GATEWAY_CONFIG,
+            operation="run",
+            payload={"worker_input": payload},
+        )
+        value = result.get("value")
+        if not isinstance(value, dict) or not isinstance(value.get("text"), str):
+            raise LocalAIRequestError("LocalAI MOSS-Audio worker 返回了非法文本 JSON。")
+        if not value["text"].strip():
+            raise LocalAIRequestError("LocalAI MOSS-Audio worker 返回空文本。")
+        return value
     with gpu_runtime_lock(f"{MODEL_SLUG}/understand"):
         with manager.lock:
             try:
@@ -445,6 +469,10 @@ async def understand(
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except GpuLockTimeoutError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except (BackendQuarantinedError, LocalAIUnavailableError) as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except LocalAIRequestError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
     except Exception as exc:
         LOGGER.exception("%s request failed", MODEL_SERVICE_NAME)
         raise HTTPException(status_code=500, detail=str(exc)) from exc

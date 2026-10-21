@@ -1,0 +1,38 @@
+[project]
+name = "unitale-localai-worker-bridge"
+version = "0.1.0"
+description = "LocalAI 外部 gRPC 后端与 Unitale 一次性 worker 的版本化桥接"
+requires-python = "==3.12.13"
+dependencies = [
+    "grpcio>=1.70,<2",
+    "protobuf>=5,<7",
+    "unitale-inference-gateway",
+    "unitale-runtime",
+]
+
+[tool.uv]
+package = true
+
+[tool.uv.sources]
+unitale-inference-gateway = { path = "../inference_gateway", editable = true }
+unitale-runtime = { path = "../unitale_runtime", editable = true }
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/unitale_localai_bridge"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["B008", "E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"

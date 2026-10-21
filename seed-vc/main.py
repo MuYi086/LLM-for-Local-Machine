@@ -14,6 +14,7 @@ import sys
 import tempfile
 import threading
 import time
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +22,16 @@ import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
+from inference_gateway import (
+    BackendQuarantinedError,
+    GatewayConfigurationError,
+    LocalAIClient,
+    LocalAIRequestError,
+    LocalAIUnavailableError,
+    UnsupportedCapabilityError,
+    load_gateway_config,
+)
+from inference_gateway.execution import execute_localai_operation
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from starlette.concurrency import run_in_threadpool
 from unitale_runtime import (
@@ -132,6 +143,18 @@ DEFAULT_F0_CONDITION = env_bool("SEED_VC_F0_CONDITION", False)
 DEFAULT_AUTO_F0_ADJUST = env_bool("SEED_VC_AUTO_F0_ADJUST", False)
 DEFAULT_SEMI_TONE_SHIFT = int(os.getenv("SEED_VC_SEMI_TONE_SHIFT", "0"))
 DEFAULT_FP16 = env_bool("SEED_VC_FP16", True)
+GATEWAY_CONFIG = load_gateway_config(
+    service_provider_env="UNITALE_SEED_VC_PROVIDER",
+    default_model="unitale.seed-vc.vc.f16",
+    request_timeout=REQUEST_TIMEOUT,
+)
+LOCALAI_SVC_MODEL = os.getenv("UNITALE_SEED_VC_SVC_MODEL", "unitale.seed-vc.svc.f16")
+if not LOCALAI_SVC_MODEL or any(
+    character not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-"
+    for character in LOCALAI_SVC_MODEL
+):
+    raise GatewayConfigurationError("UNITALE_SEED_VC_SVC_MODEL 含无效字符。")
+LOCALAI_SVC_CONFIG = replace(GATEWAY_CONFIG, model=LOCALAI_SVC_MODEL)
 
 for name, path in {
     "HF_HOME": HF_MIRROR_DIR,
@@ -245,15 +268,22 @@ class SeedVcWorkerManager:
         self.last_output_path: str | None = None
         self.last_metrics: dict[str, Any] | None = None
 
-    def build_worker_payload(self, request: SeedVcRequest) -> dict[str, Any]:
-        """在取得 GPU 锁前解析两路音频并检查所有本地依赖。"""
-        payload = request.model_dump()
-        for field in ("source_audio_path", "reference_audio_path"):
-            logical_path = payload[field]
+    def resolve_audio_paths(self, request: SeedVcRequest) -> tuple[Path, Path]:
+        """解析并校验请求引用的源音频和目标音色文件。"""
+        resolved_paths = []
+        for logical_path in (request.source_audio_path, request.reference_audio_path):
             audio_path = reference_store.prompt_audio_path(logical_path)
             if not audio_path.is_file():
                 raise HTTPException(status_code=404, detail=f"音频不存在: {logical_path}")
-            payload[field] = str(audio_path)
+            resolved_paths.append(audio_path)
+        return resolved_paths[0], resolved_paths[1]
+
+    def build_worker_payload(self, request: SeedVcRequest) -> dict[str, Any]:
+        """在取得 GPU 锁前解析两路音频并检查所有本地依赖。"""
+        payload = request.model_dump()
+        source_path, reference_path = self.resolve_audio_paths(request)
+        payload["source_audio_path"] = str(source_path)
+        payload["reference_audio_path"] = str(reference_path)
         missing = [str(path) for path in required_files(request).values() if not path.is_file()]
         if not whisper_weights_ready():
             missing.append(f"{WHISPER_MODEL_DIR}/model.safetensors 或 pytorch_model.bin")
@@ -335,6 +365,17 @@ manager = SeedVcWorkerManager()
 @app.get("/v1/health")
 def health():
     """报告两种模型模式的文件就绪状态和存储容量，不加载模型。"""
+    localai_client = LocalAIClient(GATEWAY_CONFIG) if GATEWAY_CONFIG.provider == "localai" else None
+    localai_svc_client = (
+        LocalAIClient(LOCALAI_SVC_CONFIG) if GATEWAY_CONFIG.provider == "localai" else None
+    )
+    localai_healthy = bool(localai_client and localai_client.health())
+    localai_vc_registered = bool(
+        localai_client and localai_healthy and localai_client.model_ready()
+    )
+    localai_svc_registered = bool(
+        localai_svc_client and localai_healthy and localai_svc_client.model_ready()
+    )
     availability = {}
     for mode, f0 in (("voice_conversion", False), ("f0_conversion", True)):
         request = SeedVcRequest(
@@ -362,11 +403,28 @@ def health():
             **availability,
             "torch": module_available("torch"),
             "torchaudio": module_available("torchaudio"),
+            "selected_provider": GATEWAY_CONFIG.provider,
+            "selected_provider_ready": (
+                localai_vc_registered and localai_svc_registered
+                if localai_client
+                else availability["voice_conversion"]["ready"]
+                and availability["f0_conversion"]["ready"]
+            ),
+            "localai_healthy": localai_healthy,
+            "localai_vc_model_registered": localai_vc_registered,
+            "localai_svc_model_registered": localai_svc_registered,
         },
         "runtime": {
             "worker_runtime": "uv",
             "worker_python": sys.executable,
-            "model_lifecycle": "one request -> one worker -> process exit releases VRAM",
+            "provider": GATEWAY_CONFIG.provider,
+            "localai_vc_model": GATEWAY_CONFIG.model if localai_client else None,
+            "localai_svc_model": LOCALAI_SVC_CONFIG.model if localai_client else None,
+            "model_lifecycle": (
+                "one LocalAI request -> backend/shutdown confirmation -> GPU lock release"
+                if localai_client
+                else "one request -> one worker -> process exit releases VRAM"
+            ),
             "local_files_only": LOCAL_FILES_ONLY,
             "device": DEVICE,
             "request_timeout": REQUEST_TIMEOUT,
@@ -404,12 +462,50 @@ def check_audio_exists(file_name: str):
 @app.post("/v1/seedVc/voiceConversion")
 def voice_conversion(request: SeedVcRequest):
     """串行执行一次 Seed-VC 转换，原子保存结果并返回 WAV。"""
-    try:
-        payload = manager.build_worker_payload(request)
-    except (OSError, ValueError) as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
     metrics = None
+    if GATEWAY_CONFIG.provider == "localai" and not request.fp16:
+        raise HTTPException(
+            status_code=422,
+            detail="LocalAI Seed-VC provider 固定使用 f16 权重；fp16=false 仅支持 native。",
+        )
     try:
+        if GATEWAY_CONFIG.provider == "localai":
+            source_path, reference_path = manager.resolve_audio_paths(request)
+            selected_config = LOCALAI_SVC_CONFIG if request.f0_condition else GATEWAY_CONFIG
+            params = {
+                "num_inference_steps": str(request.diffusion_steps),
+                "length_adjust": str(request.length_adjust),
+                "route": "v1_svc" if request.f0_condition else "v2_vc",
+            }
+            if request.f0_condition:
+                params.update(
+                    inference_guidance_scale=str(request.inference_cfg_rate),
+                    f0_condition="true",
+                    auto_f0_adjust=str(request.auto_f0_adjust).lower(),
+                    semitone_shift=str(request.semi_tone_shift),
+                )
+            else:
+                # Unitale exposes one guidance slider; audio.cpp V2 exposes
+                # separate content and speaker scales, so keep both aligned.
+                params.update(
+                    intelligibility_guidance_scale=str(request.inference_cfg_rate),
+                    similarity_guidance_scale=str(request.inference_cfg_rate),
+                )
+            with manager.lock:
+                audio_bytes, elapsed = execute_localai_operation(
+                    config=selected_config,
+                    operation=lambda client: client.transform_audio(
+                        audio_path=source_path,
+                        reference_path=reference_path,
+                        params=params,
+                    ),
+                )
+                manager.last_output_path = str(persist_audio_bytes(audio_bytes, OUTPUT_DIR))
+                manager.last_error = None
+                manager.last_metrics = {"provider": "localai", "request_seconds": elapsed}
+                return Response(content=audio_bytes, media_type="audio/wav")
+
+        payload = manager.build_worker_payload(request)
         with gpu_runtime_lock("seed_vc/voiceConversion") as metrics, manager.lock:
             try:
                 audio_bytes = manager.run_worker(payload)
@@ -418,7 +514,25 @@ def voice_conversion(request: SeedVcRequest):
             finally:
                 wait_after_cuda_release()
     except GpuLockTimeoutError as exc:
+        manager.last_error = str(exc)
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except BackendQuarantinedError as exc:
+        manager.last_error = str(exc)
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except LocalAIUnavailableError as exc:
+        manager.last_error = str(exc)
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except LocalAIRequestError as exc:
+        manager.last_error = str(exc)
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except UnsupportedCapabilityError as exc:
+        manager.last_error = str(exc)
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except (OSError, ValueError) as exc:
+        manager.last_error = str(exc)
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except HTTPException:
+        raise
     except Exception as exc:
         manager.last_error = str(exc)
         LOGGER.exception("Seed-VC 转换失败")

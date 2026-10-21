@@ -8,6 +8,7 @@ import os
 import sys
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
@@ -32,6 +33,7 @@ os.environ.update(
 )
 (TEST_ROOT / "model").mkdir(parents=True, exist_ok=True)
 sys.path.insert(0, str(SERVICE_DIR))
+sys.path.insert(0, str(REPOSITORY_DIR / "inference_gateway/src"))
 
 spec = importlib.util.spec_from_file_location(
     "qwen3_voicedesign_service_main",
@@ -70,6 +72,8 @@ class Qwen3VoiceDesignMigrationTests(unittest.TestCase):
         )
         self.assertTrue(payload["available"]["worker_script"])
         self.assertTrue(payload["available"]["qwen_voicedesign_model_dir"])
+        self.assertEqual(payload["available"]["selected_provider"], "native")
+        self.assertFalse(payload["available"]["localai_model_registered"])
         self.assertEqual(payload["runtime"]["worker_runtime"], "uv")
         self.assertEqual(payload["available"]["python"], sys.executable)
         self.assertEqual(payload["runtime"]["flash_attention_policy"].split(";")[0], "optional")
@@ -108,6 +112,85 @@ class Qwen3VoiceDesignMigrationTests(unittest.TestCase):
         self.assertTrue(saved_files)
         self.assertTrue(all(path.parent == main.TIMBRE_STORAGE_DIR for path in saved_files))
         self.assertFalse((TEST_ROOT / "legacy-clone").exists())
+
+    def test_localai_voice_design_preserves_chunking_pause_and_timbre_storage(self) -> None:
+        from fastapi.testclient import TestClient
+
+        generated_wav = b"RIFF\x04\x00\x00\x00WAVE"
+        generated_requests: list[dict[str, object]] = []
+
+        class FakeClient:
+            def design_voice(self, **kwargs: object):
+                generated_requests.append(kwargs)
+                return generated_wav, 0.03
+
+        def execute_operation(*, config, operation):
+            self.assertEqual(config.model, "unitale.qwen3-tts.1p7b-voicedesign")
+            return operation(FakeClient())
+
+        localai_config = replace(
+            main.GATEWAY_CONFIG,
+            provider="localai",
+            localai_enabled=True,
+            model="unitale.qwen3-tts.1p7b-voicedesign",
+        )
+        with (
+            patch.object(main, "GATEWAY_CONFIG", localai_config),
+            patch.object(main, "execute_localai_operation", side_effect=execute_operation),
+            patch.object(main, "join_localai_wavs", return_value=generated_wav) as join_wavs,
+            patch.object(main.manager, "run_worker") as run_worker,
+        ):
+            response = TestClient(main.app).post(
+                "/v1/qwen/timbre",
+                json={
+                    "voice_description": "成年女性，温柔清晰。",
+                    "text": "今天很好。明天也好。",
+                    "language": "Chinese",
+                    "max_chars_per_chunk": 5,
+                    "pause_ms": 50,
+                    "max_new_tokens": 512,
+                    "top_p": 0.85,
+                    "temperature": 0.75,
+                },
+            )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.headers["content-type"], "audio/wav")
+        self.assertEqual(
+            [item["text"] for item in generated_requests], ["今天很好。", "明天也好。"]
+        )
+        self.assertTrue(
+            all(item["instruction"] == "成年女性，温柔清晰。" for item in generated_requests)
+        )
+        self.assertTrue(all(item["max_new_tokens"] == 512 for item in generated_requests))
+        join_wavs.assert_called_once_with([generated_wav, generated_wav], 50)
+        run_worker.assert_not_called()
+        self.assertEqual(response.content, generated_wav)
+        saved_files = list(main.TIMBRE_STORAGE_DIR.glob("qwen_voicedesign_*.wav"))
+        self.assertTrue(saved_files)
+        self.assertTrue(all(path.parent == main.TIMBRE_STORAGE_DIR for path in saved_files))
+
+    def test_localai_voice_design_rejects_nondefault_hardware_overrides(self) -> None:
+        from fastapi.testclient import TestClient
+
+        localai_config = replace(
+            main.GATEWAY_CONFIG,
+            provider="localai",
+            localai_enabled=True,
+            model="unitale.qwen3-tts.1p7b-voicedesign",
+        )
+        with (
+            patch.object(main, "GATEWAY_CONFIG", localai_config),
+            patch.object(main, "execute_localai_operation") as execute_operation,
+        ):
+            response = TestClient(main.app).post(
+                "/v1/qwen/timbre",
+                json={"voice_description": "成年女性。", "dtype": "float16"},
+            )
+
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("PyTorch 参数", response.json()["detail"])
+        execute_operation.assert_not_called()
 
     def test_worker_uses_uv_interpreter_and_cleans_temporary_files(self) -> None:
         captured: dict[str, object] = {}

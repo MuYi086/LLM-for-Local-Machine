@@ -15,6 +15,13 @@ from typing import Any
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Response
+from inference_gateway import (
+    BackendQuarantinedError,
+    LocalAIRequestError,
+    LocalAIUnavailableError,
+    execute_localai_worker_file,
+    load_gateway_config,
+)
 from pydantic import BaseModel, Field, field_validator
 from starlette.middleware.base import BaseHTTPMiddleware
 from unitale_runtime import GpuLockTimeoutError
@@ -103,6 +110,11 @@ MOSS_SOUNDEFFECT_DEFAULT_SIGMA_SHIFT = float(
 MOSS_SOUNDEFFECT_DEFAULT_SEED = int(os.getenv("MOSS_SOUNDEFFECT_DEFAULT_SEED", "0"))
 MOSS_SOUNDEFFECT_DISABLE_TORCHDYNAMO = env_bool("MOSS_SOUNDEFFECT_DISABLE_TORCHDYNAMO", True)
 MOSS_SOUNDEFFECT_REQUEST_TIMEOUT = float(os.getenv("MOSS_SOUNDEFFECT_REQUEST_TIMEOUT", "600"))
+GATEWAY_CONFIG = load_gateway_config(
+    service_provider_env="UNITALE_MOSS_SOUNDEFFECT_PROVIDER",
+    default_model="unitale.moss-soundeffect-v2.worker.v1",
+    request_timeout=MOSS_SOUNDEFFECT_REQUEST_TIMEOUT,
+)
 LOCAL_FILES_ONLY = env_bool("LOCAL_FILES_ONLY", True)
 CUDA_RELEASE_DELAY = float(os.getenv("CUDA_RELEASE_DELAY", "2.0"))
 
@@ -212,6 +224,28 @@ class SoundEffectWorkerManager:
             self.last_error = str(exc)
             raise
 
+    def run_localai_worker(self, payload: dict[str, Any]) -> bytes:
+        """通过固定 worker bridge 执行声效请求并读取 WAV 成品。"""
+        artifact, _ = execute_localai_worker_file(
+            config=GATEWAY_CONFIG,
+            operation="run",
+            payload={"worker_input": payload},
+            output_dir=WORKER_TMP_DIR,
+            suffix=".wav",
+            media_type="audio/wav",
+        )
+        try:
+            audio = artifact.read_bytes()
+            if not audio:
+                raise RuntimeError("LocalAI MOSS-SoundEffect worker 返回空 WAV。")
+            self.last_error = None
+            return audio
+        except Exception as exc:
+            self.last_error = str(exc)
+            raise
+        finally:
+            artifact.unlink(missing_ok=True)
+
 
 app = FastAPI(title="Unitale MOSS-SoundEffect v2 API")
 app.add_middleware(ForceCORS)
@@ -285,10 +319,10 @@ def generate(request: SoundEffectGenerateRequest) -> Response:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     try:
-        with gpu_runtime_lock("soundeffect/generate"):
+        if GATEWAY_CONFIG.provider == "localai":
             with manager.lock:
                 try:
-                    audio = manager.run_worker(payload)
+                    audio = manager.run_localai_worker(payload)
                     if not audio:
                         raise RuntimeError("SoundEffect worker 返回空音频。")
                     saved_output_path = persist_audio_bytes(
@@ -300,10 +334,32 @@ def generate(request: SoundEffectGenerateRequest) -> Response:
                     return Response(content=audio, media_type="audio/wav")
                 except HTTPException:
                     raise
+                except (BackendQuarantinedError, LocalAIUnavailableError) as exc:
+                    raise HTTPException(status_code=503, detail=str(exc)) from exc
+                except LocalAIRequestError as exc:
+                    raise HTTPException(status_code=502, detail=str(exc)) from exc
                 except Exception as exc:
                     raise HTTPException(status_code=500, detail=str(exc)) from exc
-                finally:
-                    wait_after_cuda_release()
+        else:
+            with gpu_runtime_lock("soundeffect/generate"):
+                with manager.lock:
+                    try:
+                        audio = manager.run_worker(payload)
+                        if not audio:
+                            raise RuntimeError("SoundEffect worker 返回空音频。")
+                        saved_output_path = persist_audio_bytes(
+                            audio,
+                            "moss_soundeffect",
+                            SOUNDEFFECT_STORAGE_DIR,
+                        )
+                        print(f"[MOSS-SoundEffect] 已保存音效: {saved_output_path}")
+                        return Response(content=audio, media_type="audio/wav")
+                    except HTTPException:
+                        raise
+                    except Exception as exc:
+                        raise HTTPException(status_code=500, detail=str(exc)) from exc
+                    finally:
+                        wait_after_cuda_release()
     except GpuLockTimeoutError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 

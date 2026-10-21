@@ -7,6 +7,8 @@ API 进程负责校验请求并持有 GPU 锁；每个请求由全新的 worker 
 
 from __future__ import annotations
 
+import io
+
 # 学习入口：请求先经过 Pydantic 校验，再持有共享 GPU 锁，最后交给一次性 worker。
 import logging
 import os
@@ -18,6 +20,15 @@ from typing import Literal
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Response
+from inference_gateway import (
+    BackendQuarantinedError,
+    LocalAIClient,
+    LocalAIRequestError,
+    LocalAIUnavailableError,
+    UnsupportedCapabilityError,
+    load_gateway_config,
+)
+from inference_gateway.execution import execute_localai_operation
 from pydantic import BaseModel, Field, field_validator, model_validator
 from starlette.middleware.base import BaseHTTPMiddleware
 from unitale_runtime import GpuLockTimeoutError
@@ -43,6 +54,10 @@ REQUIRED_MODEL_FILES = (
     "t5gemma-b-b-ul2/tokenizer.json",
 )
 MAX_SECONDS = 380.0
+SAMPLE_RATE = 44_100
+CHANNELS = 2
+LOCALAI_PROVIDER_ENV = "UNITALE_STABLE_AUDIO_3_MEDIUM_PROVIDER"
+LOCALAI_MODEL_ID = "unitale.stable-audio3-medium.q8-0"
 
 
 def expand_path(value: str) -> Path:
@@ -97,6 +112,12 @@ STABLE_AUDIO_3_MEDIUM_DEFAULT_SEED = int(os.getenv("STABLE_AUDIO_3_MEDIUM_DEFAUL
 STABLE_AUDIO_3_MEDIUM_REQUEST_TIMEOUT = float(
     os.getenv("STABLE_AUDIO_3_MEDIUM_REQUEST_TIMEOUT", "900")
 )
+GATEWAY_CONFIG = load_gateway_config(
+    service_provider_env=LOCALAI_PROVIDER_ENV,
+    default_model=LOCALAI_MODEL_ID,
+    request_timeout=STABLE_AUDIO_3_MEDIUM_REQUEST_TIMEOUT,
+)
+LAST_LOCALAI_ERROR: str | None = None
 STABLE_AUDIO_3_MEDIUM_OUTPUT_DIR = expand_path(
     os.getenv("STABLE_AUDIO_3_MEDIUM_OUTPUT_DIR", str(SOUNDEFFECT_STORAGE_DIR))
 )
@@ -204,6 +225,76 @@ STABLE_AUDIO_3_MEDIUM_WORKER = WorkerConfig(
 )
 
 
+def validate_localai_request(request: StableAudio3MediumGenerateRequest) -> None:
+    """拒绝 SoundGeneration HTTP 合同无法逐请求表达的原生参数。"""
+    if request.dtype is not None:
+        raise UnsupportedCapabilityError(
+            "LocalAI Stable Audio 候选固定使用 Q8 GGUF；不能满足请求中的 PyTorch dtype 覆盖。"
+        )
+    if request.steps != STABLE_AUDIO_3_MEDIUM_DEFAULT_STEPS:
+        raise UnsupportedCapabilityError(
+            "LocalAI SoundGeneration 当前没有逐请求 num_inference_steps 字段；"
+            f"仅接受当前服务默认 steps={STABLE_AUDIO_3_MEDIUM_DEFAULT_STEPS}。"
+        )
+    if request.cfg_scale != STABLE_AUDIO_3_MEDIUM_DEFAULT_CFG_SCALE:
+        raise UnsupportedCapabilityError(
+            "LocalAI SoundGeneration 当前没有逐请求 Stable Audio guidance_scale 字段；"
+            f"仅接受当前服务默认 cfg_scale={STABLE_AUDIO_3_MEDIUM_DEFAULT_CFG_SCALE}。"
+        )
+    if request.seed >= 0:
+        raise UnsupportedCapabilityError(
+            "LocalAI SoundGeneration 当前不能传递 Stable Audio seed；"
+            "请使用 seed=-1 进行随机生成，或切回 native provider。"
+        )
+
+
+def validate_localai_wav(audio_bytes: bytes) -> tuple[int, int]:
+    """完整解码返回音频并检查 Stable Audio 3 Medium WAV 合同。"""
+    try:
+        import soundfile as sf
+
+        with sf.SoundFile(io.BytesIO(audio_bytes), mode="r") as wav_file:
+            sample_rate = wav_file.samplerate
+            channels = wav_file.channels
+            frame_count = wav_file.frames
+            if frame_count <= 0:
+                raise LocalAIRequestError("LocalAI Stable Audio 返回了空 WAV。")
+            if sample_rate != SAMPLE_RATE or channels != CHANNELS:
+                raise LocalAIRequestError(
+                    "LocalAI Stable Audio WAV 格式与当前接口不同："
+                    f"期望 {SAMPLE_RATE} Hz/{CHANNELS} 声道，得到 {sample_rate} Hz/{channels} 声道。"
+                )
+            decoded_frames = sum(
+                len(block)
+                for block in wav_file.blocks(blocksize=65_536, dtype="float32", always_2d=True)
+            )
+    except LocalAIRequestError:
+        raise
+    except (ImportError, OSError, RuntimeError, ValueError) as exc:
+        raise LocalAIRequestError(f"LocalAI Stable Audio 返回的 WAV 无效：{exc}") from exc
+    if decoded_frames != frame_count:
+        raise LocalAIRequestError(
+            f"LocalAI Stable Audio WAV 不完整：头部声明 {frame_count} 帧，实际解码 {decoded_frames} 帧。"
+        )
+    return sample_rate, channels
+
+
+def generate_localai(request: StableAudio3MediumGenerateRequest) -> tuple[bytes, float]:
+    """在共享 LocalAI GPU 租约内执行一次纯文本 Stable Audio 生成。"""
+    audio_bytes, elapsed = execute_localai_operation(
+        config=GATEWAY_CONFIG,
+        operation=lambda client: client.generate_sound(
+            text=request.prompt,
+            duration_seconds=request.seconds or STABLE_AUDIO_3_MEDIUM_DEFAULT_SECONDS,
+            bpm=None,
+            keyscale=None,
+            timesignature=None,
+        ),
+    )
+    validate_localai_wav(audio_bytes)
+    return audio_bytes, elapsed
+
+
 class StableAudio3MediumWorkerManager:
     """校验本地资源、启动一次 worker，并记录最近一次错误。"""
 
@@ -263,6 +354,11 @@ manager = StableAudio3MediumWorkerManager()
 @app.get("/v1/health")
 def health() -> dict:
     """在不加载权重的前提下返回服务、模型文件和 GPU 就绪状态。"""
+    localai_client = LocalAIClient(GATEWAY_CONFIG) if GATEWAY_CONFIG.provider == "localai" else None
+    localai_healthy = bool(localai_client and localai_client.health())
+    localai_model_registered = bool(
+        localai_client and localai_healthy and localai_client.model_ready()
+    )
     cuda = cuda_status()
     required_files = {
         name: (STABLE_AUDIO_3_MEDIUM_MODEL_DIR / name).is_file() for name in REQUIRED_MODEL_FILES
@@ -292,6 +388,14 @@ def health() -> dict:
             "torch_in_api_env": module_available("torch"),
             "flash_attn_in_api_env": module_available("flash_attn"),
             "cuda": cuda["available"],
+            "selected_provider": GATEWAY_CONFIG.provider,
+            "selected_provider_ready": (
+                localai_model_registered
+                if localai_client
+                else local_model_is_complete(STABLE_AUDIO_3_MEDIUM_MODEL_DIR)
+            ),
+            "localai_healthy": localai_healthy,
+            "localai_model_registered": localai_model_registered,
         },
         "cuda": cuda,
         "runtime": {
@@ -315,14 +419,20 @@ def health() -> dict:
             "hardware": "CUDA GPU with Ampere-or-newer compute capability",
             "flash_attention": flash_attention_status(),
             "contract": "supports music and sound effects; not designed for speech or voice generation",
+            "provider": GATEWAY_CONFIG.provider,
+            "localai_model": GATEWAY_CONFIG.model if localai_client else None,
         },
-        "last_errors": {"stable_audio_3_medium": manager.last_error},
+        "last_errors": {
+            "stable_audio_3_medium": manager.last_error,
+            "localai": LAST_LOCALAI_ERROR,
+        },
     }
 
 
 @app.post("/v1/stableAudio/soundEffect")
 def generate(request: StableAudio3MediumGenerateRequest) -> Response:
     """串行持有共享 GPU 锁，生成 WAV 并写入 soundEffect 存储目录。"""
+    global LAST_LOCALAI_ERROR
     try:
         payload = manager.build_worker_payload(request)
     except HTTPException:
@@ -330,6 +440,34 @@ def generate(request: StableAudio3MediumGenerateRequest) -> Response:
     except Exception as exc:
         LOGGER.exception("Stable Audio 3 Medium request preflight failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    if GATEWAY_CONFIG.provider == "localai":
+        try:
+            validate_localai_request(request)
+            audio, _elapsed = generate_localai(request)
+            saved_output_path = persist_audio_bytes(
+                audio,
+                "stable_audio_3_medium",
+                STABLE_AUDIO_3_MEDIUM_OUTPUT_DIR,
+            )
+            manager.last_error = None
+            LAST_LOCALAI_ERROR = None
+            print(f"[Stable Audio 3 Medium] 已保存 LocalAI 音频: {saved_output_path}")
+            return Response(content=audio, media_type="audio/wav")
+        except UnsupportedCapabilityError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except GpuLockTimeoutError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except BackendQuarantinedError as exc:
+            LAST_LOCALAI_ERROR = str(exc)
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except (LocalAIRequestError, LocalAIUnavailableError) as exc:
+            LAST_LOCALAI_ERROR = str(exc)
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except Exception as exc:
+            LAST_LOCALAI_ERROR = str(exc)
+            LOGGER.exception("LocalAI Stable Audio request failed")
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     try:
         with gpu_runtime_lock(GPU_LOCK_FILE, "stable_audio_3_medium/generate"):

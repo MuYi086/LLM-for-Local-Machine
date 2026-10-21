@@ -14,6 +14,7 @@ dependencies = [
     "torch==2.5.1",
     "torchaudio==2.5.1",
     "unitale-runtime",
+    "unitale-inference-gateway",
     "uvicorn==0.52.1",
 ]
 
@@ -26,6 +27,7 @@ dev = [
 package = false
 
 [tool.uv.sources]
+unitale-inference-gateway = { path = "../inference_gateway", editable = true }
 unitale-runtime = { path = "../unitale_runtime", editable = true }
 
 [tool.ruff]

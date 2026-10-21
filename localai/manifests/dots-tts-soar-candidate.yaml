@@ -1,0 +1,10 @@
+name: unitale.dots-tts-soar.q8-0
+backend: audio-cpp
+parameters:
+  model: DotTTS-SOAR-GGUF/dots-tts-soar-q8_0.gguf
+options:
+  - family:dots_tts
+  - task:tts
+  - backend:cuda
+  - device:0
+  - dots_tts.reference_cache_slots:0

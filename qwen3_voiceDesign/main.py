@@ -5,6 +5,7 @@ from __future__ import annotations
 
 # 学习入口：VoiceDesign API 不导入模型，只负责请求校验、锁、worker 和音频存储。
 import importlib.util
+import io
 import json
 import logging
 import os
@@ -18,6 +19,15 @@ from typing import Any
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Response
+from inference_gateway import (
+    BackendQuarantinedError,
+    LocalAIClient,
+    LocalAIRequestError,
+    LocalAIUnavailableError,
+    UnsupportedCapabilityError,
+    load_gateway_config,
+)
+from inference_gateway.execution import execute_localai_operation
 from pydantic import BaseModel, Field
 from starlette.middleware.base import BaseHTTPMiddleware
 from unitale_runtime import (
@@ -29,7 +39,7 @@ from unitale_runtime import (
 )
 
 from audio_output import persist_audio_bytes
-from voicedesign_runtime import cuda_status, terminate_process_group
+from voicedesign_runtime import cuda_status, split_text, terminate_process_group
 
 LOGGER = logging.getLogger(__name__)
 
@@ -75,6 +85,11 @@ CUDA_RELEASE_DELAY = float(os.getenv("CUDA_RELEASE_DELAY", "2.0"))
 API_HOST = os.getenv("QWEN_VOICEDESIGN_HOST", os.getenv("HOST", "0.0.0.0"))
 API_PORT = int(os.getenv("QWEN_VOICEDESIGN_PORT", os.getenv("PORT", "8301")))
 REQUEST_TIMEOUT = float(os.getenv("QWEN_VOICEDESIGN_REQUEST_TIMEOUT", "900"))
+GATEWAY_CONFIG = load_gateway_config(
+    service_provider_env="UNITALE_QWEN3_VOICEDESIGN_PROVIDER",
+    default_model="unitale.qwen3-tts.1p7b-voicedesign",
+    request_timeout=REQUEST_TIMEOUT,
+)
 DEVICE_MAP = os.getenv("QWEN_VOICEDESIGN_DEVICE_MAP", "cuda:0")
 DTYPE = os.getenv("QWEN_VOICEDESIGN_DTYPE", "auto")
 ATTN_IMPLEMENTATION = os.getenv(
@@ -109,6 +124,7 @@ os.makedirs(os.path.dirname(GPU_LOCK_FILE) or ".", exist_ok=True)
 reference_store = AudioReferenceStore(STORAGE_DIR / "clone", TIMBRE_STORAGE_DIR)
 
 app = FastAPI(title="Unitale Qwen3-TTS VoiceDesign API")
+LAST_LOCALAI_ERROR: str | None = None
 
 
 class ForceCORS(BaseHTTPMiddleware):
@@ -176,6 +192,92 @@ def worker_error_excerpt(output: str) -> str:
     if not lines:
         return "Qwen3-TTS VoiceDesign worker 未输出错误信息。"
     return " | ".join(lines[-8:])
+
+
+def validate_localai_request(request: QwenDesignRequest, payload: dict[str, Any]) -> list[str]:
+    """在 GPU 排队前拒绝 LocalAI 无法保留的 PyTorch 配置并生成分段。"""
+    hardware_defaults = {
+        "device_map": DEVICE_MAP,
+        "dtype": DTYPE,
+        "attn_implementation": ATTN_IMPLEMENTATION,
+    }
+    requested_hardware_fields = [
+        name for name, default in hardware_defaults.items() if getattr(request, name) != default
+    ]
+    if requested_hardware_fields:
+        fields = ", ".join(requested_hardware_fields)
+        raise UnsupportedCapabilityError(
+            f"LocalAI audio-cpp 不支持逐请求设置 PyTorch 参数：{fields}。"
+        )
+
+    chunks = split_text(str(payload["text"]), int(payload["max_chars_per_chunk"]))
+    if len(chunks) > 32:
+        raise UnsupportedCapabilityError(
+            "LocalAI VoiceDesign 单次请求最多支持 32 个文本片段；请增大 max_chars_per_chunk。"
+        )
+    if payload["temperature"] is not None and float(payload["temperature"]) <= 0:
+        raise UnsupportedCapabilityError(
+            "audio.cpp Qwen3 VoiceDesign 在采样开启时要求 temperature 大于 0。"
+        )
+    return chunks
+
+
+def join_localai_wavs(wav_chunks: list[bytes], pause_ms: int) -> bytes:
+    """验证 LocalAI 分段 WAV 并按原 VoiceDesign worker 规则插入静音合并。"""
+    if not wav_chunks:
+        raise LocalAIRequestError("LocalAI VoiceDesign 未返回音频片段。")
+    if sum(map(len, wav_chunks)) > 128 * 1024 * 1024:
+        raise LocalAIRequestError("LocalAI VoiceDesign 分段音频超过 128 MiB 响应上限。")
+    try:
+        import numpy as np
+        import soundfile as sf
+
+        waveforms: list[Any] = []
+        sample_rate: int | None = None
+        for wav_chunk in wav_chunks:
+            waveform, rate = sf.read(io.BytesIO(wav_chunk), dtype="float32", always_2d=True)
+            if waveform.size == 0 or not np.isfinite(waveform).all():
+                raise ValueError("WAV 片段为空或包含非有限样本。")
+            if sample_rate is not None and rate != sample_rate:
+                raise ValueError("WAV 分段采样率不一致。")
+            sample_rate = int(rate)
+            waveforms.append(waveform.mean(axis=1, dtype=np.float32))
+
+        assert sample_rate is not None
+        pause = np.zeros(int(sample_rate * max(pause_ms, 0) / 1000), dtype=np.float32)
+        joined: list[Any] = []
+        for index, waveform in enumerate(waveforms):
+            joined.append(waveform)
+            if index + 1 < len(waveforms) and len(pause):
+                joined.append(pause)
+        output = io.BytesIO()
+        sf.write(output, np.concatenate(joined), sample_rate, format="WAV")
+    except (ImportError, OSError, RuntimeError, ValueError) as exc:
+        raise LocalAIRequestError(f"LocalAI VoiceDesign 返回的 WAV 无效：{exc}") from exc
+    return output.getvalue()
+
+
+def synthesize_localai(request: QwenDesignRequest, payload: dict[str, Any]) -> tuple[bytes, float]:
+    """在一次共享 GPU 租约内逐段设计音色，并确认 backend 停止。"""
+    chunks = validate_localai_request(request, payload)
+
+    def run(client: LocalAIClient) -> tuple[bytes, float]:
+        wav_chunks: list[bytes] = []
+        elapsed_seconds = 0.0
+        for text_chunk in chunks:
+            audio_bytes, elapsed = client.design_voice(
+                text=text_chunk,
+                instruction=str(payload["voice_description"]),
+                language=payload["language"],
+                max_new_tokens=int(payload["max_new_tokens"]),
+                top_p=payload["top_p"],
+                temperature=payload["temperature"],
+            )
+            wav_chunks.append(audio_bytes)
+            elapsed_seconds += elapsed
+        return join_localai_wavs(wav_chunks, int(payload["pause_ms"])), elapsed_seconds
+
+    return execute_localai_operation(config=GATEWAY_CONFIG, operation=run)
 
 
 class QwenVoiceDesignWorkerManager:
@@ -310,6 +412,11 @@ manager = QwenVoiceDesignWorkerManager()
 def health():
     """返回 VoiceDesign 依赖和模型状态，不加载任何模型权重。"""
     cuda = cuda_status()
+    localai_client = LocalAIClient(GATEWAY_CONFIG) if GATEWAY_CONFIG.provider == "localai" else None
+    localai_healthy = bool(localai_client and localai_client.health())
+    localai_model_registered = bool(
+        localai_client and localai_healthy and localai_client.model_ready()
+    )
     return {
         "code": 200,
         "paths": {
@@ -329,11 +436,21 @@ def health():
             "soundfile": module_available("soundfile"),
             "flash_attn": module_available("flash_attn"),
             "cuda": cuda["available"],
+            "selected_provider": GATEWAY_CONFIG.provider,
+            "selected_provider_ready": (
+                localai_model_registered
+                if localai_client
+                else os.path.isdir(QWEN_VOICEDESIGN_MODEL_DIR)
+            ),
+            "localai_healthy": localai_healthy,
+            "localai_model_registered": localai_model_registered,
         },
         "cuda": cuda,
         "runtime": {
             "worker_runtime": "uv",
             "worker_python": sys.executable,
+            "provider": GATEWAY_CONFIG.provider,
+            "localai_model": GATEWAY_CONFIG.model if localai_client else None,
             "model_lifecycle": "one request -> one worker -> process exit releases VRAM",
             "local_files_only": LOCAL_FILES_ONLY,
             "request_timeout": REQUEST_TIMEOUT,
@@ -347,13 +464,17 @@ def health():
             "pause_ms": PAUSE_MS,
             "gpu_scheduling": "shared exclusive file lock",
         },
-        "last_errors": {"qwen_voicedesign": manager.last_error},
+        "last_errors": {
+            "qwen_voicedesign": manager.last_error,
+            "localai": LAST_LOCALAI_ERROR,
+        },
     }
 
 
 @app.post("/v1/qwen/timbre")
 def qwen_design(request: QwenDesignRequest):
     """串行执行一次音色设计，并将 WAV 保存到 timbre 目录。"""
+    global LAST_LOCALAI_ERROR
     try:
         payload = manager.build_worker_payload(request)
     except HTTPException:
@@ -361,6 +482,36 @@ def qwen_design(request: QwenDesignRequest):
     except Exception as exc:
         LOGGER.exception("Qwen3 VoiceDesign request preflight failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    if GATEWAY_CONFIG.provider == "localai":
+        try:
+            validate_localai_request(request, payload)
+            with manager.lock:
+                audio_bytes, _elapsed = synthesize_localai(request, payload)
+                saved_output_path = persist_audio_bytes(
+                    audio_bytes,
+                    "qwen_voicedesign",
+                    TIMBRE_STORAGE_DIR,
+                )
+                reference_store.register_timbre_file(saved_output_path)
+                manager.last_error = None
+                LAST_LOCALAI_ERROR = None
+                print(f"[Qwen3-TTS VoiceDesign LocalAI] 已保存音色音频: {saved_output_path}")
+                return Response(content=audio_bytes, media_type="audio/wav")
+        except UnsupportedCapabilityError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except GpuLockTimeoutError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except BackendQuarantinedError as exc:
+            LAST_LOCALAI_ERROR = str(exc)
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except (LocalAIRequestError, LocalAIUnavailableError) as exc:
+            LAST_LOCALAI_ERROR = str(exc)
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except Exception as exc:
+            LAST_LOCALAI_ERROR = str(exc)
+            LOGGER.exception("LocalAI Qwen3 VoiceDesign request failed")
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     try:
         with gpu_runtime_lock("qwen/design"):

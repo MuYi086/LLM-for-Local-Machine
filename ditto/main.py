@@ -20,6 +20,13 @@ import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
+from inference_gateway import (
+    BackendQuarantinedError,
+    LocalAIRequestError,
+    LocalAIUnavailableError,
+    execute_localai_worker_file,
+    load_gateway_config,
+)
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.concurrency import run_in_threadpool
 from unitale_runtime import (
@@ -82,6 +89,11 @@ FFPROBE_BIN = os.getenv("DITTO_FFPROBE_BIN", "ffprobe")
 API_HOST = os.getenv("DITTO_HOST", os.getenv("HOST", "0.0.0.0"))
 API_PORT = int(os.getenv("DITTO_PORT", os.getenv("PORT", "8392")))
 REQUEST_TIMEOUT = float(os.getenv("DITTO_REQUEST_TIMEOUT", "1800"))
+GATEWAY_CONFIG = load_gateway_config(
+    service_provider_env="UNITALE_DITTO_PROVIDER",
+    default_model="unitale.ditto.worker.v1",
+    request_timeout=REQUEST_TIMEOUT,
+)
 CUDA_RELEASE_DELAY = float(os.getenv("CUDA_RELEASE_DELAY", "2.0"))
 CUDA_VISIBLE_DEVICES = os.getenv("DITTO_CUDA_VISIBLE_DEVICES", "0")
 LOCAL_FILES_ONLY = os.getenv("LOCAL_FILES_ONLY", "1").lower() in {"1", "true", "yes", "on"}
@@ -311,6 +323,8 @@ def health():
             "default_max_size": DEFAULT_MAX_SIZE,
             "default_seed": DEFAULT_SEED,
             "cuda_visible_devices": CUDA_VISIBLE_DEVICES,
+            "inference_provider": GATEWAY_CONFIG.provider,
+            "localai_model": GATEWAY_CONFIG.model if GATEWAY_CONFIG.provider == "localai" else None,
         },
         "last_errors": {"ditto": manager.last_error},
         "last_metrics": manager.last_metrics,
@@ -401,6 +415,36 @@ def generate(request: TalkingHeadRequest):
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    if GATEWAY_CONFIG.provider == "localai":
+        artifact: Path | None = None
+        try:
+            artifact, elapsed = execute_localai_worker_file(
+                config=GATEWAY_CONFIG,
+                operation="run",
+                payload={"worker_input": payload},
+                output_dir=Path(WORKER_TMP_DIR),
+                suffix=".mp4",
+                media_type="video/mp4",
+            )
+            validate_video(artifact, FFPROBE_BIN)
+            saved = persist_video(artifact, OUTPUT_DIR)
+            manager.last_error = None
+            manager.last_output_path = str(saved)
+            manager.last_metrics = {"worker_seconds": elapsed, "provider": "localai"}
+            return FileResponse(saved, media_type="video/mp4", filename=saved.name)
+        except GpuLockTimeoutError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except (BackendQuarantinedError, LocalAIUnavailableError) as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except LocalAIRequestError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+        except Exception as exc:
+            LOGGER.exception("Ditto LocalAI generation failed")
+            manager.last_error = str(exc)
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+        finally:
+            if artifact is not None:
+                artifact.unlink(missing_ok=True)
     try:
         with gpu_runtime_lock("ditto/talkingHead") as metrics:
             try:

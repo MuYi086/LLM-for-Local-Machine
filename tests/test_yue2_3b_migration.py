@@ -317,7 +317,7 @@ class YuE2ThreeBMigrationTests(unittest.TestCase):
         self.assertIn('YUE2_3B_PORT="${YUE2_3B_PORT:-8314}"', startup)
         self.assertIn("'/v1/m-a-p/YuE2'", startup)
         self.assertIn('setsid uv run --no-sync --project "$YUE2_3B_PROJECT_DIR"', startup)
-        self.assertEqual(startup.count("setsid uv run --no-sync --project"), 30)
+        self.assertEqual(startup.count("setsid uv run --no-sync --project"), 26)
         self.assertIn("YuE2-3B", quality_gate)
         self.assertIn('"yue2_3b_"', maintenance)
         self.assertIn("YuE2-3B 歌曲生成", readme)

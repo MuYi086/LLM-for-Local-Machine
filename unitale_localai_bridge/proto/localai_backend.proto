@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package backend;
+
+// LocalAI v4.11.0 Backend wire subset. Field numbers and RPC paths match the
+// fixed backend/backend.proto; only the methods used by this bridge are listed.
+service Backend {
+  rpc Health(HealthMessage) returns (Reply);
+  rpc Free(HealthMessage) returns (Result);
+  rpc Predict(PredictOptions) returns (Reply);
+  rpc LoadModel(ModelOptions) returns (Result);
+  rpc Status(HealthMessage) returns (StatusResponse);
+}
+
+message HealthMessage {}
+
+message PredictOptions {
+  string Prompt = 1;
+  string ModelIdentity = 54;
+}
+
+message Reply {
+  bytes message = 1;
+}
+
+message ModelOptions {
+  string Model = 1;
+}
+
+message Result {
+  string message = 1;
+  bool success = 2;
+}
+
+message StatusResponse {
+  enum State {
+    UNINITIALIZED = 0;
+    BUSY = 1;
+    READY = 2;
+    ERROR = -1;
+  }
+  State state = 1;
+}

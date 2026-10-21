@@ -1,0 +1,4 @@
+name: unitale.mert-v2-fullsong.worker.v1
+backend: unitale-worker
+parameters:
+  model: unitale.mert-v2-fullsong.worker.v1

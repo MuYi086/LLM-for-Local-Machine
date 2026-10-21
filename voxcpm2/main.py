@@ -17,12 +17,22 @@ import sys
 import tempfile
 import threading
 import time
+from pathlib import Path
 from typing import Literal
 
 # 官方文档: https://voxcpm.readthedocs.io/zh-cn/latest/cookbook.html
 import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, Request, Response, UploadFile
 from fastapi.responses import JSONResponse
+from inference_gateway import (
+    BackendQuarantinedError,
+    LocalAIClient,
+    LocalAIRequestError,
+    LocalAIUnavailableError,
+    UnsupportedCapabilityError,
+    load_gateway_config,
+)
+from inference_gateway.execution import execute_localai_operation
 from pydantic import Field, model_validator
 from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -157,6 +167,12 @@ VOXCPM2_OUTPUT_DIR = expand_path(
         CLONE_STORAGE_DIR,
     )
 )
+GATEWAY_CONFIG = load_gateway_config(
+    service_provider_env="UNITALE_VOXCPM2_PROVIDER",
+    default_model="unitale.voxcpm2.q8-0",
+    request_timeout=VOXCPM2_REQUEST_TIMEOUT,
+)
+LAST_LOCALAI_ERROR: str | None = None
 
 os.environ.setdefault("HF_HOME", HF_MIRROR_DIR)
 os.environ.setdefault("HF_MODULES_CACHE", os.path.join(RUNTIME_CACHE_DIR, "hf_modules"))
@@ -547,6 +563,17 @@ manager = VoxCpm2WorkerManager()
 def health():
     """返回 VoxCPM2 克隆 worker 和 GPU 的就绪状态。"""
     cuda = cuda_status()
+    localai_client = LocalAIClient(GATEWAY_CONFIG) if GATEWAY_CONFIG.provider == "localai" else None
+    localai_healthy = bool(localai_client and localai_client.health())
+    localai_model_registered = bool(localai_client and localai_client.model_ready())
+    selected_provider_ready = (
+        localai_healthy and localai_model_registered
+        if localai_client
+        else os.path.isfile(VOXCPM2_WORKER_SCRIPT)
+        and os.path.isfile(VOXCPM2_HELPER_SCRIPT)
+        and os.path.isdir(VOXCPM2_MODEL_DIR)
+        and cuda["available"]
+    )
     return {
         "code": 200,
         "paths": {
@@ -568,10 +595,16 @@ def health():
             "torch": module_available("torch"),
             "flash_attn": module_available("flash_attn"),
             "cuda": cuda["available"],
+            "selected_provider": GATEWAY_CONFIG.provider,
+            "selected_provider_ready": selected_provider_ready,
+            "localai_healthy": localai_healthy,
+            "localai_model_registered": localai_model_registered,
         },
         "cuda": cuda,
         "runtime": {
             "worker_runtime": "uv",
+            "provider": GATEWAY_CONFIG.provider,
+            "localai_model": GATEWAY_CONFIG.model if localai_client else None,
             "worker_python": sys.executable,
             "flash_attention": "not required; VoxCPM uses PyTorch scaled_dot_product_attention",
             "flash_attention_policy": (
@@ -581,6 +614,7 @@ def health():
                 "voxcpm2": "voxcpm2",
             },
             "model_lifecycle": "one request -> one worker -> process exit releases VRAM",
+            "localai_scope": "offline VoxCPM2 clone; nonverbal tags, Python postprocessing, and retries are unsupported",
             "local_files_only": LOCAL_FILES_ONLY,
             "request_timeout": VOXCPM2_REQUEST_TIMEOUT,
             "cfg_value": VOXCPM2_CFG_VALUE,
@@ -602,6 +636,7 @@ def health():
         },
         "last_errors": {
             "voxcpm2_tts": manager.last_error,
+            "localai": LAST_LOCALAI_ERROR,
         },
     }
 
@@ -636,6 +671,8 @@ def check_audio_exists(file_name: str):
 
 def synthesize_voxcpm2_payload(data: object) -> Response:
     """在共享 GPU 锁内执行同步克隆流程并持久化结果。"""
+    global LAST_LOCALAI_ERROR
+
     try:
         request = VoxCpm2SynthesizeRequest.model_validate(data)
         payload = manager.build_worker_payload(request)
@@ -644,6 +681,33 @@ def synthesize_voxcpm2_payload(data: object) -> Response:
     except Exception as exc:
         LOGGER.exception("VoxCPM2 clone request preflight failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    if GATEWAY_CONFIG.provider == "localai":
+        try:
+            localai_request = build_localai_request(request, payload)
+            audio_bytes, _elapsed = execute_localai_operation(
+                config=GATEWAY_CONFIG,
+                operation=lambda client: client.synthesize_voxcpm2_speech(**localai_request),
+            )
+            saved_output_path = persist_generated_audio_bytes(audio_bytes)
+            manager.last_error = None
+            LAST_LOCALAI_ERROR = None
+            print(f"[VoxCPM2] 已保存 LocalAI 生成音频: {saved_output_path}")
+            return Response(content=audio_bytes, media_type="audio/wav")
+        except UnsupportedCapabilityError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except GpuLockTimeoutError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except BackendQuarantinedError as exc:
+            LAST_LOCALAI_ERROR = str(exc)
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except (LocalAIRequestError, LocalAIUnavailableError) as exc:
+            LAST_LOCALAI_ERROR = str(exc)
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except Exception as exc:
+            LAST_LOCALAI_ERROR = str(exc)
+            LOGGER.exception("LocalAI VoxCPM2 request failed")
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     try:
         with gpu_runtime_lock("voxcpm2/synthesize"):
@@ -669,6 +733,55 @@ async def synthesize_v2(request: Request) -> Response:
     """解析异步请求体，再在线程池中执行阻塞的克隆生命周期。"""
     data = await request.json()
     return await run_in_threadpool(synthesize_voxcpm2_payload, data)
+
+
+def build_localai_request(
+    request: VoxCpm2SynthesizeRequest,
+    worker_payload: dict[str, object],
+) -> dict[str, object]:
+    """映射固定 audio.cpp VoxCPM2 单段克隆并拒绝未支持字段。"""
+    if worker_payload["nonverbal_tags"]:
+        raise UnsupportedCapabilityError(
+            "固定 audio.cpp VoxCPM2 文档没有 nonverbal_tags 请求映射；请切回 native。"
+        )
+    if bool(worker_payload["normalize"]):
+        raise UnsupportedCapabilityError("LocalAI VoxCPM2 不支持 native normalize 后处理。")
+    if bool(worker_payload["denoise"]):
+        raise UnsupportedCapabilityError("LocalAI VoxCPM2 不支持 native denoise 后处理。")
+    if bool(worker_payload["load_denoiser"]):
+        raise UnsupportedCapabilityError("LocalAI VoxCPM2 不支持加载 native 降噪器。")
+    if bool(worker_payload["optimize"]):
+        raise UnsupportedCapabilityError("LocalAI VoxCPM2 不支持请求级 PyTorch optimize。")
+    if bool(worker_payload["retry_badcase"]):
+        raise UnsupportedCapabilityError(
+            "固定 audio.cpp VoxCPM2 没有 retry_badcase 等价选项；当前配置启用了该重试，请切回 native 或显式关闭重试。"
+        )
+    if int(worker_payload["seed"]) != -1:
+        raise UnsupportedCapabilityError(
+            "固定 audio.cpp VoxCPM2 请求文档没有可验证的 seed 选项；请切回 native 或使用随机种子默认值。"
+        )
+    device = str(worker_payload["device"]).lower()
+    if device not in {"cuda", "cuda:0"}:
+        raise UnsupportedCapabilityError("当前 LocalAI VoxCPM2 候选固定使用 CUDA device 0。")
+
+    text = str(worker_payload["text"])
+    max_chars = int(worker_payload["max_chars_per_chunk"])
+    if max_chars > 0 and len(text) > max_chars:
+        raise UnsupportedCapabilityError(
+            "LocalAI VoxCPM2 试点仅接受单段文本；分段及 pause_ms 拼接请求请切回 native。"
+        )
+    if request.clone_mode == "controllable":
+        instruction = str(worker_payload["control_instruction"] or "").strip()
+        text = f"({instruction}){text}"
+
+    return {
+        "text": text,
+        "voice_path": Path(str(worker_payload["ref_audio_path"])),
+        "reference_text": worker_payload["prompt_text"],
+        "guidance_scale": float(worker_payload["cfg_value"]),
+        "num_inference_steps": int(worker_payload["inference_timesteps"]),
+        "text_chunk_size": len(text) + 1,
+    }
 
 
 if __name__ == "__main__":

@@ -751,6 +751,7 @@ dependencies = [
     { name = "torchaudio" },
     { name = "tqdm" },
     { name = "transformers" },
+    { name = "unitale-inference-gateway" },
     { name = "unitale-runtime" },
     { name = "uvicorn" },
 ]
@@ -778,6 +779,7 @@ requires-dist = [
     { name = "torchaudio", specifier = "==2.7.1", index = "https://mirrors.aliyun.com/pytorch-wheels/cu126/" },
     { name = "tqdm", specifier = "==4.70.0" },
     { name = "transformers", specifier = "==5.15.0" },
+    { name = "unitale-inference-gateway", editable = "../inference_gateway" },
     { name = "unitale-runtime", editable = "../unitale_runtime" },
     { name = "uvicorn", specifier = "==0.49.0" },
 ]
@@ -972,6 +974,17 @@ sdist = { url = "https://files.pythonhosted.org/packages/a3/26/b09b8010994eccc3c
 wheels = [
     { url = "https://files.pythonhosted.org/packages/67/81/4add07e5172b7ac40d8ed5ff580409a7801a4fe26d529bdd915401dabfbe/typing_inspection-0.4.4-py3-none-any.whl", hash = "sha256:65b8397ba37ccbce054456aaccddfc91e6e3083c92824df348d96ca832f3f147", size = 14750, upload-time = "2026-08-12T12:37:24.648Z" },
 ]
+
+[[package]]
+name = "unitale-inference-gateway"
+version = "0.1.0"
+source = { editable = "../inference_gateway" }
+dependencies = [
+    { name = "unitale-runtime" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "unitale-runtime", editable = "../unitale_runtime" }]
 
 [[package]]
 name = "unitale-runtime"

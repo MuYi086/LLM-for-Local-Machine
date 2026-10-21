@@ -219,6 +219,7 @@ dependencies = [
     { name = "torchaudio" },
     { name = "torchdiffeq" },
     { name = "tqdm" },
+    { name = "unitale-inference-gateway" },
     { name = "unitale-runtime" },
     { name = "uvicorn" },
     { name = "wetextprocessing" },
@@ -252,6 +253,7 @@ requires-dist = [
     { name = "torchaudio", specifier = "==2.8.0", index = "https://mirrors.aliyun.com/pytorch-wheels/cu128/" },
     { name = "torchdiffeq", specifier = "==0.2.5" },
     { name = "tqdm", specifier = "==4.70.0" },
+    { name = "unitale-inference-gateway", editable = "../inference_gateway" },
     { name = "unitale-runtime", editable = "../unitale_runtime" },
     { name = "uvicorn", specifier = "==0.52.1" },
     { name = "wetextprocessing", specifier = "==1.2.0" },
@@ -1513,6 +1515,17 @@ sdist = { url = "https://files.pythonhosted.org/packages/92/ff/5a28bdfd8c3ebec42
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e5/6d/b53b99a9f2766d095985947a5782f1702cabb129a34f7a802d7197af832f/tzdata-2026.3-py2.py3-none-any.whl", hash = "sha256:dc096730c87af6cab1b171c9d532be840741ff5d459015e7f6947bd7d7e54931", size = 348168, upload-time = "2026-07-10T08:50:36.46Z" },
 ]
+
+[[package]]
+name = "unitale-inference-gateway"
+version = "0.1.0"
+source = { editable = "../inference_gateway" }
+dependencies = [
+    { name = "unitale-runtime" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "unitale-runtime", editable = "../unitale_runtime" }]
 
 [[package]]
 name = "unitale-runtime"

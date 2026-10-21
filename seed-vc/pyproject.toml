@@ -22,6 +22,7 @@ dependencies = [
     "pyyaml==6.0.3",
     "munch==4.0.0",
     "einops==0.8.0",
+    "unitale-inference-gateway",
     # 官方 length_regulator 在模块导入时使用 dac.nn.quantize。
     "descript-audio-codec==1.0.0",
     "unitale-runtime",
@@ -47,6 +48,7 @@ explicit = true
 
 [tool.uv.sources]
 unitale-runtime = { path = "../unitale_runtime", editable = true }
+unitale-inference-gateway = { path = "../inference_gateway", editable = true }
 torch = { index = "pytorch-cu130" }
 torchaudio = { index = "pytorch-cu130" }
 

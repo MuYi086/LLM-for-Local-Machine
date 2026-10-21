@@ -21,6 +21,13 @@ from typing import Any, Literal
 import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, Response, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
+from inference_gateway import (
+    BackendQuarantinedError,
+    LocalAIRequestError,
+    LocalAIUnavailableError,
+    execute_localai_worker_file,
+    load_gateway_config,
+)
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -77,6 +84,11 @@ CUDA_RELEASE_DELAY = float(os.getenv("CUDA_RELEASE_DELAY", "2.0"))
 API_HOST = os.getenv("SHEETSAGE2_HOST", os.getenv("HOST", "0.0.0.0"))
 API_PORT = int(os.getenv("SHEETSAGE2_PORT", os.getenv("PORT", "8315")))
 REQUEST_TIMEOUT = float(os.getenv("SHEETSAGE2_REQUEST_TIMEOUT", "1800"))
+GATEWAY_CONFIG = load_gateway_config(
+    service_provider_env="UNITALE_SHEETSAGE2_PROVIDER",
+    default_model="unitale.sheetsage2.worker.v1",
+    request_timeout=REQUEST_TIMEOUT,
+)
 GPU_LOCK_WAIT_TIMEOUT = float(os.getenv("GPU_LOCK_WAIT_TIMEOUT", "900"))
 DEVICE = os.getenv("SHEETSAGE2_DEVICE", "cuda:0")
 DEFAULT_DTYPE = os.getenv("SHEETSAGE2_DTYPE", "bf16")
@@ -420,6 +432,21 @@ app.add_middleware(ForceCORS)
 
 def execute_transcription_payload(payload: dict[str, Any]) -> Path:
     """持有共享 GPU 锁执行转写并原子保存 ZIP 成品。"""
+    if GATEWAY_CONFIG.provider == "localai":
+        try:
+            artifact, _ = execute_localai_worker_file(
+                config=GATEWAY_CONFIG,
+                operation="run",
+                payload={"worker_input": payload},
+                output_dir=WORKER_TMP_DIR,
+                suffix=".zip",
+                media_type="application/zip",
+            )
+            manager.last_error = None
+            return persist_archive_file(artifact, OUTPUT_DIR)
+        except Exception as exc:
+            manager.last_error = str(exc)
+            raise
     with gpu_runtime_lock("sheetsage2/transcribe"):
         with manager.lock:
             try:
@@ -477,6 +504,10 @@ def health() -> dict[str, Any]:
             "response": "application/zip with native ABC, MIDI and annotation files",
         },
         "last_errors": {"sheetsage2": manager.last_error},
+        "inference": {
+            "provider": GATEWAY_CONFIG.provider,
+            "localai_model": GATEWAY_CONFIG.model if GATEWAY_CONFIG.provider == "localai" else None,
+        },
     }
 
 
@@ -565,6 +596,10 @@ async def transcribe(
             archive_path = await run_in_threadpool(execute_transcription_payload, payload)
         except GpuLockTimeoutError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except (BackendQuarantinedError, LocalAIUnavailableError) as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except LocalAIRequestError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
         except TimeoutError as exc:
             LOGGER.exception("SheetSage2 request timed out")
             raise HTTPException(status_code=504, detail=str(exc)) from exc

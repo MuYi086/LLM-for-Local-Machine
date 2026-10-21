@@ -1,0 +1,10 @@
+name: unitale.qwen3-tts.1p7b-base
+backend: audio-cpp
+parameters:
+  model: __QWEN3_TTS_MODEL_PATH__
+options:
+  - family:qwen3_tts
+  - task:tts
+  - backend:cuda
+  - device:0
+  - qwen3_tts.voice_prompt_cache_slots:0

@@ -1,0 +1,4 @@
+name: unitale.moss-soundeffect-v2.worker.v1
+backend: unitale-worker
+parameters:
+  model: unitale.moss-soundeffect-v2.worker.v1
