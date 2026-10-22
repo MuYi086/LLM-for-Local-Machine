@@ -1,4 +1,0 @@
-name: unitale.moss-audio-4b.thinking.worker.v1
-backend: unitale-worker
-parameters:
-  model: unitale.moss-audio-4b.thinking.worker.v1
