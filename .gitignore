@@ -60,14 +60,13 @@ tempAudio/
 qwen_test*.wav
 synth*.wav
 *.tmp.wav
-soundEffect/outputs/
-special-audio-effect/output/
-steam_audio_renderer/build/
-steam_audio_renderer/sdk/
+空间音频讨论/output/
+model-audio/steam_audio_renderer/build/
+model-audio/steam_audio_renderer/sdk/
 
 # Third-party source clones and side-loaded Python packages
 vendor/
-tts-depency/
+LLM-depency/
 
 # Local/cloud workspace config not needed for GitHub local runtime
 .cnb/

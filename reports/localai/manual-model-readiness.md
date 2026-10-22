@@ -1,42 +1,67 @@
-# LocalAI 手动模型准备状态
+# 本地模型镜像与外部依赖状态
 
 - 检查日期：2026-10-21
-- 权重下载：本次未执行
-- 检查范围：当前 `LocalAI` audio.cpp 直接候选与 worker bridge 所需的原生服务模型
+- 检查根目录：~/hf-mirror
+- 本轮未下载模型或安装 Python 项目依赖。
+- 处理规则：完整模型目录不存在，或服务必需辅助模型缺失时，移除该服务及其运行引用；不保留待下载的缺失模型服务。
+- 当前保留范围：11 个模型服务 uv 项目、1 个控制面，共 12 个 HTTP 进程。
 
-## 尚缺的直接候选制品
+## 当前服务模型根目录
 
-以下文件均未在 `storage/.cache/localai/models/`、`$HF_MIRROR_DIR`、`$HOME/tts-depency` 或 Hugging Face hub 缓存中找到。
-下载后放进 `storage/.cache/localai/models/`，保留下列相对目录结构。
+下列 11 个服务模型根目录均存在于镜像中。目录存在不等于所有权重、Python 依赖或真实推理已经验收。
 
-| 能力 | 上游固定版本 | 文件下载地址 | 目标相对路径 |
-| --- | --- | --- | --- |
-| Qwen3-ASR-1.7B | `audio-cpp/audio.cpp-gguf@09fe073ba154561f4474162e8bd4ab233a848eca`（[固定快照](https://huggingface.co/audio-cpp/audio.cpp-gguf/tree/09fe073ba154561f4474162e8bd4ab233a848eca)） | [qwen3-asr-1.7b-q8_0.gguf](https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/09fe073ba154561f4474162e8bd4ab233a848eca/Qwen3-ASR-1.7B-GGUF/qwen3-asr-1.7b-q8_0.gguf) | `Qwen3-ASR-1.7B-GGUF/qwen3-asr-1.7b-q8_0.gguf` |
-| dots.tts-soar | `audio-cpp/audio.cpp-gguf@83c5d96c03023ff5a7712570d057ce26c8769f98`（[固定快照](https://huggingface.co/audio-cpp/audio.cpp-gguf/tree/83c5d96c03023ff5a7712570d057ce26c8769f98)） | [dots-tts-soar-q8_0.gguf](https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/83c5d96c03023ff5a7712570d057ce26c8769f98/DotTTS-SOAR-GGUF/dots-tts-soar-q8_0.gguf) | `DotTTS-SOAR-GGUF/dots-tts-soar-q8_0.gguf` |
-| VoxCPM2 | `audio-cpp/audio.cpp-gguf@09fe073ba154561f4474162e8bd4ab233a848eca`（[固定快照](https://huggingface.co/audio-cpp/audio.cpp-gguf/tree/09fe073ba154561f4474162e8bd4ab233a848eca)） | [voxcpm2-q8_0.gguf](https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/09fe073ba154561f4474162e8bd4ab233a848eca/VoxCPM2-GGUF/voxcpm2-q8_0.gguf) | `VoxCPM2-GGUF/voxcpm2-q8_0.gguf` |
-| Confucius4-TTS | `audio-cpp/audio.cpp-gguf@83c5d96c03023ff5a7712570d057ce26c8769f98`（[固定快照](https://huggingface.co/audio-cpp/audio.cpp-gguf/tree/83c5d96c03023ff5a7712570d057ce26c8769f98)） | [confucius4-tts-orig.gguf](https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/83c5d96c03023ff5a7712570d057ce26c8769f98/Confucius4-TTS-GGUF/confucius4-tts-orig.gguf) | `Confucius4-TTS-GGUF/confucius4-tts-orig.gguf` |
-| MOSS VoiceGenerator | `audio-cpp/audio.cpp-gguf@83c5d96c03023ff5a7712570d057ce26c8769f98`（[固定快照](https://huggingface.co/audio-cpp/audio.cpp-gguf/tree/83c5d96c03023ff5a7712570d057ce26c8769f98)） | [moss_voicegen_bf16_codec_f16_decode.gguf](https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/83c5d96c03023ff5a7712570d057ce26c8769f98/MOSS-VoiceGenerator-GGUF/moss_voicegen_bf16_codec_f16_decode.gguf) | `MOSS-VoiceGenerator-GGUF/moss_voicegen_bf16_codec_f16_decode.gguf` |
-| FireRedTTS3 Base | `audio-cpp/audio.cpp-gguf@83c5d96c03023ff5a7712570d057ce26c8769f98`（[固定快照](https://huggingface.co/audio-cpp/audio.cpp-gguf/tree/83c5d96c03023ff5a7712570d057ce26c8769f98)） | [fireredtts3-base-q8_0.gguf](https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/83c5d96c03023ff5a7712570d057ce26c8769f98/FireRedTTS3-Base-GGUF/fireredtts3-base-q8_0.gguf) | `FireRedTTS3-Base-GGUF/fireredtts3-base-q8_0.gguf` |
-| FireRedTTS3 Instruct | `audio-cpp/audio.cpp-gguf@83c5d96c03023ff5a7712570d057ce26c8769f98`（[固定快照](https://huggingface.co/audio-cpp/audio.cpp-gguf/tree/83c5d96c03023ff5a7712570d057ce26c8769f98)） | [fireredtts3-instruct-q8_0.gguf](https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/83c5d96c03023ff5a7712570d057ce26c8769f98/FireRedTTS3-Instruct-GGUF/fireredtts3-instruct-q8_0.gguf) | `FireRedTTS3-Instruct-GGUF/fireredtts3-instruct-q8_0.gguf` |
-| ACE-Step 1.5 XL Turbo | `CaptainArni/audio.cpp-gguf@ac4d11eda6855ddedb16e42632e1a9376bfcfa81`（[固定提交](https://huggingface.co/CaptainArni/audio.cpp-gguf/commit/ac4d11eda6855ddedb16e42632e1a9376bfcfa81)） | [ace-step-1.5-xl-turbo-q8dit.gguf](https://huggingface.co/CaptainArni/audio.cpp-gguf/resolve/ac4d11eda6855ddedb16e42632e1a9376bfcfa81/ACE-Step1.5-GGUF/xl-turbo-q8dit/ace-step-1.5-xl-turbo-q8dit.gguf) | `ACE-Step1.5-GGUF/xl-turbo-q8dit/ace-step-1.5-xl-turbo-q8dit.gguf` |
-| Stable Audio 3 Medium | `audio-cpp/audio.cpp-gguf@09fe073ba154561f4474162e8bd4ab233a848eca`（[固定快照](https://huggingface.co/audio-cpp/audio.cpp-gguf/tree/09fe073ba154561f4474162e8bd4ab233a848eca)） | [stable-audio-3-medium-q8_0.gguf](https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/09fe073ba154561f4474162e8bd4ab233a848eca/Stable-Audio-3-Medium-GGUF/stable-audio-3-medium-q8_0.gguf) | `Stable-Audio-3-Medium-GGUF/stable-audio-3-medium-q8_0.gguf` |
-| Seed-VC VC/SVC | 固定 audio.cpp 文档未固定模型包 revision 或文件 hash（[模型文档目录](https://github.com/0xShug0/audio.cpp/tree/9a02e61326aaaf9d462b584ca5e0daba22c0abfc/backend/cpp/audio-cpp/audio.cpp/docs)） | 需手动准备完整 `SeedVC-MLX` 模型目录 | `SeedVC-MLX/` |
+| 服务 | 镜像相对路径 | 目录检查 |
+| --- | --- | --- |
+| Qwen3-TTS Base | Qwen/Qwen3-TTS-12Hz-1.7B-Base | 存在 |
+| Qwen3 VoiceDesign | Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign | 存在 |
+| Qwen3-ASR | Qwen/Qwen3-ASR-1.7B | 存在 |
+| VoxCPM2 | openbmb/VoxCPM2 | 存在 |
+| Confucius4-TTS | netease-youdao/Confucius4-TTS | 存在 |
+| ACE-Step 1.5 XL Turbo | ACE-Step/acestep-v15-xl-turbo-diffusers | 存在 |
+| YuE2-3B | m-a-p/YuE2-3B | 存在 |
+| YuE2-Vae | m-a-p/YuE2-Vae | 存在 |
+| SheetSage2 | m-a-p/SheetSage2 | 存在 |
+| MERT-v2-FullSong | m-a-p/MERT-v2-FullSong | 存在 |
+| TIGER-DnR | JusperLee/TIGER-DnR | 存在 |
 
-Qwen3-ASR 的 Q8 文件在版本清单中固定为 2,473,010,048 bytes 和 SHA-256
-`da4fc2ac7f24dee784d1684eb1f35836cdbf559519452ae11777670734c0a4f8`。其余 GGUF 文件尚无上游 LFS hash；
-下载后注册会记录本地 hash，仅用于检测之后的文件变化。ACE-Step Q8 DiT 仍是 E0 候选，不能据此宣称
-音频路径兼容已验证。
+## 已按规则退役
 
-## 已准备且不需重复下载
+| 功能/制品 | 镜像检查 | 清理结果 |
+| --- | --- | --- |
+| Stable Audio 3 Medium | stabilityai/stable-audio-3-medium 不存在 | 服务目录、路由、worker、启动项、维护前缀和测试已移除 |
+| Ditto | digital-avatar/ditto-talkinghead 不存在 | 服务代码、路由、worker、启动项、维护项和测试已移除；本机忽略的运行环境残余已归入 `model-video/ditto/` |
+| Seed-VC | 主目录 Plachta/Seed-VC 存在，但必需的 openai/whisper-small 缺失；F0/SVC 另缺 44 kHz BigVGAN 和 RMVPE | 整个服务及 VC/SVC LocalAI 候选已移除 |
+| SoulX-FlashHead | 主目录存在，但必需的 facebook/wav2vec2-base-960h 缺失 | 服务代码、图片上传 API、启动项和 worker bridge 已移除；本机忽略的运行环境残余已归入 `model-video/SoulX-FlashHead-1_3B/` |
+| Qwen3-ASR LocalAI Q8 | GGUF 不在 hf-mirror | 只移除 LocalAI provider、候选 YAML、预检和候选测试；原生 Qwen3-ASR 服务保留 |
+| VoxCPM2 LocalAI Q8 | GGUF 不在 hf-mirror | 只移除 LocalAI provider、候选 YAML、预检和候选测试；原生 VoxCPM2 服务保留 |
+| Confucius4-TTS LocalAI GGUF | GGUF 不在 hf-mirror | 只移除 LocalAI provider、候选 YAML、预检和候选测试；原生 Confucius4-TTS 服务保留 |
+| ACE-Step LocalAI Q8 DiT | GGUF 不在 hf-mirror | 只移除 LocalAI provider、候选 YAML、预检和候选测试；原生 ACE-Step 服务保留 |
 
-- Qwen3-TTS Base 与 VoiceDesign 的官方 safetensors 所需文件已核验，候选 YAML 已登记在忽略的模型配置目录。
-- `start.sh` 当前默认 HF 镜像路径检查为 36/36 存在。23 个服务的只读 health 检查未报告必需模型文件或源码路径缺失；
-  这只表示文件/目录检查通过，不代表真实推理质量或硬件资源验收通过。
-- P7 worker bridge 的 11 个固定模型 YAML 已登记并核验。`MOSS-Audio` Thinking/Instruct 共用一个服务项目。
-- 仓库中的 25 个锁定 uv 项目已用 `uv sync --locked --offline` 同步，无缺失 wheel；
-  `manager.py verify-install` 通过，当前不需要额外 deb。flash-attn、Conda 及报告里的运行参数 false 项为可选优化、
-非采用环境或默认关闭的功能，不是本次缺失依赖。
+已退役服务不再列入人工补模清单；重新启用必须先重新评估模型、依赖和维护范围。
 
-模型放置后应先执行对应 `register-*-candidate` 与 `verify-*-candidate`；这些步骤不会下载权重。
-之后还需在用户提供的样本上完成 E2/E3、模型加载后 backend shutdown/显存回落和 P8 观察，
-因此软件侧完成不代表模型迁移已通过生产验收。
+## 当前保留的 LocalAI 路径
+
+Qwen3-TTS Base 与 VoiceDesign 的官方 Hugging Face 模型目录存在，直接候选 YAML 与只读文件预检保留。
+one-shot worker bridge 保留 SheetSage2、MERT-v2-FullSong、YuE2-Vae、YuE2-3B、TIGER-DnR 五个模型 ID。
+这些是本地模型服务的执行后端，不额外要求 audio.cpp GGUF。
+
+LocalAI v4.11.0 二进制和 CUDA audio-cpp backend 已在仓库忽略运行目录中存在。manager 的文件指纹核验和无模型启动/停止记录见升级报告。
+无模型检查不验证 TTS 模型加载、音质、峰值显存或 backend shutdown 后的 GPU 回落。
+
+## 外部依赖状态
+
+| 依赖 | 检查结果 | 后续操作 |
+| --- | --- | --- |
+| Steam Audio SDK 4.8.1 | 已安装于 `~/.local/share/steam-audio/4.8.1`；renderer 已构建，控制面诊断可用 | Linux `start.sh` 默认使用该目录；自定义 SDK 位置时设置 `STEAM_AUDIO_SDK_DIR` |
+| Confucius4-TTS 上游源码 | ~/LLM-depency/Confucius4-TTS 存在 | 无需补充 |
+| TIGER-DnR 上游源码 | ~/.local/share/tiger-dnr/TIGER 存在 | 无需补充 |
+| LocalAI v4.11.0 binary/backend | storage/.cache/localai 下均存在 | 无需补充 |
+| Python 锁定依赖 | 11 个服务项目、worker bridge 与 QA 的离线 `uv sync --locked --dry-run` 均为 `Would make no changes` | 没有检测到待同步的 Python 包；检查未修改环境 |
+| uv、FFmpeg、CMake、G++ | 命令可用 | 无需补充 |
+
+当前没有因 hf-mirror 根目录缺失而等待用户下载的保留服务主模型，也没有已知待补充的外部依赖。Steam Audio SDK 是空间导出的外部开发依赖，不是模型权重，也不影响 LocalAI/audio.cpp backend。
+
+## 验收边界
+
+质量门禁只验证锁、静态能力清单、无模型测试、脚本和 C++ 核心逻辑；不会下载模型、执行 CUDA 推理或证明真实输出质量。
+模型加载和端到端输出只在已有本地模型与依赖完整时单独运行。

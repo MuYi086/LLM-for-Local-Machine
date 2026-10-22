@@ -10,23 +10,23 @@ from pathlib import Path
 from unittest.mock import patch
 
 import grpc
-from unitale_localai_bridge.protocol import decode_request, encode_response
-from unitale_localai_bridge.runner import WorkerExecutionError, WorkerRunner, WorkerSpec
-from unitale_localai_bridge.server import LocalAIWorkerBackend, load_worker_specs
+from localai_worker_bridge.protocol import decode_request, encode_response
+from localai_worker_bridge.runner import WorkerExecutionError, WorkerRunner, WorkerSpec
+from localai_worker_bridge.server import LocalAIWorkerBackend, load_worker_specs
 
-from unitale_localai_bridge import (
+from localai_worker_bridge import (
     BridgeProtocolError,
     BridgeResponse,
 )
-from unitale_localai_bridge import localai_backend_pb2 as pb2
-from unitale_localai_bridge import localai_backend_pb2_grpc as pb2_grpc
+from localai_worker_bridge import localai_backend_pb2 as pb2
+from localai_worker_bridge import localai_backend_pb2_grpc as pb2_grpc
 
 
-def envelope(*, model: str = "unitale.test.echo", request_id: str = "req-1") -> str:
+def envelope(*, model: str = "llm-local.test.echo", request_id: str = "req-1") -> str:
     """序列化固定测试请求。"""
     return json.dumps(
         {
-            "protocol": "unitale.worker",
+            "protocol": "llm-local.worker",
             "version": 1,
             "model": model,
             "operation": "run",
@@ -56,55 +56,49 @@ class LocalAIWorkerBridgeTests(unittest.TestCase):
         self.assertEqual(
             set(specs),
             {
-                "unitale.sheetsage2.worker.v1",
-                "unitale.mert-v2-fullsong.worker.v1",
-                "unitale.yue2-vae.worker.v1",
-                "unitale.soulx-flashhead.worker.v1",
-                "unitale.ditto.worker.v1",
-                "unitale.yue2-3b.worker.v1",
-                "unitale.moss-soundeffect-v2.worker.v1",
-                "unitale.step-audio-editx.worker.v1",
-                "unitale.moss-audio-4b.thinking.worker.v1",
-                "unitale.moss-audio-4b.instruct.worker.v1",
-                "unitale.tiger-dnr.worker.v1",
+                "llm-local.sheetsage2.worker.v1",
+                "llm-local.mert-v2-fullsong.worker.v1",
+                "llm-local.yue2-vae.worker.v1",
+                "llm-local.yue2-3b.worker.v1",
+                "llm-local.tiger-dnr.worker.v1",
             },
         )
         self.assertEqual(
-            specs["unitale.mert-v2-fullsong.worker.v1"].output_suffixes,
+            specs["llm-local.mert-v2-fullsong.worker.v1"].output_suffixes,
             {"embedding": ".json", "frames": ".npz"},
         )
         self.assertEqual(
-            specs["unitale.yue2-vae.worker.v1"].output_suffixes,
+            specs["llm-local.yue2-vae.worker.v1"].output_suffixes,
             {"decode": ".wav", "encode": ".npy"},
         )
 
     def test_decode_enforces_protocol_identity_and_shape(self) -> None:
-        request = decode_request(envelope(), model_identity="unitale.test.echo")
-        self.assertEqual(request.model, "unitale.test.echo")
+        request = decode_request(envelope(), model_identity="llm-local.test.echo")
+        self.assertEqual(request.model, "llm-local.test.echo")
         self.assertEqual(request.payload["worker_input"]["text"], "你好")
 
         with self.assertRaises(BridgeProtocolError):
-            decode_request(envelope(), model_identity="unitale.other")
+            decode_request(envelope(), model_identity="llm-local.other")
         with self.assertRaises(BridgeProtocolError):
             decode_request("[]")
 
     def test_response_round_trips_as_versioned_json(self) -> None:
         encoded = encode_response(
             BridgeResponse(
-                model="unitale.test.echo",
+                model="llm-local.test.echo",
                 operation="run",
                 request_id="req-1",
                 result={"kind": "json", "value": {"text": "你好"}},
             )
         )
         response = json.loads(encoded)
-        self.assertEqual(response["protocol"], "unitale.worker")
+        self.assertEqual(response["protocol"], "llm-local.worker")
         self.assertEqual(response["version"], 1)
         self.assertEqual(response["result"]["value"]["text"], "你好")
 
     def test_backend_serves_fixed_localai_rpc_paths(self) -> None:
         server = grpc.server(futures.ThreadPoolExecutor(1))
-        service = LocalAIWorkerBackend(_FakeRunner(), {"unitale.test.echo"})
+        service = LocalAIWorkerBackend(_FakeRunner(), {"llm-local.test.echo"})
         pb2_grpc.add_BackendServicer_to_server(service, server)
         port = server.add_insecure_port("127.0.0.1:0")
         self.assertGreater(port, 0)
@@ -120,7 +114,7 @@ class LocalAIWorkerBridgeTests(unittest.TestCase):
             result = stub.Predict(
                 pb2.PredictOptions(
                     Prompt=envelope(),
-                    ModelIdentity="unitale.test.echo",
+                    ModelIdentity="llm-local.test.echo",
                 ),
                 timeout=2,
             )
@@ -128,8 +122,8 @@ class LocalAIWorkerBridgeTests(unittest.TestCase):
             with self.assertRaises(grpc.RpcError) as raised:
                 stub.Predict(
                     pb2.PredictOptions(
-                        Prompt=envelope(model="unitale.unknown"),
-                        ModelIdentity="unitale.unknown",
+                        Prompt=envelope(model="llm-local.unknown"),
+                        ModelIdentity="llm-local.unknown",
                     ),
                     timeout=2,
                 )
@@ -169,7 +163,7 @@ class LocalAIWorkerBridgeTests(unittest.TestCase):
             runner = WorkerRunner(
                 project,
                 {
-                    "unitale.test.echo": WorkerSpec(
+                    "llm-local.test.echo": WorkerSpec(
                         project=project,
                         script=script,
                         output_kind="json",
@@ -181,7 +175,7 @@ class LocalAIWorkerBridgeTests(unittest.TestCase):
             )
 
             result = runner.run(
-                "unitale.test.echo",
+                "llm-local.test.echo",
                 "run",
                 {"worker_input": {"text": "hello"}},
                 request_id="req-2",
@@ -213,7 +207,7 @@ class LocalAIWorkerBridgeTests(unittest.TestCase):
             runner = WorkerRunner(
                 project,
                 {
-                    "unitale.test.frames": WorkerSpec(
+                    "llm-local.test.frames": WorkerSpec(
                         project=project,
                         script=script,
                         output_kind="file",
@@ -227,7 +221,7 @@ class LocalAIWorkerBridgeTests(unittest.TestCase):
             )
 
             result = runner.run(
-                "unitale.test.frames",
+                "llm-local.test.frames",
                 "run",
                 {"worker_input": {"output": "frames"}},
                 request_id="req-suffix",
@@ -237,7 +231,7 @@ class LocalAIWorkerBridgeTests(unittest.TestCase):
         self.assertEqual(result["size_bytes"], len(b".npz"))
         with self.assertRaisesRegex(WorkerExecutionError, "扩展名"):
             runner.run(
-                "unitale.test.frames",
+                "llm-local.test.frames",
                 "run",
                 {"worker_input": {"output": "unexpected"}},
                 request_id="req-invalid-suffix",
@@ -266,7 +260,7 @@ class LocalAIWorkerBridgeTests(unittest.TestCase):
             runner = WorkerRunner(
                 root,
                 {
-                    "unitale.test.file-ref": WorkerSpec(
+                    "llm-local.test.file-ref": WorkerSpec(
                         project=project,
                         script=script,
                         output_kind="file_ref",
@@ -278,9 +272,9 @@ class LocalAIWorkerBridgeTests(unittest.TestCase):
                 uv_executable=str(uv),
             )
             request_id = "a" * 32
-            with patch.dict("os.environ", {"UNITALE_LOCALAI_ARTIFACT_DIR": str(artifact_root)}):
+            with patch.dict("os.environ", {"LLM_LOCALAI_ARTIFACT_DIR": str(artifact_root)}):
                 result = runner.run(
-                    "unitale.test.file-ref",
+                    "llm-local.test.file-ref",
                     "run",
                     {"worker_input": {}},
                     request_id=request_id,

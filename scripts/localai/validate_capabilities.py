@@ -182,7 +182,11 @@ def _pydantic_field_facts(node: ast.AnnAssign, source: str, project: str) -> dic
     }
 
 
-def _pydantic_schema_facts(source_path: Path, project: str) -> dict[str, dict[str, Any]]:
+def _pydantic_schema_facts(
+    source_path: Path,
+    project: str,
+    source_name: str,
+) -> dict[str, dict[str, Any]]:
     """提取服务 main.py 中声明的 Pydantic 类和字段。"""
     try:
         source = source_path.read_text(encoding="utf-8")
@@ -190,7 +194,6 @@ def _pydantic_schema_facts(source_path: Path, project: str) -> dict[str, dict[st
     except (OSError, SyntaxError) as exc:
         raise CapabilityManifestError(f"无法解析服务源码：{source_path}") from exc
 
-    source_name = f"{project}/main.py"
     schemas: dict[str, dict[str, Any]] = {}
     for node in ast.walk(source_tree):
         if not isinstance(node, ast.ClassDef):
@@ -330,9 +333,13 @@ def validate_capabilities_manifest(
             raise CapabilityManifestError(f"服务项目名无效或重复：{project!r}")
         project_names.add(project)
 
-        project_path = (repository_root / project).resolve()
+        directory = service.get("directory", project)
+        if not isinstance(directory, str) or not directory:
+            raise CapabilityManifestError(f"{project}.directory 必须是非空相对路径。")
+        project_path = (repository_root / directory).resolve()
         if not project_path.is_relative_to(repository_root.resolve()):
-            raise CapabilityManifestError(f"服务路径越出仓库根目录：{project}")
+            raise CapabilityManifestError(f"服务路径越出仓库根目录：{directory}")
+        source_relative_path = f"{directory.rstrip('/')}/main.py"
         source_path = project_path / "main.py"
         source_available = source_path.is_file()
         if not source_available:
@@ -344,7 +351,11 @@ def validate_capabilities_manifest(
         if not isinstance(request_schemas, dict):
             raise CapabilityManifestError(f"{project}.request_schemas 必须是 object。")
         schema_names.update((project, name) for name in request_schemas)
-        source_schemas = _pydantic_schema_facts(source_path, project) if source_available else {}
+        source_schemas = (
+            _pydantic_schema_facts(source_path, project, source_relative_path)
+            if source_available
+            else {}
+        )
         schema_field_names: dict[str, set[str]] = {}
         for name, schema_value in request_schemas.items():
             schema = _require_object(schema_value, f"{project}.{name}")
@@ -361,7 +372,7 @@ def validate_capabilities_manifest(
                 source_available
                 and source_schema is not None
                 and (
-                    schema.get("source") != f"{project}/main.py"
+                    schema.get("source") != source_relative_path
                     or schema.get("line") != source_schema["line"]
                     or schema.get("inherits") != source_schema["inherits"]
                 )
@@ -401,7 +412,7 @@ def validate_capabilities_manifest(
             if (
                 not isinstance(method, str)
                 or not isinstance(path, str)
-                or source != f"{project}/main.py"
+                or source != source_relative_path
                 or not isinstance(line, int)
             ):
                 raise CapabilityManifestError(f"{project} 含有无效路由记录：{route!r}")
@@ -496,7 +507,7 @@ def validate_capabilities_manifest(
 
         if source_available:
             actual_routes = {
-                (method, path, f"{project}/main.py", line)
+                (method, path, source_relative_path, line)
                 for method, path, line in _decorated_routes(source_path)
             }
             if expected_signatures != actual_routes:

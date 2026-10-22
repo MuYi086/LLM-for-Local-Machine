@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-# 控制面测试确保 8300 只做存储、健康检查和 MiMo 转发，不加载模型。
+# 控制面测试确保 8300 只做存储、健康检查和 CPU 导出，不加载模型。
 import importlib.util
 import json
 import os
@@ -20,7 +20,6 @@ TEST_ROOT = Path(TEST_RUNTIME.name)
 CONTROL_ENV = {
     "STORAGE_DIR": str(TEST_ROOT / "storage"),
     "TIMBRE_STORAGE_DIR": str(TEST_ROOT / "storage/timbre"),
-    "SOUNDEFFECT_STORAGE_DIR": str(TEST_ROOT / "storage/soundEffect"),
     "CLONE_STORAGE_DIR": str(TEST_ROOT / "storage/clone"),
     "PROMPTS_DIR": str(TEST_ROOT / "storage/clone"),
     "RUNTIME_CACHE_DIR": str(TEST_ROOT / "storage/.cache/runtime"),
@@ -29,7 +28,6 @@ CONTROL_ENV = {
     "GPU_LOCK_FILE": str(TEST_ROOT / "storage/.cache/runtime/gpu-runtime.lock"),
     "HOST": "127.0.0.1",
     "PORT": "8300",
-    "MIMO_TTS_PROXY_URL": "http://127.0.0.1:8303/v1/mimo/timbre",
 }
 ORIGINAL_ENV = {key: os.environ.get(key) for key in CONTROL_ENV}
 os.environ.update(CONTROL_ENV)
@@ -56,7 +54,6 @@ class MainControlPlaneMigrationTests(unittest.TestCase):
         expected_routes = {
             ("GET", "/v1/health"),
             ("GET", "/v1/control"),
-            ("POST", "/v1/mimo/timbre"),
             ("POST", "/v1/audio/export"),
             ("POST", "/v1/audio/spatial/render"),
             ("GET", "/v1/audio/spatial/render/progress/{job_id}"),
@@ -71,6 +68,7 @@ class MainControlPlaneMigrationTests(unittest.TestCase):
             if method in {"GET", "POST"}
         }
         self.assertTrue(expected_routes.issubset(actual_routes))
+        self.assertNotIn(("POST", "/v1/mimo/timbre"), actual_routes)
 
         response = TestClient(main.app).get("/v1/health")
         self.assertEqual(response.status_code, 200)
@@ -109,23 +107,6 @@ class MainControlPlaneMigrationTests(unittest.TestCase):
         self.assertEqual(checked.status_code, 200)
         self.assertTrue(checked.json()["exists"])
 
-    def test_mimo_route_is_a_proxy_only(self) -> None:
-        from fastapi.testclient import TestClient
-
-        with patch.object(
-            main,
-            "forward_mimo_design_request",
-            return_value=(200, b"RIFF-proxy", "audio/wav"),
-        ) as forward:
-            response = TestClient(main.app).post(
-                "/v1/mimo/timbre",
-                json={"voice_description": "温柔的女声", "text": "你好。"},
-            )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.content, b"RIFF-proxy")
-        forward.assert_called_once()
-
     def test_audio_export_streams_processed_result_and_cleans_response_file(self) -> None:
         from fastapi.testclient import TestClient
 
@@ -143,7 +124,7 @@ class MainControlPlaneMigrationTests(unittest.TestCase):
             return SimpleNamespace(
                 path=output_path,
                 media_type="audio/mpeg",
-                download_name="unitale_balanced.mp3",
+                download_name="llm_local_balanced.mp3",
                 cleanup=lambda: cleanup_called.append(True),
             )
 
@@ -160,7 +141,7 @@ class MainControlPlaneMigrationTests(unittest.TestCase):
         self.assertEqual(response.content, b"processed-mp3")
         self.assertEqual(response.headers["x-audio-sample-rate"], "48000")
         self.assertEqual(response.headers["x-audio-profile"], "balanced")
-        self.assertIn("unitale_balanced.mp3", response.headers["content-disposition"])
+        self.assertIn("llm_local_balanced.mp3", response.headers["content-disposition"])
         self.assertIn(
             "Content-Disposition",
             response.headers["access-control-expose-headers"],
@@ -234,7 +215,7 @@ class MainControlPlaneMigrationTests(unittest.TestCase):
             return SimpleNamespace(
                 path=output_path,
                 media_type="audio/wav",
-                download_name="unitale_steam_balanced.wav",
+                download_name="llm_local_steam_balanced.wav",
                 cleanup=lambda: cleanup_called.append(True),
             )
 

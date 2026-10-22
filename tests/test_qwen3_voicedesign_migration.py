@@ -13,7 +13,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 REPOSITORY_DIR = Path(__file__).resolve().parents[1]
-SERVICE_DIR = REPOSITORY_DIR / "qwen3_voiceDesign"
+SERVICE_DIR = REPOSITORY_DIR / "model-audio" / "qwen3_voiceDesign"
 TEST_RUNTIME = tempfile.TemporaryDirectory(prefix="qwen3-voicedesign-tests-")
 TEST_ROOT = Path(TEST_RUNTIME.name)
 
@@ -125,14 +125,14 @@ class Qwen3VoiceDesignMigrationTests(unittest.TestCase):
                 return generated_wav, 0.03
 
         def execute_operation(*, config, operation):
-            self.assertEqual(config.model, "unitale.qwen3-tts.1p7b-voicedesign")
+            self.assertEqual(config.model, "llm-local.qwen3-tts.1p7b-voicedesign")
             return operation(FakeClient())
 
         localai_config = replace(
             main.GATEWAY_CONFIG,
             provider="localai",
             localai_enabled=True,
-            model="unitale.qwen3-tts.1p7b-voicedesign",
+            model="llm-local.qwen3-tts.1p7b-voicedesign",
         )
         with (
             patch.object(main, "GATEWAY_CONFIG", localai_config),
@@ -177,7 +177,7 @@ class Qwen3VoiceDesignMigrationTests(unittest.TestCase):
             main.GATEWAY_CONFIG,
             provider="localai",
             localai_enabled=True,
-            model="unitale.qwen3-tts.1p7b-voicedesign",
+            model="llm-local.qwen3-tts.1p7b-voicedesign",
         )
         with (
             patch.object(main, "GATEWAY_CONFIG", localai_config),

@@ -17,7 +17,7 @@ from unittest.mock import Mock, patch
 from fastapi.testclient import TestClient
 
 REPOSITORY_DIR = Path(__file__).resolve().parents[1]
-SERVICE_DIR = REPOSITORY_DIR / "YuE2-3B"
+SERVICE_DIR = REPOSITORY_DIR / "model-audio" / "YuE2-3B"
 TEST_ROOT = Path()
 COMPLETE_MODELS = {
     "inference_package": {"complete": True, "missing": []},
@@ -51,7 +51,7 @@ def load_service(name: str, path: Path):
         "CUDA_RELEASE_DELAY": "0",
         "YUE2_3B_REQUEST_TIMEOUT": "5",
     }
-    source_path = [str(path.parent), str(REPOSITORY_DIR / "unitale_runtime/src"), *sys.path]
+    source_path = [str(path.parent), str(REPOSITORY_DIR / "llm_local_runtime/src"), *sys.path]
     with (
         patch.dict(os.environ, service_environment, clear=True),
         patch.object(sys, "path", source_path),
@@ -317,7 +317,7 @@ class YuE2ThreeBMigrationTests(unittest.TestCase):
         self.assertIn('YUE2_3B_PORT="${YUE2_3B_PORT:-8314}"', startup)
         self.assertIn("'/v1/m-a-p/YuE2'", startup)
         self.assertIn('setsid uv run --no-sync --project "$YUE2_3B_PROJECT_DIR"', startup)
-        self.assertEqual(startup.count("setsid uv run --no-sync --project"), 26)
+        self.assertEqual(startup.count("setsid uv run --no-sync --project"), 12)
         self.assertIn("YuE2-3B", quality_gate)
         self.assertIn('"yue2_3b_"', maintenance)
         self.assertIn("YuE2-3B 歌曲生成", readme)

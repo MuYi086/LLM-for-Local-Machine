@@ -1,4 +1,0 @@
-name: unitale.soulx-flashhead.worker.v1
-backend: unitale-worker
-parameters:
-  model: unitale.soulx-flashhead.worker.v1

@@ -15,14 +15,14 @@ class LocalAICapabilityManifestTests(unittest.TestCase):
     def test_repository_capability_manifest_matches_fastapi_source(self) -> None:
         summary = validate_capabilities_manifest()
 
-        self.assertEqual(summary.service_count, 24)
-        self.assertEqual(summary.route_count, 79)
-        self.assertEqual(summary.request_schema_count, 17)
-        self.assertEqual(summary.request_field_count, 268)
-        self.assertEqual(summary.uv_project_count, 23)
-        self.assertEqual(summary.family_candidate_count, 13)
-        self.assertEqual(summary.no_exact_family_count, 9)
-        self.assertEqual(summary.out_of_scope_count, 2)
+        self.assertEqual(summary.service_count, 12)
+        self.assertEqual(summary.route_count, 35)
+        self.assertEqual(summary.request_schema_count, 5)
+        self.assertEqual(summary.request_field_count, 116)
+        self.assertEqual(summary.uv_project_count, 11)
+        self.assertEqual(summary.family_candidate_count, 4)
+        self.assertEqual(summary.no_exact_family_count, 3)
+        self.assertEqual(summary.out_of_scope_count, 5)
 
     def test_rejects_incomplete_audio_cpp_family_screen(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:

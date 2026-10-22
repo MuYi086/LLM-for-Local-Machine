@@ -1,7 +1,7 @@
 [project]
-name = "unitale-no-model-qa"
+name = "llm-local-backend-no-model-qa"
 version = "0.1.0"
-description = "Unitale 无模型回归与静态检查环境"
+description = "LLM Local Backend 无模型回归与静态检查环境"
 requires-python = "==3.12.13"
 dependencies = [
     "fastapi==0.141.1",
@@ -13,8 +13,8 @@ dependencies = [
     "python-multipart==0.0.32",
     "pyyaml==6.0.3",
     "starlette==1.6.0",
-    "unitale-localai-worker-bridge",
-    "unitale-runtime",
+    "localai-worker-bridge",
+    "llm-local-runtime",
     "uvicorn==0.52.1",
 ]
 
@@ -27,5 +27,5 @@ dev = [
 package = false
 
 [tool.uv.sources]
-unitale-localai-worker-bridge = { path = "../unitale_localai_bridge", editable = true }
-unitale-runtime = { path = "../unitale_runtime", editable = true }
+localai-worker-bridge = { path = "../localai_worker_bridge", editable = true }
+llm-local-runtime = { path = "../llm_local_runtime", editable = true }

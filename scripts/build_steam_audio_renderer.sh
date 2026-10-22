@@ -2,13 +2,11 @@
 set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SOURCE_DIR="$PROJECT_DIR/steam_audio_renderer"
+SOURCE_DIR="$PROJECT_DIR/model-audio/steam_audio_renderer"
 BUILD_DIR="${STEAM_AUDIO_RENDERER_BUILD_DIR:-$SOURCE_DIR/build}"
+STEAM_AUDIO_SDK_DIR="${STEAM_AUDIO_SDK_DIR:-$HOME/.local/share/steam-audio/4.8.1}"
+export STEAM_AUDIO_SDK_DIR
 
-if [[ -z "${STEAM_AUDIO_SDK_DIR:-}" ]]; then
-  echo "请先设置 STEAM_AUDIO_SDK_DIR，指向已解压的 Steam Audio SDK。" >&2
-  exit 2
-fi
 if [[ ! -f "$STEAM_AUDIO_SDK_DIR/include/phonon.h" ]]; then
   echo "Steam Audio SDK 缺少 include/phonon.h: $STEAM_AUDIO_SDK_DIR" >&2
   exit 2

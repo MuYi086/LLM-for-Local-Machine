@@ -15,7 +15,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 REPOSITORY_DIR = Path(__file__).resolve().parents[1]
-QWEN3_TTS_DIR = REPOSITORY_DIR / "qwen3_tts"
+QWEN3_TTS_DIR = REPOSITORY_DIR / "model-audio" / "qwen3_tts"
 TEST_RUNTIME = tempfile.TemporaryDirectory(prefix="qwen3-tts-tests-")
 TEST_ROOT = Path(TEST_RUNTIME.name)
 
@@ -262,7 +262,7 @@ class Qwen3TtsMigrationTests(unittest.TestCase):
             main.GATEWAY_CONFIG,
             provider="localai",
             localai_enabled=True,
-            model="unitale.qwen3-tts.1p7b-base",
+            model="llm-local.qwen3-tts.1p7b-base",
         )
 
         with (

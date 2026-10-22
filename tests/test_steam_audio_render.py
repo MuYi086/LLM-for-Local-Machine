@@ -23,7 +23,7 @@ from steam_audio_render import (  # noqa: E402
     SteamAudioRenderProcessor,
 )
 
-from unitale_runtime import StagedUpload  # noqa: E402
+from llm_local_runtime import StagedUpload  # noqa: E402
 
 
 def render_manifest() -> SpatialRenderManifest:

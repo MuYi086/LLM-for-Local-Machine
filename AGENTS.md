@@ -2,85 +2,63 @@
 
 ## 适用范围与依据
 
-本仓库是 Unitale 的本地音视频后端，包含语音克隆、音色设计、音效/BGM、编辑、理解/转写、
-音源分离、音色转换、人像视频及 CPU 空间音频导出。服务采用独立 uv 项目和一次性 worker。
-文档遵循 [CONSTITUTION.md](CONSTITUTION.md) 的中文优先要求；接口和配置以实际源码为准。
-[README.md](README.md) 提供接入、配置和运维说明，本文件只记录开发边界与命令。
+本仓库提供面向本地部署的 LLM 音视频后端，当前保留语音克隆、文本音色设计、BGM、语音转写、
+音乐转谱、音源分离、CPU 母带和 Steam Audio 空间导出。服务采用独立 uv 项目和一次性 worker。
+文档遵循 CONSTITUTION.md 的中文优先要求；接口和配置以实际源码为准。
+README.md 提供接入、配置和运维说明，本文件记录开发边界与命令。
 
 ## 项目结构与服务速查
 
-当前维护 23 个服务 uv 项目与一个轻量控制面，`start.sh` 合计启动 26 个 HTTP 进程；
-`unitale_localai_bridge/` 是额外的非 HTTP uv 包，不计入服务数，也不常驻导入 Torch。
-原生能力/输出的官方依据见 [README 服务总览](README.md#服务总览)；端口、方法及路径以源码为准。
-区分原生能力、已接入接口与服务编排，额外模型流程不得写成单模型能力；各进程提供 `GET /v1/health`。
+当前维护 11 个模型服务 uv 项目与一个轻量控制面，start.sh 合计启动 12 个 HTTP 进程；
+localai_worker_bridge 是额外的非 HTTP uv 包，不计入服务数，也不常驻导入 Torch。
+原生能力和输出见 README 服务总览；端口、方法及路径以源码为准。
+区分模型原生能力、已接入接口与服务编排；各 HTTP 进程提供 GET /v1/health。
 
-| 模型/服务 | 默认端口 | 主业务接口 | 模型原生能力/职责 | 原生输出 |
+| 模型/服务 | 默认端口 | 主业务接口 | 职责 | 原生输出 |
 | --- | --- | --- | --- | --- |
-| 控制面 `main/` | 8300 | `GET /v1/control`；`POST /v1/audio/export`；`POST /v1/audio/spatial/render` | 控制、上传/检查、MiMo 代理、CPU 母带及空间导出 | 非模型服务 |
-| `qwen3_voiceDesign/` | 8301 | `POST /v1/qwen/timbre` | 文本音色设计与 TTS | 语音波形 |
-| `moss_voiceGenerator/` | 8302 | `POST /v1/moss/timbre` | 中英文音色/风格设计，无需参考音频 | 语音波形 |
-| `mimo_tts/` | 8303 | `POST /v1/mimo/timbre` | 云端文本音色设计与 TTS | 语音音频 |
-| `firered_tts3/` | 8304 Instruct / 8325 Base | `POST /v1/FireRedTTS3/timbre`；`POST /v1/FireRedTTS3/clone` | Base 克隆；Instruct 克隆/设计/内容与声学编辑 | 语音波形；部分 Instruct API 另返回规划/编辑文本 |
-| `stable_audio_3_medium/` | 8311 | `POST /v1/stableAudio/soundEffect` | 音乐/音效生成与局部补全/编辑/续写 | 音频波形 |
-| `moss_soundEffect/` | 8312 | `POST /v1/moss/soundEffect` | 中英文非语音音效生成，最长 30 秒 | 音效波形 |
-| `ace_step_1_5/` | 8313 | `POST /v1/aceStep/bgm` | 按提示词生成 BGM；当前接口不接收歌词 | 音乐波形 |
-| `YuE2-3B/` | 8314 | `POST /v1/m-a-p/YuE2` | 根据风格、歌词与可选 ABC 乐谱生成带歌声和伴奏的歌曲 | 48 kHz 立体声音频 |
-| `SheetSage2/` | 8315 | `POST /v1/m-a-p/SheetSage2` | 音乐转录为可编辑乐谱、MIDI、和弦/节拍/调性/结构与时间标注 | 可用时的 ABC、MIDI 与 JSON/LAB ZIP |
-| `YuE2-Vae/` | 8316 | `POST /v1/m-a-p/YuE2-Vae` | YuE2 acoustic latent 编码与分块解码 | `[T,64]` NPY latent 或 48 kHz 立体声 WAV |
-| `MERT-v2-FullSong/` | 8317 | `POST /v1/m-a-p/MERT-v2-FullSong` | 完整歌曲音乐表征提取（24 kHz 单声道，30–360 秒） | 1024 维整曲 embedding 或 25 Hz 逐帧 NPZ |
-| `qwen3_tts/` | 8321 | `POST /v1/qwen/clone` | 参考音频零样本多语言 TTS 克隆 | 语音波形 |
-| `voxcpm2/` | 8322 | `POST /v1/voxcpm2/clone` | 30 语种 TTS、设计、克隆及指令可控克隆 | 语音波形 |
-| `LongCat_AudioDiT_3.5B_bf16/` | 8323 | `POST /v1/longCat/clone` | 扩散 TTS，参考音频+转写克隆 | 语音波形 |
-| `dots_tts_soar/` | 8324 | `POST /v1/dotsTTS/clone` | 多语言/跨语言零样本克隆 | 语音波形 |
-| `Step_Audio_EditX/` | 8331 | `POST /v1/stepAudioEditx/edit` | 情绪/风格/副语言迭代编辑与零样本 TTS | 语音波形 |
-| `moss_audio_4b_thinking/` | 8341 Thinking / 8342 Instruct | 两端口均为 `POST /v1/mossAudioThinking/understand` | 语音/环境声/音乐理解、时间问答/推理 | 文本 |
-| `TIGER-DnR/` | 8351 | `POST /v1/tigerDnr/separate` | 对白/音效/音乐三路 Stem 分离 | 三路音频波形 |
-| `Confucius4_TTS/` | 8361 | `POST /v1/confucius4TTS/generate` | 14 语种跨语言零样本 TTS 克隆，无需参考转写 | 语音波形 |
-| `Qwen3_ASR_1.7B/` | 8371 | `POST /v1/qwen3/asr` | 语种识别与转写（30 语种、22 中文方言）；LocalAI/audio.cpp 试接入尚未验收，默认 native | 转写文本与语种 |
-| `seed-vc/` | 8381 | `POST /v1/seedVc/voiceConversion` | 零样本语音转换及 F0 条件歌声转换 | 转换后的音频波形 |
-| `SoulX-FlashHead-1_3B/` | 8391 | `POST /v1/soulX/flashHead` | 人像图+音频→说话视频（Lite/Pro） | 视频帧 / 视频 |
-| `ditto/` | 8392 | `POST /v1/ditto/talkingHead` | 人像图+音频→运动空间扩散说话视频 | 视频帧 / 视频 |
+| main 控制面 | 8300 | GET /v1/control；POST /v1/audio/export；POST /v1/audio/spatial/render | 控制、共享上传/检查、CPU 母带及空间导出 | 非模型服务 |
+| `model-audio/qwen3_voiceDesign/` | 8301 | POST /v1/qwen/timbre | 文本音色设计与 TTS | 语音波形 |
+| `model-audio/ace_step_1_5/` | 8313 | POST /v1/aceStep/bgm | 按提示词生成 BGM；接口不接收歌词 | 音乐波形 |
+| `model-audio/YuE2-3B/` | 8314 | POST /v1/m-a-p/YuE2 | 根据风格、歌词与可选 ABC 乐谱生成歌曲 | 48 kHz 立体声音频 |
+| `model-audio/SheetSage2/` | 8315 | POST /v1/m-a-p/SheetSage2 | 音乐转为乐谱、MIDI、节拍/和弦/调性/结构与时间标注 | ABC、MIDI 与 JSON/LAB ZIP |
+| `model-audio/YuE2-Vae/` | 8316 | POST /v1/m-a-p/YuE2-Vae | YuE2 acoustic latent 编码与分块解码 | [T,64] NPY 或 48 kHz WAV |
+| `model-audio/MERT-v2-FullSong/` | 8317 | POST /v1/m-a-p/MERT-v2-FullSong | 完整歌曲音乐表征提取 | 整曲 embedding 或逐帧 NPZ |
+| `model-audio/qwen3_tts/` | 8321 | POST /v1/qwen/clone | 参考音频零样本多语言 TTS 克隆 | 语音波形 |
+| `model-audio/voxcpm2/` | 8322 | POST /v1/voxcpm2/clone | 多语种 TTS、参考克隆及指令可控克隆 | 语音波形 |
+| `model-audio/TIGER-DnR/` | 8351 | POST /v1/tigerDnr/separate | 对白/音效/音乐三路 Stem 分离 | 三路音频波形 |
+| `model-audio/Confucius4_TTS/` | 8361 | POST /v1/confucius4TTS/generate | 14 语种跨语言零样本 TTS 克隆 | 语音波形 |
+| `model-audio/Qwen3_ASR_1.7B/` | 8371 | POST /v1/qwen3/asr | 语种识别与语音转写 | 转写文本与语种 |
 
-- MOSS-Audio 的变体由 `MOSS_AUDIO_4B_VARIANT=thinking|instruct` 明确指定，两者共用一个项目。
-  不要把 `moss_audio_4b_instruct/` 当作独立服务。FireRed 使用
-  `FIRERED_TTS3_MODE=timbre|clone`，每个进程只注册其模式对应的业务路由。
-- `main/main.py` 只处理健康/控制、共享上传/检查、MiMo 代理和 CPU 导出，不加载模型包或推理。
-  空间任务进度为 `GET /v1/audio/spatial/render/progress/{job_id}`，是进程内状态。
-- `unitale_runtime/` 是共享轻量包，负责流式上传、引用、原子提交、GPU 队列及存储容量/保留策略；
-  不得导入 FastAPI、Torch 或模型包。它是其他项目的 editable 依赖，没有独立 `uv.lock`。
-- `inference_gateway/` 是共享 LocalAI provider 包，只能依赖标准库与 `unitale_runtime`；服务侧 provider
-  通过 `UNITALE_*_PROVIDER` 显式选择，默认 `native`。LocalAI backend 停止无法确认时，共享 GPU 锁旁的
-  `.quarantine` 标记必须保留，`unitale_runtime.gpu_runtime_lock` 会拒绝所有后续 GPU 请求。
-  运维需通过 `scripts/localai/recover_quarantine.py` 解除隔离；受管 LocalAI API 失联时还需确认宿主机
-  进程组已退出且 loopback API 端口关闭，不得手动删除标记。
-- `scripts/localai/manager.py` 按 `localai/manifests/versions.json` 校验固定源码版本的宿主机 LocalAI
-  二进制与 audio-cpp backend 文件指纹；不使用 Docker。`UNITALE_LOCALAI_MANAGED=true` 仅在
-  `UNITALE_LOCALAI_ENABLED=true` 时由 `start.sh` 托管 LocalAI 进程组，固定绑定 loopback 并限制一个活动
-  backend。Qwen 候选权重按锁定 size/hash 预检；真实 audio.cpp 推理与进程回收仍需本机 GPU smoke。
-  更新服务 API 后须同步 `localai/manifests/capabilities.json`，
-  并运行 `uv run --project qa --locked python scripts/localai/validate_capabilities.py` 核对源码路由及字段映射。
-- `unitale_localai_bridge/` 是 LocalAI 外部 gRPC 适配后端，只依赖轻量 gateway/runtime 与 gRPC；
-  按 `localai/manifests/worker-bridge.json` 的固定模型 ID、项目和 `worker.py` 入口启动一次性 worker，
-  只监听 loopback，不导入 FastAPI、Torch 或模型包。新增 worker 必须固定输入/输出合同、超时、结果大小、
-  环境白名单和异常退出回收测试；服务侧持有共享 GPU 锁，bridge 不得递归调用服务 HTTP 路由。
-- `steam_audio_renderer/` 是 C++17 Steam Audio CPU renderer，不获取 GPU 锁；SDK 和动态库在仓库外。
-- `qa/` 是无模型测试/Ruff 项目；`scripts/quality_gate.sh` 与 GitHub Actions 使用同一质量门禁。
-  `tests/` 为根目录回归，ACE-Step 和 Stable Audio 的服务内测试须从各自目录执行。
-- `scripts/training/`、`training/configs/` 是纯文本润色 LoRA 实验，不是语音训练或 HTTP 服务。
-  模型训练需要独立外部环境；数据、adapter、预测保存到 `storage/training/`。
-- `soundEffect/` 和 `tests/testConfucius4TTS/`、`tests/testSoulX_FlashHead/`、`tests/testDitto/`
-  含真实模型演示，不能纳入自动无模型推理测试。`流行*模型功能简介.md`、`task*.md` 和
-  `special-audio-effect/` 是调研/任务/方案资料，不能据此推断已实现能力。
+- main/main.py 只处理健康/控制、共享上传/检查和 CPU 导出，不加载模型包或推理。
+  空间任务进度 GET /v1/audio/spatial/render/progress/{job_id} 是进程内状态。
+- llm_local_runtime/ 是共享轻量包，负责流式上传、引用、原子提交、GPU 队列及存储容量/保留策略；
+  不得导入 FastAPI、Torch 或模型包。它是其他项目的 editable 依赖，没有独立 uv.lock。
+- inference_gateway/ 只被 Qwen3-TTS Base/VoiceDesign LocalAI provider 与 worker bridge 使用，
+  只能依赖标准库和 llm_local_runtime。provider 默认 native。LocalAI backend 停止无法确认时，
+  GPU 锁旁的 .quarantine 标记必须保留；运维需通过 scripts/localai/recover_quarantine.py
+  解除隔离，并确认受管进程组退出、loopback API 端口关闭。
+- scripts/localai/manager.py 校验宿主机 LocalAI 固定版本、audio.cpp backend 文件指纹、
+  Qwen3-TTS 候选与五个 worker bridge；本项目使用 Linux 裸机，不使用 Docker。
+  更新服务 API 后须同步 localai/manifests/capabilities.json 并运行能力清单校验。
+- localai_worker_bridge/ 只依赖轻量 gateway/runtime 与 gRPC；按
+  localai/manifests/worker-bridge.json 固定的五个模型 ID、项目和 worker.py 入口启动一次性 worker，
+  只监听 loopback，不导入 FastAPI、Torch 或模型包。新增 worker 须覆盖合同、超时、大小、
+  环境白名单和异常退出清理。
+- model-audio/steam_audio_renderer/ 是 C++17 Steam Audio CPU renderer，不获取 GPU 锁；SDK 和动态库在仓库外。
+- qa/ 是无模型测试/Ruff 项目；scripts/quality_gate.sh 与 GitHub Actions 使用同一质量门禁。
+  根目录回归使用 QA；ACE-Step 服务内测试从 model-audio/ace_step_1_5/ 执行。
+- model-text/scripts/training/、model-text/training/configs/ 是纯文本润色 LoRA 实验，不是语音训练或 HTTP 服务。
+- model-video/ 按模态收纳视频项目；当前没有维护中的视频 HTTP 服务，目录不计入 start.sh 的进程数。
+- 流行*模型功能简介.md、task*.md 和 `空间音频讨论/` 是调研/任务/方案资料，
+  不能据此推断已实现能力。
 
 ## 安装、启动与测试
 
-部署使用 Linux、Python `3.12.13`、`uv`、FFmpeg/ffprobe、llama.cpp `llama-server` 和 CUDA/NVIDIA 驱动。
+部署使用 Linux、Python `3.12.13`、`uv`、FFmpeg/ffprobe、CUDA/NVIDIA 驱动和固定版本 LocalAI/audio.cpp。
 统一启动依赖 `setsid`、进程组信号与 `fcntl.flock`；不同服务必须保留各自 Torch/CUDA 环境。
-Step-Audio-EditX 另需系统 `sox`，Ditto 需要 GCC，renderer 构建需要 CMake 3.17+ 和 C++17。
+renderer 构建需要 CMake 3.17+ 和 C++17。
 
 按照 README 准备权重与外部源码，再执行 `uv sync --project <dir> --locked`。
-`moss_voiceGenerator` 的 `moss-tts` 是唯一固定路径例外：必须使用预先准备的本地 editable
-源码 `/home/muyi086/tts-depency/MOSS-TTS`，同步前确认该目录存在，不得改为 Git/PyPI 下载。
 修改依赖后在对应项目执行 `uv lock`，提交 `pyproject.toml` 与 `uv.lock`，并用 `uv lock --check` 验证。
 YuE2-3B 使用模型目录随附的官方 `yue2_infer` 0.1.5 wheel 和本地 MOT/VAE 权重；按模型卡准备
 24 GB GPU 及 24 GB 可用主机内存，服务请求不下载模型。
@@ -99,8 +77,8 @@ SheetSage2 使用 Hugging Face 本地快照的官方 Transformers remote code �
 MERT-v2-FullSong 父模型。服务用一次性 worker 推理，默认 FFmpeg 解码，ZIP 成品写入
 `SHEETSAGE2_OUTPUT_DIR`；请求音频暂存仅用于推理并在请求结束后删除。
 
-`bash start.sh` 在 `qwen3_tts` 环境启动 8300，其他进程使用各自服务环境；端口/路径可通过
-环境变量覆盖。启动统一使用 `uv run --no-sync`，并将 `unitale_runtime/src` 加入 `PYTHONPATH`
+`bash start.sh` 在 `model-audio/qwen3_tts` 环境启动 8300，其他进程使用各自服务环境；端口/路径可通过
+环境变量覆盖。启动统一使用 `uv run --no-sync`，并将 `llm_local_runtime/src` 加入 `PYTHONPATH`
 作为共享包离线兜底。该兜底不能代替新增依赖后的 `uv sync --locked`。
 脚本先检查整组端口，任一服务退出时终止其他进程组；重启前用 `Ctrl+C` 等待旧进程退出。
 只部署部分模型时直接启动对应 `main.py`；统一脚本没有服务启停开关。
@@ -112,19 +90,17 @@ bash scripts/quality_gate.sh
 curl -fsS http://127.0.0.1:8300/v1/control
 ```
 
-质量门禁包含无 SDK 的三个 C++ 核心测试、全部服务/bridge/QA 锁检查、Ruff 与格式检查及三组无模型测试。缺失任何当前维护项目都会使门禁失败。
+质量门禁包含无 SDK 的三个 C++ 核心测试、全部服务/bridge/QA 锁检查、Ruff 与格式检查及两组无模型测试。缺失任何当前维护项目都会使门禁失败。
 锁校验可能读取 Git/wheel 元数据；已有完整缓存时可设置 `UV_OFFLINE=1` 运行。
 单独执行测试必须用 QA，不能通过模型环境安装依赖来运行根目录回归：
 
 ```bash
 uv run --project qa --locked python -m unittest discover -s tests -v
-(cd ace_step_1_5 && uv run --project ../qa --locked python -m unittest discover -s tests -v)
-(cd stable_audio_3_medium && uv run --project ../qa --locked python -m unittest discover -s tests -v)
+(cd model-audio/ace_step_1_5 && uv run --project ../../qa --locked python -m unittest discover -s tests -v)
 ```
 
-测试不得下载权重、依赖 CUDA、调用 MiMo 或执行真实模型；应 mock worker、subprocess、
+测试不得下载权重、依赖 CUDA、调用外部模型服务或执行真实模型；应 mock worker、subprocess、
 文件系统边界和网络。FastAPI TestClient 使用 QA 的 `httpx2` 兼容依赖，不恢复旧客户端组合。
-真实 MOSS GPU smoke test 单独使用 `bash soundEffect/run_moss_soundeffect_v2.sh`。
 
 ## 架构与接口约束
 
@@ -135,43 +111,39 @@ uv run --project qa --locked python -m unittest discover -s tests -v
 - 本地模型使用共享 `GPU_LOCK_FILE` 串行执行，纯 CPU/文件预检应在获取锁前完成。保留
   `finally` 锁释放和持锁期间的 `CUDA_RELEASE_DELAY`；默认排队 900 秒，超时返回 `503`。
   整套部署应保持 `GPU_LOCK_WAIT_TIMEOUT` 为正数，新增代码不得恢复无限期等待；共享实现
-  尚有非正值兼容分支，Seed-VC 已明确拒绝该配置。指标采样用 `GPU_METRICS_SAMPLE_INTERVAL`。
+  尚有非正值兼容分支。指标采样用 `GPU_METRICS_SAMPLE_INTERVAL`。
 - 模型默认值集中在服务模块顶部；新增/修改 `start.sh` 配置只负责路由、路径、端口、环境和
   共享运行参数，不应新增静默推理覆盖。现有部分服务的默认参数还由脚本导出，改默认值须核对两处。
-- 不恢复 IndexTTS2、Ming、OmniVoice、旧 MOSS-TTS 克隆、Stable Audio 3 Small SFX、VoxCPM2
-  音色设计服务、集中式 `api/` 或 Conda 回退；不新增旧接口别名。8300 的 MiMo 同路径代理是既有边界。
-- Qwen/VoxCPM2/LongCat/dots/FireRed 克隆拒绝 `style_prompt`。VoxCPM2 `controllable` 模式使用
+- `~/hf-mirror` 是模型维护范围的本地依据；新服务及现有服务的可选 provider 必须具有完整主模型和必需辅助权重，缺失时不得保留等待用户下载的运行代码。LocalAI/audio.cpp 的上游 family 支持声明不等于本地模型可用。
+- 不恢复已从仓库移除的服务，不新增旧接口别名、集中式 `api/` 或 Conda 回退。若模型目录和依赖重新准备，先单独评估维护范围及完整运行合同。
+- Qwen/VoxCPM2 克隆拒绝 `style_prompt`。VoxCPM2 `controllable` 模式使用
   `control_instruction`，与 `prompt_text` 互斥且忽略 sidecar；`nonverbal_tags` 最多一个白名单标签。
-  LongCat 与 FireRed Base 要求准确参考转写；Confucius4 默认 `lang=zh`，参考 sidecar 不参与推理。
-- MOSS-Audio、Qwen3-ASR、TIGER 直接接收 multipart `audio`，输入只暂存；前两者返回 JSON，
-  TIGER 返回 ZIP 并原子保存分离批次。SoulX/Ditto 返回带声音 MP4，不使用 WAV 响应约定。
-  两个人像视频服务提供 `POST /v1/upload_image` 和 `GET /v1/check/image`，同样使用逻辑标识。
+- Confucius4 默认 `lang=zh`，参考 sidecar 不参与推理。Qwen3-ASR/TIGER 直接接收 multipart `audio`，
+  输入只暂存；ASR 返回 JSON，TIGER 返回 ZIP 并原子保存分离批次。
 - 正式 `balanced`/`immersive` 必须保留对象边界，走 `/v1/audio/spatial/render` 的 Manifest v1
   与重复 `assets` 字段，不在浏览器预混、不获取 GPU 锁。Steam Audio pre-master 后只能
   loudnorm/编码，禁止再叠加 Haas/aecho。`/v1/audio/export` 调用只用于显式 `profile=standard`
   的预混母带；其实现仍兼容旧空间滤镜，不扩展该旧路径。
 - `diffuse`、非 `none` 遮挡、几何反射尚未实现；不得将保留的语义字段描述为已可用能力。
-  SoulX/Ditto 仅提供单 GPU 离线文件生成，不承诺实时流或多 GPU。
 
 ## 上传、存储与清理
 
-- 音频上传经 `unitale_runtime` 按块暂存，默认 64 MiB，由 `UPLOAD_MAX_BYTES` 覆盖；校验扩展名/
+- 音频上传经 `llm_local_runtime` 按块暂存，默认 64 MiB，由 `UPLOAD_MAX_BYTES` 覆盖；校验扩展名/
   Content-Type、计算 SHA-256，使用临时文件和 `os.replace` 原子提交。不整文件 `read()` 上传，
-  不直接覆盖 sidecar 或引用映射。图片使用独立扩展名/MIME 策略，沿用共享暂存和原子提交。
+  不直接覆盖 sidecar 或引用映射。
 - `full_path` 是客户端逻辑标识，不能用于直接读取服务器任意文件。参考文本可保存 sidecar；
-  8300/Step 上传不接收 `prompt_text`，MOSS-Audio/ASR/TIGER 没有独立上传/检查接口。
-- 默认目录：音色 `storage/timbre/`，音效 `storage/soundEffect/`，BGM `storage/bgm/`，普通
-  参考音频、克隆、编辑、Seed-VC 结果 `storage/clone/`，分离批次 `storage/separation/`，
-  转谱 ZIP `storage/sheetsage2/`、YuE2-Vae latent/WAV `storage/yue2_vae/`、MERT 表征 JSON/NPZ
-  `storage/mert_v2_fullsong/`，人像视频 `storage/video/`；SoulX/Ditto 图片各保存在 `storage/flashhead/images/`、
-  `storage/ditto/images/`。目录均可按对应配置覆盖。
+  8300 上传不接收 `prompt_text`，ASR/TIGER 没有独立上传/检查接口。
+- 默认目录：音色 `storage/timbre/`、BGM `storage/bgm/`、普通参考音频与克隆结果
+  `storage/clone/`、分离批次 `storage/separation/`、转谱 ZIP `storage/sheetsage2/`、
+  YuE2-Vae latent/WAV `storage/yue2_vae/`、MERT 表征 JSON/NPZ `storage/mert_v2_fullsong/`。
+  目录均可按对应配置覆盖。
 - 设计 WAV 只保留在 `storage/timbre/`。通过共享 `AudioReferenceStore` 同步到其他服务时，
   同内容上传只在 `storage/timbre/.references/` 保存小型引用映射/文本，不在 clone 再复制 WAV。
   普通用户参考上传仍保存在 clone；不得破坏引用校验和内容哈希。
 - 保留策略默认关闭；运维显式设置 `STORAGE_RETENTION_HOURS` 或 `STORAGE_RETENTION_MAX_BYTES`
-  后才可运行 `uv run --project qwen3_tts python main/storage_maintenance.py [--apply]`。
+  后才可运行 `uv run --project model-audio/qwen3_tts python main/storage_maintenance.py [--apply]`。
   默认预览，不能自动删除普通上传或仍被引用的音色。该工具只扫描列出的 WAV 前缀，不覆盖
-  FireRed/Confucius4/Seed-VC、新视频/分离/训练产物或任意自定义输出目录；详见 README。
+  Confucius4、分离/训练产物或任意自定义输出目录；详见 README。
 - 训练脚本不自动获取服务 GPU 锁，执行真实训练/预测需独立安排 GPU；教师候选必须保留
   `research-only`、`automated-poc` 标记与按来源隔离的数据划分，不能当作生产 Gold 数据。
 
@@ -183,7 +155,7 @@ import 和 Ruff 风格。路由、校验、存储或生命周期变更须补针�
 详细工程规范见 [docs/python-engineering.md](docs/python-engineering.md)。
 
 不得提交权重、第三方源码、上传素材、生成音视频、训练数据/adapter、虚拟环境、缓存、密钥或
-机器专用绝对路径；MOSS editable 路径是上述唯一例外。`MIMO_API_KEY` 仅从环境读取。
+机器专用绝对路径。
 Commit subject 使用简洁的 Conventional Commit，如 `feat:`、`fix:`、`docs:`。
 
 - Python 注释与 Docstring 默认简体中文，标识符、类型名、库/API 名和通用技术术语保留英文。

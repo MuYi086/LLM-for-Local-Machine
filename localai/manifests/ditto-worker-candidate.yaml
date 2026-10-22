@@ -1,4 +1,0 @@
-name: unitale.ditto.worker.v1
-backend: unitale-worker
-parameters:
-  model: unitale.ditto.worker.v1

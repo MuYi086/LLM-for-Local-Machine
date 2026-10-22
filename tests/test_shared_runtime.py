@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from unitale_runtime import (
+from llm_local_runtime import (
     AudioReferenceStore,
     AudioUploadError,
     GpuLockTimeoutError,
@@ -96,7 +96,7 @@ class SharedRuntimeTests(unittest.TestCase):
             staged = StagedUpload(staged_path, digest, staged_path.stat().st_size, ".wav")
 
             with patch(
-                "unitale_runtime.storage._atomic_write_json", side_effect=OSError("disk full")
+                "llm_local_runtime.storage._atomic_write_json", side_effect=OSError("disk full")
             ):
                 with self.assertRaises(OSError):
                     store.commit_staged_upload(staged, "reference.wav")

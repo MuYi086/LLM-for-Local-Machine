@@ -7,17 +7,14 @@
 
 from __future__ import annotations
 
-import asyncio
 import os
 import shutil
-import urllib.error
-import urllib.request
 import uuid
 from pathlib import Path
 from typing import Literal
 
 import uvicorn
-from fastapi import FastAPI, File, Form, Request, UploadFile
+from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response
 from gpu_runtime import cuda_status
 from render_progress import RenderProgressError, RenderProgressRegistry
@@ -33,7 +30,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware
 from steam_audio_render import SteamAudioRenderError, SteamAudioRenderProcessor
 
-from unitale_runtime import (
+from llm_local_runtime import (
     AudioReferenceStore,
     AudioUploadError,
     StagedUpload,
@@ -54,9 +51,6 @@ def expand_path(path: str) -> str:
 STORAGE_DIR = expand_path(os.getenv("STORAGE_DIR", str(PROJECT_DIR / "storage")))
 TIMBRE_STORAGE_DIR = expand_path(os.getenv("TIMBRE_STORAGE_DIR", str(Path(STORAGE_DIR) / "timbre")))
 TIMBRE_REFERENCE_DIR = str(Path(TIMBRE_STORAGE_DIR) / ".references")
-SOUNDEFFECT_STORAGE_DIR = expand_path(
-    os.getenv("SOUNDEFFECT_STORAGE_DIR", str(Path(STORAGE_DIR) / "soundEffect"))
-)
 CLONE_STORAGE_DIR = expand_path(os.getenv("CLONE_STORAGE_DIR", str(Path(STORAGE_DIR) / "clone")))
 PROMPTS_DIR = expand_path(os.getenv("PROMPTS_DIR", CLONE_STORAGE_DIR))
 RUNTIME_CACHE_DIR = expand_path(
@@ -77,7 +71,7 @@ STEAM_AUDIO_RENDER_CACHE_DIR = expand_path(
         str(Path(RUNTIME_CACHE_DIR) / "steam_audio_renders"),
     )
 )
-_default_renderer_path = PROJECT_DIR / "steam_audio_renderer" / "build"
+_default_renderer_path = PROJECT_DIR / "model-audio" / "steam_audio_renderer" / "build"
 if os.name == "nt":
     _default_renderer_path = _default_renderer_path / "Release" / "steam-audio-render.exe"
 else:
@@ -121,11 +115,6 @@ GPU_LOCK_FILE = expand_path(
 )
 API_HOST = os.getenv("HOST", "0.0.0.0")
 API_PORT = int(os.getenv("PORT", "8300"))
-MIMO_TTS_PROXY_URL = os.getenv(
-    "MIMO_TTS_PROXY_URL",
-    f"http://127.0.0.1:{os.getenv('MIMO_TTS_PORT', '8303')}/v1/mimo/timbre",
-)
-MIMO_TTS_PROXY_TIMEOUT = float(os.getenv("MIMO_TTS_PROXY_TIMEOUT", "310"))
 LOCAL_FILES_ONLY = os.getenv("LOCAL_FILES_ONLY", "1").lower() in {
     "1",
     "true",
@@ -136,7 +125,6 @@ LOCAL_FILES_ONLY = os.getenv("LOCAL_FILES_ONLY", "1").lower() in {
 for directory in (
     TIMBRE_STORAGE_DIR,
     TIMBRE_REFERENCE_DIR,
-    SOUNDEFFECT_STORAGE_DIR,
     CLONE_STORAGE_DIR,
     PROMPTS_DIR,
     RUNTIME_CACHE_DIR,
@@ -171,7 +159,7 @@ def spatial_export_available() -> bool:
     return shutil.which(SPATIAL_EXPORT_FFMPEG_BIN) is not None
 
 
-app = FastAPI(title="Unitale AI Control Plane")
+app = FastAPI(title="LLM Local Backend Control Plane")
 
 
 class ForceCORS(BaseHTTPMiddleware):
@@ -200,36 +188,6 @@ class ForceCORS(BaseHTTPMiddleware):
 app.add_middleware(ForceCORS)
 
 
-def forward_mimo_design_request(body: bytes, accept: str) -> tuple[int, bytes, str]:
-    """将控制面最终保留的 MiMo 路由转发到独立服务。"""
-    headers = {
-        "Content-Type": "application/json",
-        "Accept": accept or "*/*",
-    }
-    upstream_request = urllib.request.Request(
-        MIMO_TTS_PROXY_URL,
-        data=body,
-        headers=headers,
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(
-            upstream_request,
-            timeout=MIMO_TTS_PROXY_TIMEOUT,
-        ) as upstream:
-            response_body = upstream.read()
-            content_type = upstream.headers.get_content_type() or "application/octet-stream"
-            return upstream.status, response_body, content_type
-    except urllib.error.HTTPError as exc:
-        response_body = exc.read()
-        content_type = exc.headers.get_content_type() if exc.headers else "application/json"
-        return exc.code, response_body, content_type or "application/json"
-    except urllib.error.URLError as exc:
-        raise RuntimeError(f"无法连接 MiMo 独立服务 {MIMO_TTS_PROXY_URL}: {exc.reason}") from exc
-    except TimeoutError as exc:
-        raise RuntimeError(f"连接 MiMo 独立服务超时: {MIMO_TTS_PROXY_URL}") from exc
-
-
 def hash_filename(filename: str) -> str:
     """将 WebUI 的逻辑路径映射为稳定文件名，避免直接使用用户输入作路径。"""
     return reference_store.clone_path(filename).name
@@ -255,14 +213,12 @@ def health():
         "paths": {
             "storage_dir": STORAGE_DIR,
             "timbre_storage_dir": TIMBRE_STORAGE_DIR,
-            "soundeffect_storage_dir": SOUNDEFFECT_STORAGE_DIR,
             "clone_storage_dir": CLONE_STORAGE_DIR,
             "prompts_dir": PROMPTS_DIR,
             "runtime_cache_dir": RUNTIME_CACHE_DIR,
             "spatial_export_cache_dir": SPATIAL_EXPORT_CACHE_DIR,
             "steam_audio_render_cache_dir": STEAM_AUDIO_RENDER_CACHE_DIR,
             "gpu_lock_file": GPU_LOCK_FILE,
-            "mimo_tts_proxy_url": MIMO_TTS_PROXY_URL,
         },
         "available": {
             "cuda": cuda["available"],
@@ -296,26 +252,6 @@ def health():
             "max_bytes": STEAM_AUDIO_RENDER_MAX_BYTES,
         },
     }
-
-
-@app.post("/v1/mimo/timbre")
-async def mimo_design_proxy(request: Request):
-    """在 MiMo 推理位于 ``mimo_tts`` 时保留 8300 控制面路由。"""
-    body = await request.body()
-    try:
-        status_code, response_body, content_type = await asyncio.to_thread(
-            forward_mimo_design_request,
-            body,
-            request.headers.get("accept", "*/*"),
-        )
-    except RuntimeError as exc:
-        return JSONResponse(status_code=503, content={"detail": str(exc)})
-
-    return Response(
-        content=response_body,
-        status_code=status_code,
-        headers={"content-type": content_type},
-    )
 
 
 @app.post("/v1/upload_audio")
@@ -527,7 +463,7 @@ def check_audio_exists(file_name: str):
 
 if __name__ == "__main__":
     print("==================================================")
-    print("   Unitale AI control plane (no model inference)")
+    print("   LLM Local Backend control plane (no model inference)")
     print("==================================================")
     print(f"[配置] storage: {STORAGE_DIR}")
     print(f"[配置] prompts: {PROMPTS_DIR}")

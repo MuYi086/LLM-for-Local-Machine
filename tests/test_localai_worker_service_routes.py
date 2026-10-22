@@ -1,4 +1,4 @@
-"""验证五个结构化/视频服务路由选择本机 LocalAI worker bridge。"""
+"""验证五个保留服务的本机 LocalAI worker bridge 路由。"""
 
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ def load_service(project: str) -> Iterator[object]:
 
 
 class LocalAIWorkerServiceRouteTests(unittest.TestCase):
-    """确认 LocalAI provider 复用各服务现有 worker payload 与输出合同。"""
+    """确认 LocalAI bridge 复用各保留服务的 worker payload 与输出合同。"""
 
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
@@ -51,7 +51,7 @@ class LocalAIWorkerServiceRouteTests(unittest.TestCase):
             {
                 "STORAGE_DIR": str(self.storage_dir),
                 "GPU_LOCK_FILE": str(self.storage_dir / ".cache/runtime/gpu.lock"),
-                "UNITALE_LOCALAI_ENABLED": "false",
+                "LLM_LOCALAI_ENABLED": "false",
                 "LOCAL_FILES_ONLY": "1",
             },
         )
@@ -69,7 +69,7 @@ class LocalAIWorkerServiceRouteTests(unittest.TestCase):
 
     def test_sheetsage2_routes_zip_through_localai_and_persists_it(self) -> None:
         with load_service("SheetSage2") as module:
-            self.select_localai(module, "unitale.sheetsage2.worker.v1")
+            self.select_localai(module, "llm-local.sheetsage2.worker.v1")
             payload = {"audio_path": "/tmp/checked.wav", "dtype": "bf16"}
             artifact = Path(self.temporary.name) / "worker.zip"
             saved = Path(self.temporary.name) / "saved.zip"
@@ -100,7 +100,7 @@ class LocalAIWorkerServiceRouteTests(unittest.TestCase):
 
     def test_mert_selects_npz_output_for_frame_features(self) -> None:
         with load_service("MERT-v2-FullSong") as module:
-            self.select_localai(module, "unitale.mert-v2-fullsong.worker.v1")
+            self.select_localai(module, "llm-local.mert-v2-fullsong.worker.v1")
             payload = {"audio_path": "/tmp/checked.wav", "output": "frames"}
             artifact = Path(self.temporary.name) / "worker.npz"
             with (
@@ -123,7 +123,7 @@ class LocalAIWorkerServiceRouteTests(unittest.TestCase):
 
     def test_yue2_vae_selects_wav_output_for_decode(self) -> None:
         with load_service("YuE2-Vae") as module:
-            self.select_localai(module, "unitale.yue2-vae.worker.v1")
+            self.select_localai(module, "llm-local.yue2-vae.worker.v1")
             payload = {"operation": "decode", "latent_path": "/tmp/checked.npy"}
             artifact = Path(self.temporary.name) / "worker.wav"
             with (
@@ -146,7 +146,7 @@ class LocalAIWorkerServiceRouteTests(unittest.TestCase):
 
     def test_yue2_3b_routes_complete_request_through_worker_bridge(self) -> None:
         with load_service("YuE2-3B") as module:
-            self.select_localai(module, "unitale.yue2-3b.worker.v1")
+            self.select_localai(module, "llm-local.yue2-3b.worker.v1")
             request = module.YuE2MusicRequest(lyrics="你好", style="民谣")
             expected_payload = {"lyrics": "你好", "style": "民谣", "seed": request.seed}
             audio = b"valid mocked wav bytes"
@@ -175,63 +175,9 @@ class LocalAIWorkerServiceRouteTests(unittest.TestCase):
             self.assertEqual(response.body, audio)
             self.assertEqual(response.media_type, "audio/wav")
 
-    def test_moss_soundeffect_uses_wav_worker_bridge(self) -> None:
-        with load_service("moss_soundEffect") as module:
-            self.select_localai(module, "unitale.moss-soundeffect-v2.worker.v1")
-            artifact = Path(self.temporary.name) / "sound.wav"
-            artifact.write_bytes(b"RIFFmock")
-            with patch.object(
-                module, "execute_localai_worker_file", return_value=(artifact, 1.0)
-            ) as execute:
-                self.assertEqual(module.manager.run_localai_worker({"prompt": "rain"}), b"RIFFmock")
-
-            self.assertEqual(execute.call_args.kwargs["suffix"], ".wav")
-            self.assertEqual(execute.call_args.kwargs["media_type"], "audio/wav")
-            self.assertFalse(artifact.exists())
-
-    def test_step_audio_editx_preserves_complete_worker_payload(self) -> None:
-        with load_service("Step_Audio_EditX") as module:
-            self.select_localai(module, "unitale.step-audio-editx.worker.v1")
-            artifact = Path(self.temporary.name) / "edit.wav"
-            artifact.write_bytes(b"RIFFmock")
-            payload = {
-                "edit_type": "emotion",
-                "edit_info": "calm",
-                "prompt_wav_path": "/tmp/in.wav",
-            }
-            with patch.object(
-                module, "execute_localai_worker_file", return_value=(artifact, 1.0)
-            ) as execute:
-                self.assertEqual(module.manager.run_localai_worker(payload), b"RIFFmock")
-
-            self.assertEqual(execute.call_args.kwargs["payload"], {"worker_input": payload})
-            self.assertFalse(artifact.exists())
-
-    def test_moss_audio_variant_uses_fixed_json_worker_bridge(self) -> None:
-        with load_service("moss_audio_4b_thinking") as module:
-            self.select_localai(module, "unitale.moss-audio-4b.thinking.worker.v1")
-            payload = {"audio_path": "/tmp/input.wav", "prompt": "转写"}
-            with (
-                patch.object(
-                    module,
-                    "execute_localai_worker",
-                    return_value=({"kind": "json", "value": {"text": "转写结果"}}, 1.0),
-                ) as execute,
-                patch.object(
-                    module,
-                    "gpu_runtime_lock",
-                    side_effect=AssertionError("LocalAI 分支不能二次获取 GPU 锁"),
-                ),
-            ):
-                self.assertEqual(
-                    module.execute_understanding_payload(payload), {"text": "转写结果"}
-                )
-
-            self.assertEqual(execute.call_args.kwargs["payload"], {"worker_input": payload})
-
     def test_tiger_dnr_unpacks_only_three_named_stems_from_file_reference(self) -> None:
         with load_service("TIGER-DnR") as module:
-            self.select_localai(module, "unitale.tiger-dnr.worker.v1")
+            self.select_localai(module, "llm-local.tiger-dnr.worker.v1")
             archive = Path(self.temporary.name) / "tiger.zip"
             with zipfile.ZipFile(archive, "w") as worker_archive:
                 for stem in ("dialog", "effects", "music"):
@@ -251,7 +197,7 @@ class LocalAIWorkerServiceRouteTests(unittest.TestCase):
 
     def test_tiger_dnr_rejects_unexpected_zip_entries(self) -> None:
         with load_service("TIGER-DnR") as module:
-            self.select_localai(module, "unitale.tiger-dnr.worker.v1")
+            self.select_localai(module, "llm-local.tiger-dnr.worker.v1")
             archive = Path(self.temporary.name) / "bad-tiger.zip"
             with zipfile.ZipFile(archive, "w") as worker_archive:
                 worker_archive.writestr("dialog.wav", b"RIFF-dialog")
@@ -266,60 +212,6 @@ class LocalAIWorkerServiceRouteTests(unittest.TestCase):
                 with self.assertRaisesRegex(module.LocalAIRequestError, "只能包含三个"):
                     module.manager.run_localai_worker({"audio_path": "/tmp/input.wav"})
             self.assertFalse(archive.exists())
-
-    def _assert_video_service_uses_localai(
-        self, project: str, route_name: str, request: object
-    ) -> None:
-        with load_service(project) as module:
-            model = {
-                "SoulX-FlashHead-1_3B": "unitale.soulx-flashhead.worker.v1",
-                "ditto": "unitale.ditto.worker.v1",
-            }[project]
-            self.select_localai(module, model)
-            worker_payload = {"reference_image_path": "/tmp/image.png"}
-            artifact = Path(self.temporary.name) / f"{project}.mp4"
-            artifact.write_bytes(b"temporary video")
-            saved = Path(self.temporary.name) / f"{project}-saved.mp4"
-            saved.write_bytes(b"saved video")
-            with (
-                patch.object(module.manager, "build_worker_payload", return_value=worker_payload),
-                patch.object(
-                    module,
-                    "execute_localai_worker_file",
-                    return_value=(artifact, 2.5),
-                ) as execute,
-                patch.object(module, "validate_video") as validate,
-                patch.object(module, "persist_video", return_value=saved) as persist,
-                patch.object(
-                    module,
-                    "gpu_runtime_lock",
-                    side_effect=AssertionError("LocalAI 分支不能二次获取 GPU 锁"),
-                ),
-            ):
-                response = getattr(module, route_name)(request)
-
-            execute.assert_called_once_with(
-                config=module.GATEWAY_CONFIG,
-                operation="run",
-                payload={"worker_input": worker_payload},
-                output_dir=Path(module.WORKER_TMP_DIR),
-                suffix=".mp4",
-                media_type="video/mp4",
-            )
-            validate.assert_called_once_with(artifact, module.FFPROBE_BIN)
-            persist.assert_called_once_with(artifact, module.OUTPUT_DIR)
-            self.assertTrue(artifact.is_file() is False)
-            self.assertEqual(Path(response.path), saved)
-
-    def test_soulx_preserves_validated_mp4_output(self) -> None:
-        with load_service("SoulX-FlashHead-1_3B") as module:
-            request = module.FlashHeadRequest(image_path="image.png", audio_path="audio.wav")
-        self._assert_video_service_uses_localai("SoulX-FlashHead-1_3B", "generate", request)
-
-    def test_ditto_preserves_validated_mp4_output(self) -> None:
-        with load_service("ditto") as module:
-            request = module.TalkingHeadRequest(image_path="image.png", audio_path="audio.wav")
-        self._assert_video_service_uses_localai("ditto", "generate", request)
 
 
 if __name__ == "__main__":

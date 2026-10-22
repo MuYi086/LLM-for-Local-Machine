@@ -42,55 +42,23 @@ class FastApiExecutionModelTests(unittest.TestCase):
     def test_blocking_routes_use_sync_handlers(self) -> None:
         expected_routes = {
             "main/main.py": {"/v1/health", "/v1/check/audio"},
-            "mimo_tts/main.py": {
-                "/v1/health",
-                "/v1/mimo/timbre",
-            },
-            "qwen3_tts/main.py": {
+            "model-audio/qwen3_tts/main.py": {
                 "/v1/health",
                 "/v1/check/audio",
                 "/v1/qwen/clone",
             },
-            "voxcpm2/main.py": {"/v1/health", "/v1/check/audio"},
-            "LongCat_AudioDiT_3.5B_bf16/main.py": {
-                "/v1/health",
-                "/v1/check/audio",
-                "/v1/longCat/clone",
-            },
-            "dots_tts_soar/main.py": {
-                "/v1/health",
-                "/v1/check/audio",
-                "/v1/dotsTTS/clone",
-            },
-            "moss_soundEffect/main.py": {
-                "/v1/health",
-                "/v1/moss/soundEffect",
-            },
-            "stable_audio_3_medium/main.py": {
-                "/v1/health",
-                "/v1/stableAudio/soundEffect",
-            },
-            "ace_step_1_5/main.py": {
+            "model-audio/voxcpm2/main.py": {"/v1/health", "/v1/check/audio"},
+            "model-audio/ace_step_1_5/main.py": {
                 "/v1/health",
                 "/v1/aceStep/bgm",
             },
-            "qwen3_voiceDesign/main.py": {"/v1/health"},
-            "moss_voiceGenerator/main.py": {"/v1/health"},
-            "moss_audio_4b_thinking/main.py": {"/v1/health"},
-            "Confucius4_TTS/main.py": {
+            "model-audio/qwen3_voiceDesign/main.py": {"/v1/health"},
+            "model-audio/Confucius4_TTS/main.py": {
                 "/v1/health",
                 "/v1/check/audio",
                 "/v1/confucius4TTS/generate",
             },
-            "Step_Audio_EditX/main.py": {"/v1/health", "/v1/check/audio"},
-            "TIGER-DnR/main.py": {"/v1/health"},
-            "seed-vc/main.py": {"/v1/health", "/v1/check/audio", "/v1/seedVc/voiceConversion"},
-            "SoulX-FlashHead-1_3B/main.py": {
-                "/v1/health",
-                "/v1/check/audio",
-                "/v1/check/image",
-                "/v1/soulX/flashHead",
-            },
+            "model-audio/TIGER-DnR/main.py": {"/v1/health"},
         }
 
         for relative_path, routes in expected_routes.items():
@@ -101,7 +69,9 @@ class FastApiExecutionModelTests(unittest.TestCase):
                     {route: "FunctionDef" for route in routes},
                 )
 
-        voxcpm2_source = (REPOSITORY_DIR / "voxcpm2/main.py").read_text(encoding="utf-8")
+        voxcpm2_source = (REPOSITORY_DIR / "model-audio/voxcpm2/main.py").read_text(
+            encoding="utf-8"
+        )
         self.assertIn(
             "return await run_in_threadpool(synthesize_voxcpm2_payload, data)", voxcpm2_source
         )
@@ -109,14 +79,9 @@ class FastApiExecutionModelTests(unittest.TestCase):
     def test_async_upload_routes_offload_filesystem_work(self) -> None:
         upload_sources = {
             "main/main.py",
-            "qwen3_tts/main.py",
-            "voxcpm2/main.py",
-            "LongCat_AudioDiT_3.5B_bf16/main.py",
-            "dots_tts_soar/main.py",
-            "Step_Audio_EditX/main.py",
-            "Confucius4_TTS/main.py",
-            "seed-vc/main.py",
-            "SoulX-FlashHead-1_3B/main.py",
+            "model-audio/qwen3_tts/main.py",
+            "model-audio/voxcpm2/main.py",
+            "model-audio/Confucius4_TTS/main.py",
         }
 
         for relative_path in upload_sources:
@@ -126,14 +91,6 @@ class FastApiExecutionModelTests(unittest.TestCase):
                     "return await run_in_threadpool(store_uploaded_audio,",
                     source,
                 )
-
-        thinking_source = (REPOSITORY_DIR / "moss_audio_4b_thinking" / "main.py").read_text(
-            encoding="utf-8"
-        )
-        self.assertIn(
-            "result = await run_in_threadpool(execute_understanding_payload, payload)",
-            thinking_source,
-        )
 
 
 if __name__ == "__main__":

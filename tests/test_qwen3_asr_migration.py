@@ -9,12 +9,11 @@ import os
 import sys
 import tempfile
 import unittest
-from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
 REPOSITORY_DIR = Path(__file__).resolve().parents[1]
-SERVICE_DIR = REPOSITORY_DIR / "Qwen3_ASR_1.7B"
+SERVICE_DIR = REPOSITORY_DIR / "model-audio" / "Qwen3_ASR_1.7B"
 TEST_RUNTIME = tempfile.TemporaryDirectory(prefix="qwen3-asr-tests-")
 TEST_ROOT = Path(TEST_RUNTIME.name)
 MODEL_DIR = TEST_ROOT / "Qwen3-ASR-1.7B"
@@ -30,9 +29,7 @@ os.environ.update(
         "CUDA_RELEASE_DELAY": "0",
         "QWEN3_ASR_REQUEST_TIMEOUT": "5",
         "QWEN3_ASR_PORT": "8371",
-        "UNITALE_LOCALAI_ENABLED": "false",
-        "UNITALE_INFERENCE_PROVIDER": "native",
-        "UNITALE_QWEN3_ASR_PROVIDER": "native",
+        "LLM_LOCAL_INFERENCE_PROVIDER": "native",
     }
 )
 MODEL_DIR.mkdir(parents=True, exist_ok=True)
@@ -61,7 +58,7 @@ for filename in (
 )
 
 sys.path.insert(0, str(REPOSITORY_DIR / "inference_gateway/src"))
-sys.path.insert(0, str(REPOSITORY_DIR / "unitale_runtime/src"))
+sys.path.insert(0, str(REPOSITORY_DIR / "llm_local_runtime/src"))
 sys.path.insert(0, str(SERVICE_DIR))
 spec = importlib.util.spec_from_file_location(
     "qwen3_asr_service_main_for_tests",
@@ -85,11 +82,6 @@ class Qwen3AsrMigrationTests(unittest.TestCase):
             source,
         )
         self.assertIn('QWEN3_ASR_PORT="${QWEN3_ASR_PORT:-8371}"', source)
-        self.assertIn('UNITALE_LOCALAI_ENABLED="${UNITALE_LOCALAI_ENABLED:-false}"', source)
-        self.assertIn(
-            'UNITALE_QWEN3_ASR_PROVIDER="${UNITALE_QWEN3_ASR_PROVIDER:-$UNITALE_INFERENCE_PROVIDER}"',
-            source,
-        )
         self.assertIn("inference_gateway/src", source)
         self.assertIn("'/v1/qwen3/asr'", source)
         self.assertIn("qwen3_asr_pid", source)
@@ -103,7 +95,7 @@ class Qwen3AsrMigrationTests(unittest.TestCase):
         self.assertIn('"qwen-asr==0.0.6"', source)
         self.assertIn('name = "qwen-asr"', lock)
         self.assertIn('version = "0.0.6"', lock)
-        self.assertIn('name = "unitale-inference-gateway"', lock)
+        self.assertIn('name = "llm-local-inference-gateway"', lock)
 
     def test_route_and_health_contract(self) -> None:
         """验证服务只注册最终识别路由，并可在不加载模型时报告状态。"""
@@ -199,130 +191,6 @@ class Qwen3AsrMigrationTests(unittest.TestCase):
         self.assertEqual(captured["max_new_tokens"], 512)
         self.assertFalse(Path(str(captured["audio_path"])).exists())
         self.assertEqual(list(Path(main.UPLOAD_STAGING_DIR).iterdir()), [])
-
-    def test_localai_route_skips_native_dependency_checks(self) -> None:
-        """显式 LocalAI 请求不要求导入或安装原生 Torch/Qwen 推理依赖。"""
-        from fastapi.testclient import TestClient
-
-        original_config = main.GATEWAY_CONFIG
-        main.GATEWAY_CONFIG = replace(original_config, provider="localai", localai_enabled=True)
-        try:
-            with (
-                patch.object(main, "module_available", return_value=False),
-                patch.object(
-                    main,
-                    "execute_localai_transcription",
-                    return_value=({"text": "localai result", "language": "English"}, 1.5),
-                ) as execute,
-            ):
-                response = TestClient(main.app).post(
-                    "/v1/qwen3/asr",
-                    files={"audio": ("speech.wav", b"RIFF" + b"\0" * 40, "audio/wav")},
-                )
-        finally:
-            main.GATEWAY_CONFIG = original_config
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["text"], "localai result")
-        self.assertEqual(response.json()["elapsed_seconds"], 1.5)
-        execute.assert_called_once()
-
-    def test_localai_health_uses_selected_provider_without_claiming_native_ready(self) -> None:
-        """LocalAI 健康使用 LocalAI 状态，并单独展示 native 依赖。"""
-        from fastapi.testclient import TestClient
-
-        class FakeLocalAIClient:
-            def __init__(self, config: object) -> None:
-                return
-
-            def health(self) -> bool:
-                return True
-
-            def model_ready(self) -> bool:
-                return True
-
-        original_config = main.GATEWAY_CONFIG
-        main.GATEWAY_CONFIG = replace(original_config, provider="localai", localai_enabled=True)
-        try:
-            with (
-                patch.object(main, "LocalAIClient", FakeLocalAIClient),
-                patch.object(main, "module_available", return_value=False),
-                patch.object(main, "cuda_status", return_value={"available": False}),
-            ):
-                response = TestClient(main.app).get("/v1/health")
-        finally:
-            main.GATEWAY_CONFIG = original_config
-
-        self.assertEqual(response.status_code, 200)
-        body = response.json()
-        self.assertEqual(body["available"]["selected_provider"], "localai")
-        self.assertTrue(body["available"]["selected_provider_ready"])
-        self.assertFalse(body["available"]["torch"])
-        self.assertTrue(body["available"]["localai_model_registered"])
-        self.assertIn("shutdown confirmation", body["runtime"]["model_lifecycle"])
-
-    def test_localai_rejects_unmapped_context_before_inference(self) -> None:
-        """LocalAI 请求携带未映射 context 时明确拒绝且删除上传。"""
-        from fastapi.testclient import TestClient
-
-        original_config = main.GATEWAY_CONFIG
-        main.GATEWAY_CONFIG = replace(original_config, provider="localai", localai_enabled=True)
-        try:
-            with patch.object(main, "execute_localai_transcription") as execute:
-                response = TestClient(main.app).post(
-                    "/v1/qwen3/asr",
-                    files={"audio": ("speech.wav", b"RIFF" + b"\0" * 40, "audio/wav")},
-                    data={"context": "人名：张三"},
-                )
-        finally:
-            main.GATEWAY_CONFIG = original_config
-
-        self.assertEqual(response.status_code, 422)
-        self.assertIn("context", response.json()["detail"])
-        execute.assert_not_called()
-        self.assertEqual(list(Path(main.UPLOAD_STAGING_DIR).iterdir()), [])
-
-    def test_localai_rejects_unmapped_token_budget(self) -> None:
-        """LocalAI 不接受未经映射的非默认 token 预算。"""
-        from fastapi.testclient import TestClient
-
-        original_config = main.GATEWAY_CONFIG
-        main.GATEWAY_CONFIG = replace(original_config, provider="localai", localai_enabled=True)
-        try:
-            with patch.object(main, "execute_localai_transcription") as execute:
-                response = TestClient(main.app).post(
-                    "/v1/qwen3/asr",
-                    files={"audio": ("speech.wav", b"RIFF" + b"\0" * 40, "audio/wav")},
-                    data={"max_new_tokens": "512"},
-                )
-        finally:
-            main.GATEWAY_CONFIG = original_config
-
-        self.assertEqual(response.status_code, 422)
-        self.assertIn("max_new_tokens", response.json()["detail"])
-        execute.assert_not_called()
-
-    def test_localai_requires_detected_language_for_automatic_requests(self) -> None:
-        """自动语种识别没有返回语言时不伪造成功响应。"""
-        from fastapi.testclient import TestClient
-
-        original_config = main.GATEWAY_CONFIG
-        main.GATEWAY_CONFIG = replace(original_config, provider="localai", localai_enabled=True)
-        try:
-            with patch.object(
-                main,
-                "execute_localai_transcription",
-                return_value=({"text": "recognized"}, 0.5),
-            ):
-                response = TestClient(main.app).post(
-                    "/v1/qwen3/asr",
-                    files={"audio": ("speech.wav", b"RIFF" + b"\0" * 40, "audio/wav")},
-                )
-        finally:
-            main.GATEWAY_CONFIG = original_config
-
-        self.assertEqual(response.status_code, 503)
-        self.assertIn("自动识别语种", response.json()["detail"])
 
     def test_worker_uses_uv_interpreter_and_cleans_temporary_files(self) -> None:
         """验证 worker 使用服务解释器，正常退出后清理 JSON 临时文件。"""

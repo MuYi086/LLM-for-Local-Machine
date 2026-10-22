@@ -13,7 +13,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 REPOSITORY_DIR = Path(__file__).resolve().parents[1]
-SERVICE_DIR = REPOSITORY_DIR / "Confucius4_TTS"
+SERVICE_DIR = REPOSITORY_DIR / "model-audio" / "Confucius4_TTS"
 TEST_RUNTIME = tempfile.TemporaryDirectory(prefix="confucius4-tts-tests-")
 TEST_ROOT = Path(TEST_RUNTIME.name)
 MODEL_DIR = TEST_ROOT / "model"
@@ -39,8 +39,7 @@ os.environ.update(
         "CUDA_RELEASE_DELAY": "0",
         "CONFUCIUS4_TTS_REQUEST_TIMEOUT": "5",
         "CONFUCIUS4_TTS_PORT": "8361",
-        "UNITALE_CONFUCIUS4_TTS_PROVIDER": "native",
-        "UNITALE_LOCALAI_ENABLED": "false",
+        "LLM_LOCALAI_ENABLED": "false",
     }
 )
 MODEL_DIR.mkdir(parents=True, exist_ok=True)
@@ -125,11 +124,11 @@ class Confucius4TtsMigrationTests(unittest.TestCase):
         )
         self.assertIn("'/v1/confucius4TTS/generate'", source)
         self.assertIn("confucius4_tts_pid", source)
-        self.assertIn("UNITALE_CONFUCIUS4_TTS_PROVIDER", source)
-        self.assertIn("UNITALE_CONFUCIUS4_TTS_MODEL", source)
+        self.assertNotIn("LLM_LOCAL_CONFUCIUS4_TTS_PROVIDER", source)
+        self.assertNotIn("LLM_LOCAL_CONFUCIUS4_TTS_MODEL", source)
         preflight = (REPOSITORY_DIR / "scripts/localai/preflight.py").read_text(encoding="utf-8")
-        self.assertIn('"UNITALE_CONFUCIUS4_TTS_PROVIDER"', preflight)
-        self.assertIn("verify_confucius4_tts_candidate", preflight)
+        self.assertNotIn("CONFUCIUS4_TTS_PROVIDER", preflight)
+        self.assertNotIn("verify_confucius4_tts_candidate", preflight)
 
     def test_project_declares_torchcodec_for_current_torchaudio(self) -> None:
         source = (SERVICE_DIR / "pyproject.toml").read_text(encoding="utf-8")
@@ -217,90 +216,6 @@ class Confucius4TtsMigrationTests(unittest.TestCase):
         self.assertEqual(payload["code_path"], str(CODE_DIR))
         self.assertEqual(payload["reference_audio_path"], str(stored_path))
         self.assertTrue(payload["local_files_only"])
-
-    def test_localai_mapping_preserves_fields_and_omits_reference_sidecar(self) -> None:
-        from inference_gateway import UnsupportedCapabilityError
-
-        reference_path = TEST_ROOT / "localai-reference.wav"
-        reference_path.write_bytes(b"RIFF" + b"\0" * 40)
-        request = main.Confucius4TtsRequest(text="你好。", audio_path="localai-reference.wav")
-        with (
-            patch.object(main, "prompt_audio_path", return_value=str(reference_path)),
-            patch.object(main, "load_prompt_text_sidecar", return_value="不应发送") as sidecar,
-        ):
-            payload = main.manager.build_worker_payload(request, provider="localai")
-            mapped = main.build_localai_request(request, payload)
-
-        sidecar.assert_not_called()
-        self.assertEqual(mapped["text"], "你好。")
-        self.assertEqual(mapped["language"], "zh")
-        self.assertEqual(mapped["voice_path"], reference_path)
-        self.assertEqual(mapped["max_tokens"], 1520)
-        self.assertEqual(mapped["num_inference_steps"], 25)
-        self.assertEqual(mapped["guidance_scale"], 0.7)
-        self.assertEqual(mapped["text_chunk_size"], 80)
-        self.assertNotIn("reference_text", mapped)
-
-        for override in (
-            {"raw": True},
-            {"verbose": True},
-            {"vocalization_duration_seconds": 0.5},
-            {"lang": "xx"},
-        ):
-            with self.subTest(override=override):
-                unsupported = main.Confucius4TtsRequest(
-                    text="你好。", audio_path="localai-reference.wav", **override
-                )
-                with patch.object(main, "prompt_audio_path", return_value=str(reference_path)):
-                    worker_payload = main.manager.build_worker_payload(
-                        unsupported, provider="localai"
-                    )
-                with self.assertRaises(UnsupportedCapabilityError):
-                    main.build_localai_request(unsupported, worker_payload)
-
-    def test_localai_route_uses_shared_operation_and_skips_native_worker(self) -> None:
-        from unittest.mock import Mock
-
-        from fastapi.testclient import TestClient
-
-        reference = main.reference_store.clone_path("localai-route-reference.wav")
-        reference.write_bytes(b"RIFF" + b"\0" * 40)
-        localai_config = main.load_gateway_config(
-            service_provider_env="UNITALE_CONFUCIUS4_TTS_PROVIDER",
-            default_model="unitale.confucius4-tts.orig",
-            request_timeout=5,
-            environ={
-                "UNITALE_LOCALAI_ENABLED": "true",
-                "UNITALE_CONFUCIUS4_TTS_PROVIDER": "localai",
-                "UNITALE_LOCALAI_BASE_URL": "http://127.0.0.1:8400",
-                "GPU_LOCK_FILE": str(TEST_ROOT / "cache" / "localai.lock"),
-                "CUDA_RELEASE_DELAY": "0",
-            },
-        )
-        response_wav = b"RIFF\x04\x00\x00\x00WAVE"
-
-        def fake_execute(*, config, operation):
-            client = Mock()
-            client.synthesize_confucius4_speech.return_value = (response_wav, 0.01)
-            result = operation(client)
-            self.assertEqual(config.model, "unitale.confucius4-tts.orig")
-            return result
-
-        with (
-            patch.object(main, "GATEWAY_CONFIG", localai_config),
-            patch.object(main, "execute_localai_operation", side_effect=fake_execute),
-            patch.object(main.manager, "run_worker") as native_worker,
-        ):
-            response = TestClient(main.app).post(
-                "/v1/confucius4TTS/generate",
-                json={"text": "你好。", "audio_path": "localai-route-reference.wav"},
-            )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.content, response_wav)
-        self.assertEqual(response.headers["content-type"], "audio/wav")
-        native_worker.assert_not_called()
-        self.assertTrue(list((TEST_ROOT / "storage" / "clone").glob("confucius4_tts_*.wav")))
 
     def test_worker_uses_uv_interpreter_and_cleans_temporary_files(self) -> None:
         captured: dict[str, object] = {}

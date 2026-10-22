@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "workers": {
-    "unitale.sheetsage2.worker.v1": {
-      "project": "SheetSage2",
+    "llm-local.sheetsage2.worker.v1": {
+      "project": "model-audio/SheetSage2",
       "script": "worker.py",
       "output_kind": "file",
       "output_argument": "--output-zip",
@@ -16,8 +16,8 @@
         "XDG_CACHE_HOME": "${RUNTIME_CACHE_DIR}/xdg"
       }
     },
-    "unitale.mert-v2-fullsong.worker.v1": {
-      "project": "MERT-v2-FullSong",
+    "llm-local.mert-v2-fullsong.worker.v1": {
+      "project": "model-audio/MERT-v2-FullSong",
       "script": "worker.py",
       "output_kind": "file",
       "output_argument": "--output-file",
@@ -32,8 +32,8 @@
         "HF_MODULES_CACHE": "${RUNTIME_CACHE_DIR}/mert_v2_hf_modules"
       }
     },
-    "unitale.yue2-vae.worker.v1": {
-      "project": "YuE2-Vae",
+    "llm-local.yue2-vae.worker.v1": {
+      "project": "model-audio/YuE2-Vae",
       "script": "worker.py",
       "output_kind": "file",
       "output_argument": "--output-file",
@@ -48,34 +48,8 @@
         "HF_MODULES_CACHE": "${RUNTIME_CACHE_DIR}/hf_modules"
       }
     },
-    "unitale.soulx-flashhead.worker.v1": {
-      "project": "SoulX-FlashHead-1_3B",
-      "script": "worker.py",
-      "output_kind": "file",
-      "output_argument": "--output-video",
-      "output_suffix": ".mp4",
-      "timeout_seconds": 900,
-      "environment": {
-        "CUDA_VISIBLE_DEVICES": "${SOULX_FLASHHEAD_CUDA_VISIBLE_DEVICES}",
-        "HF_HOME": "${HF_MIRROR_DIR}",
-        "TORCHINDUCTOR_CACHE_DIR": "${RUNTIME_CACHE_DIR}/flashhead_inductor"
-      }
-    },
-    "unitale.ditto.worker.v1": {
-      "project": "ditto",
-      "script": "worker.py",
-      "output_kind": "file",
-      "output_argument": "--output-video",
-      "output_suffix": ".mp4",
-      "timeout_seconds": 900,
-      "environment": {
-        "CUDA_VISIBLE_DEVICES": "${DITTO_CUDA_VISIBLE_DEVICES}",
-        "HF_HOME": "${HF_MIRROR_DIR}",
-        "NUMBA_CACHE_DIR": "${RUNTIME_CACHE_DIR}/ditto_numba"
-      }
-    },
-    "unitale.yue2-3b.worker.v1": {
-      "project": "YuE2-3B",
+    "llm-local.yue2-3b.worker.v1": {
+      "project": "model-audio/YuE2-3B",
       "script": "worker.py",
       "output_kind": "file",
       "output_argument": "--output-wav",
@@ -87,57 +61,8 @@
         "TORCHINDUCTOR_CACHE_DIR": "${RUNTIME_CACHE_DIR}/torchinductor"
       }
     },
-    "unitale.moss-soundeffect-v2.worker.v1": {
-      "project": "moss_soundEffect",
-      "script": "worker.py",
-      "output_kind": "file",
-      "output_argument": "--output-wav",
-      "output_suffix": ".wav",
-      "timeout_seconds": 600,
-      "environment": {
-        "HF_HOME": "${HF_MIRROR_DIR}",
-        "HF_MODULES_CACHE": "${RUNTIME_CACHE_DIR}/moss_soundeffect_hf_modules"
-      }
-    },
-    "unitale.step-audio-editx.worker.v1": {
-      "project": "Step_Audio_EditX",
-      "script": "worker.py",
-      "output_kind": "file",
-      "output_argument": "--output-wav",
-      "output_suffix": ".wav",
-      "timeout_seconds": 900,
-      "environment": {
-        "HF_HOME": "${HF_MIRROR_DIR}",
-        "HF_MODULES_CACHE": "${RUNTIME_CACHE_DIR}/step_audio_editx_hf_modules",
-        "VLLM_ATTENTION_BACKEND": "TRITON_ATTN"
-      }
-    },
-    "unitale.moss-audio-4b.thinking.worker.v1": {
-      "project": "moss_audio_4b_thinking",
-      "script": "worker.py",
-      "output_kind": "json",
-      "output_argument": "--output-json",
-      "timeout_seconds": 900,
-      "environment": {
-        "MOSS_AUDIO_4B_VARIANT": "thinking",
-        "HF_HOME": "${HF_MIRROR_DIR}",
-        "HF_MODULES_CACHE": "${RUNTIME_CACHE_DIR}/moss_audio_hf_modules"
-      }
-    },
-    "unitale.moss-audio-4b.instruct.worker.v1": {
-      "project": "moss_audio_4b_thinking",
-      "script": "worker.py",
-      "output_kind": "json",
-      "output_argument": "--output-json",
-      "timeout_seconds": 900,
-      "environment": {
-        "MOSS_AUDIO_4B_VARIANT": "instruct",
-        "HF_HOME": "${HF_MIRROR_DIR}",
-        "HF_MODULES_CACHE": "${RUNTIME_CACHE_DIR}/moss_audio_hf_modules"
-      }
-    },
-    "unitale.tiger-dnr.worker.v1": {
-      "project": "TIGER-DnR",
+    "llm-local.tiger-dnr.worker.v1": {
+      "project": "model-audio/TIGER-DnR",
       "script": "worker.py",
       "output_kind": "file_ref",
       "output_argument": "--output-zip",

@@ -4,13 +4,13 @@
 - 日期：2026-10-21
 - 服务：`qwen3_tts` / 8321，`POST /v1/qwen/clone`
 - 默认 provider：`native`
-- LocalAI 候选：`unitale.qwen3-tts.1p7b-base`，audio.cpp `family:qwen3_tts`、`task:tts`
+- LocalAI 候选：`llm-local.qwen3-tts.1p7b-base`，audio.cpp `family:qwen3_tts`、`task:tts`
 - 模型制品：官方 `Qwen/Qwen3-TTS-12Hz-1.7B-Base` safetensors；权重由用户手动准备，snapshot revision 与文件 hash 尚待登记
-- 证据：无模型 mock 覆盖；无 LocalAI backend 或模型运行证据，不是 E2/E3
+- 证据：无模型 mock 覆盖；固定 LocalAI/backend 已安装但尚无模型运行证据，不是 E2/E3
 
 ## 字段映射
 
-| Unitale 字段 | LocalAI/audio.cpp 处理 | 状态与限制 |
+| LLM Local Backend 字段 | LocalAI/audio.cpp 处理 | 状态与限制 |
 | --- | --- | --- |
 | `text` | `/v1/audio/speech` 的 `input` | 保留原请求校验；长文本若按现行切段策略会产生多个片段则返回 422 |
 | `audio_path` | 现有逻辑标识解析成 `voice` 本地音频路径 | 只使用已校验的引用，不接受任意服务器路径；真实 gRPC 文件传递待验证 |
@@ -27,7 +27,7 @@
 
 ## 生命周期与候选注册
 
-provider 通过 `UNITALE_QWEN3_TTS_PROVIDER=localai` 单独启用；native 仍是默认。LocalAI 请求沿用共享 GPU 文件锁，完成后调用 `/backend/shutdown`；停止未确认时写入隔离标记，阻止后续 GPU 推理。候选注册命令只检查手动准备的文件并生成匹配 YAML，不下载权重：
+provider 通过 `LLM_LOCAL_QWEN3_TTS_PROVIDER=localai` 单独启用；native 仍是默认。LocalAI 请求沿用共享 GPU 文件锁，完成后调用 `/backend/shutdown`；停止未确认时写入隔离标记，阻止后续 GPU 推理。候选注册命令只检查手动准备的文件并生成匹配 YAML，不下载权重：
 
 ```bash
 python3 scripts/localai/manager.py register-qwen3-tts-candidate
@@ -37,15 +37,14 @@ python3 scripts/localai/manager.py register-qwen3-tts-candidate
 
 ## 无模型验证
 
-2026-10-21 仓库完整质量门禁通过：shell 语法、renderer 核心检查、28 个 uv 锁、Ruff/格式、能力清单，以及根目录 345 项、ACE-Step 9 项和 Stable Audio 7 项无模型回归。VoiceDesign 的 gateway/manager/provider 路由均由 mock 覆盖；这不证明固定 audio.cpp RPC、模型载入、WAV 质量、shutdown 后显存释放或并发真实表现。
+历史验证记录：本轮服务退役前的质量门禁通过；当时的项目与测试计数已过期。当前收尾质量门禁结果见 [升级记录](../../docs/localai-audiocpp-upgrade.md)。VoiceDesign 的 gateway/manager/provider 路由均由 mock 覆盖；这不证明固定 audio.cpp RPC、模型载入、WAV 质量、shutdown 后显存释放或并发真实表现。
 
 ## 待完成验收
 
-1. 准备并记录 Base snapshot revision、完整文件 hash 和许可 sidecar。
-2. 构建/安装 LocalAI gRPC backend 并通过固定 LocalAI 二进制与 backend 指纹检查。
-3. 在 GPU 上验证 YAML 加载、参考 WAV/文本映射、语言、token/采样值、输出格式和音频质量。
-4. 核验 `/backend/shutdown` 后 backend 子进程退出与显存回落，并执行失败断连和隔离恢复演练。
-5. 对照 native 建立中英多长度样本与 CER/WER/盲听及延迟、峰值显存基线；满足第 9 节发布门禁后才考虑改变默认值。
+1. 用户准备并登记 Base 模型文件，记录 snapshot revision、完整文件 hash 和许可 sidecar。
+2. 在 GPU 上验证 YAML 加载、参考 WAV/文本映射、语言、token/采样值、输出格式和音频质量。
+3. 核验 `/backend/shutdown` 后 backend 子进程退出与显存回落，并执行失败断连和隔离恢复演练。
+4. 对照 native 建立中英多长度样本与 CER/WER/盲听及延迟、峰值显存基线；满足第 9 节发布门禁后才考虑改变默认值。
 
 ---
 
@@ -54,13 +53,13 @@ python3 scripts/localai/manager.py register-qwen3-tts-candidate
 - 状态：`implemented_unverified`
 - 服务：`qwen3_voiceDesign` / 8301，`POST /v1/qwen/timbre`
 - 默认 provider：`native`
-- LocalAI 候选：`unitale.qwen3-tts.1p7b-voicedesign`，audio.cpp `family:qwen3_tts`、`task:vdes`
+- LocalAI 候选：`llm-local.qwen3-tts.1p7b-voicedesign`，audio.cpp `family:qwen3_tts`、`task:vdes`
 - 模型制品：官方 `Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign` safetensors；权重由用户手动准备，snapshot revision 与文件 hash 尚待登记
-- 证据：mock 覆盖接口字段和切段存储；无 LocalAI backend 或模型运行证据，不是 E2/E3
+- 证据：mock 覆盖接口字段和切段存储；固定 LocalAI/backend 已安装但尚无模型运行证据，不是 E2/E3
 
 ### 字段映射和限制
 
-| Unitale 字段 | LocalAI/audio.cpp 处理 | 状态与限制 |
+| LLM Local Backend 字段 | LocalAI/audio.cpp 处理 | 状态与限制 |
 | --- | --- | --- |
 | `voice_description` | `/v1/audio/speech` 的 `instructions` | 固定 `task:vdes`，不附加 Base 克隆参考音频 |
 | `text`、`language` | `input`、`language` | 保留现有文本和语言值 |

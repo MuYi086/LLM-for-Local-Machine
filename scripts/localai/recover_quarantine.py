@@ -13,22 +13,22 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "inference_gateway/src"))
-sys.path.insert(0, str(ROOT / "unitale_runtime/src"))
+sys.path.insert(0, str(ROOT / "llm_local_runtime/src"))
 
 from inference_gateway import LocalAIClient, load_gateway_config  # noqa: E402
 from scripts.localai.manager import LocalAIManager, LocalAIManagerError  # noqa: E402
-from unitale_runtime import gpu_quarantine_path  # noqa: E402
+from llm_local_runtime import gpu_quarantine_path  # noqa: E402
 
 
 def main() -> int:
     """持有 GPU 锁，停止隔离记录中的模型并原子清除标记。"""
     config = load_gateway_config(
-        service_provider_env="UNITALE_QWEN3_ASR_PROVIDER",
-        default_model="unitale.qwen3-asr.1p7b",
-        request_timeout=float(os.getenv("QWEN3_ASR_REQUEST_TIMEOUT", "900")),
+        service_provider_env="LLM_LOCAL_QWEN3_TTS_PROVIDER",
+        default_model="llm-local.qwen3-tts.1p7b-base",
+        request_timeout=float(os.getenv("QWEN3_TTS_REQUEST_TIMEOUT", "600")),
     )
     if not config.localai_enabled:
-        print("恢复前需设置 UNITALE_LOCALAI_ENABLED=true。", file=sys.stderr)
+        print("恢复前需设置 LLM_LOCALAI_ENABLED=true。", file=sys.stderr)
         return 2
     lock_path = Path(config.gpu_lock_file)
     marker_path = gpu_quarantine_path(lock_path)
@@ -56,7 +56,7 @@ def main() -> int:
             try:
                 client.shutdown_model()
             except Exception as exc:
-                managed = os.getenv("UNITALE_LOCALAI_MANAGED", "false").strip().lower() in {
+                managed = os.getenv("LLM_LOCALAI_MANAGED", "false").strip().lower() in {
                     "1",
                     "true",
                     "yes",

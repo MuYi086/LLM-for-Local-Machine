@@ -23,9 +23,7 @@ from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST_PATH = ROOT / "localai/manifests/versions.json"
-QWEN3_ASR_MODEL_NAME = "unitale.qwen3-asr.1p7b"
-QWEN3_ASR_CONFIG_PATH = ROOT / "localai/manifests/qwen3-asr-candidate.yaml"
-QWEN3_TTS_MODEL_NAME = "unitale.qwen3-tts.1p7b-base"
+QWEN3_TTS_MODEL_NAME = "llm-local.qwen3-tts.1p7b-base"
 QWEN3_TTS_CONFIG_PATH = ROOT / "localai/manifests/qwen3-tts-base-candidate.yaml"
 QWEN3_TTS_MODEL_FILES = (
     "config.json",
@@ -37,59 +35,22 @@ QWEN3_TTS_MODEL_FILES = (
     "vocab.json",
     "merges.txt",
 )
-QWEN3_VOICEDESIGN_MODEL_NAME = "unitale.qwen3-tts.1p7b-voicedesign"
+QWEN3_VOICEDESIGN_MODEL_NAME = "llm-local.qwen3-tts.1p7b-voicedesign"
 QWEN3_VOICEDESIGN_CONFIG_PATH = ROOT / "localai/manifests/qwen3-tts-voicedesign-candidate.yaml"
-DOTS_TTS_SOAR_MODEL_NAME = "unitale.dots-tts-soar.q8-0"
-DOTS_TTS_SOAR_CONFIG_PATH = ROOT / "localai/manifests/dots-tts-soar-candidate.yaml"
-VOXCPM2_MODEL_NAME = "unitale.voxcpm2.q8-0"
-VOXCPM2_CONFIG_PATH = ROOT / "localai/manifests/voxcpm2-candidate.yaml"
-CONFUCIUS4_TTS_MODEL_NAME = "unitale.confucius4-tts.orig"
-CONFUCIUS4_TTS_CONFIG_PATH = ROOT / "localai/manifests/confucius4-tts-candidate.yaml"
-MOSS_VOICEGENERATOR_MODEL_NAME = "unitale.moss-voicegenerator.bf16"
-MOSS_VOICEGENERATOR_CONFIG_PATH = ROOT / "localai/manifests/moss-voicegenerator-candidate.yaml"
-FIREREDTTS3_BASE_MODEL_NAME = "unitale.fireredtts3.base.q8-0"
-FIREREDTTS3_BASE_CONFIG_PATH = ROOT / "localai/manifests/fireredtts3-base-candidate.yaml"
-FIREREDTTS3_INSTRUCT_MODEL_NAME = "unitale.fireredtts3.instruct.q8-0"
-FIREREDTTS3_INSTRUCT_CONFIG_PATH = ROOT / "localai/manifests/fireredtts3-instruct-candidate.yaml"
-ACE_STEP_MODEL_NAME = "unitale.ace-step15.xl-turbo.q8dit"
-ACE_STEP_CONFIG_PATH = ROOT / "localai/manifests/ace-step-xl-turbo-candidate.yaml"
-STABLE_AUDIO_MODEL_NAME = "unitale.stable-audio3-medium.q8-0"
-STABLE_AUDIO_CONFIG_PATH = ROOT / "localai/manifests/stable-audio3-medium-candidate.yaml"
-SEED_VC_VC_MODEL_NAME = "unitale.seed-vc.vc.f16"
-SEED_VC_VC_CONFIG_PATH = ROOT / "localai/manifests/seed-vc-vc-candidate.yaml"
-SEED_VC_SVC_MODEL_NAME = "unitale.seed-vc.svc.f16"
-SEED_VC_SVC_CONFIG_PATH = ROOT / "localai/manifests/seed-vc-svc-candidate.yaml"
-SEED_VC_ARTIFACT_STAMP = "unitale.seed-vc.artifact.json"
 WORKER_BRIDGE_CANDIDATES = {
-    "unitale.sheetsage2.worker.v1": ROOT / "localai/manifests/sheetsage2-worker-candidate.yaml",
-    "unitale.mert-v2-fullsong.worker.v1": ROOT
+    "llm-local.sheetsage2.worker.v1": ROOT / "localai/manifests/sheetsage2-worker-candidate.yaml",
+    "llm-local.mert-v2-fullsong.worker.v1": ROOT
     / "localai/manifests/mert-v2-fullsong-worker-candidate.yaml",
-    "unitale.yue2-vae.worker.v1": ROOT / "localai/manifests/yue2-vae-worker-candidate.yaml",
-    "unitale.soulx-flashhead.worker.v1": ROOT
-    / "localai/manifests/soulx-flashhead-worker-candidate.yaml",
-    "unitale.ditto.worker.v1": ROOT / "localai/manifests/ditto-worker-candidate.yaml",
-    "unitale.yue2-3b.worker.v1": ROOT / "localai/manifests/yue2-3b-worker-candidate.yaml",
-    "unitale.moss-soundeffect-v2.worker.v1": ROOT
-    / "localai/manifests/moss-soundeffect-v2-worker-candidate.yaml",
-    "unitale.step-audio-editx.worker.v1": ROOT
-    / "localai/manifests/step-audio-editx-worker-candidate.yaml",
-    "unitale.moss-audio-4b.thinking.worker.v1": ROOT
-    / "localai/manifests/moss-audio-4b-thinking-worker-candidate.yaml",
-    "unitale.moss-audio-4b.instruct.worker.v1": ROOT
-    / "localai/manifests/moss-audio-4b-instruct-worker-candidate.yaml",
-    "unitale.tiger-dnr.worker.v1": ROOT / "localai/manifests/tiger-dnr-worker-candidate.yaml",
+    "llm-local.yue2-vae.worker.v1": ROOT / "localai/manifests/yue2-vae-worker-candidate.yaml",
+    "llm-local.yue2-3b.worker.v1": ROOT / "localai/manifests/yue2-3b-worker-candidate.yaml",
+    "llm-local.tiger-dnr.worker.v1": ROOT / "localai/manifests/tiger-dnr-worker-candidate.yaml",
 }
 WORKER_BRIDGE_MANIFEST_PATH = ROOT / "localai/manifests/worker-bridge.json"
 WORKER_BRIDGE_PROJECTS = (
     "SheetSage2",
     "MERT-v2-FullSong",
     "YuE2-Vae",
-    "SoulX-FlashHead-1_3B",
-    "ditto",
     "YuE2-3B",
-    "moss_soundEffect",
-    "Step_Audio_EditX",
-    "moss_audio_4b_thinking",
     "TIGER-DnR",
 )
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -118,23 +79,23 @@ class LocalAIManager:
         self.manifest = self._load_manifest()
         self.data_dir = Path(
             self.environ.get(
-                "UNITALE_LOCALAI_DATA_DIR",
+                "LLM_LOCALAI_DATA_DIR",
                 str(Path(self.environ.get("STORAGE_DIR", ROOT / "storage")) / ".cache/localai"),
             )
         ).expanduser()
         self.models_dir = Path(
-            self.environ.get("UNITALE_LOCALAI_MODELS_DIR", str(self.data_dir / "models"))
+            self.environ.get("LLM_LOCALAI_MODELS_DIR", str(self.data_dir / "models"))
         ).expanduser()
         self.backends_dir = Path(
-            self.environ.get("UNITALE_LOCALAI_BACKENDS_DIR", str(self.data_dir / "backends"))
+            self.environ.get("LLM_LOCALAI_BACKENDS_DIR", str(self.data_dir / "backends"))
         ).expanduser()
         self.binary_path = Path(
-            self.environ.get("UNITALE_LOCALAI_BINARY", str(self.data_dir / "bin/local-ai"))
+            self.environ.get("LLM_LOCALAI_BINARY", str(self.data_dir / "bin/local-ai"))
         ).expanduser()
         self.logs_dir = self.data_dir / "logs"
         self.state_dir = self.data_dir / "run"
         self.state_path = self.state_dir / "localai.json"
-        self.install_stamp_path = self.data_dir / ".unitale-install.json"
+        self.install_stamp_path = self.data_dir / ".llm-local-backend-install.json"
 
     @staticmethod
     def _load_manifest() -> dict[str, object]:
@@ -244,94 +205,6 @@ class LocalAIManager:
                 raise LocalAIManagerError(f"LocalAI worker bridge 路径越界：{model_name}")
             if not project.is_dir() or not script.is_file():
                 raise LocalAIManagerError(f"LocalAI worker bridge worker 不存在：{model_name}")
-
-    def register_qwen3_asr_candidate(self) -> None:
-        """校验本地候选 GGUF 后，将固定 YAML 原子复制到 LocalAI models 目录。"""
-        self._verify_qwen3_asr_artifact()
-        self._ensure_directories()
-        try:
-            candidate_yaml = QWEN3_ASR_CONFIG_PATH.read_bytes()
-        except OSError as exc:
-            raise LocalAIManagerError("Qwen3-ASR 候选 YAML 模板不可读。") from exc
-        destination = self.models_dir / f"{QWEN3_ASR_MODEL_NAME}.yaml"
-        if destination.exists():
-            try:
-                current_yaml = destination.read_bytes()
-            except OSError as exc:
-                raise LocalAIManagerError("现有 Qwen3-ASR YAML 不可读。") from exc
-            if current_yaml != candidate_yaml:
-                raise LocalAIManagerError(f"现有模型配置与候选模板不同，拒绝覆盖：{destination}")
-            print(f"Qwen3-ASR 候选配置已存在：{destination}")
-            return
-
-        temporary_path = self._write_temporary_file(self.models_dir, ".qwen3-asr-", ".yaml")
-        try:
-            temporary_path.write_bytes(candidate_yaml)
-            self._fsync_file(temporary_path)
-            os.replace(temporary_path, destination)
-            self._fsync_directory(self.models_dir)
-        finally:
-            temporary_path.unlink(missing_ok=True)
-        print(f"已注册 E0 候选配置（不是生产验收）：{destination}")
-
-    def verify_qwen3_asr_candidate(self) -> None:
-        """校验候选模型文件大小、SHA-256 和已注册 YAML。"""
-        self._verify_qwen3_asr_artifact()
-        destination = self.models_dir / f"{QWEN3_ASR_MODEL_NAME}.yaml"
-        try:
-            installed_yaml = destination.read_bytes()
-            candidate_yaml = QWEN3_ASR_CONFIG_PATH.read_bytes()
-        except OSError as exc:
-            raise LocalAIManagerError(
-                "Qwen3-ASR 固定 YAML 尚未注册；运行 manager.py register-qwen3-asr-candidate。"
-            ) from exc
-        if installed_yaml != candidate_yaml:
-            raise LocalAIManagerError("LocalAI models 目录中的 Qwen3-ASR YAML 与固定模板不一致。")
-
-    def _verify_qwen3_asr_artifact(self) -> None:
-        """按 P0 记录的相对路径、文件长度和 hash 校验 Qwen3-ASR GGUF。"""
-        artifacts = self.manifest.get("model_artifacts")
-        packages = (
-            artifacts.get("selected_localai_packages") if isinstance(artifacts, dict) else None
-        )
-        if not isinstance(packages, list):
-            raise LocalAIManagerError("版本清单缺少 Qwen3-ASR 制品记录。")
-        records = [
-            record
-            for record in packages
-            if isinstance(record, dict) and record.get("capability") == "Qwen3-ASR-1.7B / 8371"
-        ]
-        if len(records) != 1:
-            raise LocalAIManagerError("版本清单必须且只能包含一个 Qwen3-ASR 候选制品。")
-        record = records[0]
-        relative_path = record.get("model_file")
-        expected_size = record.get("model_file_size_bytes")
-        expected_hash = record.get("model_file_sha256")
-        if (
-            not isinstance(relative_path, str)
-            or not relative_path
-            or Path(relative_path).is_absolute()
-            or "\\" in relative_path
-            or ".." in Path(relative_path).parts
-        ):
-            raise LocalAIManagerError("Qwen3-ASR 制品路径必须是 models 目录下的相对路径。")
-        if not isinstance(expected_size, int) or expected_size <= 0:
-            raise LocalAIManagerError("Qwen3-ASR 制品缺少有效文件大小。")
-        if not isinstance(expected_hash, str) or not _SHA256_RE.fullmatch(expected_hash):
-            raise LocalAIManagerError("Qwen3-ASR 制品缺少有效 SHA-256。")
-        artifact_path = (self.models_dir / relative_path).resolve()
-        if not artifact_path.is_relative_to(self.models_dir.resolve()):
-            raise LocalAIManagerError("Qwen3-ASR 制品路径越出了 LocalAI models 目录。")
-        try:
-            actual_size = artifact_path.stat().st_size
-        except OSError as exc:
-            raise LocalAIManagerError(f"Qwen3-ASR 候选权重不存在：{artifact_path}") from exc
-        if actual_size != expected_size:
-            raise LocalAIManagerError(
-                f"Qwen3-ASR 候选权重大小不匹配：期望 {expected_size}，实际 {actual_size}。"
-            )
-        if self._sha256_file(artifact_path) != expected_hash:
-            raise LocalAIManagerError("Qwen3-ASR 候选权重 SHA-256 与版本清单不匹配。")
 
     def register_qwen3_tts_candidate(self) -> None:
         """校验用户准备的 Base safetensors 快照并注册本地模型 YAML。"""
@@ -456,918 +329,6 @@ class LocalAIManager:
             )
         return model_dir
 
-    def register_dots_tts_soar_candidate(self) -> None:
-        """为手动准备的固定 DotTTS SOAR GGUF 注册 YAML 和本地 hash 记录。"""
-        artifact_path = self._dots_tts_soar_artifact_path()
-        record = self._dots_tts_candidate_record()
-        self._ensure_directories()
-        template = DOTS_TTS_SOAR_CONFIG_PATH.read_text(encoding="utf-8")
-        relative_path = str(record["model_file"])
-        if template.count(f"  model: {relative_path}\n") != 1:
-            raise LocalAIManagerError("DotTTS SOAR YAML 路径与版本清单不一致。")
-        destination = self.models_dir / f"{DOTS_TTS_SOAR_MODEL_NAME}.yaml"
-        self._register_model_config(DOTS_TTS_SOAR_MODEL_NAME, template)
-        stamp = {
-            "schema_version": 1,
-            "model": DOTS_TTS_SOAR_MODEL_NAME,
-            "relative_path": relative_path,
-            "size_bytes": artifact_path.stat().st_size,
-            "sha256": self._sha256_file(artifact_path),
-            "source_revision": record["repository_revision"],
-        }
-        self._write_json_atomically(
-            self.models_dir / f"{DOTS_TTS_SOAR_MODEL_NAME}.artifact.json",
-            stamp,
-            prefix=".dots-tts-soar-artifact-",
-        )
-        print(
-            "已注册 E0 DotTTS SOAR Q8 候选；本地 hash 仅用于检测后续文件变化，不等于上游制品验收："
-            f"{destination}"
-        )
-
-    def verify_dots_tts_soar_candidate(self) -> None:
-        """校验 DotTTS SOAR 候选路径、配置与注册时记录的本地 hash。"""
-        artifact_path = self._dots_tts_soar_artifact_path()
-        record = self._dots_tts_candidate_record()
-        config_path = self.models_dir / f"{DOTS_TTS_SOAR_MODEL_NAME}.yaml"
-        stamp_path = self.models_dir / f"{DOTS_TTS_SOAR_MODEL_NAME}.artifact.json"
-        try:
-            expected_config = DOTS_TTS_SOAR_CONFIG_PATH.read_bytes()
-            installed_config = config_path.read_bytes()
-            stamp = json.loads(stamp_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
-            raise LocalAIManagerError(
-                "DotTTS SOAR 权重或固定 YAML 尚未注册；手动准备模型后运行 "
-                "manager.py register-dots-tts-soar-candidate。"
-            ) from exc
-        if expected_config.decode("utf-8").count(f"  model: {record.get('model_file')}\n") != 1:
-            raise LocalAIManagerError("DotTTS SOAR YAML 路径与版本清单不一致。")
-        if installed_config != expected_config:
-            raise LocalAIManagerError("LocalAI DotTTS SOAR YAML 与固定模板不一致。")
-        if (
-            not isinstance(stamp, dict)
-            or stamp.get("schema_version") != 1
-            or stamp.get("model") != DOTS_TTS_SOAR_MODEL_NAME
-            or stamp.get("relative_path") != record.get("model_file")
-            or stamp.get("source_revision") != record.get("repository_revision")
-        ):
-            raise LocalAIManagerError("DotTTS SOAR 本地制品记录缺失或与固定 revision 不符。")
-        if stamp.get("size_bytes") != artifact_path.stat().st_size or stamp.get(
-            "sha256"
-        ) != self._sha256_file(artifact_path):
-            raise LocalAIManagerError("DotTTS SOAR GGUF 与注册时记录的本地 size/hash 不一致。")
-
-    def _dots_tts_soar_artifact_path(self) -> Path:
-        """解析 models 下固定相对路径并要求权重文件已由用户提供。"""
-        record = self._dots_tts_candidate_record()
-        relative_value = record.get("model_file")
-        if not isinstance(relative_value, str) or not relative_value:
-            raise LocalAIManagerError("DotTTS SOAR 版本清单缺少 GGUF 相对路径。")
-        relative_path = Path(relative_value)
-        if (
-            relative_path.is_absolute()
-            or ".." in relative_path.parts
-            or "\\" in relative_value
-            or not re.fullmatch(r"[A-Za-z0-9._/-]+", relative_value)
-        ):
-            raise LocalAIManagerError("DotTTS SOAR 模型路径必须位于 LocalAI models 目录内。")
-        artifact_path = (self.models_dir / relative_path).resolve()
-        if not artifact_path.is_relative_to(self.models_dir.resolve()):
-            raise LocalAIManagerError("DotTTS SOAR 模型路径越出了 LocalAI models 目录。")
-        try:
-            size = artifact_path.stat().st_size
-        except OSError as exc:
-            raise LocalAIManagerError(
-                "DotTTS SOAR GGUF 尚未准备；请手动放入 LocalAI models 目录的 "
-                f"{relative_value}。本命令不会下载模型。"
-            ) from exc
-        if not artifact_path.is_file() or size <= 0:
-            raise LocalAIManagerError("DotTTS SOAR GGUF 必须是非空常规文件。")
-        return artifact_path
-
-    def _dots_tts_candidate_record(self) -> dict[str, object]:
-        """读取唯一 DotTTS SOAR 制品记录并核验 revision 形状。"""
-        artifacts = self.manifest.get("model_artifacts")
-        candidates = artifacts.get("dots_tts_candidates") if isinstance(artifacts, dict) else None
-        records = (
-            [
-                item
-                for item in candidates or []
-                if isinstance(item, dict) and item.get("capability") == "dots.tts-soar clone / 8324"
-            ]
-            if isinstance(candidates, list)
-            else []
-        )
-        if len(records) != 1:
-            raise LocalAIManagerError("版本清单必须且只能有一个 DotTTS SOAR 候选制品记录。")
-        record = records[0]
-        revision = record.get("repository_revision")
-        if not isinstance(revision, str) or not _COMMIT_RE.fullmatch(revision):
-            raise LocalAIManagerError("DotTTS SOAR 候选缺少固定的 HF repository revision。")
-        return record
-
-    def register_voxcpm2_candidate(self) -> None:
-        """为手动准备的 VoxCPM2 Q8 GGUF 注册固定 audio.cpp YAML。"""
-        artifact_path = self._voxcpm2_artifact_path()
-        record = self._voxcpm2_candidate_record()
-        rendered = VOXCPM2_CONFIG_PATH.read_text(encoding="utf-8")
-        if rendered.count(f"  model: {record['model_file']}\n") != 1:
-            raise LocalAIManagerError("VoxCPM2 候选 YAML 与版本清单中的路径不一致。")
-        self._register_model_config(VOXCPM2_MODEL_NAME, rendered)
-        self._write_json_atomically(
-            self.models_dir / f"{VOXCPM2_MODEL_NAME}.artifact.json",
-            {
-                "schema_version": 1,
-                "model": VOXCPM2_MODEL_NAME,
-                "relative_path": record["model_file"],
-                "size_bytes": artifact_path.stat().st_size,
-                "sha256": self._sha256_file(artifact_path),
-                "source_revision": record["repository_revision"],
-            },
-            prefix=".voxcpm2-artifact-",
-        )
-        print("已注册 E0 VoxCPM2 Q8 候选；本地 hash 仅用于检测后续文件变化，不等于上游制品验收。")
-
-    def verify_voxcpm2_candidate(self) -> None:
-        """核对 VoxCPM2 候选路径、配置与注册时记录的本地 hash。"""
-        artifact_path = self._voxcpm2_artifact_path()
-        record = self._voxcpm2_candidate_record()
-        try:
-            expected_config = VOXCPM2_CONFIG_PATH.read_bytes()
-            installed_config = (self.models_dir / f"{VOXCPM2_MODEL_NAME}.yaml").read_bytes()
-            stamp = json.loads(
-                (self.models_dir / f"{VOXCPM2_MODEL_NAME}.artifact.json").read_text()
-            )
-        except (OSError, json.JSONDecodeError) as exc:
-            raise LocalAIManagerError(
-                "VoxCPM2 权重或固定 YAML 尚未注册；手动准备模型后运行 "
-                "manager.py register-voxcpm2-candidate。"
-            ) from exc
-        if expected_config.decode("utf-8").count(f"  model: {record['model_file']}\n") != 1:
-            raise LocalAIManagerError("VoxCPM2 YAML 路径与固定版本清单不一致。")
-        if installed_config != expected_config:
-            raise LocalAIManagerError("LocalAI VoxCPM2 YAML 与固定模板不一致。")
-        if (
-            not isinstance(stamp, dict)
-            or stamp.get("schema_version") != 1
-            or stamp.get("model") != VOXCPM2_MODEL_NAME
-            or stamp.get("relative_path") != record.get("model_file")
-            or stamp.get("source_revision") != record.get("repository_revision")
-        ):
-            raise LocalAIManagerError("VoxCPM2 本地制品记录缺失或与固定 revision 不符。")
-        if stamp.get("size_bytes") != artifact_path.stat().st_size or stamp.get(
-            "sha256"
-        ) != self._sha256_file(artifact_path):
-            raise LocalAIManagerError("VoxCPM2 GGUF 与注册时记录的本地 size/hash 不一致。")
-
-    def _voxcpm2_artifact_path(self) -> Path:
-        """解析 LocalAI models 下的 VoxCPM2 文件，并拒绝越界路径。"""
-        record = self._voxcpm2_candidate_record()
-        relative_value = record.get("model_file")
-        if not isinstance(relative_value, str) or not relative_value:
-            raise LocalAIManagerError("VoxCPM2 清单缺少模型相对路径。")
-        relative_path = Path(relative_value)
-        if (
-            relative_path.is_absolute()
-            or ".." in relative_path.parts
-            or "\\" in relative_value
-            or not re.fullmatch(r"[A-Za-z0-9._/-]+", relative_value)
-        ):
-            raise LocalAIManagerError("VoxCPM2 模型路径必须位于 LocalAI models 目录内。")
-        artifact_path = (self.models_dir / relative_path).resolve()
-        if not artifact_path.is_relative_to(self.models_dir.resolve()):
-            raise LocalAIManagerError("VoxCPM2 模型路径越出了 LocalAI models 目录。")
-        try:
-            size = artifact_path.stat().st_size
-        except OSError as exc:
-            raise LocalAIManagerError(
-                "VoxCPM2 Q8 GGUF 尚未准备；请手动放入 LocalAI models 目录的 "
-                f"{relative_value}。本命令不会下载模型。"
-            ) from exc
-        if not artifact_path.is_file() or size <= 0:
-            raise LocalAIManagerError("VoxCPM2 GGUF 必须是非空常规文件。")
-        return artifact_path
-
-    def _voxcpm2_candidate_record(self) -> dict[str, object]:
-        """读取唯一 VoxCPM2 制品记录并核验完整 HF commit。"""
-        artifacts = self.manifest.get("model_artifacts")
-        candidates = artifacts.get("voxcpm2_candidates") if isinstance(artifacts, dict) else None
-        records = (
-            [
-                item
-                for item in candidates or []
-                if isinstance(item, dict)
-                and item.get("capability") == "VoxCPM2 clone and controllable clone / 8322"
-            ]
-            if isinstance(candidates, list)
-            else []
-        )
-        if len(records) != 1:
-            raise LocalAIManagerError("版本清单必须且只能有一个 VoxCPM2 候选制品记录。")
-        record = records[0]
-        if not isinstance(record.get("repository_revision"), str) or not _COMMIT_RE.fullmatch(
-            str(record["repository_revision"])
-        ):
-            raise LocalAIManagerError("VoxCPM2 候选缺少固定的 HF repository revision。")
-        return record
-
-    def register_confucius4_tts_candidate(self) -> None:
-        """为手动准备的 Confucius4-TTS original GGUF 注册固定 audio.cpp YAML。"""
-        artifact_path = self._confucius4_tts_artifact_path()
-        record = self._confucius4_tts_candidate_record()
-        rendered = CONFUCIUS4_TTS_CONFIG_PATH.read_text(encoding="utf-8")
-        if rendered.count(f"  model: {record['model_file']}\n") != 1:
-            raise LocalAIManagerError("Confucius4-TTS 候选 YAML 与版本清单中的路径不一致。")
-        self._register_model_config(CONFUCIUS4_TTS_MODEL_NAME, rendered)
-        self._write_json_atomically(
-            self.models_dir / f"{CONFUCIUS4_TTS_MODEL_NAME}.artifact.json",
-            {
-                "schema_version": 1,
-                "model": CONFUCIUS4_TTS_MODEL_NAME,
-                "relative_path": record["model_file"],
-                "size_bytes": artifact_path.stat().st_size,
-                "sha256": self._sha256_file(artifact_path),
-                "source_revision": record["repository_revision"],
-            },
-            prefix=".confucius4-tts-artifact-",
-        )
-        print(
-            "已注册 E0 Confucius4-TTS original 候选；本地 hash 只检测后续文件变化，"
-            "不等于上游制品验收。"
-        )
-
-    def verify_confucius4_tts_candidate(self) -> None:
-        """核对 Confucius4-TTS 候选路径、配置和本地文件指纹。"""
-        artifact_path = self._confucius4_tts_artifact_path()
-        record = self._confucius4_tts_candidate_record()
-        try:
-            expected_config = CONFUCIUS4_TTS_CONFIG_PATH.read_bytes()
-            installed_config = (self.models_dir / f"{CONFUCIUS4_TTS_MODEL_NAME}.yaml").read_bytes()
-            stamp = json.loads(
-                (self.models_dir / f"{CONFUCIUS4_TTS_MODEL_NAME}.artifact.json").read_text()
-            )
-        except (OSError, json.JSONDecodeError) as exc:
-            raise LocalAIManagerError(
-                "Confucius4-TTS 权重或固定 YAML 尚未注册；手动准备模型后运行 "
-                "manager.py register-confucius4-tts-candidate。"
-            ) from exc
-        if expected_config.decode("utf-8").count(f"  model: {record['model_file']}\n") != 1:
-            raise LocalAIManagerError("Confucius4-TTS YAML 与版本清单中的路径不一致。")
-        if installed_config != expected_config:
-            raise LocalAIManagerError("LocalAI Confucius4-TTS YAML 与固定模板不一致。")
-        if (
-            not isinstance(stamp, dict)
-            or stamp.get("schema_version") != 1
-            or stamp.get("model") != CONFUCIUS4_TTS_MODEL_NAME
-            or stamp.get("relative_path") != record.get("model_file")
-            or stamp.get("source_revision") != record.get("repository_revision")
-        ):
-            raise LocalAIManagerError("Confucius4-TTS 本地制品记录缺失或与固定 revision 不符。")
-        if stamp.get("size_bytes") != artifact_path.stat().st_size or stamp.get(
-            "sha256"
-        ) != self._sha256_file(artifact_path):
-            raise LocalAIManagerError("Confucius4-TTS GGUF 与注册时记录的本地 size/hash 不一致。")
-
-    def _confucius4_tts_artifact_path(self) -> Path:
-        """解析 LocalAI models 下的 Confucius4-TTS 文件并拒绝路径越界。"""
-        record = self._confucius4_tts_candidate_record()
-        relative_value = record.get("model_file")
-        if not isinstance(relative_value, str) or not relative_value:
-            raise LocalAIManagerError("Confucius4-TTS 清单缺少模型相对路径。")
-        relative_path = Path(relative_value)
-        if (
-            relative_path.is_absolute()
-            or ".." in relative_path.parts
-            or "\\" in relative_value
-            or not re.fullmatch(r"[A-Za-z0-9._/-]+", relative_value)
-        ):
-            raise LocalAIManagerError("Confucius4-TTS 模型路径必须位于 LocalAI models 目录内。")
-        artifact_path = (self.models_dir / relative_path).resolve()
-        if not artifact_path.is_relative_to(self.models_dir.resolve()):
-            raise LocalAIManagerError("Confucius4-TTS 模型路径越出了 LocalAI models 目录。")
-        try:
-            size = artifact_path.stat().st_size
-        except OSError as exc:
-            raise LocalAIManagerError(
-                "Confucius4-TTS original GGUF 尚未准备；请手动放入 LocalAI models 目录的 "
-                f"{relative_value}。本命令不会下载模型。"
-            ) from exc
-        if not artifact_path.is_file() or size <= 0:
-            raise LocalAIManagerError("Confucius4-TTS GGUF 必须是非空常规文件。")
-        return artifact_path
-
-    def _confucius4_tts_candidate_record(self) -> dict[str, object]:
-        """读取唯一 Confucius4-TTS 制品记录并核验固定 HF commit。"""
-        artifacts = self.manifest.get("model_artifacts")
-        candidates = (
-            artifacts.get("confucius4_tts_candidates") if isinstance(artifacts, dict) else None
-        )
-        records = (
-            [
-                item
-                for item in candidates or []
-                if isinstance(item, dict)
-                and item.get("capability") == "Confucius4-TTS clone / 8361"
-            ]
-            if isinstance(candidates, list)
-            else []
-        )
-        if len(records) != 1:
-            raise LocalAIManagerError("版本清单必须且只能有一个 Confucius4-TTS 候选制品记录。")
-        record = records[0]
-        if not isinstance(record.get("repository_revision"), str) or not _COMMIT_RE.fullmatch(
-            str(record["repository_revision"])
-        ):
-            raise LocalAIManagerError("Confucius4-TTS 候选缺少固定 HF repository revision。")
-        return record
-
-    def register_moss_voicegenerator_candidate(self) -> None:
-        """为用户手动准备的 MOSS VoiceGenerator GGUF 注册固定 audio.cpp YAML。"""
-        artifact_path = self._moss_voicegenerator_artifact_path()
-        record = self._moss_voicegenerator_candidate_record()
-        rendered = MOSS_VOICEGENERATOR_CONFIG_PATH.read_text(encoding="utf-8")
-        if rendered.count(f"  model: {record['model_file']}\n") != 1:
-            raise LocalAIManagerError("MOSS VoiceGenerator 候选 YAML 与清单中的路径不一致。")
-        self._register_model_config(MOSS_VOICEGENERATOR_MODEL_NAME, rendered)
-        self._write_json_atomically(
-            self.models_dir / f"{MOSS_VOICEGENERATOR_MODEL_NAME}.artifact.json",
-            {
-                "schema_version": 1,
-                "model": MOSS_VOICEGENERATOR_MODEL_NAME,
-                "relative_path": record["model_file"],
-                "size_bytes": artifact_path.stat().st_size,
-                "sha256": self._sha256_file(artifact_path),
-                "source_revision": record["repository_revision"],
-            },
-            prefix=".moss-voicegenerator-artifact-",
-        )
-        print(
-            "已注册 E0 MOSS VoiceGenerator BF16 候选；本地 hash 仅检测后续变化，"
-            "不等于上游制品验收。"
-        )
-
-    def verify_moss_voicegenerator_candidate(self) -> None:
-        """核对 MOSS VoiceGenerator GGUF 路径、固定 YAML 和本地文件指纹。"""
-        artifact_path = self._moss_voicegenerator_artifact_path()
-        record = self._moss_voicegenerator_candidate_record()
-        try:
-            expected_config = MOSS_VOICEGENERATOR_CONFIG_PATH.read_bytes()
-            installed_config = (
-                self.models_dir / f"{MOSS_VOICEGENERATOR_MODEL_NAME}.yaml"
-            ).read_bytes()
-            stamp = json.loads(
-                (self.models_dir / f"{MOSS_VOICEGENERATOR_MODEL_NAME}.artifact.json").read_text()
-            )
-        except (OSError, json.JSONDecodeError) as exc:
-            raise LocalAIManagerError(
-                "MOSS VoiceGenerator 权重或固定 YAML 尚未注册；手动准备模型后运行 "
-                "manager.py register-moss-voicegenerator-candidate。"
-            ) from exc
-        if expected_config.decode("utf-8").count(f"  model: {record['model_file']}\n") != 1:
-            raise LocalAIManagerError("MOSS VoiceGenerator YAML 与清单中的路径不一致。")
-        if installed_config != expected_config:
-            raise LocalAIManagerError("LocalAI MOSS VoiceGenerator YAML 与固定模板不一致。")
-        if (
-            not isinstance(stamp, dict)
-            or stamp.get("schema_version") != 1
-            or stamp.get("model") != MOSS_VOICEGENERATOR_MODEL_NAME
-            or stamp.get("relative_path") != record.get("model_file")
-            or stamp.get("source_revision") != record.get("repository_revision")
-        ):
-            raise LocalAIManagerError("MOSS VoiceGenerator 本地制品记录缺失或 revision 不一致。")
-        if stamp.get("size_bytes") != artifact_path.stat().st_size or stamp.get(
-            "sha256"
-        ) != self._sha256_file(artifact_path):
-            raise LocalAIManagerError("MOSS VoiceGenerator GGUF 与注册时记录的 size/hash 不一致。")
-
-    def _moss_voicegenerator_artifact_path(self) -> Path:
-        """解析固定 models 相对路径并拒绝 MOSS VoiceGenerator 权重越界。"""
-        record = self._moss_voicegenerator_candidate_record()
-        relative_value = record.get("model_file")
-        if not isinstance(relative_value, str) or not relative_value:
-            raise LocalAIManagerError("MOSS VoiceGenerator 清单缺少模型相对路径。")
-        relative_path = Path(relative_value)
-        if (
-            relative_path.is_absolute()
-            or ".." in relative_path.parts
-            or "\\" in relative_value
-            or not re.fullmatch(r"[A-Za-z0-9._/-]+", relative_value)
-        ):
-            raise LocalAIManagerError("MOSS VoiceGenerator 模型路径必须位于 models 目录内。")
-        artifact_path = (self.models_dir / relative_path).resolve()
-        if not artifact_path.is_relative_to(self.models_dir.resolve()):
-            raise LocalAIManagerError("MOSS VoiceGenerator 模型路径越出了 models 目录。")
-        try:
-            size = artifact_path.stat().st_size
-        except OSError as exc:
-            raise LocalAIManagerError(
-                "MOSS VoiceGenerator GGUF 尚未准备；请手动放入 LocalAI models 目录的 "
-                f"{relative_value}。本命令不会下载模型。"
-            ) from exc
-        if not artifact_path.is_file() or size <= 0:
-            raise LocalAIManagerError("MOSS VoiceGenerator GGUF 必须是非空常规文件。")
-        return artifact_path
-
-    def _moss_voicegenerator_candidate_record(self) -> dict[str, object]:
-        """读取唯一 MOSS VoiceGenerator 候选并校验固定 HF commit。"""
-        artifacts = self.manifest.get("model_artifacts")
-        candidates = (
-            artifacts.get("moss_voicegenerator_candidates") if isinstance(artifacts, dict) else None
-        )
-        records = (
-            [
-                item
-                for item in candidates or []
-                if isinstance(item, dict)
-                and item.get("capability") == "MOSS-VoiceGenerator voice design / 8302"
-            ]
-            if isinstance(candidates, list)
-            else []
-        )
-        if len(records) != 1:
-            raise LocalAIManagerError("版本清单必须且只能有一个 MOSS VoiceGenerator 候选制品记录。")
-        record = records[0]
-        if not isinstance(record.get("repository_revision"), str) or not _COMMIT_RE.fullmatch(
-            str(record["repository_revision"])
-        ):
-            raise LocalAIManagerError("MOSS VoiceGenerator 候选缺少固定 HF revision。")
-        return record
-
-    def register_fireredtts3_base_candidate(self) -> None:
-        """注册用户手动准备的 FireRedTTS3 Base Q8 克隆模型。"""
-        self._register_fireredtts3_candidate("base")
-
-    def register_fireredtts3_instruct_candidate(self) -> None:
-        """注册用户手动准备的 FireRedTTS3 Instruct Q8 音色设计模型。"""
-        self._register_fireredtts3_candidate("instruct")
-
-    def verify_fireredtts3_base_candidate(self) -> None:
-        """校验已注册的 FireRedTTS3 Base Q8 克隆模型。"""
-        self._verify_fireredtts3_candidate("base")
-
-    def verify_fireredtts3_instruct_candidate(self) -> None:
-        """校验已注册的 FireRedTTS3 Instruct Q8 音色设计模型。"""
-        self._verify_fireredtts3_candidate("instruct")
-
-    def register_ace_step_candidate(self) -> None:
-        """注册用户手动准备的 ACE-Step XL Turbo Q8 DiT 候选。"""
-        artifact_path = self._ace_step_artifact_path()
-        record = self._ace_step_candidate_record()
-        rendered = ACE_STEP_CONFIG_PATH.read_text(encoding="utf-8")
-        if rendered.count(f"  model: {record['model_file']}\n") != 1:
-            raise LocalAIManagerError("ACE-Step YAML 与固定版本清单中的模型路径不一致。")
-        self._register_model_config(ACE_STEP_MODEL_NAME, rendered)
-        self._write_json_atomically(
-            self.models_dir / f"{ACE_STEP_MODEL_NAME}.artifact.json",
-            {
-                "schema_version": 1,
-                "model": ACE_STEP_MODEL_NAME,
-                "relative_path": record["model_file"],
-                "size_bytes": artifact_path.stat().st_size,
-                "sha256": self._sha256_file(artifact_path),
-                "source_revision": record["repository_revision"],
-            },
-            prefix=".ace-step-artifact-",
-        )
-        print(
-            "已注册 E0 ACE-Step XL Turbo Q8 DiT 候选；本地 hash 只检测后续文件变化，"
-            "不等于上游制品验收。"
-        )
-
-    def verify_ace_step_candidate(self) -> None:
-        """核对 ACE-Step Q8 DiT 候选路径、固定 YAML 和本地文件指纹。"""
-        artifact_path = self._ace_step_artifact_path()
-        record = self._ace_step_candidate_record()
-        try:
-            expected_config = ACE_STEP_CONFIG_PATH.read_bytes()
-            installed_config = (self.models_dir / f"{ACE_STEP_MODEL_NAME}.yaml").read_bytes()
-            stamp = json.loads(
-                (self.models_dir / f"{ACE_STEP_MODEL_NAME}.artifact.json").read_text(
-                    encoding="utf-8"
-                )
-            )
-        except (OSError, json.JSONDecodeError) as exc:
-            raise LocalAIManagerError(
-                "ACE-Step XL Turbo 权重或固定 YAML 尚未注册；手动准备模型后运行 "
-                "manager.py register-ace-step-candidate。"
-            ) from exc
-        if expected_config.decode("utf-8").count(f"  model: {record['model_file']}\n") != 1:
-            raise LocalAIManagerError("ACE-Step YAML 与版本清单中的模型路径不一致。")
-        if installed_config != expected_config:
-            raise LocalAIManagerError("LocalAI ACE-Step YAML 与固定模板不一致。")
-        if (
-            not isinstance(stamp, dict)
-            or stamp.get("schema_version") != 1
-            or stamp.get("model") != ACE_STEP_MODEL_NAME
-            or stamp.get("relative_path") != record.get("model_file")
-            or stamp.get("source_revision") != record.get("repository_revision")
-        ):
-            raise LocalAIManagerError("ACE-Step 本地制品记录缺失或与固定 revision 不符。")
-        if stamp.get("size_bytes") != artifact_path.stat().st_size or stamp.get(
-            "sha256"
-        ) != self._sha256_file(artifact_path):
-            raise LocalAIManagerError("ACE-Step GGUF 与注册时记录的本地 size/hash 不一致。")
-
-    def _ace_step_candidate_record(self) -> dict[str, object]:
-        """读取唯一 ACE-Step XL Turbo Q8 DiT 制品并验证固定仓库 revision。"""
-        artifacts = self.manifest.get("model_artifacts")
-        candidates = artifacts.get("ace_step_candidates") if isinstance(artifacts, dict) else None
-        records = (
-            [
-                item
-                for item in candidates or []
-                if isinstance(item, dict)
-                and item.get("capability") == "ACE-Step 1.5 XL Turbo BGM / 8313"
-            ]
-            if isinstance(candidates, list)
-            else []
-        )
-        if len(records) != 1:
-            raise LocalAIManagerError("版本清单必须且只能有一个 ACE-Step XL Turbo 候选。")
-        record = records[0]
-        if not isinstance(record.get("repository_revision"), str) or not _COMMIT_RE.fullmatch(
-            str(record["repository_revision"])
-        ):
-            raise LocalAIManagerError("ACE-Step 候选缺少固定模型仓库 commit。")
-        return record
-
-    def _ace_step_artifact_path(self) -> Path:
-        """解析 models 内固定 ACE-Step GGUF 路径并拒绝路径越界。"""
-        record = self._ace_step_candidate_record()
-        relative_value = record.get("model_file")
-        if not isinstance(relative_value, str) or not relative_value:
-            raise LocalAIManagerError("ACE-Step 版本清单缺少模型相对路径。")
-        relative_path = Path(relative_value)
-        if (
-            relative_path.is_absolute()
-            or ".." in relative_path.parts
-            or "\\" in relative_value
-            or not re.fullmatch(r"[A-Za-z0-9._/-]+", relative_value)
-        ):
-            raise LocalAIManagerError("ACE-Step 模型路径必须位于 LocalAI models 目录内。")
-        artifact_path = (self.models_dir / relative_path).resolve()
-        if not artifact_path.is_relative_to(self.models_dir.resolve()):
-            raise LocalAIManagerError("ACE-Step 模型路径越出了 LocalAI models 目录。")
-        try:
-            size = artifact_path.stat().st_size
-        except OSError as exc:
-            raise LocalAIManagerError(
-                "ACE-Step XL Turbo Q8 DiT GGUF 尚未准备；请手动放入 LocalAI models 目录的 "
-                f"{relative_value}。本命令不会下载模型。"
-            ) from exc
-        if not artifact_path.is_file() or size <= 0:
-            raise LocalAIManagerError("ACE-Step GGUF 必须是非空常规文件。")
-        return artifact_path
-
-    def register_stable_audio_candidate(self) -> None:
-        """注册用户手动准备的 Stable Audio 3 Medium Q8 GGUF 候选。"""
-        artifact_path = self._stable_audio_artifact_path()
-        record = self._stable_audio_candidate_record()
-        template = STABLE_AUDIO_CONFIG_PATH.read_text(encoding="utf-8")
-        if template.count(f"  model: {record['model_file']}\n") != 1:
-            raise LocalAIManagerError("Stable Audio YAML 与固定版本清单中的模型路径不一致。")
-        self._register_model_config(STABLE_AUDIO_MODEL_NAME, template)
-        self._write_json_atomically(
-            self.models_dir / f"{STABLE_AUDIO_MODEL_NAME}.artifact.json",
-            {
-                "schema_version": 1,
-                "model": STABLE_AUDIO_MODEL_NAME,
-                "relative_path": record["model_file"],
-                "size_bytes": artifact_path.stat().st_size,
-                "sha256": self._sha256_file(artifact_path),
-                "source_revision": record["repository_revision"],
-            },
-            prefix=".stable-audio-artifact-",
-        )
-        print(
-            "已注册 E0 Stable Audio 3 Medium Q8 候选；本地 hash 只检测文件后续变化，"
-            "不证明上游制品来源。"
-        )
-
-    def verify_stable_audio_candidate(self) -> None:
-        """核对 Stable Audio 固定 YAML、手动文件路径和本地 hash 指纹。"""
-        artifact_path = self._stable_audio_artifact_path()
-        record = self._stable_audio_candidate_record()
-        try:
-            expected_config = STABLE_AUDIO_CONFIG_PATH.read_bytes()
-            installed_config = (self.models_dir / f"{STABLE_AUDIO_MODEL_NAME}.yaml").read_bytes()
-            stamp = json.loads(
-                (self.models_dir / f"{STABLE_AUDIO_MODEL_NAME}.artifact.json").read_text(
-                    encoding="utf-8"
-                )
-            )
-        except (OSError, json.JSONDecodeError) as exc:
-            raise LocalAIManagerError(
-                "Stable Audio 3 Medium 权重或固定 YAML 尚未注册；手动准备模型后运行 "
-                "manager.py register-stable-audio-candidate。"
-            ) from exc
-        if expected_config.decode("utf-8").count(f"  model: {record['model_file']}\n") != 1:
-            raise LocalAIManagerError("Stable Audio YAML 与版本清单中的模型路径不一致。")
-        if installed_config != expected_config:
-            raise LocalAIManagerError("LocalAI Stable Audio YAML 与固定模板不一致。")
-        if (
-            not isinstance(stamp, dict)
-            or stamp.get("schema_version") != 1
-            or stamp.get("model") != STABLE_AUDIO_MODEL_NAME
-            or stamp.get("relative_path") != record.get("model_file")
-            or stamp.get("source_revision") != record.get("repository_revision")
-        ):
-            raise LocalAIManagerError("Stable Audio 本地制品记录缺失或与固定 revision 不符。")
-        if stamp.get("size_bytes") != artifact_path.stat().st_size or stamp.get(
-            "sha256"
-        ) != self._sha256_file(artifact_path):
-            raise LocalAIManagerError("Stable Audio GGUF 与登记时记录的本地 size/hash 不一致。")
-
-    def _stable_audio_candidate_record(self) -> dict[str, object]:
-        """读取唯一 Stable Audio Medium 候选并核验固定包 revision。"""
-        artifacts = self.manifest.get("model_artifacts")
-        candidates = (
-            artifacts.get("stable_audio_candidates") if isinstance(artifacts, dict) else None
-        )
-        records = (
-            [
-                item
-                for item in candidates or []
-                if isinstance(item, dict)
-                and item.get("capability") == "Stable Audio 3 Medium generation / 8311"
-            ]
-            if isinstance(candidates, list)
-            else []
-        )
-        if len(records) != 1:
-            raise LocalAIManagerError("版本清单必须且只能有一个 Stable Audio Medium 候选。")
-        record = records[0]
-        if not isinstance(record.get("repository_revision"), str) or not _COMMIT_RE.fullmatch(
-            str(record["repository_revision"])
-        ):
-            raise LocalAIManagerError("Stable Audio 候选缺少固定模型包 commit。")
-        return record
-
-    def _stable_audio_artifact_path(self) -> Path:
-        """解析 Stable Audio Q8 GGUF 相对路径并拒绝 models 目录外路径。"""
-        record = self._stable_audio_candidate_record()
-        relative_value = record.get("model_file")
-        if not isinstance(relative_value, str) or not relative_value:
-            raise LocalAIManagerError("Stable Audio 版本清单缺少模型相对路径。")
-        relative_path = Path(relative_value)
-        if (
-            relative_path.is_absolute()
-            or ".." in relative_path.parts
-            or "\\" in relative_value
-            or not re.fullmatch(r"[A-Za-z0-9._/-]+", relative_value)
-        ):
-            raise LocalAIManagerError("Stable Audio 模型路径必须位于 LocalAI models 目录内。")
-        artifact_path = (self.models_dir / relative_path).resolve()
-        if not artifact_path.is_relative_to(self.models_dir.resolve()):
-            raise LocalAIManagerError("Stable Audio 模型路径越出了 LocalAI models 目录。")
-        try:
-            size = artifact_path.stat().st_size
-        except OSError as exc:
-            raise LocalAIManagerError(
-                "Stable Audio 3 Medium Q8 GGUF 尚未准备；请手动放入 LocalAI models 目录的 "
-                f"{relative_value}。本命令不会下载模型。"
-            ) from exc
-        if not artifact_path.is_file() or size <= 0:
-            raise LocalAIManagerError("Stable Audio GGUF 必须是非空常规文件。")
-        return artifact_path
-
-    def register_seed_vc_candidate(self) -> None:
-        """登记用户手动准备的 Seed-VC 目录和 vc/svc 双任务配置。"""
-        model_dir = self._seed_vc_model_dir()
-        templates = (
-            (SEED_VC_VC_MODEL_NAME, SEED_VC_VC_CONFIG_PATH),
-            (SEED_VC_SVC_MODEL_NAME, SEED_VC_SVC_CONFIG_PATH),
-        )
-        rendered_configs = [(name, path.read_text(encoding="utf-8")) for name, path in templates]
-        for model_name, rendered in rendered_configs:
-            installed = self.models_dir / f"{model_name}.yaml"
-            if installed.exists() and installed.read_text(encoding="utf-8") != rendered:
-                raise LocalAIManagerError(f"拒绝覆盖不同的 Seed-VC LocalAI 配置：{installed}。")
-        for model_name, rendered in rendered_configs:
-            self._register_model_config(model_name, rendered)
-        artifacts = self.manifest.get("model_artifacts")
-        record = artifacts.get("seed_vc_candidate") if isinstance(artifacts, dict) else None
-        if not isinstance(record, dict):
-            raise LocalAIManagerError("版本清单缺少 Seed-VC 目录候选记录。")
-        self._write_json_atomically(
-            self.models_dir / SEED_VC_ARTIFACT_STAMP,
-            {
-                "schema_version": 1,
-                "model_directory": record["model_directory"],
-                "tree_sha256": self._sha256_tree(model_dir),
-                "audio_cpp_source_commit": record["audio_cpp_source_commit"],
-                "model_source_revision": record.get("model_source_revision"),
-            },
-            prefix=".seed-vc-artifact-",
-        )
-        print(
-            "已登记 E0 Seed-VC 目录与 vc/svc 配置；目录 hash 只检测后续变更，"
-            "不证明上游来源或推理兼容。"
-        )
-
-    def verify_seed_vc_candidate(self) -> None:
-        """核对 Seed-VC 手动目录树指纹以及两种固定任务 YAML。"""
-        model_dir = self._seed_vc_model_dir()
-        artifacts = self.manifest.get("model_artifacts")
-        record = artifacts.get("seed_vc_candidate") if isinstance(artifacts, dict) else None
-        if not isinstance(record, dict):
-            raise LocalAIManagerError("版本清单缺少 Seed-VC 目录候选记录。")
-        try:
-            stamp = json.loads(
-                (self.models_dir / SEED_VC_ARTIFACT_STAMP).read_text(encoding="utf-8")
-            )
-            installed_vc = (self.models_dir / f"{SEED_VC_VC_MODEL_NAME}.yaml").read_bytes()
-            installed_svc = (self.models_dir / f"{SEED_VC_SVC_MODEL_NAME}.yaml").read_bytes()
-        except (OSError, json.JSONDecodeError) as exc:
-            raise LocalAIManagerError(
-                "Seed-VC 模型目录或 vc/svc 配置尚未登记；手动准备模型后运行 "
-                "manager.py register-seed-vc-candidate。本命令不会下载模型。"
-            ) from exc
-        if installed_vc != SEED_VC_VC_CONFIG_PATH.read_bytes():
-            raise LocalAIManagerError("LocalAI Seed-VC vc YAML 与固定模板不一致。")
-        if installed_svc != SEED_VC_SVC_CONFIG_PATH.read_bytes():
-            raise LocalAIManagerError("LocalAI Seed-VC svc YAML 与固定模板不一致。")
-        if (
-            not isinstance(stamp, dict)
-            or stamp.get("schema_version") != 1
-            or stamp.get("model_directory") != record.get("model_directory")
-            or stamp.get("audio_cpp_source_commit") != record.get("audio_cpp_source_commit")
-            or stamp.get("model_source_revision") != record.get("model_source_revision")
-        ):
-            raise LocalAIManagerError("Seed-VC 本地目录指纹缺失或版本记录不匹配。")
-        if stamp.get("tree_sha256") != self._sha256_tree(model_dir):
-            raise LocalAIManagerError("Seed-VC 模型目录与登记时记录的 tree hash 不一致。")
-
-    def _seed_vc_model_dir(self) -> Path:
-        """解析 models 下的 Seed-VC 资源目录并检查其为非空安全目录。"""
-        artifacts = self.manifest.get("model_artifacts")
-        record = artifacts.get("seed_vc_candidate") if isinstance(artifacts, dict) else None
-        relative_value = record.get("model_directory") if isinstance(record, dict) else None
-        if not isinstance(relative_value, str) or not relative_value:
-            raise LocalAIManagerError("Seed-VC 版本清单缺少模型目录。")
-        relative_path = Path(relative_value)
-        if (
-            relative_path.is_absolute()
-            or ".." in relative_path.parts
-            or "\\" in relative_value
-            or not re.fullmatch(r"[A-Za-z0-9._/-]+", relative_value)
-        ):
-            raise LocalAIManagerError("Seed-VC 模型目录必须位于 LocalAI models 目录内。")
-        model_dir = (self.models_dir / relative_path).resolve()
-        if not model_dir.is_relative_to(self.models_dir.resolve()):
-            raise LocalAIManagerError("Seed-VC 模型目录越出了 LocalAI models 目录。")
-        if not model_dir.is_dir():
-            raise LocalAIManagerError(
-                f"Seed-VC 资源目录尚未准备：{relative_value}。请手动准备，本命令不会下载模型。"
-            )
-        try:
-            self._sha256_tree(model_dir)
-        except (OSError, LocalAIManagerError) as exc:
-            raise LocalAIManagerError(f"Seed-VC 资源目录不完整或包含不安全文件：{exc}") from exc
-        if not any(path.is_file() for path in model_dir.rglob("*")):
-            raise LocalAIManagerError("Seed-VC 资源目录必须包含模型文件。")
-        return model_dir
-
-    def _fireredtts3_spec(self, mode: str) -> tuple[str, Path, str]:
-        if mode == "base":
-            return (
-                FIREREDTTS3_BASE_MODEL_NAME,
-                FIREREDTTS3_BASE_CONFIG_PATH,
-                "FireRedTTS3 Base clone / 8325",
-            )
-        if mode == "instruct":
-            return (
-                FIREREDTTS3_INSTRUCT_MODEL_NAME,
-                FIREREDTTS3_INSTRUCT_CONFIG_PATH,
-                "FireRedTTS3 Instruct voice design / 8304",
-            )
-        raise LocalAIManagerError(f"FireRedTTS3 模型模式无效：{mode}")
-
-    def _fireredtts3_candidate_record(self, mode: str) -> dict[str, object]:
-        """读取单个 FireRedTTS3 模式候选并验证固定 HF commit。"""
-        _model_name, _config_path, capability = self._fireredtts3_spec(mode)
-        artifacts = self.manifest.get("model_artifacts")
-        candidates = (
-            artifacts.get("fireredtts3_candidates") if isinstance(artifacts, dict) else None
-        )
-        records = (
-            [
-                item
-                for item in candidates or []
-                if isinstance(item, dict) and item.get("capability") == capability
-            ]
-            if isinstance(candidates, list)
-            else []
-        )
-        if len(records) != 1:
-            raise LocalAIManagerError(f"版本清单必须且只能有一个 FireRedTTS3 {mode} 候选制品记录。")
-        record = records[0]
-        if not isinstance(record.get("repository_revision"), str) or not _COMMIT_RE.fullmatch(
-            str(record["repository_revision"])
-        ):
-            raise LocalAIManagerError(f"FireRedTTS3 {mode} 候选缺少固定 HF revision。")
-        return record
-
-    def _fireredtts3_artifact_path(self, mode: str) -> Path:
-        """解析 models 内固定相对路径并拒绝 FireRedTTS3 权重越界。"""
-        record = self._fireredtts3_candidate_record(mode)
-        relative_value = record.get("model_file")
-        if not isinstance(relative_value, str) or not relative_value:
-            raise LocalAIManagerError(f"FireRedTTS3 {mode} 清单缺少模型相对路径。")
-        relative_path = Path(relative_value)
-        if (
-            relative_path.is_absolute()
-            or ".." in relative_path.parts
-            or "\\" in relative_value
-            or not re.fullmatch(r"[A-Za-z0-9._/-]+", relative_value)
-        ):
-            raise LocalAIManagerError(f"FireRedTTS3 {mode} 模型路径必须位于 models 目录内。")
-        artifact_path = (self.models_dir / relative_path).resolve()
-        if not artifact_path.is_relative_to(self.models_dir.resolve()):
-            raise LocalAIManagerError(f"FireRedTTS3 {mode} 模型路径越出了 models 目录。")
-        try:
-            size = artifact_path.stat().st_size
-        except OSError as exc:
-            raise LocalAIManagerError(
-                f"FireRedTTS3 {mode} Q8 GGUF 尚未准备；请手动放入 LocalAI models 目录的 "
-                f"{relative_value}。本命令不会下载模型。"
-            ) from exc
-        if not artifact_path.is_file() or size <= 0:
-            raise LocalAIManagerError(f"FireRedTTS3 {mode} GGUF 必须是非空常规文件。")
-        return artifact_path
-
-    def _register_fireredtts3_candidate(self, mode: str) -> None:
-        model_name, config_path, _capability = self._fireredtts3_spec(mode)
-        artifact_path = self._fireredtts3_artifact_path(mode)
-        record = self._fireredtts3_candidate_record(mode)
-        rendered = config_path.read_text(encoding="utf-8")
-        if rendered.count(f"  model: {record['model_file']}\n") != 1:
-            raise LocalAIManagerError(f"FireRedTTS3 {mode} 候选 YAML 与版本清单路径不一致。")
-        self._register_model_config(model_name, rendered)
-        self._write_json_atomically(
-            self.models_dir / f"{model_name}.artifact.json",
-            {
-                "schema_version": 1,
-                "model": model_name,
-                "relative_path": record["model_file"],
-                "size_bytes": artifact_path.stat().st_size,
-                "sha256": self._sha256_file(artifact_path),
-                "source_revision": record["repository_revision"],
-            },
-            prefix=f".{model_name}-artifact-",
-        )
-        print(
-            f"已注册 E0 FireRedTTS3 {mode} Q8 候选；本地 hash 仅检测后续文件变化，"
-            "不等于上游制品验收。"
-        )
-
-    def _verify_fireredtts3_candidate(self, mode: str) -> None:
-        model_name, config_path, _capability = self._fireredtts3_spec(mode)
-        artifact_path = self._fireredtts3_artifact_path(mode)
-        record = self._fireredtts3_candidate_record(mode)
-        try:
-            expected_config = config_path.read_bytes()
-            installed_config = (self.models_dir / f"{model_name}.yaml").read_bytes()
-            stamp = json.loads(
-                (self.models_dir / f"{model_name}.artifact.json").read_text(encoding="utf-8")
-            )
-        except (OSError, json.JSONDecodeError) as exc:
-            raise LocalAIManagerError(
-                f"FireRedTTS3 {mode} 权重或固定 YAML 尚未注册；手动准备模型后运行对应 register 命令。"
-            ) from exc
-        if expected_config.decode("utf-8").count(f"  model: {record['model_file']}\n") != 1:
-            raise LocalAIManagerError(f"FireRedTTS3 {mode} YAML 与版本清单路径不一致。")
-        if installed_config != expected_config:
-            raise LocalAIManagerError(f"LocalAI FireRedTTS3 {mode} YAML 与固定模板不一致。")
-        if (
-            not isinstance(stamp, dict)
-            or stamp.get("schema_version") != 1
-            or stamp.get("model") != model_name
-            or stamp.get("relative_path") != record.get("model_file")
-            or stamp.get("source_revision") != record.get("repository_revision")
-        ):
-            raise LocalAIManagerError(f"FireRedTTS3 {mode} 本地制品记录缺失或 revision 不一致。")
-        if stamp.get("size_bytes") != artifact_path.stat().st_size or stamp.get(
-            "sha256"
-        ) != self._sha256_file(artifact_path):
-            raise LocalAIManagerError(f"FireRedTTS3 {mode} GGUF 与注册时记录的 size/hash 不一致。")
-
-    def _write_json_atomically(
-        self, destination: Path, payload: dict[str, object], *, prefix: str
-    ) -> None:
-        """在指定目录原子保存 JSON 安装记录。"""
-        temporary_path = self._write_temporary_file(destination.parent, prefix, ".json")
-        try:
-            temporary_path.write_text(
-                json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
-                encoding="utf-8",
-            )
-            self._fsync_file(temporary_path)
-            os.replace(temporary_path, destination)
-            self._fsync_directory(destination.parent)
-        finally:
-            temporary_path.unlink(missing_ok=True)
-
     def _register_model_config(self, model_name: str, rendered: str) -> None:
         """原子注册模型 YAML，拒绝覆盖内容不同的既有配置。"""
         destination = self.models_dir / f"{model_name}.yaml"
@@ -1397,7 +358,7 @@ class LocalAIManager:
     def start(self) -> None:
         """以独立进程组启动只监听 loopback 的 LocalAI，并等待 readiness。"""
         if not self._enabled():
-            raise LocalAIManagerError("启动前必须显式设置 UNITALE_LOCALAI_ENABLED=true。")
+            raise LocalAIManagerError("启动前必须显式设置 LLM_LOCALAI_ENABLED=true。")
         self._ensure_linux_amd64()
         self._ensure_install_stamp()
         self._ensure_directories()
@@ -1409,12 +370,12 @@ class LocalAIManager:
 
         owner_pid: int | None = None
         owner_start_time: str | None = None
-        raw_owner_pid = self.environ.get("UNITALE_LOCALAI_OWNER_PID")
+        raw_owner_pid = self.environ.get("LLM_LOCALAI_OWNER_PID")
         if raw_owner_pid:
             try:
                 owner_pid = int(raw_owner_pid)
             except ValueError as exc:
-                raise LocalAIManagerError("UNITALE_LOCALAI_OWNER_PID 必须是进程号。") from exc
+                raise LocalAIManagerError("LLM_LOCALAI_OWNER_PID 必须是进程号。") from exc
             owner_start_time = self._process_start_time(owner_pid)
             if owner_start_time is None:
                 raise LocalAIManagerError("LocalAI 启动所有者已退出。")
@@ -1432,7 +393,7 @@ class LocalAIManager:
             "LOCALAI_AUTOLOAD_BACKEND_GALLERIES": "false",
             "LOCALAI_DISABLE_GALLERY_ENDPOINT": "true",
             "LOCALAI_DISABLE_WEBUI": "true",
-            "UNITALE_LOCALAI_RUN_ID": run_id,
+            "LLM_LOCALAI_RUN_ID": run_id,
         }
         runtime_cache = Path(
             localai_environment.get(
@@ -1444,18 +405,18 @@ class LocalAIManager:
             )
         ).expanduser()
         localai_environment.setdefault(
-            "UNITALE_LOCALAI_ARTIFACT_DIR", str(runtime_cache / "localai_artifacts")
+            "LLM_LOCALAI_ARTIFACT_DIR", str(runtime_cache / "localai_artifacts")
         )
         worker_bridge_enabled = self._worker_bridge_enabled()
         command = [str(self.binary_path), "run"]
         if worker_bridge_enabled:
             bridge_address, bridge_port = self._bridge_address_and_port()
             self._ensure_port_available(bridge_port)
-            localai_environment["UNITALE_LOCALAI_WORKER_BRIDGE_ENABLED"] = "true"
-            localai_environment["UNITALE_LOCALAI_BRIDGE_ADDRESS"] = bridge_address
+            localai_environment["LLM_LOCALAI_WORKER_BRIDGE_ENABLED"] = "true"
+            localai_environment["LLM_LOCALAI_BRIDGE_ADDRESS"] = bridge_address
             worker_manifest = Path(
                 self.environ.get(
-                    "UNITALE_LOCALAI_BRIDGE_WORKERS",
+                    "LLM_LOCALAI_BRIDGE_WORKERS",
                     str(ROOT / "localai/manifests/worker-bridge.json"),
                 )
             ).expanduser()
@@ -1463,18 +424,18 @@ class LocalAIManager:
                 raise LocalAIManagerError(
                     f"LocalAI bridge worker manifest 不存在：{worker_manifest}"
                 )
-            localai_environment["UNITALE_LOCALAI_BRIDGE_WORKERS"] = str(worker_manifest.resolve())
+            localai_environment["LLM_LOCALAI_BRIDGE_WORKERS"] = str(worker_manifest.resolve())
             backend_entries = [
                 entry
                 for entry in localai_environment.get("LOCALAI_EXTERNAL_GRPC_BACKENDS", "").split(
                     ","
                 )
-                if entry and entry.split(":", 1)[0] != "unitale-worker"
+                if entry and entry.split(":", 1)[0] != "llm-local-worker"
             ]
-            backend_entries.append(f"unitale-worker:{bridge_address}")
+            backend_entries.append(f"llm-local-worker:{bridge_address}")
             localai_environment["LOCALAI_EXTERNAL_GRPC_BACKENDS"] = ",".join(backend_entries)
             command = [sys.executable, str(ROOT / "scripts/localai/host.py"), str(self.binary_path)]
-        if api_key := self.environ.get("UNITALE_LOCALAI_API_KEY"):
+        if api_key := self.environ.get("LLM_LOCALAI_API_KEY"):
             localai_environment["LOCALAI_API_KEY"] = api_key
         try:
             process_id = self._spawn_detached(command, localai_environment, stdout_path=log_path)
@@ -1497,7 +458,7 @@ class LocalAIManager:
             "base_url": base_url,
             "command": command,
             "bridge_address": (
-                localai_environment.get("UNITALE_LOCALAI_BRIDGE_ADDRESS")
+                localai_environment.get("LLM_LOCALAI_BRIDGE_ADDRESS")
                 if worker_bridge_enabled
                 else None
             ),
@@ -1564,7 +525,7 @@ class LocalAIManager:
     def _worker_bridge_enabled(self) -> bool:
         """读取是否将固定的一次性 worker bridge 纳入受管 LocalAI 进程组。"""
         return self.environ.get(
-            "UNITALE_LOCALAI_WORKER_BRIDGE_ENABLED", "false"
+            "LLM_LOCALAI_WORKER_BRIDGE_ENABLED", "false"
         ).strip().lower() in {
             "1",
             "true",
@@ -1574,10 +535,10 @@ class LocalAIManager:
 
     def _bridge_address_and_port(self) -> tuple[str, int]:
         """读取并限制 bridge gRPC 监听在本机回环。"""
-        address = self.environ.get("UNITALE_LOCALAI_BRIDGE_ADDRESS", "127.0.0.1:50052")
+        address = self.environ.get("LLM_LOCALAI_BRIDGE_ADDRESS", "127.0.0.1:50052")
         host, separator, raw_port = address.rpartition(":")
         if not separator or host != "127.0.0.1":
-            raise LocalAIManagerError("UNITALE_LOCALAI_BRIDGE_ADDRESS 必须是 127.0.0.1 回环地址。")
+            raise LocalAIManagerError("LLM_LOCALAI_BRIDGE_ADDRESS 必须是 127.0.0.1 回环地址。")
         try:
             port = int(raw_port)
         except ValueError as exc:
@@ -1771,7 +732,7 @@ class LocalAIManager:
             raise LocalAIManagerError("固定宿主机二进制方案仅支持 linux/amd64。")
 
     def _base_url_and_port(self) -> tuple[str, int]:
-        raw_url = self.environ.get("UNITALE_LOCALAI_BASE_URL", "http://127.0.0.1:8400")
+        raw_url = self.environ.get("LLM_LOCALAI_BASE_URL", "http://127.0.0.1:8400")
         parsed = urlsplit(raw_url)
         if (
             parsed.scheme != "http"
@@ -1786,9 +747,9 @@ class LocalAIManager:
         try:
             port = parsed.port or 80
         except ValueError as exc:
-            raise LocalAIManagerError("UNITALE_LOCALAI_BASE_URL 端口无效。") from exc
+            raise LocalAIManagerError("LLM_LOCALAI_BASE_URL 端口无效。") from exc
         if not 1 <= port <= 65535:
-            raise LocalAIManagerError("UNITALE_LOCALAI_BASE_URL 端口超出有效范围。")
+            raise LocalAIManagerError("LLM_LOCALAI_BASE_URL 端口超出有效范围。")
         return f"http://{parsed.hostname}:{port}", port
 
     def _ensure_port_closed(self) -> None:
@@ -1806,7 +767,7 @@ class LocalAIManager:
             str(self.binary_path.resolve()).encode(),
             str(self.backends_dir.resolve()).encode(),
             str((ROOT / "scripts/localai/host.py").resolve()).encode(),
-            b"unitale_localai_bridge.server",
+            b"localai_worker_bridge.server",
         )
         process_ids: list[int] = []
         for process_path in Path("/proc").glob("[0-9]*"):
@@ -1929,7 +890,7 @@ class LocalAIManager:
                 or "--input-json" not in decoded_arguments
                 or not expected_scripts.intersection(decoded_arguments)
                 or not any(
-                    entry.startswith(b"UNITALE_LOCALAI_REQUEST_ID=")
+                    entry.startswith(b"LLM_LOCALAI_REQUEST_ID=")
                     for entry in process_environment
                 )
                 or process_group <= 1
@@ -2011,7 +972,7 @@ class LocalAIManager:
 
     @classmethod
     def _group_has_run_id(cls, pgid: int, run_id: str) -> bool:
-        expected = f"UNITALE_LOCALAI_RUN_ID={run_id}".encode()
+        expected = f"LLM_LOCALAI_RUN_ID={run_id}".encode()
         for process_path in Path("/proc").glob("[0-9]*"):
             try:
                 process_id = int(process_path.name)
@@ -2032,9 +993,9 @@ class LocalAIManager:
     ) -> None:
         """启动独立 watcher，在 start.sh 异常退出时回收宿主机进程组。"""
         child_environment = {**os.environ, **self.environ}
-        child_environment.pop("UNITALE_LOCALAI_API_KEY", None)
+        child_environment.pop("LLM_LOCALAI_API_KEY", None)
         child_environment.pop("LOCALAI_API_KEY", None)
-        child_environment.pop("UNITALE_LOCALAI_OWNER_PID", None)
+        child_environment.pop("LLM_LOCALAI_OWNER_PID", None)
         try:
             self._spawn_detached(
                 [
@@ -2082,7 +1043,7 @@ class LocalAIManager:
         last_error: Exception | None = None
         health_url = f"{base_url}/readyz"
         headers: dict[str, str] = {}
-        if api_key := self.environ.get("UNITALE_LOCALAI_API_KEY"):
+        if api_key := self.environ.get("LLM_LOCALAI_API_KEY"):
             headers["Authorization"] = f"Bearer {api_key}"
         while True:
             state = self._read_state(required=False)
@@ -2197,41 +1158,22 @@ class LocalAIManager:
             temporary_path.unlink(missing_ok=True)
 
     def _enabled(self) -> bool:
-        value = self.environ.get("UNITALE_LOCALAI_ENABLED", "false").strip().lower()
+        value = self.environ.get("LLM_LOCALAI_ENABLED", "false").strip().lower()
         return value in {"1", "true", "yes", "on"}
 
 
 def main() -> int:
     """解析固定版本校验、启停与状态子命令。"""
-    parser = argparse.ArgumentParser(description="管理 Unitale 裸机 LocalAI 实例")
+    parser = argparse.ArgumentParser(description="管理 LLM Local Backend 裸机 LocalAI 实例")
     parser.add_argument(
         "command",
         choices=(
             "verify-install",
-            "register-qwen3-asr-candidate",
             "register-qwen3-tts-candidate",
             "verify-qwen3-tts-candidate",
             "register-qwen3-voicedesign-candidate",
-            "register-dots-tts-soar-candidate",
-            "register-voxcpm2-candidate",
-            "verify-voxcpm2-candidate",
-            "register-confucius4-tts-candidate",
-            "verify-confucius4-tts-candidate",
-            "register-moss-voicegenerator-candidate",
-            "verify-moss-voicegenerator-candidate",
-            "register-fireredtts3-base-candidate",
-            "verify-fireredtts3-base-candidate",
-            "register-fireredtts3-instruct-candidate",
-            "verify-fireredtts3-instruct-candidate",
-            "register-ace-step-candidate",
-            "verify-ace-step-candidate",
-            "register-stable-audio-candidate",
-            "verify-stable-audio-candidate",
-            "register-seed-vc-candidate",
-            "verify-seed-vc-candidate",
             "register-worker-bridge-candidates",
             "verify-worker-bridge-candidates",
-            "verify-dots-tts-soar-candidate",
             "verify-qwen3-voicedesign-candidate",
             "start",
             "stop",
@@ -2252,54 +1194,16 @@ def main() -> int:
                 int(arguments.watch_args[2]),
                 arguments.watch_args[3],
             )
-        elif arguments.command == "register-qwen3-asr-candidate":
-            manager.register_qwen3_asr_candidate()
         elif arguments.command == "register-qwen3-tts-candidate":
             manager.register_qwen3_tts_candidate()
         elif arguments.command == "verify-qwen3-tts-candidate":
             manager.verify_qwen3_tts_candidate()
         elif arguments.command == "register-qwen3-voicedesign-candidate":
             manager.register_qwen3_voicedesign_candidate()
-        elif arguments.command == "register-dots-tts-soar-candidate":
-            manager.register_dots_tts_soar_candidate()
-        elif arguments.command == "register-voxcpm2-candidate":
-            manager.register_voxcpm2_candidate()
-        elif arguments.command == "verify-voxcpm2-candidate":
-            manager.verify_voxcpm2_candidate()
-        elif arguments.command == "register-confucius4-tts-candidate":
-            manager.register_confucius4_tts_candidate()
-        elif arguments.command == "verify-confucius4-tts-candidate":
-            manager.verify_confucius4_tts_candidate()
-        elif arguments.command == "register-moss-voicegenerator-candidate":
-            manager.register_moss_voicegenerator_candidate()
-        elif arguments.command == "verify-moss-voicegenerator-candidate":
-            manager.verify_moss_voicegenerator_candidate()
-        elif arguments.command == "register-fireredtts3-base-candidate":
-            manager.register_fireredtts3_base_candidate()
-        elif arguments.command == "verify-fireredtts3-base-candidate":
-            manager.verify_fireredtts3_base_candidate()
-        elif arguments.command == "register-fireredtts3-instruct-candidate":
-            manager.register_fireredtts3_instruct_candidate()
-        elif arguments.command == "verify-fireredtts3-instruct-candidate":
-            manager.verify_fireredtts3_instruct_candidate()
-        elif arguments.command == "register-ace-step-candidate":
-            manager.register_ace_step_candidate()
-        elif arguments.command == "verify-ace-step-candidate":
-            manager.verify_ace_step_candidate()
-        elif arguments.command == "register-stable-audio-candidate":
-            manager.register_stable_audio_candidate()
-        elif arguments.command == "verify-stable-audio-candidate":
-            manager.verify_stable_audio_candidate()
-        elif arguments.command == "register-seed-vc-candidate":
-            manager.register_seed_vc_candidate()
-        elif arguments.command == "verify-seed-vc-candidate":
-            manager.verify_seed_vc_candidate()
         elif arguments.command == "register-worker-bridge-candidates":
             manager.register_worker_bridge_candidates()
         elif arguments.command == "verify-worker-bridge-candidates":
             manager.verify_worker_bridge_candidates()
-        elif arguments.command == "verify-dots-tts-soar-candidate":
-            manager.verify_dots_tts_soar_candidate()
         elif arguments.command == "verify-qwen3-voicedesign-candidate":
             manager.verify_qwen3_voicedesign_candidate()
         elif arguments.command == "verify-install":

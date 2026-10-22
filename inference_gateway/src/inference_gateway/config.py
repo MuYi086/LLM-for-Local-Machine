@@ -73,12 +73,12 @@ def _validate_base_url(value: str) -> str:
         or parsed.fragment
     ):
         raise GatewayConfigurationError(
-            "UNITALE_LOCALAI_BASE_URL 只允许不带凭据的本机 HTTP 回环地址。"
+            "LLM_LOCALAI_BASE_URL 只允许不带凭据的本机 HTTP 回环地址。"
         )
     try:
         _ = parsed.port
     except ValueError as exc:
-        raise GatewayConfigurationError("UNITALE_LOCALAI_BASE_URL 端口无效。") from exc
+        raise GatewayConfigurationError("LLM_LOCALAI_BASE_URL 端口无效。") from exc
     return value.rstrip("/")
 
 
@@ -91,7 +91,7 @@ def load_gateway_config(
 ) -> GatewayConfig:
     """加载服务 provider 配置，并在启动时拒绝不安全值。"""
     values = os.environ if environ is None else environ
-    enabled = values.get("UNITALE_LOCALAI_ENABLED", "false").strip().lower() in {
+    enabled = values.get("LLM_LOCALAI_ENABLED", "false").strip().lower() in {
         "1",
         "true",
         "yes",
@@ -100,7 +100,7 @@ def load_gateway_config(
     provider = (
         values.get(
             service_provider_env,
-            values.get("UNITALE_INFERENCE_PROVIDER", "native"),
+            values.get("LLM_LOCAL_INFERENCE_PROVIDER", "native"),
         )
         .strip()
         .lower()
@@ -109,10 +109,10 @@ def load_gateway_config(
         raise GatewayConfigurationError(f"{service_provider_env} 只支持 native 或 localai。")
     if provider == "localai" and not enabled:
         raise GatewayConfigurationError(
-            f"{service_provider_env}=localai 需要显式设置 UNITALE_LOCALAI_ENABLED=true。"
+            f"{service_provider_env}=localai 需要显式设置 LLM_LOCALAI_ENABLED=true。"
         )
 
-    base_url = _validate_base_url(values.get("UNITALE_LOCALAI_BASE_URL", "http://127.0.0.1:8400"))
+    base_url = _validate_base_url(values.get("LLM_LOCALAI_BASE_URL", "http://127.0.0.1:8400"))
     model = values.get(f"{service_provider_env.removesuffix('_PROVIDER')}_MODEL", default_model)
     if not model or any(
         character not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-"
@@ -125,18 +125,18 @@ def load_gateway_config(
         localai_enabled=enabled,
         base_url=base_url,
         model=model,
-        api_key=values.get("UNITALE_LOCALAI_API_KEY") or None,
+        api_key=values.get("LLM_LOCALAI_API_KEY") or None,
         connect_timeout=_positive_float(
-            "UNITALE_LOCALAI_CONNECT_TIMEOUT",
-            values.get("UNITALE_LOCALAI_CONNECT_TIMEOUT", "5"),
+            "LLM_LOCALAI_CONNECT_TIMEOUT",
+            values.get("LLM_LOCALAI_CONNECT_TIMEOUT", "5"),
         ),
         request_timeout=_positive_float(
             "LocalAI 请求超时",
             str(request_timeout),
         ),
         cleanup_timeout=_positive_float(
-            "UNITALE_LOCALAI_CLEANUP_TIMEOUT",
-            values.get("UNITALE_LOCALAI_CLEANUP_TIMEOUT", "30"),
+            "LLM_LOCALAI_CLEANUP_TIMEOUT",
+            values.get("LLM_LOCALAI_CLEANUP_TIMEOUT", "30"),
         ),
         gpu_lock_file=values.get("GPU_LOCK_FILE", "storage/.cache/runtime/gpu-runtime.lock"),
         gpu_lock_wait_timeout=_positive_float(

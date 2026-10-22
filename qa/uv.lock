@@ -341,37 +341,37 @@ wheels = [
 ]
 
 [[package]]
-name = "unitale-inference-gateway"
+name = "llm-local-inference-gateway"
 version = "0.1.0"
 source = { editable = "../inference_gateway" }
 dependencies = [
-    { name = "unitale-runtime" },
+    { name = "llm-local-runtime" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "unitale-runtime", editable = "../unitale_runtime" }]
+requires-dist = [{ name = "llm-local-runtime", editable = "../llm_local_runtime" }]
 
 [[package]]
-name = "unitale-localai-worker-bridge"
+name = "localai-worker-bridge"
 version = "0.1.0"
-source = { editable = "../unitale_localai_bridge" }
+source = { editable = "../localai_worker_bridge" }
 dependencies = [
     { name = "grpcio" },
     { name = "protobuf" },
-    { name = "unitale-inference-gateway" },
-    { name = "unitale-runtime" },
+    { name = "llm-local-inference-gateway" },
+    { name = "llm-local-runtime" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "grpcio", specifier = ">=1.70,<2" },
     { name = "protobuf", specifier = ">=5,<7" },
-    { name = "unitale-inference-gateway", editable = "../inference_gateway" },
-    { name = "unitale-runtime", editable = "../unitale_runtime" },
+    { name = "llm-local-inference-gateway", editable = "../inference_gateway" },
+    { name = "llm-local-runtime", editable = "../llm_local_runtime" },
 ]
 
 [[package]]
-name = "unitale-no-model-qa"
+name = "llm-local-backend-no-model-qa"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
@@ -384,8 +384,8 @@ dependencies = [
     { name = "python-multipart" },
     { name = "pyyaml" },
     { name = "starlette" },
-    { name = "unitale-localai-worker-bridge" },
-    { name = "unitale-runtime" },
+    { name = "localai-worker-bridge" },
+    { name = "llm-local-runtime" },
     { name = "uvicorn" },
 ]
 
@@ -405,8 +405,8 @@ requires-dist = [
     { name = "python-multipart", specifier = "==0.0.32" },
     { name = "pyyaml", specifier = "==6.0.3" },
     { name = "starlette", specifier = "==1.6.0" },
-    { name = "unitale-localai-worker-bridge", editable = "../unitale_localai_bridge" },
-    { name = "unitale-runtime", editable = "../unitale_runtime" },
+    { name = "localai-worker-bridge", editable = "../localai_worker_bridge" },
+    { name = "llm-local-runtime", editable = "../llm_local_runtime" },
     { name = "uvicorn", specifier = "==0.52.1" },
 ]
 
@@ -414,9 +414,9 @@ requires-dist = [
 dev = [{ name = "ruff", specifier = ">=0.15.9" }]
 
 [[package]]
-name = "unitale-runtime"
+name = "llm-local-runtime"
 version = "0.1.0"
-source = { editable = "../unitale_runtime" }
+source = { editable = "../llm_local_runtime" }
 
 [[package]]
 name = "uvicorn"

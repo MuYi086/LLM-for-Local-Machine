@@ -26,10 +26,10 @@ from spatial_audio import (
 )
 from spatial_schema import SpatialRenderManifest
 
-from unitale_runtime import StagedUpload
+from llm_local_runtime import StagedUpload
 
 MAX_ERROR_LINES = 40
-RENDERER_PROGRESS_PATTERN = re.compile(r"^UNITALE_PROGRESS\s+(\d+)\s+(\d+)$")
+RENDERER_PROGRESS_PATTERN = re.compile(r"^LLM_LOCAL_PROGRESS\s+(\d+)\s+(\d+)$")
 LOGGER = logging.getLogger("uvicorn.error")
 ProgressCallback = Callable[[str, int, str], None]
 
@@ -402,7 +402,7 @@ class SteamAudioRenderProcessor:
                 job_dir,
                 profile=profile,
                 output_format=output_format,
-                download_prefix="unitale_steam",
+                download_prefix="llm-local_steam",
             )
             pre_master_path.unlink(missing_ok=True)
             if progress_callback:

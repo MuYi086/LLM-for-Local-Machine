@@ -1,4 +1,4 @@
-name: unitale.sheetsage2.worker.v1
-backend: unitale-worker
+name: llm-local.sheetsage2.worker.v1
+backend: llm-local-worker
 parameters:
-  model: unitale.sheetsage2.worker.v1
+  model: llm-local.sheetsage2.worker.v1

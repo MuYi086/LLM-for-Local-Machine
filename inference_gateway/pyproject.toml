@@ -1,9 +1,9 @@
 [project]
-name = "unitale-inference-gateway"
+name = "llm-local-inference-gateway"
 version = "0.1.0"
 description = "轻量 LocalAI 接入与 GPU 执行边界"
 requires-python = ">=3.12"
-dependencies = ["unitale-runtime"]
+dependencies = ["llm-local-runtime"]
 
 [tool.uv]
 package = true
@@ -16,7 +16,7 @@ build-backend = "hatchling.build"
 packages = ["src/inference_gateway"]
 
 [tool.uv.sources]
-unitale-runtime = { path = "../unitale_runtime", editable = true }
+llm-local-runtime = { path = "../llm_local_runtime", editable = true }
 
 [tool.ruff]
 line-length = 100

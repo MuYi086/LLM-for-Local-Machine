@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import signal
@@ -40,27 +39,17 @@ class LocalAIManagerTests(unittest.TestCase):
 
     def manager(self, **overrides: str) -> LocalAIManager:
         environment = {
-            "UNITALE_LOCALAI_DATA_DIR": str(self.data_dir),
-            "UNITALE_LOCALAI_BINARY": str(self.binary_path),
-            "UNITALE_LOCALAI_BACKENDS_DIR": str(self.data_dir / "backends"),
-            "UNITALE_LOCALAI_ENABLED": "true",
-            "UNITALE_LOCALAI_BASE_URL": "http://127.0.0.1:18400",
+            "LLM_LOCALAI_DATA_DIR": str(self.data_dir),
+            "LLM_LOCALAI_BINARY": str(self.binary_path),
+            "LLM_LOCALAI_BACKENDS_DIR": str(self.data_dir / "backends"),
+            "LLM_LOCALAI_ENABLED": "true",
+            "LLM_LOCALAI_BASE_URL": "http://127.0.0.1:18400",
             **overrides,
         }
         return LocalAIManager(environ=environment, readiness_timeout=0.01)
 
     def install_stamp(self) -> None:
         self.manager().verify_install()
-
-    def manager_with_test_artifact(self, contents: bytes = b"candidate gguf") -> LocalAIManager:
-        manager = self.manager()
-        package = manager.manifest["model_artifacts"]["selected_localai_packages"][0]
-        artifact_path = self.data_dir / "models" / package["model_file"]
-        artifact_path.parent.mkdir(parents=True, exist_ok=True)
-        artifact_path.write_bytes(contents)
-        package["model_file_size_bytes"] = len(contents)
-        package["model_file_sha256"] = hashlib.sha256(contents).hexdigest()
-        return manager
 
     def qwen3_tts_model(self) -> Path:
         model_dir = Path(self.temporary.name) / "Qwen3-TTS-12Hz-1.7B-Base"
@@ -148,140 +137,30 @@ class LocalAIManagerTests(unittest.TestCase):
         with self.assertRaisesRegex(LocalAIManagerError, "软链接越界"):
             self.manager()._sha256_tree(self.backend_run.parent)
 
-    def test_candidate_yaml_references_the_pinned_gguf_repository_path(self) -> None:
-        versions = json.loads((REPOSITORY_DIR / "localai/manifests/versions.json").read_text())
-        model_file = versions["model_artifacts"]["selected_localai_packages"][0]["model_file"]
-        candidate = (REPOSITORY_DIR / "localai/manifests/qwen3-asr-candidate.yaml").read_text()
-
-        self.assertIn(f"  model: {model_file}\n", candidate)
-
-    def test_candidate_registration_verifies_hash_and_copies_pinned_yaml(self) -> None:
-        manager = self.manager_with_test_artifact()
-        manager.register_qwen3_asr_candidate()
-        manager.verify_qwen3_asr_candidate()
-
-        installed_config = self.data_dir / "models/unitale.qwen3-asr.1p7b.yaml"
-        self.assertEqual(
-            installed_config.read_bytes(),
-            (REPOSITORY_DIR / "localai/manifests/qwen3-asr-candidate.yaml").read_bytes(),
-        )
-
-    def test_candidate_registration_rejects_modified_artifact_or_config(self) -> None:
-        manager = self.manager_with_test_artifact()
-        manager.register_qwen3_asr_candidate()
-        artifact = (
-            self.data_dir
-            / "models"
-            / manager.manifest["model_artifacts"]["selected_localai_packages"][0]["model_file"]
-        )
-        artifact.write_bytes(b"modified artifact")
-        with self.assertRaises(LocalAIManagerError):
-            manager.verify_qwen3_asr_candidate()
-
     def test_worker_bridge_candidate_registration_needs_no_model_weights(self) -> None:
         manager = self.manager()
         manager.register_worker_bridge_candidates()
         manager.verify_worker_bridge_candidates()
 
         for model_name in (
-            "unitale.sheetsage2.worker.v1",
-            "unitale.mert-v2-fullsong.worker.v1",
-            "unitale.yue2-vae.worker.v1",
-            "unitale.soulx-flashhead.worker.v1",
-            "unitale.ditto.worker.v1",
-            "unitale.yue2-3b.worker.v1",
-            "unitale.moss-soundeffect-v2.worker.v1",
-            "unitale.step-audio-editx.worker.v1",
-            "unitale.moss-audio-4b.thinking.worker.v1",
-            "unitale.moss-audio-4b.instruct.worker.v1",
-            "unitale.tiger-dnr.worker.v1",
+            "llm-local.sheetsage2.worker.v1",
+            "llm-local.mert-v2-fullsong.worker.v1",
+            "llm-local.yue2-vae.worker.v1",
+            "llm-local.yue2-3b.worker.v1",
+            "llm-local.tiger-dnr.worker.v1",
         ):
             installed = self.data_dir / "models" / f"{model_name}.yaml"
             self.assertTrue(installed.is_file())
-            self.assertIn("backend: unitale-worker", installed.read_text(encoding="utf-8"))
+            self.assertIn("backend: llm-local-worker", installed.read_text(encoding="utf-8"))
 
     def test_worker_bridge_candidate_verification_rejects_modified_yaml(self) -> None:
         manager = self.manager()
         manager.register_worker_bridge_candidates()
-        candidate = self.data_dir / "models/unitale.sheetsage2.worker.v1.yaml"
+        candidate = self.data_dir / "models/llm-local.sheetsage2.worker.v1.yaml"
         candidate.write_text(candidate.read_text(encoding="utf-8") + "# changed\n")
 
         with self.assertRaisesRegex(LocalAIManagerError, "YAML 不匹配"):
             manager.verify_worker_bridge_candidates()
-
-    def test_ace_step_candidate_registration_tracks_manual_file_hash(self) -> None:
-        manager = self.manager()
-        artifact_path = (
-            self.data_dir
-            / "models/ACE-Step1.5-GGUF/xl-turbo-q8dit/ace-step-1.5-xl-turbo-q8dit.gguf"
-        )
-        artifact_path.parent.mkdir(parents=True)
-        artifact_path.write_bytes(b"manual ACE-Step model fixture")
-
-        manager.register_ace_step_candidate()
-        manager.verify_ace_step_candidate()
-
-        installed_config = self.data_dir / "models/unitale.ace-step15.xl-turbo.q8dit.yaml"
-        self.assertEqual(
-            installed_config.read_bytes(),
-            (REPOSITORY_DIR / "localai/manifests/ace-step-xl-turbo-candidate.yaml").read_bytes(),
-        )
-        artifact_path.write_bytes(b"changed fixture")
-        with self.assertRaisesRegex(LocalAIManagerError, "size/hash"):
-            manager.verify_ace_step_candidate()
-
-    def test_ace_step_candidate_registration_never_downloads_missing_model(self) -> None:
-        with self.assertRaisesRegex(LocalAIManagerError, "不会下载模型"):
-            self.manager().register_ace_step_candidate()
-
-    def test_stable_audio_candidate_registration_tracks_manual_file_hash(self) -> None:
-        manager = self.manager()
-        artifact_path = (
-            self.data_dir / "models/Stable-Audio-3-Medium-GGUF/stable-audio-3-medium-q8_0.gguf"
-        )
-        artifact_path.parent.mkdir(parents=True)
-        artifact_path.write_bytes(b"manual Stable Audio model fixture")
-
-        manager.register_stable_audio_candidate()
-        manager.verify_stable_audio_candidate()
-
-        installed_config = self.data_dir / "models/unitale.stable-audio3-medium.q8-0.yaml"
-        self.assertEqual(
-            installed_config.read_bytes(),
-            (REPOSITORY_DIR / "localai/manifests/stable-audio3-medium-candidate.yaml").read_bytes(),
-        )
-        artifact_path.write_bytes(b"changed fixture")
-        with self.assertRaisesRegex(LocalAIManagerError, "size/hash"):
-            manager.verify_stable_audio_candidate()
-
-    def test_stable_audio_candidate_registration_never_downloads_missing_model(self) -> None:
-        with self.assertRaisesRegex(LocalAIManagerError, "不会下载模型"):
-            self.manager().register_stable_audio_candidate()
-
-    def test_seed_vc_registration_tracks_directory_and_both_task_configs(self) -> None:
-        manager = self.manager()
-        model_dir = self.data_dir / "models/SeedVC-MLX"
-        model_dir.mkdir(parents=True)
-        (model_dir / "package.json").write_text("fixture", encoding="utf-8")
-
-        manager.register_seed_vc_candidate()
-        manager.verify_seed_vc_candidate()
-
-        for model_name, template_name in (
-            ("unitale.seed-vc.vc.f16", "seed-vc-vc-candidate.yaml"),
-            ("unitale.seed-vc.svc.f16", "seed-vc-svc-candidate.yaml"),
-        ):
-            installed = self.data_dir / f"models/{model_name}.yaml"
-            template = REPOSITORY_DIR / "localai/manifests" / template_name
-            self.assertEqual(installed.read_bytes(), template.read_bytes())
-
-        (model_dir / "package.json").write_text("changed", encoding="utf-8")
-        with self.assertRaisesRegex(LocalAIManagerError, "tree hash"):
-            manager.verify_seed_vc_candidate()
-
-    def test_seed_vc_registration_does_not_download_missing_directory(self) -> None:
-        with self.assertRaisesRegex(LocalAIManagerError, "不会下载模型"):
-            self.manager().register_seed_vc_candidate()
 
     def test_qwen3_tts_registration_requires_manual_model_and_renders_model_path(self) -> None:
         missing_model_dir = Path(self.temporary.name) / "not-downloaded"
@@ -293,7 +172,7 @@ class LocalAIManagerTests(unittest.TestCase):
         manager.register_qwen3_tts_candidate()
         manager.verify_qwen3_tts_candidate()
 
-        installed_config = self.data_dir / "models/unitale.qwen3-tts.1p7b-base.yaml"
+        installed_config = self.data_dir / "models/llm-local.qwen3-tts.1p7b-base.yaml"
         rendered = installed_config.read_text(encoding="utf-8")
         self.assertIn(f"  model: {json.dumps(str(model_dir.resolve()))}\n", rendered)
         self.assertIn("family:qwen3_tts", rendered)
@@ -303,7 +182,7 @@ class LocalAIManagerTests(unittest.TestCase):
         model_dir = self.qwen3_tts_model()
         manager = self.manager(QWEN3_TTS_MODEL_DIR=str(model_dir))
         manager.register_qwen3_tts_candidate()
-        config_path = self.data_dir / "models/unitale.qwen3-tts.1p7b-base.yaml"
+        config_path = self.data_dir / "models/llm-local.qwen3-tts.1p7b-base.yaml"
         config_path.write_text(config_path.read_text(encoding="utf-8") + "# changed\n")
 
         with self.assertRaisesRegex(LocalAIManagerError, "不一致"):
@@ -321,7 +200,7 @@ class LocalAIManagerTests(unittest.TestCase):
         manager.register_qwen3_voicedesign_candidate()
         manager.verify_qwen3_voicedesign_candidate()
 
-        installed_config = self.data_dir / "models/unitale.qwen3-tts.1p7b-voicedesign.yaml"
+        installed_config = self.data_dir / "models/llm-local.qwen3-tts.1p7b-voicedesign.yaml"
         rendered = installed_config.read_text(encoding="utf-8")
         self.assertIn(f"  model: {json.dumps(str(model_dir.resolve()))}\n", rendered)
         self.assertIn("family:qwen3_tts", rendered)
@@ -332,178 +211,14 @@ class LocalAIManagerTests(unittest.TestCase):
         model_dir = self.qwen3_voicedesign_model()
         manager = self.manager(QWEN_VOICEDESIGN_MODEL_DIR=str(model_dir))
         manager.register_qwen3_voicedesign_candidate()
-        config_path = self.data_dir / "models/unitale.qwen3-tts.1p7b-voicedesign.yaml"
+        config_path = self.data_dir / "models/llm-local.qwen3-tts.1p7b-voicedesign.yaml"
         config_path.write_text(config_path.read_text(encoding="utf-8") + "# changed\n")
 
         with self.assertRaisesRegex(LocalAIManagerError, "不一致"):
             manager.verify_qwen3_voicedesign_candidate()
 
-    def test_dots_tts_registration_requires_manual_gguf_and_tracks_local_hash(self) -> None:
-        manager = self.manager()
-        with self.assertRaisesRegex(LocalAIManagerError, "不会下载模型"):
-            manager.register_dots_tts_soar_candidate()
-
-        artifact = self.data_dir / "models/DotTTS-SOAR-GGUF/dots-tts-soar-q8_0.gguf"
-        artifact.parent.mkdir(parents=True)
-        artifact.write_bytes(b"manual DotTTS Q8 fixture")
-        manager.register_dots_tts_soar_candidate()
-        manager.verify_dots_tts_soar_candidate()
-
-        installed_config = self.data_dir / "models/unitale.dots-tts-soar.q8-0.yaml"
-        self.assertEqual(
-            installed_config.read_bytes(),
-            (REPOSITORY_DIR / "localai/manifests/dots-tts-soar-candidate.yaml").read_bytes(),
-        )
-        stamp = json.loads(
-            (self.data_dir / "models/unitale.dots-tts-soar.q8-0.artifact.json").read_text()
-        )
-        self.assertEqual(stamp["relative_path"], "DotTTS-SOAR-GGUF/dots-tts-soar-q8_0.gguf")
-        self.assertEqual(stamp["sha256"], hashlib.sha256(artifact.read_bytes()).hexdigest())
-
-        artifact.write_bytes(b"changed after registration")
-        with self.assertRaisesRegex(LocalAIManagerError, "size/hash"):
-            manager.verify_dots_tts_soar_candidate()
-
-    def test_voxcpm2_registration_requires_manual_gguf_and_tracks_local_hash(self) -> None:
-        manager = self.manager()
-        with self.assertRaisesRegex(LocalAIManagerError, "不会下载模型"):
-            manager.register_voxcpm2_candidate()
-
-        artifact = self.data_dir / "models/VoxCPM2-GGUF/voxcpm2-q8_0.gguf"
-        artifact.parent.mkdir(parents=True)
-        artifact.write_bytes(b"manual VoxCPM2 Q8 fixture")
-        manager.register_voxcpm2_candidate()
-        manager.verify_voxcpm2_candidate()
-
-        installed_config = self.data_dir / "models/unitale.voxcpm2.q8-0.yaml"
-        self.assertEqual(
-            installed_config.read_bytes(),
-            (REPOSITORY_DIR / "localai/manifests/voxcpm2-candidate.yaml").read_bytes(),
-        )
-        stamp = json.loads(
-            (self.data_dir / "models/unitale.voxcpm2.q8-0.artifact.json").read_text()
-        )
-        self.assertEqual(stamp["relative_path"], "VoxCPM2-GGUF/voxcpm2-q8_0.gguf")
-        self.assertEqual(stamp["sha256"], hashlib.sha256(artifact.read_bytes()).hexdigest())
-
-        artifact.write_bytes(b"changed after registration")
-        with self.assertRaisesRegex(LocalAIManagerError, "size/hash"):
-            manager.verify_voxcpm2_candidate()
-
-    def test_confucius4_tts_registration_requires_manual_original_gguf(self) -> None:
-        manager = self.manager()
-        with self.assertRaisesRegex(LocalAIManagerError, "不会下载模型"):
-            manager.register_confucius4_tts_candidate()
-
-        artifact = self.data_dir / "models/Confucius4-TTS-GGUF/confucius4-tts-orig.gguf"
-        artifact.parent.mkdir(parents=True)
-        artifact.write_bytes(b"manual Confucius4 original fixture")
-        manager.register_confucius4_tts_candidate()
-        manager.verify_confucius4_tts_candidate()
-
-        installed_config = self.data_dir / "models/unitale.confucius4-tts.orig.yaml"
-        self.assertEqual(
-            installed_config.read_bytes(),
-            (REPOSITORY_DIR / "localai/manifests/confucius4-tts-candidate.yaml").read_bytes(),
-        )
-        stamp = json.loads(
-            (self.data_dir / "models/unitale.confucius4-tts.orig.artifact.json").read_text()
-        )
-        self.assertEqual(stamp["relative_path"], "Confucius4-TTS-GGUF/confucius4-tts-orig.gguf")
-        self.assertEqual(stamp["sha256"], hashlib.sha256(artifact.read_bytes()).hexdigest())
-
-        artifact.write_bytes(b"changed after registration")
-        with self.assertRaisesRegex(LocalAIManagerError, "size/hash"):
-            manager.verify_confucius4_tts_candidate()
-
-    def test_asr_candidate_registration_rejects_modified_config(self) -> None:
-        manager = self.manager_with_test_artifact()
-        manager.register_qwen3_asr_candidate()
-        config_path = self.data_dir / "models/unitale.qwen3-asr.1p7b.yaml"
-        config_path.write_text(config_path.read_text() + "# changed\n")
-        with self.assertRaises(LocalAIManagerError):
-            manager.verify_qwen3_asr_candidate()
-
-    def test_moss_voicegenerator_registration_requires_manual_self_contained_gguf(self) -> None:
-        manager = self.manager()
-        with self.assertRaisesRegex(LocalAIManagerError, "不会下载模型"):
-            manager.register_moss_voicegenerator_candidate()
-
-        artifact = (
-            self.data_dir
-            / "models/MOSS-VoiceGenerator-GGUF/moss_voicegen_bf16_codec_f16_decode.gguf"
-        )
-        artifact.parent.mkdir(parents=True)
-        artifact.write_bytes(b"manual MOSS VoiceGenerator BF16 fixture")
-        manager.register_moss_voicegenerator_candidate()
-        manager.verify_moss_voicegenerator_candidate()
-
-        installed_config = self.data_dir / "models/unitale.moss-voicegenerator.bf16.yaml"
-        self.assertEqual(
-            installed_config.read_bytes(),
-            (REPOSITORY_DIR / "localai/manifests/moss-voicegenerator-candidate.yaml").read_bytes(),
-        )
-        stamp = json.loads(
-            (self.data_dir / "models/unitale.moss-voicegenerator.bf16.artifact.json").read_text()
-        )
-        self.assertEqual(
-            stamp["relative_path"],
-            "MOSS-VoiceGenerator-GGUF/moss_voicegen_bf16_codec_f16_decode.gguf",
-        )
-        self.assertEqual(stamp["sha256"], hashlib.sha256(artifact.read_bytes()).hexdigest())
-
-        artifact.write_bytes(b"changed after registration")
-        with self.assertRaisesRegex(LocalAIManagerError, "size/hash"):
-            manager.verify_moss_voicegenerator_candidate()
-
-    def test_fireredtts3_registers_base_clone_and_instruct_design_candidates(self) -> None:
-        manager = self.manager()
-        specifications = (
-            (
-                "base",
-                "FireRedTTS3-Base-GGUF/fireredtts3-base-q8_0.gguf",
-                "unitale.fireredtts3.base.q8-0",
-                "fireredtts3-base-candidate.yaml",
-                manager.register_fireredtts3_base_candidate,
-                manager.verify_fireredtts3_base_candidate,
-            ),
-            (
-                "instruct",
-                "FireRedTTS3-Instruct-GGUF/fireredtts3-instruct-q8_0.gguf",
-                "unitale.fireredtts3.instruct.q8-0",
-                "fireredtts3-instruct-candidate.yaml",
-                manager.register_fireredtts3_instruct_candidate,
-                manager.verify_fireredtts3_instruct_candidate,
-            ),
-        )
-        for mode, relative_path, model_name, template_name, register, verify in specifications:
-            with self.subTest(mode=mode):
-                with self.assertRaisesRegex(LocalAIManagerError, "不会下载模型"):
-                    register()
-
-                artifact = self.data_dir / "models" / relative_path
-                artifact.parent.mkdir(parents=True, exist_ok=True)
-                artifact.write_bytes(f"manual FireRed {mode} Q8 fixture".encode())
-                register()
-                verify()
-
-                installed_config = self.data_dir / f"models/{model_name}.yaml"
-                self.assertEqual(
-                    installed_config.read_bytes(),
-                    (REPOSITORY_DIR / "localai/manifests" / template_name).read_bytes(),
-                )
-                stamp = json.loads(
-                    (self.data_dir / f"models/{model_name}.artifact.json").read_text()
-                )
-                self.assertEqual(stamp["relative_path"], relative_path)
-                self.assertEqual(stamp["sha256"], hashlib.sha256(artifact.read_bytes()).hexdigest())
-
-                artifact.write_bytes(b"changed after registration")
-                with self.assertRaisesRegex(LocalAIManagerError, "size/hash"):
-                    verify()
-
     def test_start_is_loopback_only_single_backend_and_waits_for_ready(self) -> None:
-        manager = self.manager(UNITALE_LOCALAI_API_KEY="test-key")
+        manager = self.manager(LLM_LOCALAI_API_KEY="test-key")
         manager.verify_install()
         with (
             patch("scripts.localai.manager.os.posix_spawn", return_value=4242) as spawn,
@@ -533,9 +248,9 @@ class LocalAIManagerTests(unittest.TestCase):
 
     def test_start_registers_managed_worker_bridge_in_external_backend_map(self) -> None:
         manager = self.manager(
-            UNITALE_LOCALAI_WORKER_BRIDGE_ENABLED="true",
-            UNITALE_LOCALAI_BRIDGE_ADDRESS="127.0.0.1:18401",
-            LOCALAI_EXTERNAL_GRPC_BACKENDS="other:127.0.0.1:50060,unitale-worker:127.0.0.1:9",
+            LLM_LOCALAI_WORKER_BRIDGE_ENABLED="true",
+            LLM_LOCALAI_BRIDGE_ADDRESS="127.0.0.1:18401",
+            LOCALAI_EXTERNAL_GRPC_BACKENDS="other:127.0.0.1:50060,llm-local-worker:127.0.0.1:9",
         )
         manager.verify_install()
         with (
@@ -564,23 +279,23 @@ class LocalAIManagerTests(unittest.TestCase):
         )
         self.assertEqual(
             environment["LOCALAI_EXTERNAL_GRPC_BACKENDS"],
-            "other:127.0.0.1:50060,unitale-worker:127.0.0.1:18401",
+            "other:127.0.0.1:50060,llm-local-worker:127.0.0.1:18401",
         )
-        self.assertEqual(environment["UNITALE_LOCALAI_WORKER_BRIDGE_ENABLED"], "true")
-        self.assertEqual(environment["UNITALE_LOCALAI_BRIDGE_ADDRESS"], "127.0.0.1:18401")
+        self.assertEqual(environment["LLM_LOCALAI_WORKER_BRIDGE_ENABLED"], "true")
+        self.assertEqual(environment["LLM_LOCALAI_BRIDGE_ADDRESS"], "127.0.0.1:18401")
         self.assertEqual([call.args[0] for call in ensure_port.call_args_list], [18400, 18401])
 
     def test_worker_bridge_rejects_non_loopback_address(self) -> None:
         manager = self.manager(
-            UNITALE_LOCALAI_WORKER_BRIDGE_ENABLED="true",
-            UNITALE_LOCALAI_BRIDGE_ADDRESS="0.0.0.0:50052",
+            LLM_LOCALAI_WORKER_BRIDGE_ENABLED="true",
+            LLM_LOCALAI_BRIDGE_ADDRESS="0.0.0.0:50052",
         )
         manager.verify_install()
         with self.assertRaisesRegex(LocalAIManagerError, "127.0.0.1"):
             manager.start()
 
     def test_manager_reaps_orphaned_worker_bridge_process_group(self) -> None:
-        worker_script = REPOSITORY_DIR / "SheetSage2/worker.py"
+        worker_script = REPOSITORY_DIR / "model-audio/SheetSage2/worker.py"
         worker = subprocess.Popen(
             [
                 sys.executable,
@@ -590,7 +305,7 @@ class LocalAIManagerTests(unittest.TestCase):
                 "--input-json",
                 "unused.json",
             ],
-            env={**os.environ, "UNITALE_LOCALAI_REQUEST_ID": "test-request"},
+            env={**os.environ, "LLM_LOCALAI_REQUEST_ID": "test-request"},
             start_new_session=True,
         )
         try:
@@ -624,7 +339,7 @@ class LocalAIManagerTests(unittest.TestCase):
             encoding="utf-8",
         )
         self.binary_path.chmod(0o755)
-        manager = self.manager(UNITALE_LOCALAI_BASE_URL=f"http://127.0.0.1:{port}")
+        manager = self.manager(LLM_LOCALAI_BASE_URL=f"http://127.0.0.1:{port}")
         manager.readiness_timeout = 3
         manager.verify_install()
 
@@ -662,8 +377,8 @@ class LocalAIManagerTests(unittest.TestCase):
         self.binary_path.chmod(0o755)
         owner = subprocess.Popen(["/bin/sleep", "30"], start_new_session=True)
         manager = self.manager(
-            UNITALE_LOCALAI_BASE_URL=f"http://127.0.0.1:{port}",
-            UNITALE_LOCALAI_OWNER_PID=str(owner.pid),
+            LLM_LOCALAI_BASE_URL=f"http://127.0.0.1:{port}",
+            LLM_LOCALAI_OWNER_PID=str(owner.pid),
         )
         manager.readiness_timeout = 3
         manager.verify_install()
@@ -709,7 +424,7 @@ class LocalAIManagerTests(unittest.TestCase):
         self.assertFalse(manager.state_path.exists())
 
     def test_start_requires_explicit_enable_and_verified_native_install(self) -> None:
-        disabled = self.manager(UNITALE_LOCALAI_ENABLED="false")
+        disabled = self.manager(LLM_LOCALAI_ENABLED="false")
         with self.assertRaises(LocalAIManagerError):
             disabled.start()
         with self.assertRaisesRegex(LocalAIManagerError, "verify-install"):
@@ -721,13 +436,13 @@ class LocalAIManagerTests(unittest.TestCase):
         for base_url in ("http://192.168.1.20:18400", "http://127.0.0.1:18400/api"):
             with self.subTest(base_url=base_url):
                 with self.assertRaises(LocalAIManagerError):
-                    self.manager(UNITALE_LOCALAI_BASE_URL=base_url)._base_url_and_port()
+                    self.manager(LLM_LOCALAI_BASE_URL=base_url)._base_url_and_port()
 
     def test_owner_watcher_is_started_before_readiness_without_copying_api_key(self) -> None:
         manager = self.manager(
-            UNITALE_LOCALAI_API_KEY="private-key",
+            LLM_LOCALAI_API_KEY="private-key",
             LOCALAI_API_KEY="legacy-private-key",
-            UNITALE_LOCALAI_OWNER_PID="42",
+            LLM_LOCALAI_OWNER_PID="42",
         )
         state = {"pid": 4242, "process_start_time": "18"}
         events: list[str] = []
@@ -744,7 +459,7 @@ class LocalAIManagerTests(unittest.TestCase):
 
         call = start_watcher.call_args
         self.assertEqual(call.args[1][4:9], ["watch", "42", "17", "4242", "18"])
-        self.assertNotIn("UNITALE_LOCALAI_API_KEY", call.args[2])
+        self.assertNotIn("LLM_LOCALAI_API_KEY", call.args[2])
         self.assertNotIn("LOCALAI_API_KEY", call.args[2])
 
     def test_owner_watcher_stops_group_after_owner_disappears(self) -> None:

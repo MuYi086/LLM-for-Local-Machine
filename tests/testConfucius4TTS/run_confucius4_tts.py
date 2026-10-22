@@ -169,7 +169,7 @@ def upload_audio(
     timeout: float,
 ) -> None:
     """以 multipart/form-data 流式上传参考音频，避免一次性复制大 WAV。"""
-    boundary = f"----UnitaleConfucius4TTS{uuid.uuid4().hex}"
+    boundary = f"----LLMLocalBackendConfucius4TTS{uuid.uuid4().hex}"
     text_parts = [
         (
             f"--{boundary}\r\n"

@@ -10,27 +10,16 @@ from pathlib import Path
 
 REPOSITORY_DIR = Path(__file__).resolve().parents[1]
 MODEL_PROJECTS = (
-    "mimo_tts",
     "qwen3_tts",
     "voxcpm2",
-    "LongCat_AudioDiT_3.5B_bf16",
-    "dots_tts_soar",
-    "moss_soundEffect",
-    "stable_audio_3_medium",
     "ace_step_1_5",
     "qwen3_voiceDesign",
-    "moss_voiceGenerator",
-    "moss_audio_4b_thinking",
     "Confucius4_TTS",
     "YuE2-3B",
     "SheetSage2",
     "YuE2-Vae",
     "MERT-v2-FullSong",
-    "seed-vc",
-    "SoulX-FlashHead-1_3B",
-    "ditto",
-    "Step_Audio_EditX",
-    "firered_tts3",
+    "Qwen3_ASR_1.7B",
     "TIGER-DnR",
 )
 EXPECTED_RUFF_RULES = {"E", "F", "I", "UP", "B"}
@@ -66,33 +55,18 @@ class PythonQualityConfigurationTests(unittest.TestCase):
                     'name = "ruff"', (project_dir / "uv.lock").read_text(encoding="utf-8")
                 )
 
-    def test_root_quality_rules_and_moss_dependency_use_the_local_checkout(self) -> None:
+    def test_root_quality_rules_remain_configured(self) -> None:
         root_ruff = tomllib.loads((REPOSITORY_DIR / "ruff.toml").read_text(encoding="utf-8"))
         self.assertEqual(set(root_ruff["lint"]["select"]), EXPECTED_RUFF_RULES)
         self.assertIn("E501", root_ruff["lint"]["ignore"])
 
-        moss_configuration = (REPOSITORY_DIR / "moss_voiceGenerator" / "pyproject.toml").read_text(
-            encoding="utf-8"
-        )
-        self.assertIn('path = "/home/muyi086/tts-depency/MOSS-TTS"', moss_configuration)
-        self.assertIn("editable = true", moss_configuration)
-        self.assertNotIn('git = "https://github.com/OpenMOSS/MOSS-TTS"', moss_configuration)
-
     def test_startup_uses_locked_environments_without_runtime_sync(self) -> None:
         start_script = (REPOSITORY_DIR / "start.sh").read_text(encoding="utf-8")
 
-        self.assertEqual(start_script.count("setsid uv run --no-sync --project"), 26)
+        self.assertEqual(start_script.count("setsid uv run --no-sync --project"), 12)
         self.assertNotIn("setsid uv run --project", start_script)
         self.assertEqual(start_script.count('for pid in "${pids[@]}"; do'), 3)
         self.assertNotIn('wait "$qwen3_tts_pid"', start_script)
-
-    def test_ditto_onnxruntime_stays_on_cuda12_release_series(self) -> None:
-        """ORT 1.27 起默认使用 CUDA 13，不能复用本服务 Torch 的 CUDA 12 动态库。"""
-        lock = tomllib.loads((REPOSITORY_DIR / "ditto/uv.lock").read_text(encoding="utf-8"))
-        package = next(item for item in lock["package"] if item["name"] == "onnxruntime-gpu")
-        version = tuple(int(value) for value in package["version"].split(".")[:2])
-        self.assertGreaterEqual(version, (1, 21))
-        self.assertLess(version, (1, 27))
 
 
 if __name__ == "__main__":

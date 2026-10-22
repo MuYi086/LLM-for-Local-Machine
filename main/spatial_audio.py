@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from unitale_runtime import StagedUpload
+from llm_local_runtime import StagedUpload
 
 SPATIAL_EXPORT_PROFILES = ("standard", "balanced", "immersive")
 SPATIAL_EXPORT_FORMATS = ("wav", "mp3")
@@ -196,7 +196,7 @@ class AudioMasteringProcessor:
         *,
         profile: str,
         output_format: str,
-        download_prefix: str = "unitale",
+        download_prefix: str = "llm-local",
     ) -> SpatialAudioExportResult:
         """只做母带与编码，不增加 Haas、声像或房间反射。
 

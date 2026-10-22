@@ -16,7 +16,7 @@ from unittest.mock import Mock, patch
 from fastapi.testclient import TestClient
 
 REPOSITORY_DIR = Path(__file__).resolve().parents[1]
-SERVICE_DIR = REPOSITORY_DIR / "YuE2-Vae"
+SERVICE_DIR = REPOSITORY_DIR / "model-audio" / "YuE2-Vae"
 TEST_ROOT = Path()
 
 
@@ -47,7 +47,7 @@ def load_service(name: str):
         "YUE2_VAE_MAX_LATENT_FRAMES": "250",
         "UPLOAD_MAX_BYTES": "1048576",
     }
-    source_path = [str(SERVICE_DIR), str(REPOSITORY_DIR / "unitale_runtime/src"), *sys.path]
+    source_path = [str(SERVICE_DIR), str(REPOSITORY_DIR / "llm_local_runtime/src"), *sys.path]
     with (
         patch.dict(os.environ, environment, clear=True),
         patch.object(sys, "path", source_path),
@@ -318,7 +318,7 @@ class YuE2VaeServiceTests(unittest.TestCase):
         self.assertIn("'/v1/m-a-p/YuE2-Vae'", startup)
         self.assertIn("YuE2-Vae", quality_gate)
         self.assertIn("/v1/m-a-p/YuE2-Vae", readme)
-        self.assertIn("YuE2-Vae/` | 8316", agent_guide)
+        self.assertIn("model-audio/YuE2-Vae/` | 8316", agent_guide)
 
 
 if __name__ == "__main__":

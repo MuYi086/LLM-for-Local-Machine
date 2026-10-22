@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 
 REPOSITORY_DIR = Path(__file__).resolve().parents[1]
-SERVICE_DIR = REPOSITORY_DIR / "ace_step_1_5"
+SERVICE_DIR = REPOSITORY_DIR / "model-audio" / "ace_step_1_5"
 
 
 class AceStepMigrationTests(unittest.TestCase):
@@ -33,7 +33,7 @@ class AceStepMigrationTests(unittest.TestCase):
         self.assertIn('export ACESTEP_PORT="${ACESTEP_PORT:-8313}"', script)
         self.assertIn('setsid uv run --no-sync --project "$ACESTEP_PROJECT_DIR"', script)
         self.assertIn('python "$ACESTEP_PROJECT_DIR/main.py"', script)
-        self.assertNotIn("ace_step_1_5/worker.py", script)
+        self.assertNotIn("model-audio/ace_step_1_5/worker.py", script)
 
     def test_final_route_and_bgm_storage_contract_are_documented(self) -> None:
         readme = (REPOSITORY_DIR / "README.md").read_text(encoding="utf-8")

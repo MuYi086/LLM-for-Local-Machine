@@ -7,7 +7,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-PROTOCOL_NAME = "unitale.worker"
+PROTOCOL_NAME = "llm-local.worker"
 PROTOCOL_VERSION = 1
 MAX_ENVELOPE_BYTES = 2 * 1024 * 1024
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")

@@ -19,7 +19,7 @@ from unittest.mock import Mock, patch
 from fastapi.testclient import TestClient
 
 REPOSITORY_DIR = Path(__file__).resolve().parents[1]
-SERVICE_DIR = REPOSITORY_DIR / "SheetSage2"
+SERVICE_DIR = REPOSITORY_DIR / "model-audio" / "SheetSage2"
 TEST_ROOT = Path()
 
 
@@ -48,7 +48,7 @@ def load_service(name: str, path: Path):
         "CUDA_RELEASE_DELAY": "0",
         "SHEETSAGE2_REQUEST_TIMEOUT": "5",
     }
-    source_path = [str(path.parent), str(REPOSITORY_DIR / "unitale_runtime/src"), *sys.path]
+    source_path = [str(path.parent), str(REPOSITORY_DIR / "llm_local_runtime/src"), *sys.path]
     with (
         patch.dict(os.environ, service_environment, clear=True),
         patch.object(sys, "path", source_path),
@@ -336,7 +336,7 @@ class SheetSage2ServiceTests(unittest.TestCase):
         self.assertIn("SheetSage2", quality_gate)
         self.assertIn("/v1/m-a-p/SheetSage2", readme)
         self.assertIn("/v1/m-a-p/YuE2", readme)
-        self.assertIn("SheetSage2/` | 8315", agent_guide)
+        self.assertIn("model-audio/SheetSage2/` | 8315", agent_guide)
 
 
 if __name__ == "__main__":

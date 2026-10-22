@@ -13,8 +13,8 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-BRIDGE_PROJECT = ROOT / "unitale_localai_bridge"
-BRIDGE_MODULE = "unitale_localai_bridge.server"
+BRIDGE_PROJECT = ROOT / "localai_worker_bridge"
+BRIDGE_MODULE = "localai_worker_bridge.server"
 _CHILDREN: list[subprocess.Popen[bytes]] = []
 _STOP_REQUESTED = False
 
@@ -27,7 +27,7 @@ def _handle_signal(signum: int, frame: object) -> None:
 
 
 def _bridge_enabled() -> bool:
-    return os.getenv("UNITALE_LOCALAI_WORKER_BRIDGE_ENABLED", "false").strip().lower() in {
+    return os.getenv("LLM_LOCALAI_WORKER_BRIDGE_ENABLED", "false").strip().lower() in {
         "1",
         "true",
         "yes",
@@ -39,7 +39,7 @@ def _validate_address(address: str) -> tuple[str, int]:
     """限制 bridge 地址到回环并解析有效端口。"""
     host, separator, raw_port = address.rpartition(":")
     if not separator or host not in {"127.0.0.1", "localhost", "[::1]"}:
-        raise ValueError("UNITALE_LOCALAI_BRIDGE_ADDRESS 只允许本机回环地址。")
+        raise ValueError("LLM_LOCALAI_BRIDGE_ADDRESS 只允许本机回环地址。")
     try:
         port = int(raw_port)
     except ValueError as exc:
@@ -67,11 +67,11 @@ def _wait_for_bridge(process: subprocess.Popen[bytes], address: str) -> None:
 
 
 def _start_bridge() -> None:
-    address = os.getenv("UNITALE_LOCALAI_BRIDGE_ADDRESS", "127.0.0.1:50052")
+    address = os.getenv("LLM_LOCALAI_BRIDGE_ADDRESS", "127.0.0.1:50052")
     _validate_address(address)
     manifest = Path(
         os.getenv(
-            "UNITALE_LOCALAI_BRIDGE_WORKERS",
+            "LLM_LOCALAI_BRIDGE_WORKERS",
             str(ROOT / "localai/manifests/worker-bridge.json"),
         )
     ).expanduser()

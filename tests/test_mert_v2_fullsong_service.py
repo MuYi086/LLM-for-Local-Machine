@@ -16,7 +16,7 @@ from unittest.mock import Mock, patch
 from fastapi.testclient import TestClient
 
 REPOSITORY_DIR = Path(__file__).resolve().parents[1]
-SERVICE_DIR = REPOSITORY_DIR / "MERT-v2-FullSong"
+SERVICE_DIR = REPOSITORY_DIR / "model-audio" / "MERT-v2-FullSong"
 TEST_ROOT = Path()
 
 
@@ -47,7 +47,7 @@ def load_service(name: str):
         "MERT_V2_FULLSONG_MAX_AUDIO_SECONDS": "360",
         "UPLOAD_MAX_BYTES": "1048576",
     }
-    source_path = [str(SERVICE_DIR), str(REPOSITORY_DIR / "unitale_runtime/src"), *sys.path]
+    source_path = [str(SERVICE_DIR), str(REPOSITORY_DIR / "llm_local_runtime/src"), *sys.path]
     with (
         patch.dict(os.environ, environment, clear=True),
         patch.object(sys, "path", source_path),
@@ -336,8 +336,8 @@ class MertV2FullSongServiceTests(unittest.TestCase):
         self.assertIn("'/v1/m-a-p/MERT-v2-FullSong'", startup)
         self.assertIn("MERT-v2-FullSong", quality_gate)
         self.assertIn("/v1/m-a-p/MERT-v2-FullSong", readme)
-        self.assertIn("MERT-v2-FullSong/` | 8317", agent_guide)
-        self.assertEqual(startup.count("setsid uv run --no-sync --project"), 26)
+        self.assertIn("model-audio/MERT-v2-FullSong/` | 8317", agent_guide)
+        self.assertEqual(startup.count("setsid uv run --no-sync --project"), 12)
         self.assertIn('requires-python = "==3.12.13"', project)
         self.assertIn('name = "mert-v2-fullsong-service"', project)
         self.assertIn('name = "mert-v2-fullsong-service"', lock)

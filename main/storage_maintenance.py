@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""显式维护 Unitale 生成文件，默认只预览不删除。"""
+"""显式维护 LLM Local Backend 生成文件，默认只预览不删除。"""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import argparse
 import os
 from pathlib import Path
 
-from unitale_runtime import prune_generated_outputs, storage_disk_status
+from llm_local_runtime import prune_generated_outputs, storage_disk_status
 
 
 def expand_path(value: str) -> Path:
@@ -17,7 +17,7 @@ def expand_path(value: str) -> Path:
 
 def parse_args() -> argparse.Namespace:
     """解析明确的执行确认开关。"""
-    parser = argparse.ArgumentParser(description="预览或执行 Unitale 生成音频保留策略")
+    parser = argparse.ArgumentParser(description="预览或执行 LLM Local Backend 生成音频保留策略")
     parser.add_argument("--apply", action="store_true", help="实际删除匹配的历史生成 WAV")
     return parser.parse_args()
 
@@ -28,9 +28,6 @@ def main() -> int:
     storage_dir = expand_path(os.getenv("STORAGE_DIR", "storage"))
     timbre_dir = expand_path(os.getenv("TIMBRE_STORAGE_DIR", str(storage_dir / "timbre")))
     clone_dir = expand_path(os.getenv("CLONE_STORAGE_DIR", str(storage_dir / "clone")))
-    soundeffect_dir = expand_path(
-        os.getenv("SOUNDEFFECT_STORAGE_DIR", str(storage_dir / "soundEffect"))
-    )
     bgm_dir = expand_path(os.getenv("BGM_STORAGE_DIR", str(storage_dir / "bgm")))
     status = storage_disk_status(storage_dir)
     print(status)
@@ -42,15 +39,8 @@ def main() -> int:
 
     planned = prune_generated_outputs(
         {
-            timbre_dir: ("qwen_voicedesign_", "moss_voicegenerator_", "mimo_voicedesign_"),
-            clone_dir: (
-                "qwen3_tts_",
-                "voxcpm2_",
-                "longcat_audiodit_",
-                "dots_tts_soar_",
-                "step_audio_editx_",
-            ),
-            soundeffect_dir: ("moss_soundeffect_", "stable_audio_3_medium_"),
+            timbre_dir: ("qwen_voicedesign_",),
+            clone_dir: ("qwen3_tts_", "voxcpm2_"),
             bgm_dir: ("ace_step_1_5_", "yue2_3b_"),
         },
         retention_hours=float(status["retention_hours"]),

@@ -3,8 +3,6 @@
 !.gitignore
 !timbre/
 !timbre/.gitkeep
-!soundEffect/
-!soundEffect/.gitkeep
 !bgm/
 !bgm/.gitkeep
 !clone/

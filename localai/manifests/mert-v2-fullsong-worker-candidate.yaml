@@ -1,4 +1,4 @@
-name: unitale.mert-v2-fullsong.worker.v1
-backend: unitale-worker
+name: llm-local.mert-v2-fullsong.worker.v1
+backend: llm-local-worker
 parameters:
-  model: unitale.mert-v2-fullsong.worker.v1
+  model: llm-local.mert-v2-fullsong.worker.v1

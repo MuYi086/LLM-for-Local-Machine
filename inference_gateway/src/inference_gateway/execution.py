@@ -13,9 +13,8 @@ import uuid
 from collections.abc import Callable
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
 
-from unitale_runtime import GpuLockTimeoutError, GpuQuarantinedError, gpu_runtime_lock
+from llm_local_runtime import GpuLockTimeoutError, GpuQuarantinedError, gpu_runtime_lock
 
 from .config import GatewayConfig
 from .errors import BackendQuarantinedError, LocalAIRequestError
@@ -47,28 +46,6 @@ def _request_marker(lock_path: str, model: str):
         yield marker
     finally:
         temporary.unlink(missing_ok=True)
-
-
-def execute_localai_transcription(
-    *,
-    config: GatewayConfig,
-    audio_path: Path,
-    filename: str,
-    content_type: str,
-    language: str | None,
-    client: LocalAIClient | None = None,
-) -> tuple[dict[str, Any], float]:
-    """持有唯一 GPU 租约，完成 ASR 后停止 backend 再释放租约。"""
-    return execute_localai_operation(
-        config=config,
-        operation=lambda localai: localai.transcribe(
-            audio_path=audio_path,
-            filename=filename,
-            content_type=content_type,
-            language=language,
-        ),
-        client=client,
-    )
 
 
 def execute_localai_worker(

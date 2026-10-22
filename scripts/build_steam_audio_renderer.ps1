@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 
 $ProjectDir = Split-Path -Parent $PSScriptRoot
-$SourceDir = Join-Path $ProjectDir "steam_audio_renderer"
+$SourceDir = Join-Path $ProjectDir "model-audio/steam_audio_renderer"
 $BuildDir = if ($env:STEAM_AUDIO_RENDERER_BUILD_DIR) {
     $env:STEAM_AUDIO_RENDERER_BUILD_DIR
 } else {

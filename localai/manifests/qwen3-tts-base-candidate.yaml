@@ -1,4 +1,4 @@
-name: unitale.qwen3-tts.1p7b-base
+name: llm-local.qwen3-tts.1p7b-base
 backend: audio-cpp
 parameters:
   model: __QWEN3_TTS_MODEL_PATH__

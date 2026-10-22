@@ -1,0 +1,9 @@
+[project]
+name = "llm-local-runtime"
+version = "0.1.0"
+description = "LLM Local Backend 服务共享的轻量存储与 GPU 运行时工具"
+requires-python = "==3.12.13"
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
