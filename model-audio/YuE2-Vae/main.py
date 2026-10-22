@@ -27,13 +27,13 @@ from inference_gateway import (
     BackendQuarantinedError,
     LocalAIRequestError,
     LocalAIUnavailableError,
-    execute_localai_worker_file,
+    execute_localai_worker_file_reference,
     load_gateway_config,
 )
-from starlette.concurrency import run_in_threadpool
-from starlette.middleware.base import BaseHTTPMiddleware
 from llm_local_runtime import AudioUploadError, GpuLockTimeoutError, stage_audio_upload
 from llm_local_runtime import gpu_runtime_lock as shared_gpu_runtime_lock
+from starlette.concurrency import run_in_threadpool
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from runtime import cuda_status, module_available, terminate_process_group
 
@@ -59,6 +59,9 @@ def env_bool(name: str, default: bool = False) -> bool:
 HF_MIRROR_DIR = expand_path(os.getenv("HF_MIRROR_DIR", "~/hf-mirror"))
 STORAGE_DIR = expand_path(os.getenv("STORAGE_DIR", str(REPOSITORY_DIR / "storage")))
 RUNTIME_CACHE_DIR = expand_path(os.getenv("RUNTIME_CACHE_DIR", str(STORAGE_DIR / ".cache/runtime")))
+LOCALAI_ARTIFACT_DIR = Path(
+    expand_path(os.getenv("LLM_LOCALAI_ARTIFACT_DIR", str(RUNTIME_CACHE_DIR / "localai_artifacts")))
+)
 GPU_LOCK_FILE = str(
     expand_path(os.getenv("GPU_LOCK_FILE", str(RUNTIME_CACHE_DIR / "gpu-runtime.lock")))
 )
@@ -458,11 +461,12 @@ def execute_worker(payload: dict[str, object]) -> Path:
             (".wav", "audio/wav") if operation == "decode" else (".npy", "application/x-npy")
         )
         try:
-            artifact, _ = execute_localai_worker_file(
+            artifact, _ = execute_localai_worker_file_reference(
                 config=GATEWAY_CONFIG,
                 operation="run",
                 payload={"worker_input": payload},
                 output_dir=WORKER_TMP_DIR,
+                artifact_dir=LOCALAI_ARTIFACT_DIR,
                 suffix=suffix,
                 media_type=media_type,
             )

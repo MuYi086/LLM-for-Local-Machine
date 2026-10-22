@@ -37,7 +37,11 @@ from inference_gateway import (  # noqa: E402
     LocalAIUnavailableError,
     load_gateway_config,
 )
-from llm_local_runtime import GpuLockTimeoutError, GpuQuarantinedError, gpu_runtime_lock  # noqa: E402
+from llm_local_runtime import (  # noqa: E402
+    GpuLockTimeoutError,
+    GpuQuarantinedError,
+    gpu_runtime_lock,
+)
 
 
 def config(**overrides: str):
@@ -478,6 +482,29 @@ class LocalAIGatewayTests(unittest.TestCase):
             self.assertEqual(result, "complete")
             self.assertEqual(events, ["shutdown", "release-delay"])
             self.assertFalse(marker.exists())
+
+    def test_http_success_cannot_clear_worker_cleanup_failure_marker(self) -> None:
+        class Client:
+            def shutdown_model(self) -> None:
+                return
+
+        with tempfile.TemporaryDirectory() as temporary:
+            lock_path = str(Path(temporary) / "gpu.lock")
+            marker = Path(f"{lock_path}.quarantine")
+
+            def operation(_: LocalAIClient) -> str:
+                marker.write_text('{"reason":"worker_process_exit_unconfirmed"}')
+                return "result"
+
+            with self.assertRaises(BackendQuarantinedError):
+                execute_localai_operation(
+                    config=replace(config(), gpu_lock_file=lock_path),
+                    operation=operation,
+                    client=Client(),
+                )
+            self.assertEqual(
+                json.loads(marker.read_text())["reason"], "worker_process_exit_unconfirmed"
+            )
 
     def test_failed_backend_shutdown_preserves_quarantine_marker(self) -> None:
         class Client:

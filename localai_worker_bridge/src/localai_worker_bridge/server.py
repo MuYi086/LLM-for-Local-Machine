@@ -46,8 +46,11 @@ class LocalAIWorkerBackend(pb2_grpc.BackendServicer):
         return pb2.Result(message="one-shot worker adapter 已就绪", success=True)
 
     def Free(self, request: Any, context: grpc.ServicerContext) -> Any:
-        del request, context
-        # 每个 RPC 的 worker 都由该次 Predict 确认退出，无需保留模型上下文。
+        del request
+        try:
+            self.runner.ensure_stopped()
+        except WorkerExecutionError as exc:
+            context.abort(grpc.StatusCode.FAILED_PRECONDITION, str(exc))
         return pb2.Result(message="one-shot worker 已退出", success=True)
 
     def Predict(self, request: Any, context: grpc.ServicerContext) -> Any:
@@ -210,7 +213,7 @@ def create_server(address: str, manifest_path: Path) -> grpc.Server:
     specs = load_worker_specs(manifest_path)
     options = [
         ("grpc.max_receive_message_length", 4 * 1024 * 1024),
-        ("grpc.max_send_message_length", 180 * 1024 * 1024),
+        ("grpc.max_send_message_length", 50 * 1024 * 1024),
     ]
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=1), options=options)
     pb2_grpc.add_BackendServicer_to_server(
@@ -224,14 +227,14 @@ def create_server(address: str, manifest_path: Path) -> grpc.Server:
 
 def main() -> int:
     """启动外部 backend 并在 TERM/INT 时有界退出。"""
-    parser = argparse.ArgumentParser(description="LocalAI one-shot worker bridge for LLM Local Backend")
+    parser = argparse.ArgumentParser(
+        description="LocalAI one-shot worker bridge for LLM Local Backend"
+    )
     parser.add_argument(
         "--manifest",
         type=Path,
         default=Path(
-            os.getenv(
-                "LLM_LOCALAI_BRIDGE_WORKERS", ROOT / "localai/manifests/worker-bridge.json"
-            )
+            os.getenv("LLM_LOCALAI_BRIDGE_WORKERS", ROOT / "localai/manifests/worker-bridge.json")
         ),
     )
     parser.add_argument(

@@ -16,7 +16,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-MAX_RESULT_BYTES = 128 * 1024 * 1024
+# 固定 LocalAI Go client 只接收 50 MiB；base64 的 4/3 膨胀后仍须留出 envelope 空间。
+MAX_RESULT_BYTES = 32 * 1024 * 1024
 MAX_SHARED_ARTIFACT_BYTES = 4 * 1024 * 1024 * 1024
 MAX_DIAGNOSTIC_BYTES = 8 * 1024
 
@@ -53,6 +54,13 @@ class WorkerRunner:
         self.repository_root = repository_root.resolve()
         self.specs = specs
         self.uv_executable = uv_executable
+        self._processes: dict[int, tuple[subprocess.Popen[bytes], str]] = {}
+
+    def ensure_stopped(self) -> None:
+        """重试未确认的进程组收尾；Free 只能在所有组退出后确认成功。"""
+        for pid, (process, request_id) in list(self._processes.items()):
+            _stop_process_group(process, request_id)
+            self._processes.pop(pid)
 
     def run(
         self,
@@ -113,6 +121,8 @@ class WorkerRunner:
                 worker_environment.pop(key, None)
             worker_environment["WORLD_SIZE"] = "1"
             worker_environment["LLM_LOCALAI_REQUEST_ID"] = request_id
+            # 子进程继承入口身份；即便 worker 父进程先退出，manager 仍可按 manifest 回收该组。
+            worker_environment["LLM_LOCALAI_WORKER_SCRIPT"] = str(spec.script.resolve())
             storage_dir = Path(os.getenv("STORAGE_DIR", self.repository_root / "storage"))
             worker_environment.setdefault(
                 "RUNTIME_CACHE_DIR",
@@ -224,8 +234,8 @@ class WorkerRunner:
             "size_bytes": size_bytes,
         }
 
-    @staticmethod
     def _run_process(
+        self,
         command: list[str],
         *,
         cwd: Path,
@@ -250,46 +260,65 @@ class WorkerRunner:
             except OSError as exc:
                 raise WorkerExecutionError("无法启动固定的一次性 worker。") from exc
 
-            deadline = started + timeout_seconds
-            while True:
-                return_code = process.poll()
-                if return_code is not None:
-                    break
-                if cancelled is not None and not cancelled():
-                    _stop_process_group(process, request_id)
-                    raise WorkerExecutionError("LocalAI 请求已取消，worker 进程组已停止。")
-                if time.monotonic() >= deadline:
-                    _stop_process_group(process, request_id)
-                    raise WorkerExecutionError("一次性 worker 超时，进程组已停止。")
-                time.sleep(0.05)
-            elapsed = time.monotonic() - started
-            if return_code != 0:
-                raise WorkerExecutionError(
-                    f"一次性 worker 退出码 {return_code}；请求 {request_id}。"
-                )
-            return elapsed
+            self._processes[process.pid] = (process, request_id)
+            try:
+                deadline = started + timeout_seconds
+                while True:
+                    return_code = process.poll()
+                    if return_code is not None:
+                        break
+                    if cancelled is not None and not cancelled():
+                        raise WorkerExecutionError("LocalAI 请求已取消。")
+                    if time.monotonic() >= deadline:
+                        raise WorkerExecutionError("一次性 worker 超时。")
+                    time.sleep(0.05)
+                if return_code != 0:
+                    raise WorkerExecutionError(
+                        f"一次性 worker 退出码 {return_code}；请求 {request_id}。"
+                    )
+                return time.monotonic() - started
+            finally:
+                # 父进程退出并不意味着其 CUDA/数据加载子进程已退出；所有结果走同一收尾。
+                _stop_process_group(process, request_id)
+                self._processes.pop(process.pid)
 
 
 def _stop_process_group(process: subprocess.Popen[bytes], request_id: str) -> None:
     """发送 TERM 后限时 KILL，并在无法确认回收时写入 GPU 隔离标记。"""
     try:
-        os.killpg(process.pid, signal.SIGTERM)
-    except ProcessLookupError:
-        pass
-    try:
-        process.wait(timeout=2.0)
-        return
-    except subprocess.TimeoutExpired:
-        pass
-    try:
-        os.killpg(process.pid, signal.SIGKILL)
-    except ProcessLookupError:
-        pass
-    try:
-        process.wait(timeout=2.0)
-    except subprocess.TimeoutExpired as exc:
+        for signum in (signal.SIGTERM, signal.SIGKILL):
+            process.poll()
+            if not _process_group_alive(process.pid):
+                return
+            try:
+                os.killpg(process.pid, signum)
+            except ProcessLookupError:
+                pass
+            deadline = time.monotonic() + 2.0
+            while time.monotonic() < deadline:
+                process.poll()
+                if not _process_group_alive(process.pid):
+                    return
+                time.sleep(0.05)
+        raise WorkerExecutionError("worker 进程组在 TERM/KILL 后仍有活动成员。")
+    except (OSError, WorkerExecutionError) as exc:
         _write_quarantine(request_id)
         raise WorkerExecutionError("worker 在 TERM/KILL 后仍无法确认退出；GPU 已隔离。") from exc
+
+
+def _process_group_alive(pgid: int) -> bool:
+    """检查 Linux 进程组的活动成员，忽略无法再占用 CUDA 的 zombie。"""
+    for entry in Path("/proc").glob("[0-9]*/stat"):
+        try:
+            stat = entry.read_text()
+        except (FileNotFoundError, ProcessLookupError):
+            continue
+        fields = stat[stat.rfind(")") + 2 :].split()
+        if len(fields) < 3:
+            raise WorkerExecutionError("无法解析进程状态以确认 worker 退出。")
+        if int(fields[2]) == pgid and fields[0] not in {"Z", "X"}:
+            return True
+    return False
 
 
 def _write_quarantine(request_id: str) -> None:

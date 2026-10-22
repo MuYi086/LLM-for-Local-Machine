@@ -28,7 +28,8 @@ class AceStepMigrationTests(unittest.TestCase):
     def test_start_script_keeps_ace_step_separate_and_offline_at_startup(self) -> None:
         script = (REPOSITORY_DIR / "start.sh").read_text(encoding="utf-8")
         self.assertIn(
-            'ACESTEP_PROJECT_DIR="${ACESTEP_PROJECT_DIR:-$PROJECT_DIR/ace_step_1_5}"', script
+            'ACESTEP_PROJECT_DIR="${ACESTEP_PROJECT_DIR:-$PROJECT_DIR/model-audio/ace_step_1_5}"',
+            script,
         )
         self.assertIn('export ACESTEP_PORT="${ACESTEP_PORT:-8313}"', script)
         self.assertIn('setsid uv run --no-sync --project "$ACESTEP_PROJECT_DIR"', script)

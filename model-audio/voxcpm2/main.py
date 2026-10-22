@@ -23,9 +23,6 @@ from typing import Literal
 import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, Request, Response, UploadFile
 from fastapi.responses import JSONResponse
-from pydantic import Field, model_validator
-from starlette.concurrency import run_in_threadpool
-from starlette.middleware.base import BaseHTTPMiddleware
 from llm_local_runtime import (
     AudioReferenceStore,
     AudioUploadError,
@@ -36,6 +33,9 @@ from llm_local_runtime import (
 from llm_local_runtime import (
     gpu_runtime_lock as shared_gpu_runtime_lock,
 )
+from pydantic import Field, model_validator
+from starlette.concurrency import run_in_threadpool
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from audio_output import persist_audio_bytes
 from gpu_runtime import cuda_status, terminate_process_group

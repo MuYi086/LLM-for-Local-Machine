@@ -16,8 +16,8 @@ sys.path.insert(0, str(ROOT / "inference_gateway/src"))
 sys.path.insert(0, str(ROOT / "llm_local_runtime/src"))
 
 from inference_gateway import LocalAIClient, load_gateway_config  # noqa: E402
-from scripts.localai.manager import LocalAIManager, LocalAIManagerError  # noqa: E402
 from llm_local_runtime import gpu_quarantine_path  # noqa: E402
+from scripts.localai.manager import LocalAIManager, LocalAIManagerError  # noqa: E402
 
 
 def main() -> int:
@@ -53,9 +53,15 @@ def main() -> int:
                 print("隔离标记缺少有效 model，保留隔离状态。", file=sys.stderr)
                 return 1
             client = LocalAIClient(replace(config, model=model))
+            shutdown_error: Exception | None = None
             try:
                 client.shutdown_model()
             except Exception as exc:
+                shutdown_error = exc
+            # 外部 bridge 的 Free 错误可能被固定 LocalAI 吞掉；曾经无法回收的
+            # worker 必须由宿主机进程组检查确认，HTTP 200 不足以解除隔离。
+            worker_cleanup_failed = marker.get("reason") == "worker_process_exit_unconfirmed"
+            if shutdown_error is not None or worker_cleanup_failed:
                 managed = os.getenv("LLM_LOCALAI_MANAGED", "false").strip().lower() in {
                     "1",
                     "true",
@@ -63,20 +69,27 @@ def main() -> int:
                     "on",
                 }
                 if not managed:
-                    print(f"LocalAI 未确认停止 {model}：{exc}", file=sys.stderr)
+                    print(
+                        f"LocalAI 未确认停止 {model}：{shutdown_error or 'worker 回收失败'}",
+                        file=sys.stderr,
+                    )
                     return 1
                 try:
-                    manager = LocalAIManager()
+                    manager = LocalAIManager(
+                        environ={**os.environ, "LLM_LOCALAI_WORKER_BRIDGE_ENABLED": "true"}
+                        if worker_cleanup_failed
+                        else None
+                    )
                     manager.stop()
                     manager.verify_managed_localai_stopped()
                 except LocalAIManagerError as verification_error:
                     print(
-                        f"LocalAI backend 未确认停止 {model}：{exc}；进程组退出复核失败："
+                        f"LocalAI backend 未确认停止 {model}：{shutdown_error or 'worker 回收失败'}；进程组退出复核失败："
                         f"{verification_error}",
                         file=sys.stderr,
                     )
                     return 1
-                print("API 不可用；已停止受管 LocalAI 进程组并确认 loopback 端口关闭。")
+                print("已停止受管 LocalAI 进程组并确认 worker 与 loopback 端口回收。")
             marker_path.unlink()
             directory_fd = os.open(marker_path.parent, os.O_RDONLY)
             try:

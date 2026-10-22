@@ -9,7 +9,10 @@ import re
 from pathlib import Path
 from typing import Any
 
-from scripts.training.build_audio_polisher_poc import SYSTEM_PROMPT, USER_INSTRUCTION
+if __package__:
+    from .build_audio_polisher_poc import SYSTEM_PROMPT, USER_INSTRUCTION
+else:
+    from build_audio_polisher_poc import SYSTEM_PROMPT, USER_INSTRUCTION
 
 
 def build_messages(source: str) -> list[dict[str, str]]:

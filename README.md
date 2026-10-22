@@ -235,11 +235,16 @@ backend、关闭自动 Gallery 加载及 WebUI。管理器将 boot ID、PID、�
 进程，再停止受管 LocalAI 进程组。
 
 Qwen3-TTS Base 与 VoiceDesign 注册命令检查各自官方模型目录所需文件，
-并把当前解析后的模型路径写入独立候选 YAML。VoiceDesign 使用 `QWEN_VOICEDESIGN_MODEL_DIR` 和
+并在 LocalAI models 目录内建立 `<model-id>.hf` 符号链接；YAML 使用该相对名称，
+verify 同时检查链接仍指向配置的完整本地快照，避免 LocalAI 拒绝绝对 `parameters.model`。
+Base 的会话选项使用 `session.qwen3_tts.voice_prompt_cache_slots:0`。
+VoiceDesign 使用 `QWEN_VOICEDESIGN_MODEL_DIR` 和
 `python3 scripts/localai/manager.py register-qwen3-voicedesign-candidate`，固定 YAML 使用 `family:qwen3_tts`、
 `task:vdes`，不与 Base 克隆的 `task:tts` 混用。这些命令只准备候选，不代表模型可运行或质量达标。LocalAI
 固定版本 LocalAI 二进制和 audio.cpp CUDA gRPC backend 已在本机编译、打包、安装并通过无模型启停检查；
-P7 worker bridge 已接入五个服务项目（五个固定 model ID）。本次没有主动下载模型权重；原生实现仍是默认，无模型测试不能代替真实端到端验收。
+P7 worker bridge 已接入五个服务项目（五个固定 model ID）。2026-10-22 两个 Qwen 直接候选各完成一次
+24 kHz 短句真实推理与 shutdown，尚未完成听感、相似度和长文本验收，见
+[升级记录](docs/localai-audiocpp-upgrade.md#7-2026-10-22-复核修复与当前验证)。原生实现仍是默认。
 
 #### LocalAI 一次性 worker bridge（P7）
 
@@ -250,15 +255,31 @@ LocalAI 与 gRPC bridge 默认只监听 `127.0.0.1`。受管启动会将 LocalAI
 进程组，停止时核对进程组、端口并回收带请求标记的遗留 worker。
 
 当前接入的文件输出合同为：SheetSage2 ZIP；MERT embedding JSON / frame features NPZ；YuE2-Vae
-encode NPY / decode WAV；YuE2-3B WAV；TIGER-DnR 三 Stem ZIP 文件引用。以下命令只登记和核验
+encode NPY / decode WAV；YuE2-3B WAV；TIGER-DnR 三 Stem ZIP。五个 worker 的文件成品均通过随机
+`file_ref` ID 从共享目录流式取回，单文件上限 4 GiB；服务与 bridge 须使用相同的
+`LLM_LOCALAI_ARTIFACT_DIR`（默认 `$RUNTIME_CACHE_DIR/localai_artifacts`）。
+取回后立即删除共享产物；未消费文件在下次发布时清理超过 24 小时的项目。
+大文件不进入 gRPC Reply，避免固定 LocalAI 50 MiB 接收上限。
+以下命令只登记和核验
 不含权重路径的 bridge YAML，不下载模型或权重：
 
-另外，YuE2-3B 经 bridge 返回 WAV；TIGER-DnR 使用随机文件引用安全取回三路 Stem ZIP。
+bridge 会在成功、失败、取消和超时后确认整个 worker 进程组退出；Free 复核未回收的组。
+无法确认时保留 GPU 隔离标记，即便 LocalAI shutdown 返回 HTTP 200 也不会清除。
+恢复这类标记须启用受管模式，由恢复脚本停止宿主机并复核 worker、进程组和监听端口。
 
 ```bash
 python3 scripts/localai/manager.py register-worker-bridge-candidates
 python3 scripts/localai/manager.py verify-worker-bridge-candidates
 ```
+
+已有固定版本的本机 LocalAI 安装后，可独立运行无模型大文件检查：
+
+```bash
+uv run --project qa --locked python scripts/localai/smoke_worker_bridge.py
+```
+
+该命令使用临时配置和 QA 假 worker 生成 41 MiB、129 MiB 静音 WAV，经真实 LocalAI HTTP/gRPC
+链路验证取回、内容、产物清理和停止。它不属于无需 LocalAI 安装的默认质量门禁。
 
 在 `start.sh` 中受管运行时启用 bridge，并显式选择要切换的服务；各服务默认仍为 `native`：
 

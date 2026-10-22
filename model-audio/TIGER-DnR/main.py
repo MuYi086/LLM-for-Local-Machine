@@ -33,8 +33,6 @@ from inference_gateway import (
     execute_localai_worker_file_reference,
     load_gateway_config,
 )
-from starlette.concurrency import run_in_threadpool
-from starlette.middleware.base import BaseHTTPMiddleware
 from llm_local_runtime import (
     AudioUploadError,
     GpuLockTimeoutError,
@@ -43,6 +41,8 @@ from llm_local_runtime import (
     stage_audio_upload,
 )
 from llm_local_runtime.storage import close_upload_safely
+from starlette.concurrency import run_in_threadpool
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from tiger_dnr_runtime import (
     cuda_status,

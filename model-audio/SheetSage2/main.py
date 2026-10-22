@@ -25,14 +25,14 @@ from inference_gateway import (
     BackendQuarantinedError,
     LocalAIRequestError,
     LocalAIUnavailableError,
-    execute_localai_worker_file,
+    execute_localai_worker_file_reference,
     load_gateway_config,
 )
+from llm_local_runtime import AudioUploadError, GpuLockTimeoutError, stage_audio_upload
+from llm_local_runtime import gpu_runtime_lock as shared_gpu_runtime_lock
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware
-from llm_local_runtime import AudioUploadError, GpuLockTimeoutError, stage_audio_upload
-from llm_local_runtime import gpu_runtime_lock as shared_gpu_runtime_lock
 
 from runtime import cuda_status, terminate_process_group
 
@@ -60,6 +60,9 @@ UPLOAD_STAGING_DIR = Path(
     expand_path(
         os.getenv("SHEETSAGE2_UPLOAD_STAGING_DIR", str(RUNTIME_CACHE_DIR / "sheetsage2_uploads"))
     )
+)
+LOCALAI_ARTIFACT_DIR = Path(
+    expand_path(os.getenv("LLM_LOCALAI_ARTIFACT_DIR", str(RUNTIME_CACHE_DIR / "localai_artifacts")))
 )
 GPU_LOCK_FILE = expand_path(os.getenv("GPU_LOCK_FILE", str(RUNTIME_CACHE_DIR / "gpu-runtime.lock")))
 HF_MIRROR_DIR = expand_path(os.getenv("HF_MIRROR_DIR", "~/hf-mirror"))
@@ -434,11 +437,12 @@ def execute_transcription_payload(payload: dict[str, Any]) -> Path:
     """持有共享 GPU 锁执行转写并原子保存 ZIP 成品。"""
     if GATEWAY_CONFIG.provider == "localai":
         try:
-            artifact, _ = execute_localai_worker_file(
+            artifact, _ = execute_localai_worker_file_reference(
                 config=GATEWAY_CONFIG,
                 operation="run",
                 payload={"worker_input": payload},
                 output_dir=WORKER_TMP_DIR,
+                artifact_dir=LOCALAI_ARTIFACT_DIR,
                 suffix=".zip",
                 media_type="application/zip",
             )

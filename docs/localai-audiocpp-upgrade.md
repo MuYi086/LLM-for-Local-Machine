@@ -1,6 +1,6 @@
 # LocalAI 与 audio.cpp 升级及镜像清理记录
 
-> 状态：LocalAI/audio.cpp Linux 裸机构建、管理代码、当前模型候选筛选、五个 one-shot worker bridge、镜像缺失模型清理、文档和无模型质量门禁已完成。本轮不使用 Docker，不下载模型，不安装 Python 项目依赖。当前模型推理与音质不属于无模型门禁结果。更新日期：2026-10-21。
+> 状态：宿主机构建与当前维护范围已完成；2026-10-22 修复升级复核中的五项问题及真实 Qwen 调用发现的候选配置遗漏。完整无模型门禁、真实 LocalAI 大文件传输和两个 Qwen 短句推理通过。完整模型部署与音质验收仍需单独进行。本轮不使用 Docker，不下载模型，不安装 Python 项目依赖。更新日期：2026-10-22。
 
 ## 1. 目标与完成标准
 
@@ -74,7 +74,9 @@ python3 scripts/localai/manager.py verify-worker-bridge-candidates
 ~~~
 
 无模型测试覆盖 RPC envelope、allowlist、服务路由、文件合同、大小限制和清理；
-真实模型加载、资源、输出质量、backend shutdown 后的显存回落仍需模型运行时单独验证。
+五个 bridge 的真实模型加载、资源和输出质量仍需模型运行时单独验证。
+当前五个 worker 文件成品统一使用最大 4 GiB 的共享 `file_ref`，不将 WAV/NPZ/ZIP 放进 gRPC Reply；
+服务与 bridge 必须使用相同的 `LLM_LOCALAI_ARTIFACT_DIR`。取回时流式复制并删除共享原文件。
 
 ## 6. 验证与当前限制
 
@@ -88,7 +90,7 @@ UV_OFFLINE=1 bash scripts/quality_gate.sh
 
 能力清单当前校验 12 个服务入口、11 个模型 uv 项目、35 条路由、5 个请求 schema 和 116 个请求字段。
 quality gate 还包含 shell 语法、Steam Audio renderer 的无 SDK 核心测试、锁检查、Ruff、格式检查与两组无模型回归。
-最终 `UV_OFFLINE=1 bash scripts/quality_gate.sh` 通过：13 个 uv 项目锁检查、Ruff 和 104 个 Python 文件格式检查通过；
+2026-10-21 的历史 `UV_OFFLINE=1 bash scripts/quality_gate.sh` 记录为通过：13 个 uv 项目锁检查、Ruff 和 104 个 Python 文件格式检查通过；
 能力清单通过；根目录 198 项、ACE-Step 9 项无模型测试全部通过。`bash -n start.sh` 和 Steam Audio renderer
 无 SDK 核心测试也包含在门禁中。
 
@@ -100,4 +102,46 @@ LocalAI `verify-install`、两个 Qwen3-TTS 候选和五个 worker bridge 候选
 可执行文件已存在于 `model-audio/steam_audio_renderer/build/`；`ldd` 可解析 `libphonon.so`。
 Linux 启动与构建脚本均默认使用该 SDK 路径，无需每次额外设置环境变量。SDK 保持在仓库外，
 不会提交。模型镜像中没有保留服务需要用户补充的缺失主模型；缺失 GGUF 和辅助模型对应的功能均已退役。
-模型权重及真实测试样本仍由用户管理。真实模型推理、输出质量和 GPU 回收仍未验收。
+模型权重及真实测试样本仍由用户管理。下节记录当前目录布局修复后的新验证结果；
+历史门禁结果不能代替当前提交验证。
+
+## 7. 2026-10-22 复核修复与当前验证
+
+复核基线为 `1bd58ae`（目录优化），详细问题和修复证据见 [升级后问题](../升级后问题.md)。
+
+- manager 从已验证的 worker manifest 获取回收入口，覆盖五个迁移后的项目；
+  子进程继承入口标记，父 worker 提前退出后仍可识别并回收遗留组。
+- bridge 对成功、非零退出、取消和超时统一执行整个进程组的 TERM/KILL 收尾；
+  Free 重试尚未确认的组，失败时保留隔离。固定 LocalAI 可能吞掉 Free 错误，
+  gateway 因此另行检测被 bridge 更新的隔离标记，恢复脚本要求宿主机退出证据。
+- 五个 bridge 文件产物均使用共享引用，泛用内联产物上限降为 32 MiB，
+  为固定 LocalAI 的 50 MiB gRPC 接收限制预留 base64 和 envelope 空间。
+- 修复服务路由测试、uv 配置测试、ACE-Step 启动断言及文本训练测试的目录迁移遗漏，
+  修正训练推理脚本的包内/直接执行导入，完成 Ruff 安全修复并同步能力清单行号。
+- 真实 Qwen 调用发现绝对 `parameters.model` 被 LocalAI 拒绝，以及 Base session 选项缺少
+  `session.` 前缀。候选现通过 models 内 `<model-id>.hf` 符号链接引用本地快照，
+  verify 命令同时检查链接目标；不复制权重。旧本机 YAML 已备份后重新登记。
+- LocalAI 可变数据设置到 `$LLM_LOCALAI_DATA_DIR/data`，避免污染仓库根目录。
+  本机残留的两份退役 worker YAML 已备份移出 models；备份不在 LocalAI 扫描目录。
+
+当前验证结果：
+
+| 验证 | 结果与边界 |
+| --- | --- |
+| 完整离线质量门禁 | 13 份锁、Ruff、107 个文件格式检查、能力清单、三个 C++ 核心测试、根目录 205 项及 ACE-Step 9 项测试通过 |
+| 生命周期回归 | 五个 worker 入口、继承入口标记、四种退出结果的抗 TERM 子进程、Free 失败及隔离恢复均有无模型覆盖 |
+| `smoke_worker_bridge.py` | 41 MiB、129 MiB 静音 WAV 经真实 HTTP → Go gRPC → bridge 取回，内容、消费清理及宿主机停止确认通过；不加载模型 |
+| Qwen VoiceDesign | 一个真实短句，24 kHz、76,800 帧、153,644 字节 WAV；shutdown 确认成功 |
+| Qwen Base | 使用上述合成参考做一次 x-vector-only 克隆，24 kHz、76,800 帧、153,644 字节 WAV；shutdown 确认成功 |
+| Qwen 资源记录 | 本轮两次调用可见整卡峰值分别约 5,310 / 5,217 MiB，最终宿主机停止后采样为 1,394 MiB；不等于模型独占显存或完整资源基准 |
+| Qwen 制品指纹 | 本地 metadata revision 与每个快照 13 个非缓存文件 SHA-256 已记入 `versions.json`；未联网核对上游快照 |
+
+大文件 smoke 可独立复现：
+
+```bash
+uv run --project qa --locked python scripts/localai/smoke_worker_bridge.py
+```
+
+两个 Qwen 短句仅证明加载、调用、WAV 合同和本次 shutdown 路径可运行；
+不代表听感、克隆相似度、长文本、多语种、错误注入及所有模型的 E2/E3 验收完成。
+五个 bridge 的真实模型推理、YuE2-3B 在本机 16 GiB GPU 上的资源适配仍需另行验证。

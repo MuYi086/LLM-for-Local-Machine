@@ -72,9 +72,7 @@ def _validate_base_url(value: str) -> str:
         or parsed.query
         or parsed.fragment
     ):
-        raise GatewayConfigurationError(
-            "LLM_LOCALAI_BASE_URL 只允许不带凭据的本机 HTTP 回环地址。"
-        )
+        raise GatewayConfigurationError("LLM_LOCALAI_BASE_URL 只允许不带凭据的本机 HTTP 回环地址。")
     try:
         _ = parsed.port
     except ValueError as exc:

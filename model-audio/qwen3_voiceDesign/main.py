@@ -28,8 +28,6 @@ from inference_gateway import (
     load_gateway_config,
 )
 from inference_gateway.execution import execute_localai_operation
-from pydantic import BaseModel, Field
-from starlette.middleware.base import BaseHTTPMiddleware
 from llm_local_runtime import (
     AudioReferenceStore,
     GpuLockTimeoutError,
@@ -37,6 +35,8 @@ from llm_local_runtime import (
 from llm_local_runtime import (
     gpu_runtime_lock as shared_gpu_runtime_lock,
 )
+from pydantic import BaseModel, Field
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from audio_output import persist_audio_bytes
 from voicedesign_runtime import cuda_status, split_text, terminate_process_group

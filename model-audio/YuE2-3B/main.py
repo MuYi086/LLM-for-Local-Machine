@@ -21,12 +21,12 @@ from inference_gateway import (
     BackendQuarantinedError,
     LocalAIRequestError,
     LocalAIUnavailableError,
-    execute_localai_worker_file,
+    execute_localai_worker_file_reference,
     load_gateway_config,
 )
+from llm_local_runtime import GpuLockTimeoutError
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from starlette.middleware.base import BaseHTTPMiddleware
-from llm_local_runtime import GpuLockTimeoutError
 
 from runtime import (
     cuda_status,
@@ -61,6 +61,9 @@ STORAGE_DIR = expand_path(os.getenv("STORAGE_DIR", str(REPOSITORY_DIR / "storage
 BGM_STORAGE_DIR = expand_path(os.getenv("BGM_STORAGE_DIR", str(STORAGE_DIR / "bgm")))
 OUTPUT_DIR = expand_path(os.getenv("YUE2_3B_OUTPUT_DIR", str(BGM_STORAGE_DIR)))
 RUNTIME_CACHE_DIR = expand_path(os.getenv("RUNTIME_CACHE_DIR", str(STORAGE_DIR / ".cache/runtime")))
+LOCALAI_ARTIFACT_DIR = Path(
+    expand_path(os.getenv("LLM_LOCALAI_ARTIFACT_DIR", str(RUNTIME_CACHE_DIR / "localai_artifacts")))
+)
 GPU_LOCK_FILE = str(
     expand_path(os.getenv("GPU_LOCK_FILE", str(RUNTIME_CACHE_DIR / "gpu-runtime.lock")))
 )
@@ -378,11 +381,12 @@ class YuE2WorkerManager:
 
     def run_localai_worker(self, payload: dict[str, Any]) -> bytes:
         """通过版本化 worker bridge 执行歌曲生成并读取 WAV 成品。"""
-        artifact, _ = execute_localai_worker_file(
+        artifact, _ = execute_localai_worker_file_reference(
             config=GATEWAY_CONFIG,
             operation="run",
             payload={"worker_input": payload},
             output_dir=WORKER_TMP_DIR,
+            artifact_dir=LOCALAI_ARTIFACT_DIR,
             suffix=".wav",
             media_type="audio/wav",
         )

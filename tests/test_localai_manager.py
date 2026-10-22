@@ -174,9 +174,14 @@ class LocalAIManagerTests(unittest.TestCase):
 
         installed_config = self.data_dir / "models/llm-local.qwen3-tts.1p7b-base.yaml"
         rendered = installed_config.read_text(encoding="utf-8")
-        self.assertIn(f"  model: {json.dumps(str(model_dir.resolve()))}\n", rendered)
+        self.assertIn('  model: "llm-local.qwen3-tts.1p7b-base.hf"\n', rendered)
+        self.assertEqual(
+            (manager.models_dir / "llm-local.qwen3-tts.1p7b-base.hf").resolve(), model_dir.resolve()
+        )
         self.assertIn("family:qwen3_tts", rendered)
         self.assertIn("task:tts", rendered)
+        self.assertIn("session.qwen3_tts.voice_prompt_cache_slots:0", rendered)
+        self.assertNotIn("\n  - qwen3_tts.voice_prompt_cache_slots:0", rendered)
 
     def test_qwen3_tts_registration_rejects_modified_config(self) -> None:
         model_dir = self.qwen3_tts_model()
@@ -202,7 +207,11 @@ class LocalAIManagerTests(unittest.TestCase):
 
         installed_config = self.data_dir / "models/llm-local.qwen3-tts.1p7b-voicedesign.yaml"
         rendered = installed_config.read_text(encoding="utf-8")
-        self.assertIn(f"  model: {json.dumps(str(model_dir.resolve()))}\n", rendered)
+        self.assertIn('  model: "llm-local.qwen3-tts.1p7b-voicedesign.hf"\n', rendered)
+        self.assertEqual(
+            (manager.models_dir / "llm-local.qwen3-tts.1p7b-voicedesign.hf").resolve(),
+            model_dir.resolve(),
+        )
         self.assertIn("family:qwen3_tts", rendered)
         self.assertIn("task:vdes", rendered)
         self.assertNotIn("task:tts", rendered)
@@ -238,6 +247,7 @@ class LocalAIManagerTests(unittest.TestCase):
         self.assertEqual(command, [setsid_path, "--", str(self.binary_path), "run"])
         self.assertEqual(spawn.call_args.kwargs["file_actions"][0][1:4], (0, "/dev/null", 0))
         self.assertEqual(environment["LOCALAI_ADDRESS"], "127.0.0.1:18400")
+        self.assertEqual(environment["LOCALAI_DATA_PATH"], str(self.data_dir / "data"))
         self.assertEqual(environment["LOCALAI_MAX_ACTIVE_BACKENDS"], "1")
         self.assertEqual(environment["LOCALAI_AUTOLOAD_GALLERIES"], "false")
         self.assertEqual(environment["LOCALAI_AUTOLOAD_BACKEND_GALLERIES"], "false")
@@ -245,6 +255,36 @@ class LocalAIManagerTests(unittest.TestCase):
         self.assertEqual(environment["LOCALAI_DISABLE_WEBUI"], "true")
         self.assertEqual(environment["LOCALAI_API_KEY"], "test-key")
         self.assertEqual(wait_ready.call_args.args[0], "http://127.0.0.1:18400")
+
+    def test_qwen_verification_rejects_repointed_model_directory(self) -> None:
+        for variant in ("base", "voicedesign"):
+            with self.subTest(variant=variant):
+                if variant == "base":
+                    model_dir = self.qwen3_tts_model()
+                    manager = self.manager(QWEN3_TTS_MODEL_DIR=str(model_dir))
+                    manager.register_qwen3_tts_candidate()
+                    verify = manager.verify_qwen3_tts_candidate
+                else:
+                    model_dir = self.qwen3_voicedesign_model()
+                    manager = self.manager(QWEN_VOICEDESIGN_MODEL_DIR=str(model_dir))
+                    manager.register_qwen3_voicedesign_candidate()
+                    verify = manager.verify_qwen3_voicedesign_candidate
+                link = manager.models_dir / f"llm-local.qwen3-tts.1p7b-{variant}.hf"
+                link.unlink()
+                link.symlink_to(model_dir.parent)
+                with self.assertRaisesRegex(LocalAIManagerError, "引用缺失或目标不一致"):
+                    verify()
+
+    def test_stop_waits_for_listener_to_close_after_process_exit(self) -> None:
+        with (
+            patch(
+                "scripts.localai.manager.socket.create_connection",
+                side_effect=[Mock(), ConnectionRefusedError],
+            ) as connect,
+            patch("scripts.localai.manager.time.sleep"),
+        ):
+            self.manager()._ensure_port_closed(timeout=1)
+        self.assertEqual(connect.call_count, 2)
 
     def test_start_registers_managed_worker_bridge_in_external_backend_map(self) -> None:
         manager = self.manager(
@@ -295,26 +335,48 @@ class LocalAIManagerTests(unittest.TestCase):
             manager.start()
 
     def test_manager_reaps_orphaned_worker_bridge_process_group(self) -> None:
+        manifest = json.loads((REPOSITORY_DIR / "localai/manifests/worker-bridge.json").read_text())
+        for entry in manifest["workers"].values():
+            worker_script = REPOSITORY_DIR / entry["project"] / entry["script"]
+            with self.subTest(worker=entry["project"]):
+                worker = subprocess.Popen(
+                    [
+                        sys.executable,
+                        "-c",
+                        "import time; time.sleep(60)",
+                        str(worker_script),
+                        "--input-json",
+                        "unused.json",
+                    ],
+                    env={**os.environ, "LLM_LOCALAI_REQUEST_ID": "test-request"},
+                    start_new_session=True,
+                )
+                try:
+                    self.manager()._reap_worker_bridge_processes()
+                    self.assertIsNotNone(worker.poll())
+                finally:
+                    if worker.poll() is None:
+                        worker.kill()
+                    worker.wait(timeout=2)
+
+    def test_manager_reaps_tagged_descendant_after_worker_parent_exits(self) -> None:
         worker_script = REPOSITORY_DIR / "model-audio/SheetSage2/worker.py"
-        worker = subprocess.Popen(
-            [
-                sys.executable,
-                "-c",
-                "import time; time.sleep(60)",
-                str(worker_script),
-                "--input-json",
-                "unused.json",
-            ],
-            env={**os.environ, "LLM_LOCALAI_REQUEST_ID": "test-request"},
+        descendant = subprocess.Popen(
+            [sys.executable, "-c", "import time; time.sleep(60)"],
+            env={
+                **os.environ,
+                "LLM_LOCALAI_REQUEST_ID": "orphan-test",
+                "LLM_LOCALAI_WORKER_SCRIPT": str(worker_script),
+            },
             start_new_session=True,
         )
         try:
             self.manager()._reap_worker_bridge_processes()
-            self.assertIsNotNone(worker.poll())
+            self.assertIsNotNone(descendant.poll())
         finally:
-            if worker.poll() is None:
-                worker.kill()
-            worker.wait(timeout=2)
+            if descendant.poll() is None:
+                descendant.kill()
+            descendant.wait(timeout=2)
 
     def test_fake_host_process_runs_ready_and_is_reaped_from_its_process_group(self) -> None:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:

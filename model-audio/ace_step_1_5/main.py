@@ -17,9 +17,9 @@ from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Response
+from llm_local_runtime import GpuLockTimeoutError
 from pydantic import BaseModel, Field, field_validator
 from starlette.middleware.base import BaseHTTPMiddleware
-from llm_local_runtime import GpuLockTimeoutError
 
 from runtime import (
     WorkerConfig,

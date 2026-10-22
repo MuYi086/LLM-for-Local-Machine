@@ -46,13 +46,6 @@ WORKER_BRIDGE_CANDIDATES = {
     "llm-local.tiger-dnr.worker.v1": ROOT / "localai/manifests/tiger-dnr-worker-candidate.yaml",
 }
 WORKER_BRIDGE_MANIFEST_PATH = ROOT / "localai/manifests/worker-bridge.json"
-WORKER_BRIDGE_PROJECTS = (
-    "SheetSage2",
-    "MERT-v2-FullSong",
-    "YuE2-Vae",
-    "YuE2-3B",
-    "TIGER-DnR",
-)
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 _COMMAND_TIMEOUT_SECONDS = 15
@@ -170,8 +163,8 @@ class LocalAIManager:
                 raise LocalAIManagerError(f"LocalAI worker bridge YAML 不匹配：{model_name}")
 
     @staticmethod
-    def _verify_worker_bridge_manifest() -> None:
-        """验证版本化 bridge registry 只引用仓库内固定 worker 脚本。"""
+    def _verify_worker_bridge_manifest() -> set[Path]:
+        """验证版本化 registry，并返回回收时使用的同一组 worker 入口。"""
         try:
             manifest = json.loads(WORKER_BRIDGE_MANIFEST_PATH.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
@@ -183,6 +176,7 @@ class LocalAIManager:
             raise LocalAIManagerError("LocalAI worker bridge manifest schema_version 必须为 1。")
         if not isinstance(workers, dict) or set(workers) != set(WORKER_BRIDGE_CANDIDATES):
             raise LocalAIManagerError("LocalAI worker bridge registry 与固定候选模型集合不一致。")
+        scripts: set[Path] = set()
         for model_name, entry in workers.items():
             if not isinstance(entry, dict):
                 raise LocalAIManagerError(
@@ -205,6 +199,8 @@ class LocalAIManager:
                 raise LocalAIManagerError(f"LocalAI worker bridge 路径越界：{model_name}")
             if not project.is_dir() or not script.is_file():
                 raise LocalAIManagerError(f"LocalAI worker bridge worker 不存在：{model_name}")
+            scripts.add(script)
+        return scripts
 
     def register_qwen3_tts_candidate(self) -> None:
         """校验用户准备的 Base safetensors 快照并注册本地模型 YAML。"""
@@ -215,30 +211,11 @@ class LocalAIManager:
             raise LocalAIManagerError("Qwen3-TTS Base 候选 YAML 模板不可读。") from exc
         if template.count("__QWEN3_TTS_MODEL_PATH__") != 1:
             raise LocalAIManagerError("Qwen3-TTS Base YAML 模板必须且只能有一个模型路径占位符。")
-        candidate_yaml = template.replace(
-            "__QWEN3_TTS_MODEL_PATH__", json.dumps(str(model_dir))
-        ).encode()
-        self._ensure_directories()
-        destination = self.models_dir / f"{QWEN3_TTS_MODEL_NAME}.yaml"
-        if destination.exists():
-            try:
-                current_yaml = destination.read_bytes()
-            except OSError as exc:
-                raise LocalAIManagerError("现有 Qwen3-TTS Base YAML 不可读。") from exc
-            if current_yaml != candidate_yaml:
-                raise LocalAIManagerError(f"现有 Qwen3-TTS Base 配置不同，拒绝覆盖：{destination}")
-            print(f"Qwen3-TTS Base 候选配置已存在：{destination}")
-            return
-
-        temporary_path = self._write_temporary_file(self.models_dir, ".qwen3-tts-", ".yaml")
-        try:
-            temporary_path.write_bytes(candidate_yaml)
-            self._fsync_file(temporary_path)
-            os.replace(temporary_path, destination)
-            self._fsync_directory(self.models_dir)
-        finally:
-            temporary_path.unlink(missing_ok=True)
-        print(f"已注册 E0 候选配置（不是推理验收）：{destination}")
+        model_reference = self._register_model_directory(QWEN3_TTS_MODEL_NAME, model_dir)
+        self._register_model_config(
+            QWEN3_TTS_MODEL_NAME,
+            template.replace("__QWEN3_TTS_MODEL_PATH__", json.dumps(model_reference)),
+        )
 
     def verify_qwen3_tts_candidate(self) -> None:
         """校验 Qwen3-TTS Base 所需权重文件及已注册模型配置。"""
@@ -251,8 +228,9 @@ class LocalAIManager:
                 "Qwen3-TTS Base 模型或固定 YAML 尚未就绪；先下载模型并运行 "
                 "manager.py register-qwen3-tts-candidate。"
             ) from exc
+        model_reference = self._verify_model_directory(QWEN3_TTS_MODEL_NAME, model_dir)
         candidate_yaml = template.replace(
-            "__QWEN3_TTS_MODEL_PATH__", json.dumps(str(model_dir))
+            "__QWEN3_TTS_MODEL_PATH__", json.dumps(model_reference)
         ).encode()
         if installed_yaml != candidate_yaml:
             raise LocalAIManagerError(
@@ -286,7 +264,8 @@ class LocalAIManager:
         template = QWEN3_VOICEDESIGN_CONFIG_PATH.read_text(encoding="utf-8")
         if template.count("__QWEN3_VOICEDESIGN_MODEL_PATH__") != 1:
             raise LocalAIManagerError("Qwen3 VoiceDesign 候选 YAML 模板占位符无效。")
-        rendered = template.replace("__QWEN3_VOICEDESIGN_MODEL_PATH__", json.dumps(str(model_dir)))
+        model_reference = self._register_model_directory(QWEN3_VOICEDESIGN_MODEL_NAME, model_dir)
+        rendered = template.replace("__QWEN3_VOICEDESIGN_MODEL_PATH__", json.dumps(model_reference))
         self._register_model_config(QWEN3_VOICEDESIGN_MODEL_NAME, rendered)
 
     def verify_qwen3_voicedesign_candidate(self) -> None:
@@ -300,8 +279,9 @@ class LocalAIManager:
                 "Qwen3 VoiceDesign 模型或固定 YAML 尚未就绪；先手动准备模型并运行 "
                 "manager.py register-qwen3-voicedesign-candidate。"
             ) from exc
+        model_reference = self._verify_model_directory(QWEN3_VOICEDESIGN_MODEL_NAME, model_dir)
         candidate_yaml = template.replace(
-            "__QWEN3_VOICEDESIGN_MODEL_PATH__", json.dumps(str(model_dir))
+            "__QWEN3_VOICEDESIGN_MODEL_PATH__", json.dumps(model_reference)
         ).encode()
         if installed_yaml != candidate_yaml:
             raise LocalAIManagerError(
@@ -328,6 +308,30 @@ class LocalAIManager:
                 "该候选需要官方 Qwen3-TTS-12Hz-1.7B-VoiceDesign safetensors 快照。"
             )
         return model_dir
+
+    def _register_model_directory(self, model_name: str, model_dir: Path) -> str:
+        """在 models 内建立受控引用，满足 LocalAI 禁止绝对 parameters.model 的合同。"""
+        self.models_dir.mkdir(parents=True, exist_ok=True)
+        reference = f"{model_name}.hf"
+        destination = self.models_dir / reference
+        if destination.exists() or destination.is_symlink():
+            return self._verify_model_directory(model_name, model_dir)
+        temporary = self.models_dir / f".{reference}.{uuid.uuid4().hex}.tmp"
+        try:
+            temporary.symlink_to(model_dir, target_is_directory=True)
+            os.replace(temporary, destination)
+            self._fsync_directory(self.models_dir)
+        finally:
+            temporary.unlink(missing_ok=True)
+        return reference
+
+    def _verify_model_directory(self, model_name: str, model_dir: Path) -> str:
+        """确认相对引用仍指向显式配置且已检查完整的本地快照。"""
+        reference = f"{model_name}.hf"
+        link = self.models_dir / reference
+        if not link.is_symlink() or link.resolve() != model_dir.resolve():
+            raise LocalAIManagerError(f"LocalAI 模型目录引用缺失或目标不一致：{link}")
+        return reference
 
     def _register_model_config(self, model_name: str, rendered: str) -> None:
         """原子注册模型 YAML，拒绝覆盖内容不同的既有配置。"""
@@ -388,6 +392,7 @@ class LocalAIManager:
             "LOCALAI_ADDRESS": f"127.0.0.1:{port}",
             "LOCALAI_MODELS_PATH": str(self.models_dir.resolve()),
             "LOCALAI_BACKENDS_PATH": str(self.backends_dir.resolve()),
+            "LOCALAI_DATA_PATH": str((self.data_dir / "data").resolve()),
             "LOCALAI_MAX_ACTIVE_BACKENDS": "1",
             "LOCALAI_AUTOLOAD_GALLERIES": "false",
             "LOCALAI_AUTOLOAD_BACKEND_GALLERIES": "false",
@@ -479,8 +484,12 @@ class LocalAIManager:
         """终止受管进程组并确认所有组成员退出且 API 端口关闭。"""
         state = self._read_state(required=False)
         if state is None:
+            self._reap_worker_bridge_processes()
             self._ensure_no_managed_processes()
             self._ensure_port_closed()
+            if self._worker_bridge_enabled():
+                address, _port = self._bridge_address_and_port()
+                self._ensure_bridge_port_closed(address)
             print("受管 LocalAI 未运行。")
             return
         self._terminate_process_group(state)
@@ -524,9 +533,7 @@ class LocalAIManager:
 
     def _worker_bridge_enabled(self) -> bool:
         """读取是否将固定的一次性 worker bridge 纳入受管 LocalAI 进程组。"""
-        return self.environ.get(
-            "LLM_LOCALAI_WORKER_BRIDGE_ENABLED", "false"
-        ).strip().lower() in {
+        return self.environ.get("LLM_LOCALAI_WORKER_BRIDGE_ENABLED", "false").strip().lower() in {
             "1",
             "true",
             "yes",
@@ -752,13 +759,18 @@ class LocalAIManager:
             raise LocalAIManagerError("LLM_LOCALAI_BASE_URL 端口超出有效范围。")
         return f"http://{parsed.hostname}:{port}", port
 
-    def _ensure_port_closed(self) -> None:
+    def _ensure_port_closed(self, *, timeout: float = 0) -> None:
         base_url, port = self._base_url_and_port()
-        try:
-            connection = socket.create_connection(("127.0.0.1", port), timeout=0.5)
-        except OSError:
-            return
-        connection.close()
+        deadline = time.monotonic() + timeout
+        while True:
+            try:
+                connection = socket.create_connection(("127.0.0.1", port), timeout=0.5)
+            except OSError:
+                return
+            connection.close()
+            if time.monotonic() >= deadline:
+                break
+            time.sleep(0.05)
         raise LocalAIManagerError(f"LocalAI 状态文件不存在，但 loopback 端口仍可连接：{base_url}")
 
     def _managed_process_ids(self) -> list[int]:
@@ -862,15 +874,14 @@ class LocalAIManager:
             raise LocalAIManagerError("LocalAI 进程组在 SIGKILL 后仍有活动进程。")
         if state.get("bridge_address") is not None:
             self._reap_worker_bridge_processes()
-        self._ensure_port_closed()
+        # 进程组消失与内核关闭监听之间存在短暂间隔，限时复核后再报告失败。
+        self._ensure_port_closed(timeout=min(self.stop_timeout, 2.0))
         self._ensure_bridge_port_closed(state.get("bridge_address"))
         self._reap_spawned_child(pid)
 
     def _reap_worker_bridge_processes(self) -> None:
         """回收 bridge 被强制终止后脱离宿主机进程组的一次性模型 worker。"""
-        expected_scripts = {
-            str((ROOT / project / "worker.py").resolve()) for project in WORKER_BRIDGE_PROJECTS
-        }
+        expected_scripts = {str(script) for script in self._verify_worker_bridge_manifest()}
         groups: dict[int, dict[int, str]] = {}
         for process_path in Path("/proc").glob("[0-9]*"):
             try:
@@ -880,6 +891,14 @@ class LocalAIManager:
                     argument.decode("utf-8", errors="replace") for argument in arguments
                 ]
                 process_environment = process_path.joinpath("environ").read_bytes().split(b"\0")
+                inherited_script = next(
+                    (
+                        entry.split(b"=", 1)[1].decode("utf-8", errors="replace")
+                        for entry in process_environment
+                        if entry.startswith(b"LLM_LOCALAI_WORKER_SCRIPT=")
+                    ),
+                    None,
+                )
                 stat = self._read_process_stat(process_id)
                 process_group = os.getpgid(process_id)
             except (OSError, ProcessLookupError, ValueError):
@@ -887,11 +906,15 @@ class LocalAIManager:
             if (
                 stat is None
                 or stat[0] in {"Z", "X"}
-                or "--input-json" not in decoded_arguments
-                or not expected_scripts.intersection(decoded_arguments)
+                or not (
+                    (
+                        "--input-json" in decoded_arguments
+                        and expected_scripts.intersection(decoded_arguments)
+                    )
+                    or inherited_script in expected_scripts
+                )
                 or not any(
-                    entry.startswith(b"LLM_LOCALAI_REQUEST_ID=")
-                    for entry in process_environment
+                    entry.startswith(b"LLM_LOCALAI_REQUEST_ID=") for entry in process_environment
                 )
                 or process_group <= 1
                 or process_group == os.getpgrp()

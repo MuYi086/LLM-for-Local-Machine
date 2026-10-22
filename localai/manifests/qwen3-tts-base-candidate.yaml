@@ -7,4 +7,4 @@ options:
   - task:tts
   - backend:cuda
   - device:0
-  - qwen3_tts.voice_prompt_cache_slots:0
+  - session.qwen3_tts.voice_prompt_cache_slots:0

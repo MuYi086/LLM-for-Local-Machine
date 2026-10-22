@@ -193,6 +193,7 @@ def execute_localai_operation[Result](
             timeout_seconds=config.gpu_lock_wait_timeout,
         ):
             with _request_marker(config.gpu_lock_file, config.model) as marker:
+                request_marker = marker.read_bytes()
                 result: Result | None = None
                 inference_error: BaseException | None = None
                 try:
@@ -206,6 +207,12 @@ def execute_localai_operation[Result](
                     raise BackendQuarantinedError(
                         f"LocalAI backend {config.model} 未确认停止，GPU 已隔离；标记文件保留在 {marker}。"
                     ) from cleanup_error
+                # 固定 LocalAI 对外部 backend 的 Free 错误只记日志，HTTP 200 不能覆盖
+                # bridge 已写下的回收失败标记；保留隔离，交给运维恢复流程确认进程退出。
+                if marker.read_bytes() != request_marker:
+                    raise BackendQuarantinedError(
+                        f"LocalAI worker 收尾期间更新了 GPU 隔离标记，需人工恢复：{marker}。"
+                    )
                 if config.cuda_release_delay > 0:
                     time.sleep(config.cuda_release_delay)
                 marker.unlink(missing_ok=True)

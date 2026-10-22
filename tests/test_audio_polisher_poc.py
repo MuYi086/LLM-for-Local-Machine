@@ -5,18 +5,26 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from importlib import import_module
 from pathlib import Path
 
-from scripts.training.build_audio_polisher_poc import (
-    clean_markdown,
-    extract_candidate_chunks,
-    select_source_files,
-    split_source_names,
-    validate_teacher_output,
-)
-from scripts.training.compare_audio_polisher_predictions import compare_predictions
-from scripts.training.import_audio_polisher_to_easy_dataset import decide_dataset_import
-from scripts.training.run_audio_polisher_inference import build_messages, normalize_prediction_text
+# model-text 按模态保留目录名，动态导入其 namespace package，避免修改全局 sys.path。
+_training = "model-text.scripts.training"
+_builder = import_module(f"{_training}.build_audio_polisher_poc")
+clean_markdown = _builder.clean_markdown
+extract_candidate_chunks = _builder.extract_candidate_chunks
+select_source_files = _builder.select_source_files
+split_source_names = _builder.split_source_names
+validate_teacher_output = _builder.validate_teacher_output
+compare_predictions = import_module(
+    f"{_training}.compare_audio_polisher_predictions"
+).compare_predictions
+decide_dataset_import = import_module(
+    f"{_training}.import_audio_polisher_to_easy_dataset"
+).decide_dataset_import
+_inference = import_module(f"{_training}.run_audio_polisher_inference")
+build_messages = _inference.build_messages
+normalize_prediction_text = _inference.normalize_prediction_text
 
 
 class AudioPolisherPocTests(unittest.TestCase):

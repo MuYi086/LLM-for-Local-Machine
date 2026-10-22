@@ -38,6 +38,9 @@ def envelope(*, model: str = "llm-local.test.echo", request_id: str = "req-1") -
 
 
 class _FakeRunner:
+    def ensure_stopped(self):
+        return
+
     def run(self, model, operation, payload, *, request_id, cancelled=None):
         if cancelled is not None and not cancelled():
             raise AssertionError("active test request was marked cancelled")
@@ -111,6 +114,7 @@ class LocalAIWorkerBridgeTests(unittest.TestCase):
                 stub.Status(pb2.HealthMessage(), timeout=2).state, pb2.StatusResponse.READY
             )
             self.assertTrue(stub.LoadModel(pb2.ModelOptions(Model="unused"), timeout=2).success)
+            self.assertTrue(stub.Free(pb2.HealthMessage(), timeout=2).success)
             result = stub.Predict(
                 pb2.PredictOptions(
                     Prompt=envelope(),

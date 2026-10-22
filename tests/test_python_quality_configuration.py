@@ -29,7 +29,7 @@ class PythonQualityConfigurationTests(unittest.TestCase):
     def test_each_model_project_has_a_locked_ruff_baseline(self) -> None:
         for project_name in MODEL_PROJECTS:
             with self.subTest(project=project_name):
-                project_dir = REPOSITORY_DIR / project_name
+                project_dir = REPOSITORY_DIR / "model-audio" / project_name
                 configuration = tomllib.loads(
                     (project_dir / "pyproject.toml").read_text(encoding="utf-8")
                 )

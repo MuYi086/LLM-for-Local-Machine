@@ -7,6 +7,14 @@
       "output_kind": "json",
       "output_argument": "--output-json",
       "timeout_seconds": 10
+    },
+    "llm-local.bridge.smoke-file": {
+      "project": "qa",
+      "script": "tests/fixtures/localai_bridge_smoke_worker.py",
+      "output_kind": "file_ref",
+      "output_argument": "--output-file",
+      "output_suffix": ".wav",
+      "timeout_seconds": 30
     }
   }
 }

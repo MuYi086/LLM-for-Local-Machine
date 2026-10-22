@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 @contextmanager
 def load_service(project: str) -> Iterator[object]:
     """在临时存储配置下加载单个服务模块，不加载模型环境。"""
-    project_dir = ROOT / project
+    project_dir = ROOT / "model-audio" / project
     module_name = f"localai_test_{project.lower().replace('-', '_')}"
     previous_runtime = sys.modules.pop("runtime", None)
     sys.path.insert(0, str(project_dir))
@@ -76,7 +76,7 @@ class LocalAIWorkerServiceRouteTests(unittest.TestCase):
             with (
                 patch.object(
                     module,
-                    "execute_localai_worker_file",
+                    "execute_localai_worker_file_reference",
                     return_value=(artifact, 1.25),
                 ) as execute,
                 patch.object(module, "persist_archive_file", return_value=saved) as persist,
@@ -93,6 +93,7 @@ class LocalAIWorkerServiceRouteTests(unittest.TestCase):
                 operation="run",
                 payload={"worker_input": payload},
                 output_dir=module.WORKER_TMP_DIR,
+                artifact_dir=module.LOCALAI_ARTIFACT_DIR,
                 suffix=".zip",
                 media_type="application/zip",
             )
@@ -106,7 +107,7 @@ class LocalAIWorkerServiceRouteTests(unittest.TestCase):
             with (
                 patch.object(
                     module,
-                    "execute_localai_worker_file",
+                    "execute_localai_worker_file_reference",
                     return_value=(artifact, 2.0),
                 ) as execute,
                 patch.object(
@@ -129,7 +130,7 @@ class LocalAIWorkerServiceRouteTests(unittest.TestCase):
             with (
                 patch.object(
                     module,
-                    "execute_localai_worker_file",
+                    "execute_localai_worker_file_reference",
                     return_value=(artifact, 1.5),
                 ) as execute,
                 patch.object(

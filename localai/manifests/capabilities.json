@@ -63,7 +63,7 @@
                 },
                 "required": true,
                 "source": "model-audio/Confucius4_TTS/main.py",
-                "line": 200
+                "line": 184
               },
               {
                 "name": "lang",
@@ -76,7 +76,7 @@
                 },
                 "required": false,
                 "source": "model-audio/Confucius4_TTS/main.py",
-                "line": 201
+                "line": 185
               },
               {
                 "name": "audio_path",
@@ -89,7 +89,7 @@
                 },
                 "required": true,
                 "source": "model-audio/Confucius4_TTS/main.py",
-                "line": 202
+                "line": 186
               },
               {
                 "name": "raw",
@@ -99,7 +99,7 @@
                 "constraints": {},
                 "required": false,
                 "source": "model-audio/Confucius4_TTS/main.py",
-                "line": 203
+                "line": 187
               },
               {
                 "name": "temperature",
@@ -112,7 +112,7 @@
                 },
                 "required": false,
                 "source": "model-audio/Confucius4_TTS/main.py",
-                "line": 204
+                "line": 188
               },
               {
                 "name": "top_p",
@@ -125,7 +125,7 @@
                 },
                 "required": false,
                 "source": "model-audio/Confucius4_TTS/main.py",
-                "line": 205
+                "line": 189
               },
               {
                 "name": "top_k",
@@ -138,7 +138,7 @@
                 },
                 "required": false,
                 "source": "model-audio/Confucius4_TTS/main.py",
-                "line": 206
+                "line": 190
               },
               {
                 "name": "num_beams",
@@ -151,7 +151,7 @@
                 },
                 "required": false,
                 "source": "model-audio/Confucius4_TTS/main.py",
-                "line": 207
+                "line": 191
               },
               {
                 "name": "repetition_penalty",
@@ -164,7 +164,7 @@
                 },
                 "required": false,
                 "source": "model-audio/Confucius4_TTS/main.py",
-                "line": 208
+                "line": 192
               },
               {
                 "name": "max_length",
@@ -177,7 +177,7 @@
                 },
                 "required": false,
                 "source": "model-audio/Confucius4_TTS/main.py",
-                "line": 209
+                "line": 193
               },
               {
                 "name": "n_timesteps",
@@ -190,7 +190,7 @@
                 },
                 "required": false,
                 "source": "model-audio/Confucius4_TTS/main.py",
-                "line": 210
+                "line": 194
               },
               {
                 "name": "inference_cfg_rate",
@@ -203,7 +203,7 @@
                 },
                 "required": false,
                 "source": "model-audio/Confucius4_TTS/main.py",
-                "line": 211
+                "line": 195
               },
               {
                 "name": "max_text_tokens_per_segment",
@@ -216,7 +216,7 @@
                 },
                 "required": false,
                 "source": "model-audio/Confucius4_TTS/main.py",
-                "line": 212
+                "line": 196
               },
               {
                 "name": "cross_fade_duration",
@@ -229,7 +229,7 @@
                 },
                 "required": false,
                 "source": "model-audio/Confucius4_TTS/main.py",
-                "line": 217
+                "line": 201
               },
               {
                 "name": "edge_fade_duration",
@@ -242,7 +242,7 @@
                 },
                 "required": false,
                 "source": "model-audio/Confucius4_TTS/main.py",
-                "line": 218
+                "line": 202
               },
               {
                 "name": "edge_pad_duration",
@@ -255,7 +255,7 @@
                 },
                 "required": false,
                 "source": "model-audio/Confucius4_TTS/main.py",
-                "line": 219
+                "line": 203
               },
               {
                 "name": "vocalization_duration_seconds",
@@ -269,7 +269,7 @@
                 },
                 "required": false,
                 "source": "model-audio/Confucius4_TTS/main.py",
-                "line": 220
+                "line": 204
               },
               {
                 "name": "verbose",
@@ -279,7 +279,7 @@
                 "constraints": {},
                 "required": false,
                 "source": "model-audio/Confucius4_TTS/main.py",
-                "line": 223
+                "line": 207
               }
             ],
             "field_mappings": [
@@ -879,7 +879,7 @@
             "method": "GET",
             "path": "/v1/health",
             "source": "model-audio/MERT-v2-FullSong/main.py",
-            "line": 451,
+            "line": 455,
             "source_fields": [],
             "localai_endpoint_candidate": null,
             "field_mappings": [],
@@ -890,7 +890,7 @@
             "method": "POST",
             "path": "/v1/m-a-p/MERT-v2-FullSong",
             "source": "model-audio/MERT-v2-FullSong/main.py",
-            "line": 508,
+            "line": 512,
             "source_fields": [
               {
                 "name": "audio",
@@ -976,7 +976,7 @@
           "path": "/v1/health",
           "function": "health",
           "source": "model-audio/MERT-v2-FullSong/main.py",
-          "line": 451,
+          "line": 455,
           "parameters": [],
           "request_schemas": [],
           "response_annotation": "dict[str, object]",
@@ -998,7 +998,7 @@
           "path": "/v1/m-a-p/MERT-v2-FullSong",
           "function": "extract_features_route",
           "source": "model-audio/MERT-v2-FullSong/main.py",
-          "line": 508,
+          "line": 512,
           "parameters": [
             {
               "name": "audio",
@@ -1250,7 +1250,7 @@
             "method": "GET",
             "path": "/v1/health",
             "source": "model-audio/SheetSage2/main.py",
-            "line": 459,
+            "line": 463,
             "source_fields": [],
             "localai_endpoint_candidate": null,
             "field_mappings": [],
@@ -1261,7 +1261,7 @@
             "method": "POST",
             "path": "/v1/m-a-p/SheetSage2",
             "source": "model-audio/SheetSage2/main.py",
-            "line": 550,
+            "line": 554,
             "source_fields": [
               {
                 "name": "audio",
@@ -1533,7 +1533,7 @@
           "path": "/v1/health",
           "function": "health",
           "source": "model-audio/SheetSage2/main.py",
-          "line": 459,
+          "line": 463,
           "parameters": [],
           "request_schemas": [],
           "response_annotation": "dict[str, Any]",
@@ -1555,7 +1555,7 @@
           "path": "/v1/m-a-p/SheetSage2",
           "function": "transcribe",
           "source": "model-audio/SheetSage2/main.py",
-          "line": 550,
+          "line": 554,
           "parameters": [
             {
               "name": "audio",
@@ -1834,7 +1834,7 @@
             "method": "GET",
             "path": "/v1/health",
             "source": "model-audio/YuE2-3B/main.py",
-            "line": 407,
+            "line": 411,
             "source_fields": [],
             "localai_endpoint_candidate": null,
             "field_mappings": [],
@@ -1844,7 +1844,7 @@
             "method": "POST",
             "path": "/v1/m-a-p/YuE2",
             "source": "model-audio/YuE2-3B/main.py",
-            "line": 448,
+            "line": 452,
             "source_fields": [
               {
                 "name": "style",
@@ -1857,7 +1857,7 @@
                 },
                 "required": false,
                 "source": "model-audio/YuE2-3B/main.py",
-                "line": 151
+                "line": 166
               },
               {
                 "name": "tags",
@@ -1870,7 +1870,7 @@
                 },
                 "required": false,
                 "source": "model-audio/YuE2-3B/main.py",
-                "line": 152
+                "line": 167
               },
               {
                 "name": "lyrics",
@@ -1883,7 +1883,7 @@
                 },
                 "required": true,
                 "source": "model-audio/YuE2-3B/main.py",
-                "line": 153
+                "line": 168
               },
               {
                 "name": "cot",
@@ -1893,7 +1893,7 @@
                 "constraints": {},
                 "required": false,
                 "source": "model-audio/YuE2-3B/main.py",
-                "line": 154
+                "line": 169
               },
               {
                 "name": "seed",
@@ -1906,7 +1906,7 @@
                 },
                 "required": false,
                 "source": "model-audio/YuE2-3B/main.py",
-                "line": 155
+                "line": 170
               },
               {
                 "name": "abc",
@@ -1919,7 +1919,7 @@
                 },
                 "required": false,
                 "source": "model-audio/YuE2-3B/main.py",
-                "line": 156
+                "line": 171
               },
               {
                 "name": "cfg_scale",
@@ -1933,7 +1933,7 @@
                 },
                 "required": false,
                 "source": "model-audio/YuE2-3B/main.py",
-                "line": 157
+                "line": 172
               },
               {
                 "name": "id",
@@ -1945,7 +1945,7 @@
                 },
                 "required": false,
                 "source": "model-audio/YuE2-3B/main.py",
-                "line": 158
+                "line": 173
               },
               {
                 "name": "abc_sampling",
@@ -1955,7 +1955,7 @@
                 "constraints": {},
                 "required": false,
                 "source": "model-audio/YuE2-3B/main.py",
-                "line": 159
+                "line": 174
               },
               {
                 "name": "semantic_sampling",
@@ -1965,7 +1965,7 @@
                 "constraints": {},
                 "required": false,
                 "source": "model-audio/YuE2-3B/main.py",
-                "line": 160
+                "line": 175
               }
             ],
             "localai_endpoint_candidate": null,
@@ -2072,7 +2072,7 @@
       "request_schemas": {
         "YuE2MusicRequest": {
           "source": "model-audio/YuE2-3B/main.py",
-          "line": 158,
+          "line": 161,
           "inherits": [],
           "fields": [
             {
@@ -2086,7 +2086,7 @@
               },
               "required": false,
               "source": "model-audio/YuE2-3B/main.py",
-              "line": 163
+              "line": 166
             },
             {
               "name": "tags",
@@ -2099,7 +2099,7 @@
               },
               "required": false,
               "source": "model-audio/YuE2-3B/main.py",
-              "line": 164
+              "line": 167
             },
             {
               "name": "lyrics",
@@ -2112,7 +2112,7 @@
               },
               "required": true,
               "source": "model-audio/YuE2-3B/main.py",
-              "line": 165
+              "line": 168
             },
             {
               "name": "cot",
@@ -2122,7 +2122,7 @@
               "constraints": {},
               "required": false,
               "source": "model-audio/YuE2-3B/main.py",
-              "line": 166
+              "line": 169
             },
             {
               "name": "seed",
@@ -2135,7 +2135,7 @@
               },
               "required": false,
               "source": "model-audio/YuE2-3B/main.py",
-              "line": 167
+              "line": 170
             },
             {
               "name": "abc",
@@ -2148,7 +2148,7 @@
               },
               "required": false,
               "source": "model-audio/YuE2-3B/main.py",
-              "line": 168
+              "line": 171
             },
             {
               "name": "cfg_scale",
@@ -2162,7 +2162,7 @@
               },
               "required": false,
               "source": "model-audio/YuE2-3B/main.py",
-              "line": 169
+              "line": 172
             },
             {
               "name": "id",
@@ -2174,7 +2174,7 @@
               },
               "required": false,
               "source": "model-audio/YuE2-3B/main.py",
-              "line": 170
+              "line": 173
             },
             {
               "name": "abc_sampling",
@@ -2184,7 +2184,7 @@
               "constraints": {},
               "required": false,
               "source": "model-audio/YuE2-3B/main.py",
-              "line": 171
+              "line": 174
             },
             {
               "name": "semantic_sampling",
@@ -2194,7 +2194,7 @@
               "constraints": {},
               "required": false,
               "source": "model-audio/YuE2-3B/main.py",
-              "line": 172
+              "line": 175
             }
           ]
         }
@@ -2205,7 +2205,7 @@
           "path": "/v1/health",
           "function": "health",
           "source": "model-audio/YuE2-3B/main.py",
-          "line": 407,
+          "line": 411,
           "parameters": [],
           "request_schemas": [],
           "response_annotation": "dict[str, Any]",
@@ -2225,7 +2225,7 @@
           "path": "/v1/m-a-p/YuE2",
           "function": "generate_music",
           "source": "model-audio/YuE2-3B/main.py",
-          "line": 448,
+          "line": 452,
           "parameters": [
             {
               "name": "request",
@@ -2278,7 +2278,7 @@
             "method": "GET",
             "path": "/v1/health",
             "source": "model-audio/YuE2-Vae/main.py",
-            "line": 513,
+            "line": 517,
             "source_fields": [],
             "localai_endpoint_candidate": null,
             "field_mappings": [],
@@ -2289,7 +2289,7 @@
             "method": "POST",
             "path": "/v1/m-a-p/YuE2-Vae",
             "source": "model-audio/YuE2-Vae/main.py",
-            "line": 566,
+            "line": 570,
             "source_fields": [
               {
                 "name": "operation",
@@ -2429,7 +2429,7 @@
           "path": "/v1/health",
           "function": "health",
           "source": "model-audio/YuE2-Vae/main.py",
-          "line": 513,
+          "line": 517,
           "parameters": [],
           "request_schemas": [],
           "response_annotation": "dict[str, object]",
@@ -2451,7 +2451,7 @@
           "path": "/v1/m-a-p/YuE2-Vae",
           "function": "process_vae",
           "source": "model-audio/YuE2-Vae/main.py",
-          "line": 566,
+          "line": 570,
           "parameters": [
             {
               "name": "operation",
@@ -2543,7 +2543,7 @@
                 },
                 "required": true,
                 "source": "model-audio/ace_step_1_5/main.py",
-                "line": 145
+                "line": 126
               },
               {
                 "name": "seconds",
@@ -2556,7 +2556,7 @@
                 },
                 "required": false,
                 "source": "model-audio/ace_step_1_5/main.py",
-                "line": 146
+                "line": 127
               },
               {
                 "name": "steps",
@@ -2569,7 +2569,7 @@
                 },
                 "required": false,
                 "source": "model-audio/ace_step_1_5/main.py",
-                "line": 147
+                "line": 128
               },
               {
                 "name": "bpm",
@@ -2582,7 +2582,7 @@
                 },
                 "required": false,
                 "source": "model-audio/ace_step_1_5/main.py",
-                "line": 148
+                "line": 129
               },
               {
                 "name": "keyscale",
@@ -2594,7 +2594,7 @@
                 },
                 "required": false,
                 "source": "model-audio/ace_step_1_5/main.py",
-                "line": 149
+                "line": 130
               },
               {
                 "name": "timesignature",
@@ -2606,7 +2606,7 @@
                 },
                 "required": false,
                 "source": "model-audio/ace_step_1_5/main.py",
-                "line": 150
+                "line": 131
               },
               {
                 "name": "seed",
@@ -2616,7 +2616,7 @@
                 "constraints": {},
                 "required": false,
                 "source": "model-audio/ace_step_1_5/main.py",
-                "line": 151
+                "line": 132
               }
             ],
             "field_mappings": [
@@ -5077,7 +5077,7 @@
       ]
     }
   ],
-  "updated_on": "2026-10-21",
+  "updated_on": "2026-10-22",
   "audio_cpp_family_screen": {
     "source_repository": "https://github.com/0xShug0/audio.cpp",
     "source_revision": "9a02e61326aaaf9d462b584ca5e0daba22c0abfc",
