@@ -2,7 +2,7 @@
   "schema_version": 1,
   "workers": {
     "llm-local.sheetsage2.worker.v1": {
-      "project": "model-audio/SheetSage2",
+      "project": "model-audio/score_sheetsage-2",
       "script": "worker.py",
       "output_kind": "file_ref",
       "output_argument": "--output-zip",
@@ -17,7 +17,7 @@
       }
     },
     "llm-local.mert-v2-fullsong.worker.v1": {
-      "project": "model-audio/MERT-v2-FullSong",
+      "project": "model-audio/embedding_mert-v2-fullsong",
       "script": "worker.py",
       "output_kind": "file_ref",
       "output_argument": "--output-file",
@@ -33,7 +33,7 @@
       }
     },
     "llm-local.yue2-vae.worker.v1": {
-      "project": "model-audio/YuE2-Vae",
+      "project": "model-audio/codec_yue2-vae",
       "script": "worker.py",
       "output_kind": "file_ref",
       "output_argument": "--output-file",
@@ -49,7 +49,7 @@
       }
     },
     "llm-local.yue2-3b.worker.v1": {
-      "project": "model-audio/YuE2-3B",
+      "project": "model-audio/music_yue2-3b",
       "script": "worker.py",
       "output_kind": "file_ref",
       "output_argument": "--output-wav",
@@ -62,7 +62,7 @@
       }
     },
     "llm-local.tiger-dnr.worker.v1": {
-      "project": "model-audio/TIGER-DnR",
+      "project": "model-audio/separate_tiger-dnr",
       "script": "worker.py",
       "output_kind": "file_ref",
       "output_argument": "--output-zip",

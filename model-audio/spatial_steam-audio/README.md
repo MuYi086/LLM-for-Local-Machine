@@ -20,7 +20,7 @@ Linux：
 
 ```bash
 bash scripts/build_steam_audio_renderer.sh
-export STEAM_AUDIO_RENDERER_BIN="$PWD/model-audio/steam_audio_renderer/build/steam-audio-render"
+export STEAM_AUDIO_RENDERER_BIN="$PWD/model-audio/spatial_steam-audio/build/steam-audio-render"
 ```
 
 Windows PowerShell：
@@ -28,7 +28,7 @@ Windows PowerShell：
 ```powershell
 $env:STEAM_AUDIO_SDK_DIR = "C:\sdk\steamaudio"
 .\scripts\build_steam_audio_renderer.ps1
-$env:STEAM_AUDIO_RENDERER_BIN = "$PWD\model-audio\steam_audio_renderer\build\Release\steam-audio-render.exe"
+$env:STEAM_AUDIO_RENDERER_BIN = "$PWD\model-audio\spatial_steam-audio\build\Release\steam-audio-render.exe"
 $env:PATH = "$env:STEAM_AUDIO_SDK_DIR\lib\windows-x64;$env:PATH"
 ```
 

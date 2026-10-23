@@ -300,7 +300,7 @@ def generate_bgm(request: AceStepBgmRequest) -> Response:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     try:
-        with gpu_runtime_lock(GPU_LOCK_FILE, "model-audio/ace_step_1_5/generate"):
+        with gpu_runtime_lock(GPU_LOCK_FILE, "model-audio/music_ace-step-1.5/generate"):
             with manager.lock:
                 try:
                     result = manager.run_worker(payload)

@@ -8,7 +8,7 @@
   "services": [
     {
       "project": "Confucius4_TTS",
-      "directory": "model-audio/Confucius4_TTS",
+      "directory": "model-audio/clone_confucius-4",
       "ports": [
         8361
       ],
@@ -26,7 +26,7 @@
           {
             "method": "GET",
             "path": "/v1/check/audio",
-            "source": "model-audio/Confucius4_TTS/main.py",
+            "source": "model-audio/clone_confucius-4/main.py",
             "line": 495,
             "source_fields": [
               {
@@ -49,7 +49,7 @@
           {
             "method": "POST",
             "path": "/v1/confucius4TTS/generate",
-            "source": "model-audio/Confucius4_TTS/main.py",
+            "source": "model-audio/clone_confucius-4/main.py",
             "line": 506,
             "source_fields": [
               {
@@ -62,7 +62,7 @@
                   "max_length": "12000"
                 },
                 "required": true,
-                "source": "model-audio/Confucius4_TTS/main.py",
+                "source": "model-audio/clone_confucius-4/main.py",
                 "line": 184
               },
               {
@@ -75,7 +75,7 @@
                   "max_length": "32"
                 },
                 "required": false,
-                "source": "model-audio/Confucius4_TTS/main.py",
+                "source": "model-audio/clone_confucius-4/main.py",
                 "line": 185
               },
               {
@@ -88,7 +88,7 @@
                   "max_length": "1024"
                 },
                 "required": true,
-                "source": "model-audio/Confucius4_TTS/main.py",
+                "source": "model-audio/clone_confucius-4/main.py",
                 "line": 186
               },
               {
@@ -98,7 +98,7 @@
                 "default_factory": null,
                 "constraints": {},
                 "required": false,
-                "source": "model-audio/Confucius4_TTS/main.py",
+                "source": "model-audio/clone_confucius-4/main.py",
                 "line": 187
               },
               {
@@ -111,7 +111,7 @@
                   "le": "5"
                 },
                 "required": false,
-                "source": "model-audio/Confucius4_TTS/main.py",
+                "source": "model-audio/clone_confucius-4/main.py",
                 "line": 188
               },
               {
@@ -124,7 +124,7 @@
                   "le": "1"
                 },
                 "required": false,
-                "source": "model-audio/Confucius4_TTS/main.py",
+                "source": "model-audio/clone_confucius-4/main.py",
                 "line": 189
               },
               {
@@ -137,7 +137,7 @@
                   "le": "500"
                 },
                 "required": false,
-                "source": "model-audio/Confucius4_TTS/main.py",
+                "source": "model-audio/clone_confucius-4/main.py",
                 "line": 190
               },
               {
@@ -150,7 +150,7 @@
                   "le": "32"
                 },
                 "required": false,
-                "source": "model-audio/Confucius4_TTS/main.py",
+                "source": "model-audio/clone_confucius-4/main.py",
                 "line": 191
               },
               {
@@ -163,7 +163,7 @@
                   "le": "100"
                 },
                 "required": false,
-                "source": "model-audio/Confucius4_TTS/main.py",
+                "source": "model-audio/clone_confucius-4/main.py",
                 "line": 192
               },
               {
@@ -176,7 +176,7 @@
                   "le": "8192"
                 },
                 "required": false,
-                "source": "model-audio/Confucius4_TTS/main.py",
+                "source": "model-audio/clone_confucius-4/main.py",
                 "line": 193
               },
               {
@@ -189,7 +189,7 @@
                   "le": "200"
                 },
                 "required": false,
-                "source": "model-audio/Confucius4_TTS/main.py",
+                "source": "model-audio/clone_confucius-4/main.py",
                 "line": 194
               },
               {
@@ -202,7 +202,7 @@
                   "le": "10"
                 },
                 "required": false,
-                "source": "model-audio/Confucius4_TTS/main.py",
+                "source": "model-audio/clone_confucius-4/main.py",
                 "line": 195
               },
               {
@@ -215,7 +215,7 @@
                   "le": "1000"
                 },
                 "required": false,
-                "source": "model-audio/Confucius4_TTS/main.py",
+                "source": "model-audio/clone_confucius-4/main.py",
                 "line": 196
               },
               {
@@ -228,7 +228,7 @@
                   "le": "10"
                 },
                 "required": false,
-                "source": "model-audio/Confucius4_TTS/main.py",
+                "source": "model-audio/clone_confucius-4/main.py",
                 "line": 201
               },
               {
@@ -241,7 +241,7 @@
                   "le": "10"
                 },
                 "required": false,
-                "source": "model-audio/Confucius4_TTS/main.py",
+                "source": "model-audio/clone_confucius-4/main.py",
                 "line": 202
               },
               {
@@ -254,7 +254,7 @@
                   "le": "10"
                 },
                 "required": false,
-                "source": "model-audio/Confucius4_TTS/main.py",
+                "source": "model-audio/clone_confucius-4/main.py",
                 "line": 203
               },
               {
@@ -268,7 +268,7 @@
                   "allow_inf_nan": "False"
                 },
                 "required": false,
-                "source": "model-audio/Confucius4_TTS/main.py",
+                "source": "model-audio/clone_confucius-4/main.py",
                 "line": 204
               },
               {
@@ -278,7 +278,7 @@
                 "default_factory": null,
                 "constraints": {},
                 "required": false,
-                "source": "model-audio/Confucius4_TTS/main.py",
+                "source": "model-audio/clone_confucius-4/main.py",
                 "line": 207
               }
             ],
@@ -398,7 +398,7 @@
           {
             "method": "GET",
             "path": "/v1/health",
-            "source": "model-audio/Confucius4_TTS/main.py",
+            "source": "model-audio/clone_confucius-4/main.py",
             "line": 419,
             "source_fields": [],
             "field_mappings": [],
@@ -407,7 +407,7 @@
           {
             "method": "POST",
             "path": "/v1/upload_audio",
-            "source": "model-audio/Confucius4_TTS/main.py",
+            "source": "model-audio/clone_confucius-4/main.py",
             "line": 481,
             "source_fields": [
               {
@@ -453,8 +453,8 @@
           }
         ],
         "source_files": {
-          "main": "model-audio/Confucius4_TTS/main.py",
-          "worker": "model-audio/Confucius4_TTS/worker.py",
+          "main": "model-audio/clone_confucius-4/main.py",
+          "worker": "model-audio/clone_confucius-4/worker.py",
           "tests": [
             "tests/test_confucius4_tts_migration.py",
             "tests/test_confucius4_native_duration.py",
@@ -468,8 +468,8 @@
       },
       "notes": "默认 lang=zh；无需参考转写，sidecar 不参与推理。Confucius4 LocalAI GGUF 候选不在 ~/hf-mirror 中，provider 已移除。",
       "source_files": {
-        "main": "model-audio/Confucius4_TTS/main.py",
-        "worker": "model-audio/Confucius4_TTS/worker.py",
+        "main": "model-audio/clone_confucius-4/main.py",
+        "worker": "model-audio/clone_confucius-4/worker.py",
         "tests": [
           "tests/test_confucius4_tts_migration.py",
           "tests/test_confucius4_native_duration.py"
@@ -497,7 +497,7 @@
       ],
       "request_schemas": {
         "Confucius4TtsRequest": {
-          "source": "model-audio/Confucius4_TTS/main.py",
+          "source": "model-audio/clone_confucius-4/main.py",
           "line": 179,
           "inherits": [],
           "fields": [
@@ -511,7 +511,7 @@
                 "max_length": "12000"
               },
               "required": true,
-              "source": "model-audio/Confucius4_TTS/main.py",
+              "source": "model-audio/clone_confucius-4/main.py",
               "line": 184
             },
             {
@@ -524,7 +524,7 @@
                 "max_length": "32"
               },
               "required": false,
-              "source": "model-audio/Confucius4_TTS/main.py",
+              "source": "model-audio/clone_confucius-4/main.py",
               "line": 185
             },
             {
@@ -537,7 +537,7 @@
                 "max_length": "1024"
               },
               "required": true,
-              "source": "model-audio/Confucius4_TTS/main.py",
+              "source": "model-audio/clone_confucius-4/main.py",
               "line": 186
             },
             {
@@ -547,7 +547,7 @@
               "default_factory": null,
               "constraints": {},
               "required": false,
-              "source": "model-audio/Confucius4_TTS/main.py",
+              "source": "model-audio/clone_confucius-4/main.py",
               "line": 187
             },
             {
@@ -560,7 +560,7 @@
                 "le": "5"
               },
               "required": false,
-              "source": "model-audio/Confucius4_TTS/main.py",
+              "source": "model-audio/clone_confucius-4/main.py",
               "line": 188
             },
             {
@@ -573,7 +573,7 @@
                 "le": "1"
               },
               "required": false,
-              "source": "model-audio/Confucius4_TTS/main.py",
+              "source": "model-audio/clone_confucius-4/main.py",
               "line": 189
             },
             {
@@ -586,7 +586,7 @@
                 "le": "500"
               },
               "required": false,
-              "source": "model-audio/Confucius4_TTS/main.py",
+              "source": "model-audio/clone_confucius-4/main.py",
               "line": 190
             },
             {
@@ -599,7 +599,7 @@
                 "le": "32"
               },
               "required": false,
-              "source": "model-audio/Confucius4_TTS/main.py",
+              "source": "model-audio/clone_confucius-4/main.py",
               "line": 191
             },
             {
@@ -612,7 +612,7 @@
                 "le": "100"
               },
               "required": false,
-              "source": "model-audio/Confucius4_TTS/main.py",
+              "source": "model-audio/clone_confucius-4/main.py",
               "line": 192
             },
             {
@@ -625,7 +625,7 @@
                 "le": "8192"
               },
               "required": false,
-              "source": "model-audio/Confucius4_TTS/main.py",
+              "source": "model-audio/clone_confucius-4/main.py",
               "line": 193
             },
             {
@@ -638,7 +638,7 @@
                 "le": "200"
               },
               "required": false,
-              "source": "model-audio/Confucius4_TTS/main.py",
+              "source": "model-audio/clone_confucius-4/main.py",
               "line": 194
             },
             {
@@ -651,7 +651,7 @@
                 "le": "10"
               },
               "required": false,
-              "source": "model-audio/Confucius4_TTS/main.py",
+              "source": "model-audio/clone_confucius-4/main.py",
               "line": 195
             },
             {
@@ -664,7 +664,7 @@
                 "le": "1000"
               },
               "required": false,
-              "source": "model-audio/Confucius4_TTS/main.py",
+              "source": "model-audio/clone_confucius-4/main.py",
               "line": 196
             },
             {
@@ -677,7 +677,7 @@
                 "le": "10"
               },
               "required": false,
-              "source": "model-audio/Confucius4_TTS/main.py",
+              "source": "model-audio/clone_confucius-4/main.py",
               "line": 201
             },
             {
@@ -690,7 +690,7 @@
                 "le": "10"
               },
               "required": false,
-              "source": "model-audio/Confucius4_TTS/main.py",
+              "source": "model-audio/clone_confucius-4/main.py",
               "line": 202
             },
             {
@@ -703,7 +703,7 @@
                 "le": "10"
               },
               "required": false,
-              "source": "model-audio/Confucius4_TTS/main.py",
+              "source": "model-audio/clone_confucius-4/main.py",
               "line": 203
             },
             {
@@ -717,7 +717,7 @@
                 "allow_inf_nan": "False"
               },
               "required": false,
-              "source": "model-audio/Confucius4_TTS/main.py",
+              "source": "model-audio/clone_confucius-4/main.py",
               "line": 204
             },
             {
@@ -727,7 +727,7 @@
               "default_factory": null,
               "constraints": {},
               "required": false,
-              "source": "model-audio/Confucius4_TTS/main.py",
+              "source": "model-audio/clone_confucius-4/main.py",
               "line": 207
             }
           ]
@@ -738,7 +738,7 @@
           "method": "GET",
           "path": "/v1/check/audio",
           "function": "check_audio_exists",
-          "source": "model-audio/Confucius4_TTS/main.py",
+          "source": "model-audio/clone_confucius-4/main.py",
           "line": 495,
           "parameters": [
             {
@@ -765,7 +765,7 @@
           "method": "POST",
           "path": "/v1/confucius4TTS/generate",
           "function": "generate",
-          "source": "model-audio/Confucius4_TTS/main.py",
+          "source": "model-audio/clone_confucius-4/main.py",
           "line": 506,
           "parameters": [
             {
@@ -799,7 +799,7 @@
           "method": "GET",
           "path": "/v1/health",
           "function": "health",
-          "source": "model-audio/Confucius4_TTS/main.py",
+          "source": "model-audio/clone_confucius-4/main.py",
           "line": 419,
           "parameters": [],
           "request_schemas": [],
@@ -819,7 +819,7 @@
           "method": "POST",
           "path": "/v1/upload_audio",
           "function": "upload_audio",
-          "source": "model-audio/Confucius4_TTS/main.py",
+          "source": "model-audio/clone_confucius-4/main.py",
           "line": 481,
           "parameters": [
             {
@@ -860,7 +860,7 @@
     },
     {
       "project": "MERT-v2-FullSong",
-      "directory": "model-audio/MERT-v2-FullSong",
+      "directory": "model-audio/embedding_mert-v2-fullsong",
       "ports": [
         8317
       ],
@@ -878,7 +878,7 @@
           {
             "method": "GET",
             "path": "/v1/health",
-            "source": "model-audio/MERT-v2-FullSong/main.py",
+            "source": "model-audio/embedding_mert-v2-fullsong/main.py",
             "line": 455,
             "source_fields": [],
             "localai_endpoint_candidate": null,
@@ -889,7 +889,7 @@
           {
             "method": "POST",
             "path": "/v1/m-a-p/MERT-v2-FullSong",
-            "source": "model-audio/MERT-v2-FullSong/main.py",
+            "source": "model-audio/embedding_mert-v2-fullsong/main.py",
             "line": 512,
             "source_fields": [
               {
@@ -940,8 +940,8 @@
           }
         ],
         "source_files": {
-          "main": "model-audio/MERT-v2-FullSong/main.py",
-          "worker": "model-audio/MERT-v2-FullSong/worker.py",
+          "main": "model-audio/embedding_mert-v2-fullsong/main.py",
+          "worker": "model-audio/embedding_mert-v2-fullsong/worker.py",
           "tests": [
             "tests/test_mert_v2_fullsong_service.py"
           ]
@@ -955,8 +955,8 @@
       },
       "notes": "输入限制 30–360 秒，24 kHz 单声道；不是 speaker embedding。 LocalAI POST /v1/completions 传输 llm-local.worker v1 JSON envelope，由 loopback gRPC llm-local-worker backend 按固定 manifest 启动本项目一次性 worker；字段与输出路径已实现并有无模型测试，权重/真实推理尚未验收。",
       "source_files": {
-        "main": "model-audio/MERT-v2-FullSong/main.py",
-        "worker": "model-audio/MERT-v2-FullSong/worker.py",
+        "main": "model-audio/embedding_mert-v2-fullsong/main.py",
+        "worker": "model-audio/embedding_mert-v2-fullsong/worker.py",
         "tests": [
           "tests/test_mert_v2_fullsong_service.py"
         ]
@@ -975,7 +975,7 @@
           "method": "GET",
           "path": "/v1/health",
           "function": "health",
-          "source": "model-audio/MERT-v2-FullSong/main.py",
+          "source": "model-audio/embedding_mert-v2-fullsong/main.py",
           "line": 455,
           "parameters": [],
           "request_schemas": [],
@@ -997,7 +997,7 @@
           "method": "POST",
           "path": "/v1/m-a-p/MERT-v2-FullSong",
           "function": "extract_features_route",
-          "source": "model-audio/MERT-v2-FullSong/main.py",
+          "source": "model-audio/embedding_mert-v2-fullsong/main.py",
           "line": 512,
           "parameters": [
             {
@@ -1041,7 +1041,7 @@
     },
     {
       "project": "Qwen3_ASR_1.7B",
-      "directory": "model-audio/Qwen3_ASR_1.7B",
+      "directory": "model-audio/transcribe_qwen3-asr-1.7b",
       "ports": [
         8371
       ],
@@ -1059,7 +1059,7 @@
           {
             "method": "GET",
             "path": "/v1/health",
-            "source": "model-audio/Qwen3_ASR_1.7B/main.py",
+            "source": "model-audio/transcribe_qwen3-asr-1.7b/main.py",
             "line": 330,
             "source_fields": [],
             "field_mappings": [],
@@ -1068,7 +1068,7 @@
           {
             "method": "POST",
             "path": "/v1/qwen3/asr",
-            "source": "model-audio/Qwen3_ASR_1.7B/main.py",
+            "source": "model-audio/transcribe_qwen3-asr-1.7b/main.py",
             "line": 383,
             "source_fields": [
               {
@@ -1126,8 +1126,8 @@
           }
         ],
         "source_files": {
-          "main": "model-audio/Qwen3_ASR_1.7B/main.py",
-          "worker": "model-audio/Qwen3_ASR_1.7B/worker.py",
+          "main": "model-audio/transcribe_qwen3-asr-1.7b/main.py",
+          "worker": "model-audio/transcribe_qwen3-asr-1.7b/worker.py",
           "tests": [
             "tests/test_qwen3_asr_migration.py"
           ]
@@ -1138,8 +1138,8 @@
       },
       "notes": "保留原生 Qwen3-ASR；LocalAI Q8 GGUF 不在 ~/hf-mirror 中，ASR LocalAI provider 与候选注册/预检已移除。",
       "source_files": {
-        "main": "model-audio/Qwen3_ASR_1.7B/main.py",
-        "worker": "model-audio/Qwen3_ASR_1.7B/worker.py",
+        "main": "model-audio/transcribe_qwen3-asr-1.7b/main.py",
+        "worker": "model-audio/transcribe_qwen3-asr-1.7b/worker.py",
         "tests": [
           "tests/test_qwen3_asr_migration.py",
           "tests/test_localai_gateway.py"
@@ -1159,7 +1159,7 @@
           "method": "GET",
           "path": "/v1/health",
           "function": "health",
-          "source": "model-audio/Qwen3_ASR_1.7B/main.py",
+          "source": "model-audio/transcribe_qwen3-asr-1.7b/main.py",
           "line": 330,
           "parameters": [],
           "request_schemas": [],
@@ -1180,7 +1180,7 @@
           "method": "POST",
           "path": "/v1/qwen3/asr",
           "function": "transcribe",
-          "source": "model-audio/Qwen3_ASR_1.7B/main.py",
+          "source": "model-audio/transcribe_qwen3-asr-1.7b/main.py",
           "line": 383,
           "parameters": [
             {
@@ -1231,7 +1231,7 @@
     },
     {
       "project": "SheetSage2",
-      "directory": "model-audio/SheetSage2",
+      "directory": "model-audio/score_sheetsage-2",
       "ports": [
         8315
       ],
@@ -1249,7 +1249,7 @@
           {
             "method": "GET",
             "path": "/v1/health",
-            "source": "model-audio/SheetSage2/main.py",
+            "source": "model-audio/score_sheetsage-2/main.py",
             "line": 463,
             "source_fields": [],
             "localai_endpoint_candidate": null,
@@ -1260,7 +1260,7 @@
           {
             "method": "POST",
             "path": "/v1/m-a-p/SheetSage2",
-            "source": "model-audio/SheetSage2/main.py",
+            "source": "model-audio/score_sheetsage-2/main.py",
             "line": 554,
             "source_fields": [
               {
@@ -1491,8 +1491,8 @@
           }
         ],
         "source_files": {
-          "main": "model-audio/SheetSage2/main.py",
-          "worker": "model-audio/SheetSage2/worker.py",
+          "main": "model-audio/score_sheetsage-2/main.py",
+          "worker": "model-audio/score_sheetsage-2/worker.py",
           "tests": [
             "tests/test_sheetsage2_service.py"
           ]
@@ -1506,8 +1506,8 @@
       },
       "notes": "固定 MERT 父模型 revision；须核对完整 ZIP 条目、adapter 与输出结构。 LocalAI POST /v1/completions 传输 llm-local.worker v1 JSON envelope，由 loopback gRPC llm-local-worker backend 按固定 manifest 启动本项目一次性 worker；字段与输出路径已实现并有无模型测试，权重/真实推理尚未验收。",
       "source_files": {
-        "main": "model-audio/SheetSage2/main.py",
-        "worker": "model-audio/SheetSage2/worker.py",
+        "main": "model-audio/score_sheetsage-2/main.py",
+        "worker": "model-audio/score_sheetsage-2/worker.py",
         "tests": [
           "tests/test_sheetsage2_service.py"
         ]
@@ -1532,7 +1532,7 @@
           "method": "GET",
           "path": "/v1/health",
           "function": "health",
-          "source": "model-audio/SheetSage2/main.py",
+          "source": "model-audio/score_sheetsage-2/main.py",
           "line": 463,
           "parameters": [],
           "request_schemas": [],
@@ -1554,7 +1554,7 @@
           "method": "POST",
           "path": "/v1/m-a-p/SheetSage2",
           "function": "transcribe",
-          "source": "model-audio/SheetSage2/main.py",
+          "source": "model-audio/score_sheetsage-2/main.py",
           "line": 554,
           "parameters": [
             {
@@ -1656,7 +1656,7 @@
     },
     {
       "project": "TIGER-DnR",
-      "directory": "model-audio/TIGER-DnR",
+      "directory": "model-audio/separate_tiger-dnr",
       "ports": [
         8351
       ],
@@ -1674,7 +1674,7 @@
           {
             "method": "GET",
             "path": "/v1/health",
-            "source": "model-audio/TIGER-DnR/main.py",
+            "source": "model-audio/separate_tiger-dnr/main.py",
             "line": 425,
             "source_fields": [],
             "localai_endpoint_candidate": null,
@@ -1684,7 +1684,7 @@
           {
             "method": "POST",
             "path": "/v1/tigerDnr/separate",
-            "source": "model-audio/TIGER-DnR/main.py",
+            "source": "model-audio/separate_tiger-dnr/main.py",
             "line": 468,
             "source_fields": [
               {
@@ -1721,8 +1721,8 @@
           }
         ],
         "source_files": {
-          "main": "model-audio/TIGER-DnR/main.py",
-          "worker": "model-audio/TIGER-DnR/worker.py",
+          "main": "model-audio/separate_tiger-dnr/main.py",
+          "worker": "model-audio/separate_tiger-dnr/worker.py",
           "tests": [
             "tests/test_tiger_dnr_migration.py"
           ]
@@ -1733,8 +1733,8 @@
       },
       "notes": "一次推理收集三路 Stem，保留名称/同步和原子批次提交。",
       "source_files": {
-        "main": "model-audio/TIGER-DnR/main.py",
-        "worker": "model-audio/TIGER-DnR/worker.py",
+        "main": "model-audio/separate_tiger-dnr/main.py",
+        "worker": "model-audio/separate_tiger-dnr/worker.py",
         "tests": [
           "tests/test_tiger_dnr_migration.py"
         ]
@@ -1753,7 +1753,7 @@
           "method": "GET",
           "path": "/v1/health",
           "function": "health",
-          "source": "model-audio/TIGER-DnR/main.py",
+          "source": "model-audio/separate_tiger-dnr/main.py",
           "line": 425,
           "parameters": [],
           "request_schemas": [],
@@ -1774,7 +1774,7 @@
           "method": "POST",
           "path": "/v1/tigerDnr/separate",
           "function": "separate",
-          "source": "model-audio/TIGER-DnR/main.py",
+          "source": "model-audio/separate_tiger-dnr/main.py",
           "line": 468,
           "parameters": [
             {
@@ -1815,7 +1815,7 @@
     },
     {
       "project": "YuE2-3B",
-      "directory": "model-audio/YuE2-3B",
+      "directory": "model-audio/music_yue2-3b",
       "ports": [
         8314
       ],
@@ -1833,7 +1833,7 @@
           {
             "method": "GET",
             "path": "/v1/health",
-            "source": "model-audio/YuE2-3B/main.py",
+            "source": "model-audio/music_yue2-3b/main.py",
             "line": 411,
             "source_fields": [],
             "localai_endpoint_candidate": null,
@@ -1843,7 +1843,7 @@
           {
             "method": "POST",
             "path": "/v1/m-a-p/YuE2",
-            "source": "model-audio/YuE2-3B/main.py",
+            "source": "model-audio/music_yue2-3b/main.py",
             "line": 452,
             "source_fields": [
               {
@@ -1856,7 +1856,7 @@
                   "max_length": "2000"
                 },
                 "required": false,
-                "source": "model-audio/YuE2-3B/main.py",
+                "source": "model-audio/music_yue2-3b/main.py",
                 "line": 166
               },
               {
@@ -1869,7 +1869,7 @@
                   "max_length": "2000"
                 },
                 "required": false,
-                "source": "model-audio/YuE2-3B/main.py",
+                "source": "model-audio/music_yue2-3b/main.py",
                 "line": 167
               },
               {
@@ -1882,7 +1882,7 @@
                   "max_length": "100000"
                 },
                 "required": true,
-                "source": "model-audio/YuE2-3B/main.py",
+                "source": "model-audio/music_yue2-3b/main.py",
                 "line": 168
               },
               {
@@ -1892,7 +1892,7 @@
                 "default_factory": null,
                 "constraints": {},
                 "required": false,
-                "source": "model-audio/YuE2-3B/main.py",
+                "source": "model-audio/music_yue2-3b/main.py",
                 "line": 169
               },
               {
@@ -1905,7 +1905,7 @@
                   "lt": "2 ** 63"
                 },
                 "required": false,
-                "source": "model-audio/YuE2-3B/main.py",
+                "source": "model-audio/music_yue2-3b/main.py",
                 "line": 170
               },
               {
@@ -1918,7 +1918,7 @@
                   "max_length": "100000"
                 },
                 "required": false,
-                "source": "model-audio/YuE2-3B/main.py",
+                "source": "model-audio/music_yue2-3b/main.py",
                 "line": 171
               },
               {
@@ -1932,7 +1932,7 @@
                   "allow_inf_nan": "False"
                 },
                 "required": false,
-                "source": "model-audio/YuE2-3B/main.py",
+                "source": "model-audio/music_yue2-3b/main.py",
                 "line": 172
               },
               {
@@ -1944,7 +1944,7 @@
                   "pattern": "'^[A-Za-z0-9][A-Za-z0-9_.-]{0,179}$'"
                 },
                 "required": false,
-                "source": "model-audio/YuE2-3B/main.py",
+                "source": "model-audio/music_yue2-3b/main.py",
                 "line": 173
               },
               {
@@ -1954,7 +1954,7 @@
                 "default_factory": null,
                 "constraints": {},
                 "required": false,
-                "source": "model-audio/YuE2-3B/main.py",
+                "source": "model-audio/music_yue2-3b/main.py",
                 "line": 174
               },
               {
@@ -1964,7 +1964,7 @@
                 "default_factory": null,
                 "constraints": {},
                 "required": false,
-                "source": "model-audio/YuE2-3B/main.py",
+                "source": "model-audio/music_yue2-3b/main.py",
                 "line": 175
               }
             ],
@@ -2037,8 +2037,8 @@
           }
         ],
         "source_files": {
-          "main": "model-audio/YuE2-3B/main.py",
-          "worker": "model-audio/YuE2-3B/worker.py",
+          "main": "model-audio/music_yue2-3b/main.py",
+          "worker": "model-audio/music_yue2-3b/worker.py",
           "tests": [
             "tests/test_yue2_3b_migration.py"
           ]
@@ -2049,8 +2049,8 @@
       },
       "notes": "多组件包；lyrics/ABC/cot/双阶段采样逐项验证，不能以单一歌词生成代表完整迁移。",
       "source_files": {
-        "main": "model-audio/YuE2-3B/main.py",
-        "worker": "model-audio/YuE2-3B/worker.py",
+        "main": "model-audio/music_yue2-3b/main.py",
+        "worker": "model-audio/music_yue2-3b/worker.py",
         "tests": [
           "tests/test_yue2_3b_migration.py"
         ]
@@ -2071,7 +2071,7 @@
       ],
       "request_schemas": {
         "YuE2MusicRequest": {
-          "source": "model-audio/YuE2-3B/main.py",
+          "source": "model-audio/music_yue2-3b/main.py",
           "line": 161,
           "inherits": [],
           "fields": [
@@ -2085,7 +2085,7 @@
                 "max_length": "2000"
               },
               "required": false,
-              "source": "model-audio/YuE2-3B/main.py",
+              "source": "model-audio/music_yue2-3b/main.py",
               "line": 166
             },
             {
@@ -2098,7 +2098,7 @@
                 "max_length": "2000"
               },
               "required": false,
-              "source": "model-audio/YuE2-3B/main.py",
+              "source": "model-audio/music_yue2-3b/main.py",
               "line": 167
             },
             {
@@ -2111,7 +2111,7 @@
                 "max_length": "100000"
               },
               "required": true,
-              "source": "model-audio/YuE2-3B/main.py",
+              "source": "model-audio/music_yue2-3b/main.py",
               "line": 168
             },
             {
@@ -2121,7 +2121,7 @@
               "default_factory": null,
               "constraints": {},
               "required": false,
-              "source": "model-audio/YuE2-3B/main.py",
+              "source": "model-audio/music_yue2-3b/main.py",
               "line": 169
             },
             {
@@ -2134,7 +2134,7 @@
                 "lt": "2 ** 63"
               },
               "required": false,
-              "source": "model-audio/YuE2-3B/main.py",
+              "source": "model-audio/music_yue2-3b/main.py",
               "line": 170
             },
             {
@@ -2147,7 +2147,7 @@
                 "max_length": "100000"
               },
               "required": false,
-              "source": "model-audio/YuE2-3B/main.py",
+              "source": "model-audio/music_yue2-3b/main.py",
               "line": 171
             },
             {
@@ -2161,7 +2161,7 @@
                 "allow_inf_nan": "False"
               },
               "required": false,
-              "source": "model-audio/YuE2-3B/main.py",
+              "source": "model-audio/music_yue2-3b/main.py",
               "line": 172
             },
             {
@@ -2173,7 +2173,7 @@
                 "pattern": "'^[A-Za-z0-9][A-Za-z0-9_.-]{0,179}$'"
               },
               "required": false,
-              "source": "model-audio/YuE2-3B/main.py",
+              "source": "model-audio/music_yue2-3b/main.py",
               "line": 173
             },
             {
@@ -2183,7 +2183,7 @@
               "default_factory": null,
               "constraints": {},
               "required": false,
-              "source": "model-audio/YuE2-3B/main.py",
+              "source": "model-audio/music_yue2-3b/main.py",
               "line": 174
             },
             {
@@ -2193,7 +2193,7 @@
               "default_factory": null,
               "constraints": {},
               "required": false,
-              "source": "model-audio/YuE2-3B/main.py",
+              "source": "model-audio/music_yue2-3b/main.py",
               "line": 175
             }
           ]
@@ -2204,7 +2204,7 @@
           "method": "GET",
           "path": "/v1/health",
           "function": "health",
-          "source": "model-audio/YuE2-3B/main.py",
+          "source": "model-audio/music_yue2-3b/main.py",
           "line": 411,
           "parameters": [],
           "request_schemas": [],
@@ -2224,7 +2224,7 @@
           "method": "POST",
           "path": "/v1/m-a-p/YuE2",
           "function": "generate_music",
-          "source": "model-audio/YuE2-3B/main.py",
+          "source": "model-audio/music_yue2-3b/main.py",
           "line": 452,
           "parameters": [
             {
@@ -2259,7 +2259,7 @@
     },
     {
       "project": "YuE2-Vae",
-      "directory": "model-audio/YuE2-Vae",
+      "directory": "model-audio/codec_yue2-vae",
       "ports": [
         8316
       ],
@@ -2277,7 +2277,7 @@
           {
             "method": "GET",
             "path": "/v1/health",
-            "source": "model-audio/YuE2-Vae/main.py",
+            "source": "model-audio/codec_yue2-vae/main.py",
             "line": 517,
             "source_fields": [],
             "localai_endpoint_candidate": null,
@@ -2288,7 +2288,7 @@
           {
             "method": "POST",
             "path": "/v1/m-a-p/YuE2-Vae",
-            "source": "model-audio/YuE2-Vae/main.py",
+            "source": "model-audio/codec_yue2-vae/main.py",
             "line": 570,
             "source_fields": [
               {
@@ -2393,8 +2393,8 @@
           }
         ],
         "source_files": {
-          "main": "model-audio/YuE2-Vae/main.py",
-          "worker": "model-audio/YuE2-Vae/worker.py",
+          "main": "model-audio/codec_yue2-vae/main.py",
+          "worker": "model-audio/codec_yue2-vae/worker.py",
           "tests": [
             "tests/test_yue2_vae_service.py"
           ]
@@ -2408,8 +2408,8 @@
       },
       "notes": "FP32、encode/decode 分别验证，decode 使用官方 tiled 行为；不能拿 TTS codec 替代。 LocalAI POST /v1/completions 传输 llm-local.worker v1 JSON envelope，由 loopback gRPC llm-local-worker backend 按固定 manifest 启动本项目一次性 worker；字段与输出路径已实现并有无模型测试，权重/真实推理尚未验收。",
       "source_files": {
-        "main": "model-audio/YuE2-Vae/main.py",
-        "worker": "model-audio/YuE2-Vae/worker.py",
+        "main": "model-audio/codec_yue2-vae/main.py",
+        "worker": "model-audio/codec_yue2-vae/worker.py",
         "tests": [
           "tests/test_yue2_vae_service.py"
         ]
@@ -2428,7 +2428,7 @@
           "method": "GET",
           "path": "/v1/health",
           "function": "health",
-          "source": "model-audio/YuE2-Vae/main.py",
+          "source": "model-audio/codec_yue2-vae/main.py",
           "line": 517,
           "parameters": [],
           "request_schemas": [],
@@ -2450,7 +2450,7 @@
           "method": "POST",
           "path": "/v1/m-a-p/YuE2-Vae",
           "function": "process_vae",
-          "source": "model-audio/YuE2-Vae/main.py",
+          "source": "model-audio/codec_yue2-vae/main.py",
           "line": 570,
           "parameters": [
             {
@@ -2511,7 +2511,7 @@
     },
     {
       "project": "ace_step_1_5",
-      "directory": "model-audio/ace_step_1_5",
+      "directory": "model-audio/music_ace-step-1.5",
       "ports": [
         8313
       ],
@@ -2529,7 +2529,7 @@
           {
             "method": "POST",
             "path": "/v1/aceStep/bgm",
-            "source": "model-audio/ace_step_1_5/main.py",
+            "source": "model-audio/music_ace-step-1.5/main.py",
             "line": 291,
             "source_fields": [
               {
@@ -2542,7 +2542,7 @@
                   "max_length": "2000"
                 },
                 "required": true,
-                "source": "model-audio/ace_step_1_5/main.py",
+                "source": "model-audio/music_ace-step-1.5/main.py",
                 "line": 126
               },
               {
@@ -2555,7 +2555,7 @@
                   "le": "MAX_SECONDS"
                 },
                 "required": false,
-                "source": "model-audio/ace_step_1_5/main.py",
+                "source": "model-audio/music_ace-step-1.5/main.py",
                 "line": 127
               },
               {
@@ -2568,7 +2568,7 @@
                   "le": "20"
                 },
                 "required": false,
-                "source": "model-audio/ace_step_1_5/main.py",
+                "source": "model-audio/music_ace-step-1.5/main.py",
                 "line": 128
               },
               {
@@ -2581,7 +2581,7 @@
                   "le": "240"
                 },
                 "required": false,
-                "source": "model-audio/ace_step_1_5/main.py",
+                "source": "model-audio/music_ace-step-1.5/main.py",
                 "line": 129
               },
               {
@@ -2593,7 +2593,7 @@
                   "max_length": "64"
                 },
                 "required": false,
-                "source": "model-audio/ace_step_1_5/main.py",
+                "source": "model-audio/music_ace-step-1.5/main.py",
                 "line": 130
               },
               {
@@ -2605,7 +2605,7 @@
                   "max_length": "16"
                 },
                 "required": false,
-                "source": "model-audio/ace_step_1_5/main.py",
+                "source": "model-audio/music_ace-step-1.5/main.py",
                 "line": 131
               },
               {
@@ -2615,7 +2615,7 @@
                 "default_factory": null,
                 "constraints": {},
                 "required": false,
-                "source": "model-audio/ace_step_1_5/main.py",
+                "source": "model-audio/music_ace-step-1.5/main.py",
                 "line": 132
               }
             ],
@@ -2677,7 +2677,7 @@
           {
             "method": "GET",
             "path": "/v1/health",
-            "source": "model-audio/ace_step_1_5/main.py",
+            "source": "model-audio/music_ace-step-1.5/main.py",
             "line": 238,
             "source_fields": [],
             "field_mappings": [],
@@ -2685,12 +2685,12 @@
           }
         ],
         "source_files": {
-          "main": "model-audio/ace_step_1_5/main.py",
-          "worker": "model-audio/ace_step_1_5/worker.py",
+          "main": "model-audio/music_ace-step-1.5/main.py",
+          "worker": "model-audio/music_ace-step-1.5/worker.py",
           "tests": [
             "tests/test_ace_step_1_5_migration.py",
-            "model-audio/ace_step_1_5/tests/test_api.py",
-            "model-audio/ace_step_1_5/tests/test_runtime.py"
+            "model-audio/music_ace-step-1.5/tests/test_api.py",
+            "model-audio/music_ace-step-1.5/tests/test_runtime.py"
           ]
         },
         "unresolved": [
@@ -2699,12 +2699,12 @@
       },
       "notes": "保留原生 ACE-Step BGM 接口；LocalAI/audio.cpp GGUF 候选不在 ~/hf-mirror 中，provider 已移除。",
       "source_files": {
-        "main": "model-audio/ace_step_1_5/main.py",
-        "worker": "model-audio/ace_step_1_5/worker.py",
+        "main": "model-audio/music_ace-step-1.5/main.py",
+        "worker": "model-audio/music_ace-step-1.5/worker.py",
         "tests": [
           "tests/test_ace_step_1_5_migration.py",
-          "model-audio/ace_step_1_5/tests/test_api.py",
-          "model-audio/ace_step_1_5/tests/test_runtime.py"
+          "model-audio/music_ace-step-1.5/tests/test_api.py",
+          "model-audio/music_ace-step-1.5/tests/test_runtime.py"
         ]
       },
       "model_artifact_directories": [
@@ -2717,7 +2717,7 @@
       ],
       "request_schemas": {
         "AceStepBgmRequest": {
-          "source": "model-audio/ace_step_1_5/main.py",
+          "source": "model-audio/music_ace-step-1.5/main.py",
           "line": 123,
           "inherits": [],
           "fields": [
@@ -2731,7 +2731,7 @@
                 "max_length": "2000"
               },
               "required": true,
-              "source": "model-audio/ace_step_1_5/main.py",
+              "source": "model-audio/music_ace-step-1.5/main.py",
               "line": 126
             },
             {
@@ -2744,7 +2744,7 @@
                 "le": "MAX_SECONDS"
               },
               "required": false,
-              "source": "model-audio/ace_step_1_5/main.py",
+              "source": "model-audio/music_ace-step-1.5/main.py",
               "line": 127
             },
             {
@@ -2757,7 +2757,7 @@
                 "le": "20"
               },
               "required": false,
-              "source": "model-audio/ace_step_1_5/main.py",
+              "source": "model-audio/music_ace-step-1.5/main.py",
               "line": 128
             },
             {
@@ -2770,7 +2770,7 @@
                 "le": "240"
               },
               "required": false,
-              "source": "model-audio/ace_step_1_5/main.py",
+              "source": "model-audio/music_ace-step-1.5/main.py",
               "line": 129
             },
             {
@@ -2782,7 +2782,7 @@
                 "max_length": "64"
               },
               "required": false,
-              "source": "model-audio/ace_step_1_5/main.py",
+              "source": "model-audio/music_ace-step-1.5/main.py",
               "line": 130
             },
             {
@@ -2794,7 +2794,7 @@
                 "max_length": "16"
               },
               "required": false,
-              "source": "model-audio/ace_step_1_5/main.py",
+              "source": "model-audio/music_ace-step-1.5/main.py",
               "line": 131
             },
             {
@@ -2804,7 +2804,7 @@
               "default_factory": null,
               "constraints": {},
               "required": false,
-              "source": "model-audio/ace_step_1_5/main.py",
+              "source": "model-audio/music_ace-step-1.5/main.py",
               "line": 132
             }
           ]
@@ -2815,7 +2815,7 @@
           "method": "POST",
           "path": "/v1/aceStep/bgm",
           "function": "generate_bgm",
-          "source": "model-audio/ace_step_1_5/main.py",
+          "source": "model-audio/music_ace-step-1.5/main.py",
           "line": 291,
           "parameters": [
             {
@@ -2848,7 +2848,7 @@
           "method": "GET",
           "path": "/v1/health",
           "function": "health",
-          "source": "model-audio/ace_step_1_5/main.py",
+          "source": "model-audio/music_ace-step-1.5/main.py",
           "line": 238,
           "parameters": [],
           "request_schemas": [],
@@ -3381,7 +3381,7 @@
     },
     {
       "project": "qwen3_tts",
-      "directory": "model-audio/qwen3_tts",
+      "directory": "model-audio/clone_qwen3-tts-1.7b-base",
       "ports": [
         8321
       ],
@@ -3399,7 +3399,7 @@
           {
             "method": "GET",
             "path": "/v1/check/audio",
-            "source": "model-audio/qwen3_tts/main.py",
+            "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
             "line": 736,
             "source_fields": [
               {
@@ -3431,7 +3431,7 @@
           {
             "method": "GET",
             "path": "/v1/health",
-            "source": "model-audio/qwen3_tts/main.py",
+            "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
             "line": 652,
             "source_fields": [],
             "localai_endpoint_candidate": null,
@@ -3442,7 +3442,7 @@
           {
             "method": "POST",
             "path": "/v1/qwen/clone",
-            "source": "model-audio/qwen3_tts/main.py",
+            "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
             "line": 747,
             "source_fields": [
               {
@@ -3455,7 +3455,7 @@
                   "max_length": "12000"
                 },
                 "required": true,
-                "source": "model-audio/qwen3_tts/main.py",
+                "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
                 "line": 360
               },
               {
@@ -3468,7 +3468,7 @@
                   "max_length": "1024"
                 },
                 "required": true,
-                "source": "model-audio/qwen3_tts/main.py",
+                "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
                 "line": 361
               },
               {
@@ -3478,7 +3478,7 @@
                 "default_factory": null,
                 "constraints": {},
                 "required": false,
-                "source": "model-audio/qwen3_tts/main.py",
+                "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
                 "line": 362
               },
               {
@@ -3490,7 +3490,7 @@
                   "max_length": "12000"
                 },
                 "required": false,
-                "source": "model-audio/qwen3_tts/main.py",
+                "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
                 "line": 363
               },
               {
@@ -3502,7 +3502,7 @@
                   "max_length": "32"
                 },
                 "required": false,
-                "source": "model-audio/qwen3_tts/main.py",
+                "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
                 "line": 364
               },
               {
@@ -3512,7 +3512,7 @@
                 "default_factory": null,
                 "constraints": {},
                 "required": false,
-                "source": "model-audio/qwen3_tts/main.py",
+                "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
                 "line": 365
               },
               {
@@ -3524,7 +3524,7 @@
                   "max_length": "128"
                 },
                 "required": false,
-                "source": "model-audio/qwen3_tts/main.py",
+                "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
                 "line": 366
               },
               {
@@ -3536,7 +3536,7 @@
                   "max_length": "32"
                 },
                 "required": false,
-                "source": "model-audio/qwen3_tts/main.py",
+                "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
                 "line": 367
               },
               {
@@ -3548,7 +3548,7 @@
                   "max_length": "64"
                 },
                 "required": false,
-                "source": "model-audio/qwen3_tts/main.py",
+                "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
                 "line": 368
               },
               {
@@ -3561,7 +3561,7 @@
                   "le": "4096"
                 },
                 "required": false,
-                "source": "model-audio/qwen3_tts/main.py",
+                "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
                 "line": 369
               },
               {
@@ -3574,7 +3574,7 @@
                   "le": "1"
                 },
                 "required": false,
-                "source": "model-audio/qwen3_tts/main.py",
+                "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
                 "line": 370
               },
               {
@@ -3587,7 +3587,7 @@
                   "le": "5"
                 },
                 "required": false,
-                "source": "model-audio/qwen3_tts/main.py",
+                "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
                 "line": 371
               },
               {
@@ -3600,7 +3600,7 @@
                   "le": "2000"
                 },
                 "required": false,
-                "source": "model-audio/qwen3_tts/main.py",
+                "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
                 "line": 372
               },
               {
@@ -3613,7 +3613,7 @@
                   "le": "10000"
                 },
                 "required": false,
-                "source": "model-audio/qwen3_tts/main.py",
+                "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
                 "line": 373
               },
               {
@@ -3623,7 +3623,7 @@
                 "default_factory": null,
                 "constraints": {},
                 "required": false,
-                "source": "model-audio/qwen3_tts/main.py",
+                "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
                 "line": 374
               },
               {
@@ -3636,7 +3636,7 @@
                   "le": "0"
                 },
                 "required": false,
-                "source": "model-audio/qwen3_tts/main.py",
+                "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
                 "line": 375
               },
               {
@@ -3649,7 +3649,7 @@
                   "le": "10000"
                 },
                 "required": false,
-                "source": "model-audio/qwen3_tts/main.py",
+                "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
                 "line": 376
               },
               {
@@ -3662,7 +3662,7 @@
                   "le": "1000"
                 },
                 "required": false,
-                "source": "model-audio/qwen3_tts/main.py",
+                "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
                 "line": 377
               },
               {
@@ -3675,7 +3675,7 @@
                   "le": "5000"
                 },
                 "required": false,
-                "source": "model-audio/qwen3_tts/main.py",
+                "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
                 "line": 378
               },
               {
@@ -3688,7 +3688,7 @@
                   "le": "30000"
                 },
                 "required": false,
-                "source": "model-audio/qwen3_tts/main.py",
+                "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
                 "line": 379
               }
             ],
@@ -3830,7 +3830,7 @@
           {
             "method": "POST",
             "path": "/v1/upload_audio",
-            "source": "model-audio/qwen3_tts/main.py",
+            "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
             "line": 722,
             "source_fields": [
               {
@@ -3897,8 +3897,8 @@
           }
         ],
         "source_files": {
-          "main": "model-audio/qwen3_tts/main.py",
-          "worker": "model-audio/qwen3_tts/worker.py",
+          "main": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
+          "worker": "model-audio/clone_qwen3-tts-1.7b-base/worker.py",
           "tests": [
             "tests/test_qwen3_tts_migration.py"
           ]
@@ -3912,8 +3912,8 @@
       },
       "notes": "Qwen3-TTS Base 克隆已接入可显式选择的 LocalAI audio-cpp provider；native 仍为默认。需保留逻辑参考音频解析、prompt_text、x_vector_only、语言/采样和输出去静音；真实 backend 与模型验证未完成。",
       "source_files": {
-        "main": "model-audio/qwen3_tts/main.py",
-        "worker": "model-audio/qwen3_tts/worker.py",
+        "main": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
+        "worker": "model-audio/clone_qwen3-tts-1.7b-base/worker.py",
         "tests": [
           "tests/test_qwen3_tts_migration.py"
         ]
@@ -3943,7 +3943,7 @@
                 "max_length": "12000"
               },
               "required": true,
-              "source": "model-audio/qwen3_tts/main.py",
+              "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
               "line": 360
             },
             {
@@ -3956,7 +3956,7 @@
                 "max_length": "1024"
               },
               "required": true,
-              "source": "model-audio/qwen3_tts/main.py",
+              "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
               "line": 361
             },
             {
@@ -3966,7 +3966,7 @@
               "default_factory": null,
               "constraints": {},
               "required": false,
-              "source": "model-audio/qwen3_tts/main.py",
+              "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
               "line": 362
             },
             {
@@ -3978,7 +3978,7 @@
                 "max_length": "12000"
               },
               "required": false,
-              "source": "model-audio/qwen3_tts/main.py",
+              "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
               "line": 363
             },
             {
@@ -3990,7 +3990,7 @@
                 "max_length": "32"
               },
               "required": false,
-              "source": "model-audio/qwen3_tts/main.py",
+              "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
               "line": 364
             },
             {
@@ -4000,7 +4000,7 @@
               "default_factory": null,
               "constraints": {},
               "required": false,
-              "source": "model-audio/qwen3_tts/main.py",
+              "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
               "line": 365
             },
             {
@@ -4012,7 +4012,7 @@
                 "max_length": "128"
               },
               "required": false,
-              "source": "model-audio/qwen3_tts/main.py",
+              "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
               "line": 366
             },
             {
@@ -4024,7 +4024,7 @@
                 "max_length": "32"
               },
               "required": false,
-              "source": "model-audio/qwen3_tts/main.py",
+              "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
               "line": 367
             },
             {
@@ -4036,7 +4036,7 @@
                 "max_length": "64"
               },
               "required": false,
-              "source": "model-audio/qwen3_tts/main.py",
+              "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
               "line": 368
             },
             {
@@ -4049,7 +4049,7 @@
                 "le": "4096"
               },
               "required": false,
-              "source": "model-audio/qwen3_tts/main.py",
+              "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
               "line": 369
             },
             {
@@ -4062,7 +4062,7 @@
                 "le": "1"
               },
               "required": false,
-              "source": "model-audio/qwen3_tts/main.py",
+              "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
               "line": 370
             },
             {
@@ -4075,7 +4075,7 @@
                 "le": "5"
               },
               "required": false,
-              "source": "model-audio/qwen3_tts/main.py",
+              "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
               "line": 371
             },
             {
@@ -4088,7 +4088,7 @@
                 "le": "2000"
               },
               "required": false,
-              "source": "model-audio/qwen3_tts/main.py",
+              "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
               "line": 372
             },
             {
@@ -4101,7 +4101,7 @@
                 "le": "10000"
               },
               "required": false,
-              "source": "model-audio/qwen3_tts/main.py",
+              "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
               "line": 373
             },
             {
@@ -4111,7 +4111,7 @@
               "default_factory": null,
               "constraints": {},
               "required": false,
-              "source": "model-audio/qwen3_tts/main.py",
+              "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
               "line": 374
             },
             {
@@ -4124,7 +4124,7 @@
                 "le": "0"
               },
               "required": false,
-              "source": "model-audio/qwen3_tts/main.py",
+              "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
               "line": 375
             },
             {
@@ -4137,7 +4137,7 @@
                 "le": "10000"
               },
               "required": false,
-              "source": "model-audio/qwen3_tts/main.py",
+              "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
               "line": 376
             },
             {
@@ -4150,7 +4150,7 @@
                 "le": "1000"
               },
               "required": false,
-              "source": "model-audio/qwen3_tts/main.py",
+              "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
               "line": 377
             },
             {
@@ -4163,7 +4163,7 @@
                 "le": "5000"
               },
               "required": false,
-              "source": "model-audio/qwen3_tts/main.py",
+              "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
               "line": 378
             },
             {
@@ -4176,11 +4176,11 @@
                 "le": "30000"
               },
               "required": false,
-              "source": "model-audio/qwen3_tts/main.py",
+              "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
               "line": 379
             }
           ],
-          "source": "model-audio/qwen3_tts/main.py"
+          "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py"
         }
       },
       "routes": [
@@ -4188,7 +4188,7 @@
           "method": "GET",
           "path": "/v1/check/audio",
           "function": "check_audio_exists",
-          "source": "model-audio/qwen3_tts/main.py",
+          "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
           "line": 736,
           "parameters": [
             {
@@ -4216,7 +4216,7 @@
           "method": "GET",
           "path": "/v1/health",
           "function": "health",
-          "source": "model-audio/qwen3_tts/main.py",
+          "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
           "line": 652,
           "parameters": [],
           "request_schemas": [],
@@ -4237,7 +4237,7 @@
           "method": "POST",
           "path": "/v1/qwen/clone",
           "function": "synthesize_v2",
-          "source": "model-audio/qwen3_tts/main.py",
+          "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
           "line": 747,
           "parameters": [
             {
@@ -4272,7 +4272,7 @@
           "method": "POST",
           "path": "/v1/upload_audio",
           "function": "upload_audio",
-          "source": "model-audio/qwen3_tts/main.py",
+          "source": "model-audio/clone_qwen3-tts-1.7b-base/main.py",
           "line": 722,
           "parameters": [
             {
@@ -4314,7 +4314,7 @@
     },
     {
       "project": "qwen3_voiceDesign",
-      "directory": "model-audio/qwen3_voiceDesign",
+      "directory": "model-audio/design_qwen3-tts-1.7b-voicedesign",
       "ports": [
         8301
       ],
@@ -4332,7 +4332,7 @@
           {
             "method": "GET",
             "path": "/v1/health",
-            "source": "model-audio/qwen3_voiceDesign/main.py",
+            "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
             "line": 411,
             "source_fields": [],
             "localai_endpoint_candidate": null,
@@ -4343,7 +4343,7 @@
           {
             "method": "POST",
             "path": "/v1/qwen/timbre",
-            "source": "model-audio/qwen3_voiceDesign/main.py",
+            "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
             "line": 474,
             "source_fields": [
               {
@@ -4356,7 +4356,7 @@
                   "max_length": "2000"
                 },
                 "required": true,
-                "source": "model-audio/qwen3_voiceDesign/main.py",
+                "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
                 "line": 155
               },
               {
@@ -4369,7 +4369,7 @@
                   "max_length": "12000"
                 },
                 "required": false,
-                "source": "model-audio/qwen3_voiceDesign/main.py",
+                "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
                 "line": 156
               },
               {
@@ -4381,7 +4381,7 @@
                   "max_length": "32"
                 },
                 "required": false,
-                "source": "model-audio/qwen3_voiceDesign/main.py",
+                "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
                 "line": 157
               },
               {
@@ -4394,7 +4394,7 @@
                   "le": "2000"
                 },
                 "required": false,
-                "source": "model-audio/qwen3_voiceDesign/main.py",
+                "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
                 "line": 158
               },
               {
@@ -4407,7 +4407,7 @@
                   "le": "10000"
                 },
                 "required": false,
-                "source": "model-audio/qwen3_voiceDesign/main.py",
+                "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
                 "line": 159
               },
               {
@@ -4420,7 +4420,7 @@
                   "le": "4096"
                 },
                 "required": false,
-                "source": "model-audio/qwen3_voiceDesign/main.py",
+                "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
                 "line": 160
               },
               {
@@ -4433,7 +4433,7 @@
                   "le": "1"
                 },
                 "required": false,
-                "source": "model-audio/qwen3_voiceDesign/main.py",
+                "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
                 "line": 161
               },
               {
@@ -4446,7 +4446,7 @@
                   "le": "5"
                 },
                 "required": false,
-                "source": "model-audio/qwen3_voiceDesign/main.py",
+                "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
                 "line": 162
               },
               {
@@ -4458,7 +4458,7 @@
                   "max_length": "32"
                 },
                 "required": false,
-                "source": "model-audio/qwen3_voiceDesign/main.py",
+                "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
                 "line": 163
               },
               {
@@ -4470,7 +4470,7 @@
                   "max_length": "64"
                 },
                 "required": false,
-                "source": "model-audio/qwen3_voiceDesign/main.py",
+                "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
                 "line": 164
               },
               {
@@ -4482,7 +4482,7 @@
                   "max_length": "128"
                 },
                 "required": false,
-                "source": "model-audio/qwen3_voiceDesign/main.py",
+                "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
                 "line": 165
               }
             ],
@@ -4569,8 +4569,8 @@
           }
         ],
         "source_files": {
-          "main": "model-audio/qwen3_voiceDesign/main.py",
-          "worker": "model-audio/qwen3_voiceDesign/worker.py",
+          "main": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
+          "worker": "model-audio/design_qwen3-tts-1.7b-voicedesign/worker.py",
           "tests": [
             "tests/test_qwen3_voicedesign_migration.py"
           ]
@@ -4584,8 +4584,8 @@
       },
       "notes": "Qwen3 VoiceDesign 已有独立 LocalAI audio-cpp provider，固定 qwen3_tts/task:vdes；native 仍为默认。请求切段与停顿在 CPU 侧保持，真实 backend、模型与音质未验收。",
       "source_files": {
-        "main": "model-audio/qwen3_voiceDesign/main.py",
-        "worker": "model-audio/qwen3_voiceDesign/worker.py",
+        "main": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
+        "worker": "model-audio/design_qwen3-tts-1.7b-voicedesign/worker.py",
         "tests": [
           "tests/test_qwen3_voicedesign_migration.py"
         ]
@@ -4613,7 +4613,7 @@
                 "max_length": "2000"
               },
               "required": true,
-              "source": "model-audio/qwen3_voiceDesign/main.py",
+              "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
               "line": 155
             },
             {
@@ -4626,7 +4626,7 @@
                 "max_length": "12000"
               },
               "required": false,
-              "source": "model-audio/qwen3_voiceDesign/main.py",
+              "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
               "line": 156
             },
             {
@@ -4638,7 +4638,7 @@
                 "max_length": "32"
               },
               "required": false,
-              "source": "model-audio/qwen3_voiceDesign/main.py",
+              "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
               "line": 157
             },
             {
@@ -4651,7 +4651,7 @@
                 "le": "2000"
               },
               "required": false,
-              "source": "model-audio/qwen3_voiceDesign/main.py",
+              "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
               "line": 158
             },
             {
@@ -4664,7 +4664,7 @@
                 "le": "10000"
               },
               "required": false,
-              "source": "model-audio/qwen3_voiceDesign/main.py",
+              "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
               "line": 159
             },
             {
@@ -4677,7 +4677,7 @@
                 "le": "4096"
               },
               "required": false,
-              "source": "model-audio/qwen3_voiceDesign/main.py",
+              "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
               "line": 160
             },
             {
@@ -4690,7 +4690,7 @@
                 "le": "1"
               },
               "required": false,
-              "source": "model-audio/qwen3_voiceDesign/main.py",
+              "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
               "line": 161
             },
             {
@@ -4703,7 +4703,7 @@
                 "le": "5"
               },
               "required": false,
-              "source": "model-audio/qwen3_voiceDesign/main.py",
+              "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
               "line": 162
             },
             {
@@ -4715,7 +4715,7 @@
                 "max_length": "32"
               },
               "required": false,
-              "source": "model-audio/qwen3_voiceDesign/main.py",
+              "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
               "line": 163
             },
             {
@@ -4727,7 +4727,7 @@
                 "max_length": "64"
               },
               "required": false,
-              "source": "model-audio/qwen3_voiceDesign/main.py",
+              "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
               "line": 164
             },
             {
@@ -4739,11 +4739,11 @@
                 "max_length": "128"
               },
               "required": false,
-              "source": "model-audio/qwen3_voiceDesign/main.py",
+              "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
               "line": 165
             }
           ],
-          "source": "model-audio/qwen3_voiceDesign/main.py"
+          "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py"
         }
       },
       "routes": [
@@ -4751,7 +4751,7 @@
           "method": "GET",
           "path": "/v1/health",
           "function": "health",
-          "source": "model-audio/qwen3_voiceDesign/main.py",
+          "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
           "line": 411,
           "parameters": [],
           "request_schemas": [],
@@ -4770,7 +4770,7 @@
           "method": "POST",
           "path": "/v1/qwen/timbre",
           "function": "qwen_design",
-          "source": "model-audio/qwen3_voiceDesign/main.py",
+          "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
           "line": 474,
           "parameters": [
             {
@@ -4803,7 +4803,7 @@
     },
     {
       "project": "voxcpm2",
-      "directory": "model-audio/voxcpm2",
+      "directory": "model-audio/clone_voxcpm-2",
       "ports": [
         8322
       ],
@@ -4821,7 +4821,7 @@
           {
             "method": "GET",
             "path": "/v1/check/audio",
-            "source": "model-audio/voxcpm2/main.py",
+            "source": "model-audio/clone_voxcpm-2/main.py",
             "line": 629,
             "source_fields": [
               {
@@ -4844,7 +4844,7 @@
           {
             "method": "GET",
             "path": "/v1/health",
-            "source": "model-audio/voxcpm2/main.py",
+            "source": "model-audio/clone_voxcpm-2/main.py",
             "line": 545,
             "source_fields": [],
             "field_mappings": [],
@@ -4853,7 +4853,7 @@
           {
             "method": "POST",
             "path": "/v1/upload_audio",
-            "source": "model-audio/voxcpm2/main.py",
+            "source": "model-audio/clone_voxcpm-2/main.py",
             "line": 615,
             "source_fields": [
               {
@@ -4900,7 +4900,7 @@
           {
             "method": "POST",
             "path": "/v1/voxcpm2/clone",
-            "source": "model-audio/voxcpm2/main.py",
+            "source": "model-audio/clone_voxcpm-2/main.py",
             "line": 673,
             "source_fields": [
               {
@@ -4923,8 +4923,8 @@
           }
         ],
         "source_files": {
-          "main": "model-audio/voxcpm2/main.py",
-          "worker": "model-audio/voxcpm2/worker.py",
+          "main": "model-audio/clone_voxcpm-2/main.py",
+          "worker": "model-audio/clone_voxcpm-2/worker.py",
           "tests": [
             "tests/test_voxcpm2_migration.py"
           ]
@@ -4935,8 +4935,8 @@
       },
       "notes": "保留原生克隆与可控克隆合同；VoxCPM2 LocalAI GGUF 候选不在 ~/hf-mirror 中，provider 已移除。",
       "source_files": {
-        "main": "model-audio/voxcpm2/main.py",
-        "worker": "model-audio/voxcpm2/worker.py",
+        "main": "model-audio/clone_voxcpm-2/main.py",
+        "worker": "model-audio/clone_voxcpm-2/worker.py",
         "tests": [
           "tests/test_voxcpm2_migration.py"
         ]
@@ -4955,7 +4955,7 @@
           "method": "GET",
           "path": "/v1/check/audio",
           "function": "check_audio_exists",
-          "source": "model-audio/voxcpm2/main.py",
+          "source": "model-audio/clone_voxcpm-2/main.py",
           "line": 629,
           "parameters": [
             {
@@ -4984,7 +4984,7 @@
           "method": "GET",
           "path": "/v1/health",
           "function": "health",
-          "source": "model-audio/voxcpm2/main.py",
+          "source": "model-audio/clone_voxcpm-2/main.py",
           "line": 545,
           "parameters": [],
           "request_schemas": [],
@@ -5006,7 +5006,7 @@
           "method": "POST",
           "path": "/v1/upload_audio",
           "function": "upload_audio",
-          "source": "model-audio/voxcpm2/main.py",
+          "source": "model-audio/clone_voxcpm-2/main.py",
           "line": 615,
           "parameters": [
             {
@@ -5049,7 +5049,7 @@
           "method": "POST",
           "path": "/v1/voxcpm2/clone",
           "function": "synthesize_v2",
-          "source": "model-audio/voxcpm2/main.py",
+          "source": "model-audio/clone_voxcpm-2/main.py",
           "line": 673,
           "parameters": [
             {

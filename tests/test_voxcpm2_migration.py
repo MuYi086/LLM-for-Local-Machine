@@ -14,7 +14,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 REPOSITORY_DIR = Path(__file__).resolve().parents[1]
-SERVICE_DIR = REPOSITORY_DIR / "model-audio" / "voxcpm2"
+SERVICE_DIR = REPOSITORY_DIR / "model-audio" / "clone_voxcpm-2"
 TEST_RUNTIME = tempfile.TemporaryDirectory(prefix="voxcpm2-tests-")
 TEST_ROOT = Path(TEST_RUNTIME.name)
 MODEL_DIR = TEST_ROOT / "model"

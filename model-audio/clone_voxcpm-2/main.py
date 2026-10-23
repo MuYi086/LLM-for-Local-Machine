@@ -652,7 +652,7 @@ def synthesize_voxcpm2_payload(data: object) -> Response:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     try:
-        with gpu_runtime_lock("model-audio/voxcpm2/synthesize"):
+        with gpu_runtime_lock("model-audio/clone_voxcpm-2/synthesize"):
             try:
                 with manager.lock:
                     audio_bytes = manager.run_worker(payload)

@@ -13,7 +13,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 REPOSITORY_DIR = Path(__file__).resolve().parents[1]
-SERVICE_DIR = REPOSITORY_DIR / "model-audio" / "Confucius4_TTS"
+SERVICE_DIR = REPOSITORY_DIR / "model-audio" / "clone_confucius-4"
 TEST_RUNTIME = tempfile.TemporaryDirectory(prefix="confucius4-tts-tests-")
 TEST_ROOT = Path(TEST_RUNTIME.name)
 MODEL_DIR = TEST_ROOT / "model"

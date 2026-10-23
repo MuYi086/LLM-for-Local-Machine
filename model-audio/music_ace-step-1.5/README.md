@@ -13,10 +13,10 @@ worker，完成推理后退出并释放 CUDA。
 部署时由操作者手动执行：
 
 ```bash
-uv sync --project ace_step_1_5 --locked
+uv sync --project model-audio/music_ace-step-1.5 --locked
 ```
 
-本次代码变更不会替你执行该命令。
+以上命令从仓库根目录执行。
 
 ## 模型与运行配置
 
@@ -73,5 +73,5 @@ uv sync --project ace_step_1_5 --locked
 测试不会下载权重、导入真实 Diffusers Pipeline、调用 CUDA 或执行网络请求：
 
 ```bash
-uv run --project ace_step_1_5 --no-sync python -m unittest discover -s model-audio/ace_step_1_5/tests -v
+(cd model-audio/music_ace-step-1.5 && uv run --project ../../qa --locked python -m unittest discover -s tests -v)
 ```

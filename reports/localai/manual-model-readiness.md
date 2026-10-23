@@ -29,9 +29,9 @@
 | 功能/制品 | 镜像检查 | 清理结果 |
 | --- | --- | --- |
 | Stable Audio 3 Medium | stabilityai/stable-audio-3-medium 不存在 | 服务目录、路由、worker、启动项、维护前缀和测试已移除 |
-| Ditto | digital-avatar/ditto-talkinghead 不存在 | 服务代码、路由、worker、启动项、维护项和测试已移除；本机忽略的运行环境残余已归入 `model-video/ditto/` |
+| Ditto | digital-avatar/ditto-talkinghead 不存在 | 服务代码、路由、worker、启动项、维护项和测试已移除；本机忽略的运行环境残余已归入 `model-video/avatar_ditto/` |
 | Seed-VC | 主目录 Plachta/Seed-VC 存在，但必需的 openai/whisper-small 缺失；F0/SVC 另缺 44 kHz BigVGAN 和 RMVPE | 整个服务及 VC/SVC LocalAI 候选已移除 |
-| SoulX-FlashHead | 主目录存在，但必需的 facebook/wav2vec2-base-960h 缺失 | 服务代码、图片上传 API、启动项和 worker bridge 已移除；本机忽略的运行环境残余已归入 `model-video/SoulX-FlashHead-1_3B/` |
+| SoulX-FlashHead | 主目录存在，但必需的 facebook/wav2vec2-base-960h 缺失 | 服务代码、图片上传 API、启动项和 worker bridge 已移除；本机忽略的运行环境残余已归入 `model-video/avatar_soulx-flashhead-1.3b/` |
 | Qwen3-ASR LocalAI Q8 | GGUF 不在 hf-mirror | 只移除 LocalAI provider、候选 YAML、预检和候选测试；原生 Qwen3-ASR 服务保留 |
 | VoxCPM2 LocalAI Q8 | GGUF 不在 hf-mirror | 只移除 LocalAI provider、候选 YAML、预检和候选测试；原生 VoxCPM2 服务保留 |
 | Confucius4-TTS LocalAI GGUF | GGUF 不在 hf-mirror | 只移除 LocalAI provider、候选 YAML、预检和候选测试；原生 Confucius4-TTS 服务保留 |

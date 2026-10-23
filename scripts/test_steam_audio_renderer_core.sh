@@ -3,7 +3,7 @@
 set -euo pipefail
 
 repository_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-renderer_dir="$repository_dir/model-audio/steam_audio_renderer"
+renderer_dir="$repository_dir/model-audio/spatial_steam-audio"
 test_build_dir="$(mktemp -d)"
 trap 'rm -rf "$test_build_dir"' EXIT
 

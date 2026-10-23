@@ -99,7 +99,7 @@ LocalAI `verify-install`、两个 Qwen3-TTS 候选和五个 worker bridge 候选
 该只读检查没有安装依赖。13 份维护文档的相对文件链接检查通过。
 
 本机 Steam Audio SDK 4.8.1 已放置于 `$HOME/.local/share/steam-audio/4.8.1`，空间 renderer
-可执行文件已存在于 `model-audio/steam_audio_renderer/build/`；`ldd` 可解析 `libphonon.so`。
+可执行文件已存在于 `model-audio/spatial_steam-audio/build/`；`ldd` 可解析 `libphonon.so`。
 Linux 启动与构建脚本均默认使用该 SDK 路径，无需每次额外设置环境变量。SDK 保持在仓库外，
 不会提交。模型镜像中没有保留服务需要用户补充的缺失主模型；缺失 GGUF 和辅助模型对应的功能均已退役。
 模型权重及真实测试样本仍由用户管理。下节记录当前目录布局修复后的新验证结果；

@@ -13,7 +13,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 REPOSITORY_DIR = Path(__file__).resolve().parents[1]
-SERVICE_DIR = REPOSITORY_DIR / "model-audio" / "Qwen3_ASR_1.7B"
+SERVICE_DIR = REPOSITORY_DIR / "model-audio" / "transcribe_qwen3-asr-1.7b"
 TEST_RUNTIME = tempfile.TemporaryDirectory(prefix="qwen3-asr-tests-")
 TEST_ROOT = Path(TEST_RUNTIME.name)
 MODEL_DIR = TEST_ROOT / "Qwen3-ASR-1.7B"

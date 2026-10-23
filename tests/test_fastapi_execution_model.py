@@ -42,23 +42,23 @@ class FastApiExecutionModelTests(unittest.TestCase):
     def test_blocking_routes_use_sync_handlers(self) -> None:
         expected_routes = {
             "main/main.py": {"/v1/health", "/v1/check/audio"},
-            "model-audio/qwen3_tts/main.py": {
+            "model-audio/clone_qwen3-tts-1.7b-base/main.py": {
                 "/v1/health",
                 "/v1/check/audio",
                 "/v1/qwen/clone",
             },
-            "model-audio/voxcpm2/main.py": {"/v1/health", "/v1/check/audio"},
-            "model-audio/ace_step_1_5/main.py": {
+            "model-audio/clone_voxcpm-2/main.py": {"/v1/health", "/v1/check/audio"},
+            "model-audio/music_ace-step-1.5/main.py": {
                 "/v1/health",
                 "/v1/aceStep/bgm",
             },
-            "model-audio/qwen3_voiceDesign/main.py": {"/v1/health"},
-            "model-audio/Confucius4_TTS/main.py": {
+            "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py": {"/v1/health"},
+            "model-audio/clone_confucius-4/main.py": {
                 "/v1/health",
                 "/v1/check/audio",
                 "/v1/confucius4TTS/generate",
             },
-            "model-audio/TIGER-DnR/main.py": {"/v1/health"},
+            "model-audio/separate_tiger-dnr/main.py": {"/v1/health"},
         }
 
         for relative_path, routes in expected_routes.items():
@@ -69,7 +69,7 @@ class FastApiExecutionModelTests(unittest.TestCase):
                     {route: "FunctionDef" for route in routes},
                 )
 
-        voxcpm2_source = (REPOSITORY_DIR / "model-audio/voxcpm2/main.py").read_text(
+        voxcpm2_source = (REPOSITORY_DIR / "model-audio/clone_voxcpm-2/main.py").read_text(
             encoding="utf-8"
         )
         self.assertIn(
@@ -79,9 +79,9 @@ class FastApiExecutionModelTests(unittest.TestCase):
     def test_async_upload_routes_offload_filesystem_work(self) -> None:
         upload_sources = {
             "main/main.py",
-            "model-audio/qwen3_tts/main.py",
-            "model-audio/voxcpm2/main.py",
-            "model-audio/Confucius4_TTS/main.py",
+            "model-audio/clone_qwen3-tts-1.7b-base/main.py",
+            "model-audio/clone_voxcpm-2/main.py",
+            "model-audio/clone_confucius-4/main.py",
         }
 
         for relative_path in upload_sources:

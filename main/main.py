@@ -71,7 +71,7 @@ STEAM_AUDIO_RENDER_CACHE_DIR = expand_path(
         str(Path(RUNTIME_CACHE_DIR) / "steam_audio_renders"),
     )
 )
-_default_renderer_path = PROJECT_DIR / "model-audio" / "steam_audio_renderer" / "build"
+_default_renderer_path = PROJECT_DIR / "model-audio" / "spatial_steam-audio" / "build"
 if os.name == "nt":
     _default_renderer_path = _default_renderer_path / "Release" / "steam-audio-render.exe"
 else:

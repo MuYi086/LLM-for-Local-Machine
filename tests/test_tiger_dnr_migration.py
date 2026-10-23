@@ -13,7 +13,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 REPOSITORY_DIR = Path(__file__).resolve().parents[1]
-SERVICE_DIR = REPOSITORY_DIR / "model-audio" / "TIGER-DnR"
+SERVICE_DIR = REPOSITORY_DIR / "model-audio" / "separate_tiger-dnr"
 TEST_RUNTIME = tempfile.TemporaryDirectory(prefix="tiger-dnr-tests-")
 TEST_ROOT = Path(TEST_RUNTIME.name)
 MODEL_DIR = TEST_ROOT / "hf-mirror" / "JusperLee" / "TIGER-DnR"

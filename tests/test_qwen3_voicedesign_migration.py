@@ -13,7 +13,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 REPOSITORY_DIR = Path(__file__).resolve().parents[1]
-SERVICE_DIR = REPOSITORY_DIR / "model-audio" / "qwen3_voiceDesign"
+SERVICE_DIR = REPOSITORY_DIR / "model-audio" / "design_qwen3-tts-1.7b-voicedesign"
 TEST_RUNTIME = tempfile.TemporaryDirectory(prefix="qwen3-voicedesign-tests-")
 TEST_ROOT = Path(TEST_RUNTIME.name)
 

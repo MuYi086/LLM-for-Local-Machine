@@ -17,17 +17,17 @@ localai_worker_bridge 是额外的非 HTTP uv 包，不计入服务数，也不�
 | 模型/服务 | 默认端口 | 主业务接口 | 职责 | 原生输出 |
 | --- | --- | --- | --- | --- |
 | main 控制面 | 8300 | GET /v1/control；POST /v1/audio/export；POST /v1/audio/spatial/render | 控制、共享上传/检查、CPU 母带及空间导出 | 非模型服务 |
-| `model-audio/qwen3_voiceDesign/` | 8301 | POST /v1/qwen/timbre | 文本音色设计与 TTS | 语音波形 |
-| `model-audio/ace_step_1_5/` | 8313 | POST /v1/aceStep/bgm | 按提示词生成 BGM；接口不接收歌词 | 音乐波形 |
-| `model-audio/YuE2-3B/` | 8314 | POST /v1/m-a-p/YuE2 | 根据风格、歌词与可选 ABC 乐谱生成歌曲 | 48 kHz 立体声音频 |
-| `model-audio/SheetSage2/` | 8315 | POST /v1/m-a-p/SheetSage2 | 音乐转为乐谱、MIDI、节拍/和弦/调性/结构与时间标注 | ABC、MIDI 与 JSON/LAB ZIP |
-| `model-audio/YuE2-Vae/` | 8316 | POST /v1/m-a-p/YuE2-Vae | YuE2 acoustic latent 编码与分块解码 | [T,64] NPY 或 48 kHz WAV |
-| `model-audio/MERT-v2-FullSong/` | 8317 | POST /v1/m-a-p/MERT-v2-FullSong | 完整歌曲音乐表征提取 | 整曲 embedding 或逐帧 NPZ |
-| `model-audio/qwen3_tts/` | 8321 | POST /v1/qwen/clone | 参考音频零样本多语言 TTS 克隆 | 语音波形 |
-| `model-audio/voxcpm2/` | 8322 | POST /v1/voxcpm2/clone | 多语种 TTS、参考克隆及指令可控克隆 | 语音波形 |
-| `model-audio/TIGER-DnR/` | 8351 | POST /v1/tigerDnr/separate | 对白/音效/音乐三路 Stem 分离 | 三路音频波形 |
-| `model-audio/Confucius4_TTS/` | 8361 | POST /v1/confucius4TTS/generate | 14 语种跨语言零样本 TTS 克隆 | 语音波形 |
-| `model-audio/Qwen3_ASR_1.7B/` | 8371 | POST /v1/qwen3/asr | 语种识别与语音转写 | 转写文本与语种 |
+| `model-audio/design_qwen3-tts-1.7b-voicedesign/` | 8301 | POST /v1/qwen/timbre | 文本音色设计与 TTS | 语音波形 |
+| `model-audio/music_ace-step-1.5/` | 8313 | POST /v1/aceStep/bgm | 按提示词生成 BGM；接口不接收歌词 | 音乐波形 |
+| `model-audio/music_yue2-3b/` | 8314 | POST /v1/m-a-p/YuE2 | 根据风格、歌词与可选 ABC 乐谱生成歌曲 | 48 kHz 立体声音频 |
+| `model-audio/score_sheetsage-2/` | 8315 | POST /v1/m-a-p/SheetSage2 | 音乐转为乐谱、MIDI、节拍/和弦/调性/结构与时间标注 | ABC、MIDI 与 JSON/LAB ZIP |
+| `model-audio/codec_yue2-vae/` | 8316 | POST /v1/m-a-p/YuE2-Vae | YuE2 acoustic latent 编码与分块解码 | [T,64] NPY 或 48 kHz WAV |
+| `model-audio/embedding_mert-v2-fullsong/` | 8317 | POST /v1/m-a-p/MERT-v2-FullSong | 完整歌曲音乐表征提取 | 整曲 embedding 或逐帧 NPZ |
+| `model-audio/clone_qwen3-tts-1.7b-base/` | 8321 | POST /v1/qwen/clone | 参考音频零样本多语言 TTS 克隆 | 语音波形 |
+| `model-audio/clone_voxcpm-2/` | 8322 | POST /v1/voxcpm2/clone | 多语种 TTS、参考克隆及指令可控克隆 | 语音波形 |
+| `model-audio/separate_tiger-dnr/` | 8351 | POST /v1/tigerDnr/separate | 对白/音效/音乐三路 Stem 分离 | 三路音频波形 |
+| `model-audio/clone_confucius-4/` | 8361 | POST /v1/confucius4TTS/generate | 14 语种跨语言零样本 TTS 克隆 | 语音波形 |
+| `model-audio/transcribe_qwen3-asr-1.7b/` | 8371 | POST /v1/qwen3/asr | 语种识别与语音转写 | 转写文本与语种 |
 
 - main/main.py 只处理健康/控制、共享上传/检查和 CPU 导出，不加载模型包或推理。
   空间任务进度 GET /v1/audio/spatial/render/progress/{job_id} 是进程内状态。
@@ -44,9 +44,9 @@ localai_worker_bridge 是额外的非 HTTP uv 包，不计入服务数，也不�
   localai/manifests/worker-bridge.json 固定的五个模型 ID、项目和 worker.py 入口启动一次性 worker，
   只监听 loopback，不导入 FastAPI、Torch 或模型包。新增 worker 须覆盖合同、超时、大小、
   环境白名单和异常退出清理。
-- model-audio/steam_audio_renderer/ 是 C++17 Steam Audio CPU renderer，不获取 GPU 锁；SDK 和动态库在仓库外。
+- model-audio/spatial_steam-audio/ 是 C++17 Steam Audio CPU renderer，不获取 GPU 锁；SDK 和动态库在仓库外。
 - qa/ 是无模型测试/Ruff 项目；scripts/quality_gate.sh 与 GitHub Actions 使用同一质量门禁。
-  根目录回归使用 QA；ACE-Step 服务内测试从 model-audio/ace_step_1_5/ 执行。
+  根目录回归使用 QA；ACE-Step 服务内测试从 model-audio/music_ace-step-1.5/ 执行。
 - model-text/scripts/training/、model-text/training/configs/ 是纯文本润色 LoRA 实验，不是语音训练或 HTTP 服务。
 - model-video/ 按模态收纳视频项目；当前没有维护中的视频 HTTP 服务，目录不计入 start.sh 的进程数。
 - 流行*模型功能简介.md、task*.md 和 `空间音频讨论/` 是调研/任务/方案资料，
@@ -77,7 +77,7 @@ SheetSage2 使用 Hugging Face 本地快照的官方 Transformers remote code �
 MERT-v2-FullSong 父模型。服务用一次性 worker 推理，默认 FFmpeg 解码，ZIP 成品写入
 `SHEETSAGE2_OUTPUT_DIR`；请求音频暂存仅用于推理并在请求结束后删除。
 
-`bash start.sh` 在 `model-audio/qwen3_tts` 环境启动 8300，其他进程使用各自服务环境；端口/路径可通过
+`bash start.sh` 在 `model-audio/clone_qwen3-tts-1.7b-base` 环境启动 8300，其他进程使用各自服务环境；端口/路径可通过
 环境变量覆盖。启动统一使用 `uv run --no-sync`，并将 `llm_local_runtime/src` 加入 `PYTHONPATH`
 作为共享包离线兜底。该兜底不能代替新增依赖后的 `uv sync --locked`。
 脚本先检查整组端口，任一服务退出时终止其他进程组；重启前用 `Ctrl+C` 等待旧进程退出。
@@ -96,7 +96,7 @@ curl -fsS http://127.0.0.1:8300/v1/control
 
 ```bash
 uv run --project qa --locked python -m unittest discover -s tests -v
-(cd model-audio/ace_step_1_5 && uv run --project ../../qa --locked python -m unittest discover -s tests -v)
+(cd model-audio/music_ace-step-1.5 && uv run --project ../../qa --locked python -m unittest discover -s tests -v)
 ```
 
 测试不得下载权重、依赖 CUDA、调用外部模型服务或执行真实模型；应 mock worker、subprocess、
@@ -141,7 +141,7 @@ uv run --project qa --locked python -m unittest discover -s tests -v
   同内容上传只在 `storage/timbre/.references/` 保存小型引用映射/文本，不在 clone 再复制 WAV。
   普通用户参考上传仍保存在 clone；不得破坏引用校验和内容哈希。
 - 保留策略默认关闭；运维显式设置 `STORAGE_RETENTION_HOURS` 或 `STORAGE_RETENTION_MAX_BYTES`
-  后才可运行 `uv run --project model-audio/qwen3_tts python main/storage_maintenance.py [--apply]`。
+  后才可运行 `uv run --project model-audio/clone_qwen3-tts-1.7b-base python main/storage_maintenance.py [--apply]`。
   默认预览，不能自动删除普通上传或仍被引用的音色。该工具只扫描列出的 WAV 前缀，不覆盖
   Confucius4、分离/训练产物或任意自定义输出目录；详见 README。
 - 训练脚本不自动获取服务 GPU 锁，执行真实训练/预测需独立安排 GPU；教师候选必须保留

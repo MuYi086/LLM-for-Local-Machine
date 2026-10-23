@@ -68,7 +68,7 @@ class LocalAIWorkerServiceRouteTests(unittest.TestCase):
         )
 
     def test_sheetsage2_routes_zip_through_localai_and_persists_it(self) -> None:
-        with load_service("SheetSage2") as module:
+        with load_service("score_sheetsage-2") as module:
             self.select_localai(module, "llm-local.sheetsage2.worker.v1")
             payload = {"audio_path": "/tmp/checked.wav", "dtype": "bf16"}
             artifact = Path(self.temporary.name) / "worker.zip"
@@ -100,7 +100,7 @@ class LocalAIWorkerServiceRouteTests(unittest.TestCase):
             persist.assert_called_once_with(artifact, module.OUTPUT_DIR)
 
     def test_mert_selects_npz_output_for_frame_features(self) -> None:
-        with load_service("MERT-v2-FullSong") as module:
+        with load_service("embedding_mert-v2-fullsong") as module:
             self.select_localai(module, "llm-local.mert-v2-fullsong.worker.v1")
             payload = {"audio_path": "/tmp/checked.wav", "output": "frames"}
             artifact = Path(self.temporary.name) / "worker.npz"
@@ -123,7 +123,7 @@ class LocalAIWorkerServiceRouteTests(unittest.TestCase):
             self.assertEqual(execute.call_args.kwargs["payload"], {"worker_input": payload})
 
     def test_yue2_vae_selects_wav_output_for_decode(self) -> None:
-        with load_service("YuE2-Vae") as module:
+        with load_service("codec_yue2-vae") as module:
             self.select_localai(module, "llm-local.yue2-vae.worker.v1")
             payload = {"operation": "decode", "latent_path": "/tmp/checked.npy"}
             artifact = Path(self.temporary.name) / "worker.wav"
@@ -146,7 +146,7 @@ class LocalAIWorkerServiceRouteTests(unittest.TestCase):
             self.assertEqual(execute.call_args.kwargs["payload"], {"worker_input": payload})
 
     def test_yue2_3b_routes_complete_request_through_worker_bridge(self) -> None:
-        with load_service("YuE2-3B") as module:
+        with load_service("music_yue2-3b") as module:
             self.select_localai(module, "llm-local.yue2-3b.worker.v1")
             request = module.YuE2MusicRequest(lyrics="你好", style="民谣")
             expected_payload = {"lyrics": "你好", "style": "民谣", "seed": request.seed}
@@ -177,7 +177,7 @@ class LocalAIWorkerServiceRouteTests(unittest.TestCase):
             self.assertEqual(response.media_type, "audio/wav")
 
     def test_tiger_dnr_unpacks_only_three_named_stems_from_file_reference(self) -> None:
-        with load_service("TIGER-DnR") as module:
+        with load_service("separate_tiger-dnr") as module:
             self.select_localai(module, "llm-local.tiger-dnr.worker.v1")
             archive = Path(self.temporary.name) / "tiger.zip"
             with zipfile.ZipFile(archive, "w") as worker_archive:
@@ -197,7 +197,7 @@ class LocalAIWorkerServiceRouteTests(unittest.TestCase):
             module.manager.cleanup_worker_outputs(outputs)
 
     def test_tiger_dnr_rejects_unexpected_zip_entries(self) -> None:
-        with load_service("TIGER-DnR") as module:
+        with load_service("separate_tiger-dnr") as module:
             self.select_localai(module, "llm-local.tiger-dnr.worker.v1")
             archive = Path(self.temporary.name) / "bad-tiger.zip"
             with zipfile.ZipFile(archive, "w") as worker_archive:

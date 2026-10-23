@@ -61,8 +61,8 @@ qwen_test*.wav
 synth*.wav
 *.tmp.wav
 空间音频讨论/output/
-model-audio/steam_audio_renderer/build/
-model-audio/steam_audio_renderer/sdk/
+model-audio/spatial_steam-audio/build/
+model-audio/spatial_steam-audio/sdk/
 
 # Third-party source clones and side-loaded Python packages
 vendor/

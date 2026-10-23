@@ -18,7 +18,7 @@
 统一启动不会安装依赖；从仓库根目录提前同步需要的服务，例如：
 
 ```bash
-uv sync --project model-audio/qwen3_tts --locked
+uv sync --project model-audio/clone_qwen3-tts-1.7b-base --locked
 uv sync --project qa --locked
 ```
 
@@ -79,7 +79,7 @@ uv run --project qa --locked ruff format --check main llm_local_runtime tests
 ```bash
 bash -n start.sh
 uv run --project qa --locked python -m unittest discover -s tests -v
-(cd model-audio/ace_step_1_5 && uv run --project ../../qa --locked python -m unittest discover -s tests -v)
+(cd model-audio/music_ace-step-1.5 && uv run --project ../../qa --locked python -m unittest discover -s tests -v)
 ```
 
 FastAPI TestClient 回归依赖 QA 的 `httpx2` 兼容组合；不得恢复已弃用的旧客户端版本。

@@ -25,17 +25,17 @@ export PYTHONPATH="$LLM_LOCAL_RUNTIME_SRC:$INFERENCE_GATEWAY_SRC:$LOCALAI_WORKER
 STORAGE_DIR="${STORAGE_DIR:-$PROJECT_DIR/storage}"
 export STORAGE_DIR
 # 控制面 wrapper 使用 Qwen3-TTS 的 uv 环境；重型 worker 使用各自项目环境。
-QWEN3_TTS_PROJECT_DIR="${QWEN3_TTS_PROJECT_DIR:-$PROJECT_DIR/model-audio/qwen3_tts}"
-QWEN3_VOICEDESIGN_PROJECT_DIR="${QWEN3_VOICEDESIGN_PROJECT_DIR:-$PROJECT_DIR/model-audio/qwen3_voiceDesign}"
-CONFUCIUS4_TTS_PROJECT_DIR="${CONFUCIUS4_TTS_PROJECT_DIR:-$PROJECT_DIR/model-audio/Confucius4_TTS}"
-QWEN3_ASR_PROJECT_DIR="${QWEN3_ASR_PROJECT_DIR:-$PROJECT_DIR/model-audio/Qwen3_ASR_1.7B}"
-ACESTEP_PROJECT_DIR="${ACESTEP_PROJECT_DIR:-$PROJECT_DIR/model-audio/ace_step_1_5}"
-YUE2_3B_PROJECT_DIR="${YUE2_3B_PROJECT_DIR:-$PROJECT_DIR/model-audio/YuE2-3B}"
-SHEETSAGE2_PROJECT_DIR="${SHEETSAGE2_PROJECT_DIR:-$PROJECT_DIR/model-audio/SheetSage2}"
-YUE2_VAE_PROJECT_DIR="${YUE2_VAE_PROJECT_DIR:-$PROJECT_DIR/model-audio/YuE2-Vae}"
-MERT_V2_FULLSONG_PROJECT_DIR="${MERT_V2_FULLSONG_PROJECT_DIR:-$PROJECT_DIR/model-audio/MERT-v2-FullSong}"
-VOXCPM2_PROJECT_DIR="${VOXCPM2_PROJECT_DIR:-$PROJECT_DIR/model-audio/voxcpm2}"
-TIGER_DNR_PROJECT_DIR="${TIGER_DNR_PROJECT_DIR:-$PROJECT_DIR/model-audio/TIGER-DnR}"
+QWEN3_TTS_PROJECT_DIR="${QWEN3_TTS_PROJECT_DIR:-$PROJECT_DIR/model-audio/clone_qwen3-tts-1.7b-base}"
+QWEN3_VOICEDESIGN_PROJECT_DIR="${QWEN3_VOICEDESIGN_PROJECT_DIR:-$PROJECT_DIR/model-audio/design_qwen3-tts-1.7b-voicedesign}"
+CONFUCIUS4_TTS_PROJECT_DIR="${CONFUCIUS4_TTS_PROJECT_DIR:-$PROJECT_DIR/model-audio/clone_confucius-4}"
+QWEN3_ASR_PROJECT_DIR="${QWEN3_ASR_PROJECT_DIR:-$PROJECT_DIR/model-audio/transcribe_qwen3-asr-1.7b}"
+ACESTEP_PROJECT_DIR="${ACESTEP_PROJECT_DIR:-$PROJECT_DIR/model-audio/music_ace-step-1.5}"
+YUE2_3B_PROJECT_DIR="${YUE2_3B_PROJECT_DIR:-$PROJECT_DIR/model-audio/music_yue2-3b}"
+SHEETSAGE2_PROJECT_DIR="${SHEETSAGE2_PROJECT_DIR:-$PROJECT_DIR/model-audio/score_sheetsage-2}"
+YUE2_VAE_PROJECT_DIR="${YUE2_VAE_PROJECT_DIR:-$PROJECT_DIR/model-audio/codec_yue2-vae}"
+MERT_V2_FULLSONG_PROJECT_DIR="${MERT_V2_FULLSONG_PROJECT_DIR:-$PROJECT_DIR/model-audio/embedding_mert-v2-fullsong}"
+VOXCPM2_PROJECT_DIR="${VOXCPM2_PROJECT_DIR:-$PROJECT_DIR/model-audio/clone_voxcpm-2}"
+TIGER_DNR_PROJECT_DIR="${TIGER_DNR_PROJECT_DIR:-$PROJECT_DIR/model-audio/separate_tiger-dnr}"
 
 export HF_MIRROR_DIR="${HF_MIRROR_DIR:-$HOME/hf-mirror}"
 export QWEN_VOICEDESIGN_MODEL_DIR="${QWEN_VOICEDESIGN_MODEL_DIR:-$HF_MIRROR_DIR/Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign}"
@@ -110,7 +110,7 @@ export SPATIAL_EXPORT_MAX_BYTES="${SPATIAL_EXPORT_MAX_BYTES:-536870912}"
 export SPATIAL_EXPORT_TIMEOUT="${SPATIAL_EXPORT_TIMEOUT:-600}"
 export SPATIAL_EXPORT_FFMPEG_BIN="${SPATIAL_EXPORT_FFMPEG_BIN:-ffmpeg}"
 export STEAM_AUDIO_RENDER_CACHE_DIR="${STEAM_AUDIO_RENDER_CACHE_DIR:-$RUNTIME_CACHE_DIR/steam_audio_renders}"
-export STEAM_AUDIO_RENDERER_BIN="${STEAM_AUDIO_RENDERER_BIN:-$PROJECT_DIR/model-audio/steam_audio_renderer/build/steam-audio-render}"
+export STEAM_AUDIO_RENDERER_BIN="${STEAM_AUDIO_RENDERER_BIN:-$PROJECT_DIR/model-audio/spatial_steam-audio/build/steam-audio-render}"
 export STEAM_AUDIO_SDK_DIR="${STEAM_AUDIO_SDK_DIR:-$HOME/.local/share/steam-audio/4.8.1}"
 export STEAM_AUDIO_HRTF_PATH="${STEAM_AUDIO_HRTF_PATH:-}"
 export STEAM_AUDIO_RENDER_TIMEOUT="${STEAM_AUDIO_RENDER_TIMEOUT:-900}"
@@ -120,9 +120,9 @@ export STEAM_AUDIO_RENDER_MAX_BYTES="${STEAM_AUDIO_RENDER_MAX_BYTES:-2147483648}
 export STEAM_AUDIO_RENDER_THREADS="${STEAM_AUDIO_RENDER_THREADS:-4}"
 export GPU_LOCK_FILE="${GPU_LOCK_FILE:-$RUNTIME_CACHE_DIR/gpu-runtime.lock}"
 export LOCAL_FILES_ONLY="${LOCAL_FILES_ONLY:-1}"
-# 集中在 model-audio/qwen3_tts/main.py；
+# 集中在 model-audio/clone_qwen3-tts-1.7b-base/main.py；
 # 此处只保留环境、模型路径等启动路由配置，避免覆盖 API 内可直接调试的值。
-# VoxCPM2 的默认生成参数集中在 model-audio/voxcpm2/main.py；此处不再写入默认值，
+# VoxCPM2 的默认生成参数集中在 model-audio/clone_voxcpm-2/main.py；此处不再写入默认值，
 # 因此直接修改 API 顶部常量即可生效。外部显式设置的 VOXCPM2_* 环境变量会原样继承并覆盖 API 默认值。
 # VoxCPM2 只使用仓库内独立 uv 项目，旧 Conda wrapper 已移除。
 export QWEN3_TTS_USE_QWEN_LIBS="${QWEN3_TTS_USE_QWEN_LIBS:-0}"
@@ -221,7 +221,7 @@ echo "Qwen3-ASR model:                     $QWEN3_ASR_MODEL_DIR"
 echo "VoxCPM2 uv project:  $VOXCPM2_PROJECT_DIR"
 echo "VoxCPM2 model:       $VOXCPM2_MODEL_DIR"
 echo "VoxCPM2 config:      managed by $VOXCPM2_PROJECT_DIR/main.py"
-echo "Qwen3-TTS config:    managed by model-audio/qwen3_tts/main.py"
+echo "Qwen3-TTS config:    managed by model-audio/clone_qwen3-tts-1.7b-base/main.py"
 echo "Qwen sidecar libs:   $QWEN_LIBS"
 echo "LocalAI managed/base URL: $LLM_LOCALAI_MANAGED / $LLM_LOCALAI_BASE_URL"
 echo "Storage root:        $STORAGE_DIR"

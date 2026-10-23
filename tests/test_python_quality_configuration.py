@@ -10,17 +10,17 @@ from pathlib import Path
 
 REPOSITORY_DIR = Path(__file__).resolve().parents[1]
 MODEL_PROJECTS = (
-    "qwen3_tts",
-    "voxcpm2",
-    "ace_step_1_5",
-    "qwen3_voiceDesign",
-    "Confucius4_TTS",
-    "YuE2-3B",
-    "SheetSage2",
-    "YuE2-Vae",
-    "MERT-v2-FullSong",
-    "Qwen3_ASR_1.7B",
-    "TIGER-DnR",
+    "clone_qwen3-tts-1.7b-base",
+    "clone_voxcpm-2",
+    "music_ace-step-1.5",
+    "design_qwen3-tts-1.7b-voicedesign",
+    "clone_confucius-4",
+    "music_yue2-3b",
+    "score_sheetsage-2",
+    "codec_yue2-vae",
+    "embedding_mert-v2-fullsong",
+    "transcribe_qwen3-asr-1.7b",
+    "separate_tiger-dnr",
 )
 EXPECTED_RUFF_RULES = {"E", "F", "I", "UP", "B"}
 

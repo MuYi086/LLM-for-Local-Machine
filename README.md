@@ -28,17 +28,17 @@ Base/VoiceDesign 的本地模型候选及五个 one-shot worker bridge。原生 
 | 模型/服务 | 默认端口 | 主业务接口 | 模型原生能力/职责 | 原生输出 |
 | --- | --- | --- | --- | --- |
 | [控制面 `main/`](main/) | 8300 | `GET /v1/control`；`POST /v1/audio/export`；`POST /v1/audio/spatial/render` | 控制、共享上传/检查、CPU 母带与 Steam Audio 空间导出（[源码](main/main.py)） | 非模型服务，响应见下节 |
-| [Qwen3-TTS 1.7B VoiceDesign `model-audio/qwen3_voiceDesign/`](model-audio/qwen3_voiceDesign/) | 8301 | `POST /v1/qwen/timbre` | 根据自然语言音色描述和待朗读文本生成语音，支持音色、情绪和韵律描述（[官方](https://github.com/QwenLM/Qwen3-TTS#voice-design)） | 语音波形 |
-| [ACE-Step 1.5 XL Turbo `model-audio/ace_step_1_5/`](model-audio/ace_step_1_5/) | 8313 | `POST /v1/aceStep/bgm` | 按风格描述和可选音乐元数据生成 BGM；当前接口不接收歌词（[官方](https://huggingface.co/ACE-Step/acestep-v15-xl-turbo-diffusers)） | 音乐波形 |
-| [YuE2-3B `model-audio/YuE2-3B/`](model-audio/YuE2-3B/) | 8314 | `POST /v1/m-a-p/YuE2` | 根据风格、歌词和可选 ABC 乐谱生成带歌声与伴奏的歌曲（[官方](https://huggingface.co/m-a-p/YuE2-3B)） | 48 kHz 立体声音乐波形 |
-| [SheetSage2 `model-audio/SheetSage2/`](model-audio/SheetSage2/) | 8315 | `POST /v1/m-a-p/SheetSage2` | 将音乐转为可编辑乐谱、MIDI、节拍/和弦/调性/结构与时间标注（[官方](https://huggingface.co/m-a-p/SheetSage2)） | ABC、MIDI 与 JSON/LAB 标注 ZIP |
-| [YuE2-Vae `model-audio/YuE2-Vae/`](model-audio/YuE2-Vae/) | 8316 | `POST /v1/m-a-p/YuE2-Vae` | 将 48 kHz 音频编码为 acoustic latent，或将 latent 解码为立体声音乐（[官方](https://huggingface.co/m-a-p/YuE2-Vae)） | `[T,64]` NPY latent 或 48 kHz WAV |
-| [MERT-v2-FullSong `model-audio/MERT-v2-FullSong/`](model-audio/MERT-v2-FullSong/) | 8317 | `POST /v1/m-a-p/MERT-v2-FullSong` | 为 30–360 秒完整歌曲提取 MERT-v2 逐帧特征和整曲表征（[官方](https://huggingface.co/m-a-p/MERT-v2-FullSong)） | 1024 维 JSON embedding 或 25 Hz 特征 NPZ |
-| [Qwen3-TTS 1.7B Base `model-audio/qwen3_tts/`](model-audio/qwen3_tts/) | 8321 | `POST /v1/qwen/clone` | 参考音频条件下的零样本音色克隆与多语言 TTS（[官方](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-Base)） | 语音波形 |
-| [VoxCPM2 `model-audio/voxcpm2/`](model-audio/voxcpm2/) | 8322 | `POST /v1/voxcpm2/clone` | 30 语种 TTS、文本描述音色设计、参考音频克隆，以及带风格指令的可控克隆（[官方](https://huggingface.co/openbmb/VoxCPM2)） | 语音波形 |
-| [TIGER-DnR `model-audio/TIGER-DnR/`](model-audio/TIGER-DnR/) | 8351 | `POST /v1/tigerDnr/separate` | 将混音分离为对白、音效、音乐三路 Stem（[官方推理](https://github.com/JusperLee/TIGER/blob/main/inference_dnr.py)） | 三路音频波形 |
-| [Confucius4-TTS `model-audio/Confucius4_TTS/`](model-audio/Confucius4_TTS/) | 8361 | `POST /v1/confucius4TTS/generate` | 无需参考转写的零样本克隆与跨语言 TTS，支持 14 语种及参考音频的情感迁移（[官方](https://huggingface.co/netease-youdao/Confucius4-TTS)） | 语音波形 |
-| [Qwen3-ASR-1.7B `model-audio/Qwen3_ASR_1.7B/`](model-audio/Qwen3_ASR_1.7B/) | 8371 | `POST /v1/qwen3/asr` | 语种识别与语音转写，支持 30 种语言和 22 种中文方言（[官方](https://huggingface.co/Qwen/Qwen3-ASR-1.7B)） | 转写文本与语种 |
+| [Qwen3-TTS 1.7B VoiceDesign `model-audio/design_qwen3-tts-1.7b-voicedesign/`](model-audio/design_qwen3-tts-1.7b-voicedesign/) | 8301 | `POST /v1/qwen/timbre` | 根据自然语言音色描述和待朗读文本生成语音，支持音色、情绪和韵律描述（[官方](https://github.com/QwenLM/Qwen3-TTS#voice-design)） | 语音波形 |
+| [ACE-Step 1.5 XL Turbo `model-audio/music_ace-step-1.5/`](model-audio/music_ace-step-1.5/) | 8313 | `POST /v1/aceStep/bgm` | 按风格描述和可选音乐元数据生成 BGM；当前接口不接收歌词（[官方](https://huggingface.co/ACE-Step/acestep-v15-xl-turbo-diffusers)） | 音乐波形 |
+| [YuE2-3B `model-audio/music_yue2-3b/`](model-audio/music_yue2-3b/) | 8314 | `POST /v1/m-a-p/YuE2` | 根据风格、歌词和可选 ABC 乐谱生成带歌声与伴奏的歌曲（[官方](https://huggingface.co/m-a-p/YuE2-3B)） | 48 kHz 立体声音乐波形 |
+| [SheetSage2 `model-audio/score_sheetsage-2/`](model-audio/score_sheetsage-2/) | 8315 | `POST /v1/m-a-p/SheetSage2` | 将音乐转为可编辑乐谱、MIDI、节拍/和弦/调性/结构与时间标注（[官方](https://huggingface.co/m-a-p/SheetSage2)） | ABC、MIDI 与 JSON/LAB 标注 ZIP |
+| [YuE2-Vae `model-audio/codec_yue2-vae/`](model-audio/codec_yue2-vae/) | 8316 | `POST /v1/m-a-p/YuE2-Vae` | 将 48 kHz 音频编码为 acoustic latent，或将 latent 解码为立体声音乐（[官方](https://huggingface.co/m-a-p/YuE2-Vae)） | `[T,64]` NPY latent 或 48 kHz WAV |
+| [MERT-v2-FullSong `model-audio/embedding_mert-v2-fullsong/`](model-audio/embedding_mert-v2-fullsong/) | 8317 | `POST /v1/m-a-p/MERT-v2-FullSong` | 为 30–360 秒完整歌曲提取 MERT-v2 逐帧特征和整曲表征（[官方](https://huggingface.co/m-a-p/MERT-v2-FullSong)） | 1024 维 JSON embedding 或 25 Hz 特征 NPZ |
+| [Qwen3-TTS 1.7B Base `model-audio/clone_qwen3-tts-1.7b-base/`](model-audio/clone_qwen3-tts-1.7b-base/) | 8321 | `POST /v1/qwen/clone` | 参考音频条件下的零样本音色克隆与多语言 TTS（[官方](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-Base)） | 语音波形 |
+| [VoxCPM2 `model-audio/clone_voxcpm-2/`](model-audio/clone_voxcpm-2/) | 8322 | `POST /v1/voxcpm2/clone` | 30 语种 TTS、文本描述音色设计、参考音频克隆，以及带风格指令的可控克隆（[官方](https://huggingface.co/openbmb/VoxCPM2)） | 语音波形 |
+| [TIGER-DnR `model-audio/separate_tiger-dnr/`](model-audio/separate_tiger-dnr/) | 8351 | `POST /v1/tigerDnr/separate` | 将混音分离为对白、音效、音乐三路 Stem（[官方推理](https://github.com/JusperLee/TIGER/blob/main/inference_dnr.py)） | 三路音频波形 |
+| [Confucius4-TTS `model-audio/clone_confucius-4/`](model-audio/clone_confucius-4/) | 8361 | `POST /v1/confucius4TTS/generate` | 无需参考转写的零样本克隆与跨语言 TTS，支持 14 语种及参考音频的情感迁移（[官方](https://huggingface.co/netease-youdao/Confucius4-TTS)） | 语音波形 |
+| [Qwen3-ASR-1.7B `model-audio/transcribe_qwen3-asr-1.7b/`](model-audio/transcribe_qwen3-asr-1.7b/) | 8371 | `POST /v1/qwen3/asr` | 语种识别与语音转写，支持 30 种语言和 22 种中文方言（[官方](https://huggingface.co/Qwen/Qwen3-ASR-1.7B)） | 转写文本与语种 |
 
 Demo 调用对应端口并保存服务原始输出；
 都支持 `--check-only`，仅检查输入和原生服务健康状态。条件缺失时明确跳过，不写生成产物。
@@ -71,32 +71,35 @@ VoxCPM2 可控克隆使用 `control_instruction`。
 
 ## 目录与运行数据
 
+模型目录按 `功能词_模型名-版本` 命名，例如 `music_ace-step-1.5`。功能词速查见
+[音频目录说明](model-audio/README.md)和[视频目录说明](model-video/README.md)。
+
 ```text
-main/                         8300 控制面，不包含模型推理
-model-audio/                  当前维护的音频模型服务、worker 与 renderer
-model-audio/steam_audio_renderer/         独立 C++17 Steam Audio CPU renderer
-model-audio/qwen3_tts/                    Qwen3-TTS Base 的 HTTP 服务和 worker
-model-audio/voxcpm2/                      VoxCPM2 的 HTTP 服务和克隆 worker
-model-audio/ace_step_1_5/                  ACE-Step 1.5 BGM 服务和 worker
-model-audio/YuE2-3B/                       YuE2-3B 歌曲生成服务和一次性 worker
-model-audio/SheetSage2/                    SheetSage2 音乐转谱服务和一次性 worker
-model-audio/YuE2-Vae/                      YuE2 acoustic latent 编码/解码服务和一次性 worker
-model-audio/MERT-v2-FullSong/              MERT-v2-FullSong 音乐表征服务和一次性 worker
-model-audio/qwen3_voiceDesign/            Qwen VoiceDesign 服务和 worker
-model-audio/Confucius4_TTS/               Confucius4-TTS 服务和一次性 worker
-model-audio/TIGER-DnR/                    TIGER-DnR 三 Stem 分离服务和 worker
-model-audio/Qwen3_ASR_1.7B/               Qwen3-ASR-1.7B 语音识别服务和 worker
-model-text/                   有声书纯文本润色训练实验
-model-image/                  预留图像模型目录
-model-video/                  视频模型分类；当前无维护中的视频 HTTP 服务
-tests/                        根目录无模型回归测试
-qa/                           锁定的轻量测试与 Ruff 环境，不安装模型依赖
-llm_local_runtime/              共享流式上传、引用存储、GPU 队列与容量工具
-scripts/                      质量门禁与 renderer 构建工具
-model-text/scripts/training/  有声书纯文本润色训练辅助工具
-model-text/training/configs/  有声书纯文本润色 LoRA 的实验配置
-docs/                         Python 工程规范
-storage/                      上传素材、生成音视频、sidecar、训练产物、缓存和 GPU 锁
+main/                                            8300 控制面，不包含模型推理
+model-audio/                                     当前维护的音频模型服务、worker 与 renderer
+model-audio/spatial_steam-audio/                 独立 C++17 Steam Audio CPU renderer
+model-audio/clone_qwen3-tts-1.7b-base/           Qwen3-TTS Base 的 HTTP 服务和 worker
+model-audio/clone_voxcpm-2/                      VoxCPM2 的 HTTP 服务和克隆 worker
+model-audio/music_ace-step-1.5/                  ACE-Step 1.5 BGM 服务和 worker
+model-audio/music_yue2-3b/                       YuE2-3B 歌曲生成服务和一次性 worker
+model-audio/score_sheetsage-2/                   SheetSage2 音乐转谱服务和一次性 worker
+model-audio/codec_yue2-vae/                      YuE2 acoustic latent 编码/解码服务和一次性 worker
+model-audio/embedding_mert-v2-fullsong/          MERT-v2-FullSong 音乐表征服务和一次性 worker
+model-audio/design_qwen3-tts-1.7b-voicedesign/   Qwen VoiceDesign 服务和 worker
+model-audio/clone_confucius-4/                   Confucius4-TTS 服务和一次性 worker
+model-audio/separate_tiger-dnr/                  TIGER-DnR 三 Stem 分离服务和 worker
+model-audio/transcribe_qwen3-asr-1.7b/           Qwen3-ASR-1.7B 语音识别服务和 worker
+model-text/                                      有声书纯文本润色训练实验
+model-image/                                     预留图像模型目录
+model-video/                                     视频模型分类；当前无维护中的视频 HTTP 服务
+tests/                                           根目录无模型回归测试
+qa/                                              锁定的轻量测试与 Ruff 环境，不安装模型依赖
+llm_local_runtime/                               共享流式上传、引用存储、GPU 队列与容量工具
+scripts/                                         质量门禁与 renderer 构建工具
+model-text/scripts/training/                     有声书纯文本润色训练辅助工具
+model-text/training/configs/                     有声书纯文本润色 LoRA 的实验配置
+docs/                                            Python 工程规范
+storage/                                         上传素材、生成音视频、sidecar、训练产物、缓存和 GPU 锁
 ```
 
 根目录的 `流行*模型功能简介.md` 是调研资料，`空间音频讨论/` 是方案与验收记录，
@@ -150,9 +153,9 @@ cd LLM-for-Local-Machine
 先为需要的服务同步锁定依赖；部署全部服务时可以执行：
 
 ```bash
-for project in model-audio/qwen3_tts model-audio/voxcpm2 model-audio/ace_step_1_5 model-audio/YuE2-3B \
-  model-audio/SheetSage2 model-audio/YuE2-Vae model-audio/MERT-v2-FullSong \
-  model-audio/qwen3_voiceDesign model-audio/Confucius4_TTS model-audio/Qwen3_ASR_1.7B model-audio/TIGER-DnR; do
+for project in model-audio/clone_qwen3-tts-1.7b-base model-audio/clone_voxcpm-2 model-audio/music_ace-step-1.5 model-audio/music_yue2-3b \
+  model-audio/score_sheetsage-2 model-audio/codec_yue2-vae model-audio/embedding_mert-v2-fullsong \
+  model-audio/design_qwen3-tts-1.7b-voicedesign model-audio/clone_confucius-4 model-audio/transcribe_qwen3-asr-1.7b model-audio/separate_tiger-dnr; do
   uv sync --project "$project" --locked
 done
 ```
@@ -165,19 +168,19 @@ YuE2-3B 使用官方 `yue2_infer` 0.1.5 wheel 和 PyTorch 2.10；MOT 与 `YuE2-V
 
 YuE2-Vae 独立项目使用官方 `AutoModel` remote code，依赖 PyTorch 2.10、Transformers 4.57.6、
 NumPy 2.2.6 与 SoundFile。准备 `m-a-p/YuE2-Vae` 本地快照后执行
-`uv sync --project model-audio/YuE2-Vae --locked`。`POST /v1/m-a-p/YuE2-Vae` 的
+`uv sync --project model-audio/codec_yue2-vae --locked`。`POST /v1/m-a-p/YuE2-Vae` 的
 `operation=decode` 接收 `latent=@latent.npy` 并返回 48 kHz WAV；
 `operation=encode` 接收 `audio=@song.wav` 并返回 `[T,64]` NPY。音频由 FFmpeg
 转换为 48 kHz 双声道；VAE 使用 FP32 与官方 `decode_tiled` 分块解码。
 
 SheetSage2 使用 `transformers` 官方 `AutoModel` 调用及一次性 worker。请按模型卡准备
 SheetSage2 与其配置固定 revision 的 MERT-v2-FullSong 两个本地目录，再执行
-`uv sync --project model-audio/SheetSage2 --locked`。服务默认使用 BF16 推理和 SheetSage2 `default`
+`uv sync --project model-audio/score_sheetsage-2 --locked`。服务默认使用 BF16 推理和 SheetSage2 `default`
 preset，FFmpeg 解码上传音频；转写结果 ZIP 原子保存到 `storage/sheetsage2/`。
 
 MERT-v2-FullSong 有独立服务项目，使用模型卡测试过的 PyTorch/Torchaudio 2.6.0 与
 Transformers 4.53.2。模型代码、processor 和权重来自 `$HF_MIRROR_DIR/m-a-p/MERT-v2-FullSong`；
-执行 `uv sync --project model-audio/MERT-v2-FullSong --locked` 后由本服务自己的 worker 加载，和 SheetSage2
+执行 `uv sync --project model-audio/embedding_mert-v2-fullsong --locked` 后由本服务自己的 worker 加载，和 SheetSage2
 使用不同的 uv 环境。
 
 默认情况下 `LOCAL_FILES_ONLY=1`，本地 worker 不会从 Hugging Face 下载权重。确认模型、
@@ -188,7 +191,7 @@ bash start.sh
 ```
 
 `start.sh` 会启动 8300、8301、8313、8314、8315、8316、8317、8321、8322、8351、8361 和 8371，
-共 12 个进程；8300 使用 `model-audio/qwen3_tts` uv 项目中的轻量 HTTP 依赖，其余服务使用
+共 12 个进程；8300 使用 `model-audio/clone_qwen3-tts-1.7b-base` uv 项目中的轻量 HTTP 依赖，其余服务使用
 各自的 uv 项目。启动命令统一使用 `uv run --no-sync`，不会在运行阶段联网解析依赖；
 本地 GPU 服务通过 `GPU_LOCK_FILE` 串行访问 GPU。默认最多排队 900 秒，超过时返回
 `503`；用正数 `GPU_LOCK_WAIT_TIMEOUT` 调整。共享锁实现仍兼容非正值无限等待，
@@ -322,7 +325,7 @@ done
 
 ```bash
 HOST=127.0.0.1 PORT=8321 \
-  uv run --no-sync --project model-audio/qwen3_tts python model-audio/qwen3_tts/main.py
+  uv run --no-sync --project model-audio/clone_qwen3-tts-1.7b-base python model-audio/clone_qwen3-tts-1.7b-base/main.py
 ```
 
 统一脚本没有按模型启停的开关；只部署部分模型时，准备并直接启动相应目录。
@@ -342,7 +345,7 @@ HOST=127.0.0.1 PORT=8321 \
 | YuE2-Vae | `$HF_MIRROR_DIR/m-a-p/YuE2-Vae` | `YUE2_VAE_MODEL_DIR`、`YUE2_VAE_OUTPUT_DIR`、`YUE2_VAE_DEVICE`、`YUE2_VAE_REQUEST_TIMEOUT`、`YUE2_VAE_MAX_AUDIO_SECONDS` |
 | SheetSage2 | `$HF_MIRROR_DIR/m-a-p/SheetSage2` 与 `$HF_MIRROR_DIR/m-a-p/MERT-v2-FullSong` | `SHEETSAGE2_MODEL_DIR`、`SHEETSAGE2_BASE_MODEL_DIR`、`SHEETSAGE2_OUTPUT_DIR`、`SHEETSAGE2_DEVICE`、`SHEETSAGE2_DTYPE`、`SHEETSAGE2_PRESET`、`SHEETSAGE2_REQUEST_TIMEOUT` |
 | MERT-v2-FullSong | `$HF_MIRROR_DIR/m-a-p/MERT-v2-FullSong` | `MERT_V2_FULLSONG_MODEL_DIR`、`MERT_V2_FULLSONG_OUTPUT_DIR`、`MERT_V2_FULLSONG_DEVICE`、`MERT_V2_FULLSONG_REQUEST_TIMEOUT` |
-| VoxCPM2 | `$HF_MIRROR_DIR/openbmb/VoxCPM2` | `VOXCPM2_MODEL_DIR`、仓库内 `model-audio/voxcpm2/voxcpm2_helpers.py` |
+| VoxCPM2 | `$HF_MIRROR_DIR/openbmb/VoxCPM2` | `VOXCPM2_MODEL_DIR`、仓库内 `model-audio/clone_voxcpm-2/voxcpm2_helpers.py` |
 | TIGER-DnR | `$HF_MIRROR_DIR/JusperLee/TIGER-DnR` | `TIGER_DNR_MODEL_DIR`、`TIGER_DNR_SOURCE_DIR` |
 
 仓库外推理源码的默认位置如下，须在请求前准备；`start.sh` 不负责拉取源码：
@@ -582,8 +585,8 @@ STEAM_AUDIO_SDK_DIR=/opt/steam-audio bash scripts/build_steam_audio_renderer.sh
 
 Windows PowerShell 先设置 `$env:STEAM_AUDIO_SDK_DIR = "C:\\steam-audio"`，再运行
 `.\scripts\build_steam_audio_renderer.ps1`。默认可执行文件为
-`model-audio/steam_audio_renderer/build/steam-audio-render`（Windows 为
-`model-audio/steam_audio_renderer/build/Release/steam-audio-render.exe`）。可选
+`model-audio/spatial_steam-audio/build/steam-audio-render`（Windows 为
+`model-audio/spatial_steam-audio/build/Release/steam-audio-render.exe`）。可选
 `STEAM_AUDIO_HRTF_PATH` 指向 SOFA 文件；不设置时使用 SDK 内置 HRTF。`start.sh` 若发现可执行
 文件缺失会告警但仍启动既有服务，正式路由返回 `503`；`GET /v1/control` 的
 `spatial_renderer` 会报告 executable、SDK header/library、HRTF 和 GPU-lock 状态。
@@ -675,7 +678,7 @@ curl -X POST http://127.0.0.1:8313/v1/aceStep/bgm \
 依赖再启动：
 
 ```bash
-uv sync --project model-audio/ace_step_1_5 --locked
+uv sync --project model-audio/music_ace-step-1.5 --locked
 ```
 
 本仓库的 `start.sh` 对 ACE-Step 使用 `uv run --no-sync`，不会在启动时安装依赖。
@@ -704,7 +707,7 @@ curl -X POST http://127.0.0.1:8314/v1/m-a-p/YuE2 \
 先同步该项目锁定环境，再准备模型文件：
 
 ```bash
-uv sync --project model-audio/YuE2-3B --locked
+uv sync --project model-audio/music_yue2-3b --locked
 ```
 
 运行依赖固定 PyTorch `2.10.0` 和 Transformers `4.57.6`。官方 `yue2_infer` `0.1.5` wheel
@@ -742,7 +745,7 @@ GPU；请求音频临时文件会删除，生成 ZIP 保留在 `SHEETSAGE2_OUTPU
 不会自动清理这些 ZIP。
 
 SheetSage2 固定 `pretty-midi==0.2.10`，其运行时依赖 `pkg_resources`，因此同时固定
-`setuptools==80.10.2`。更新环境时使用 `uv sync --project model-audio/SheetSage2 --locked`，
+`setuptools==80.10.2`。更新环境时使用 `uv sync --project model-audio/score_sheetsage-2 --locked`，
 避免仅安装新版 setuptools 导致转谱阶段出现 `No module named 'pkg_resources'`。
 健康检查会报告该传递依赖是否可用；更改服务代码后需重启对应 HTTP 进程使检查生效。
 
@@ -855,8 +858,8 @@ adapter、数据集和预测都写入 `storage/training/`，不提交到 Git。
   ```bash
   export STORAGE_RETENTION_HOURS=168
   # 先预览，再显式确认删除；脚本只匹配已知的生成文件前缀。
-  uv run --project model-audio/qwen3_tts python main/storage_maintenance.py
-  uv run --project model-audio/qwen3_tts python main/storage_maintenance.py --apply
+  uv run --project model-audio/clone_qwen3-tts-1.7b-base python main/storage_maintenance.py
+  uv run --project model-audio/clone_qwen3-tts-1.7b-base python main/storage_maintenance.py --apply
   ```
 
 维护脚本处理默认音色、克隆和 BGM 目录中列出的生成 WAV 前缀：Qwen VoiceDesign、Qwen3-TTS/VoxCPM2、ACE-Step 与 YuE2-3B。它保护普通上传和仍被 .references 引用的音色，但尚不清理 Confucius4-TTS、SheetSage2 ZIP、YuE2-Vae latent/WAV、MERT-v2-FullSong JSON/NPZ、TIGER 分离批次或训练产物，也不自动遍历每个自定义输出目录。STORAGE_RETENTION_MAX_BYTES 只约束这些匹配的生成 WAV，不限制整个 storage/。修改输出目录时需同步考虑维护脚本的扫描范围。
@@ -883,7 +886,7 @@ GitHub Actions 使用同一脚本；需要 `uv` 和 `g++`，不需要 CUDA 或 S
 ```bash
 uv sync --project qa --locked
 uv run --project qa --locked python -m unittest discover -s tests -v
-(cd model-audio/ace_step_1_5 && uv run --project ../../qa --locked python -m unittest discover -s tests -v)
+(cd model-audio/music_ace-step-1.5 && uv run --project ../../qa --locked python -m unittest discover -s tests -v)
 ```
 
 FastAPI TestClient 回归使用 QA 的 `httpx2` 兼容依赖。不得为无模型测试安装整套模型环境或
@@ -897,7 +900,7 @@ FastAPI TestClient 回归使用 QA 的 `httpx2` 兼容依赖。不得为无模�
 测试，并在 README 中更新兼容字段。不要提交模型权重、上传音频、生成 WAV、缓存、虚拟
 环境、密钥或机器专用绝对路径。
 
-模型专用说明见 [ACE-Step](model-audio/ace_step_1_5/README.md) 与 [Steam Audio renderer](model-audio/steam_audio_renderer/README.md)。
+模型专用说明见 [ACE-Step](model-audio/music_ace-step-1.5/README.md) 与 [Steam Audio renderer](model-audio/spatial_steam-audio/README.md)。
 子目录中的迁移记录和本机实验描述仅作背景，部署命令、服务清单与测试环境以本 README
 和实际代码为准。贡献规则见 [AGENTS.md](AGENTS.md)，中文文档要求见
 [CONSTITUTION.md](CONSTITUTION.md)。

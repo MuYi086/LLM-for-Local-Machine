@@ -360,7 +360,7 @@ class LocalAIManagerTests(unittest.TestCase):
                     worker.wait(timeout=2)
 
     def test_manager_reaps_tagged_descendant_after_worker_parent_exits(self) -> None:
-        worker_script = REPOSITORY_DIR / "model-audio/SheetSage2/worker.py"
+        worker_script = REPOSITORY_DIR / "model-audio/score_sheetsage-2/worker.py"
         descendant = subprocess.Popen(
             [sys.executable, "-c", "import time; time.sleep(60)"],
             env={

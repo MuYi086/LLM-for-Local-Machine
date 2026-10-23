@@ -16,7 +16,7 @@ from unittest.mock import Mock, patch
 from fastapi.testclient import TestClient
 
 REPOSITORY_DIR = Path(__file__).resolve().parents[1]
-SERVICE_DIR = REPOSITORY_DIR / "model-audio" / "YuE2-Vae"
+SERVICE_DIR = REPOSITORY_DIR / "model-audio" / "codec_yue2-vae"
 TEST_ROOT = Path()
 
 
@@ -316,9 +316,9 @@ class YuE2VaeServiceTests(unittest.TestCase):
         self.assertIn('YUE2_VAE_PORT="' + chr(36) + "{YUE2_VAE_PORT:-8316}", startup)
         self.assertIn('"$YUE2_VAE_PROJECT_DIR"', startup)
         self.assertIn("'/v1/m-a-p/YuE2-Vae'", startup)
-        self.assertIn("YuE2-Vae", quality_gate)
+        self.assertIn("model-audio/codec_yue2-vae", quality_gate)
         self.assertIn("/v1/m-a-p/YuE2-Vae", readme)
-        self.assertIn("model-audio/YuE2-Vae/` | 8316", agent_guide)
+        self.assertIn("model-audio/codec_yue2-vae/` | 8316", agent_guide)
 
 
 if __name__ == "__main__":

@@ -788,7 +788,7 @@ def synthesize_v2(request: Qwen3TtsSynthesizeRequest):
             raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     try:
-        with gpu_runtime_lock("model-audio/qwen3_tts/synthesize"):
+        with gpu_runtime_lock("model-audio/clone_qwen3-tts-1.7b-base/synthesize"):
             with manager.lock:
                 try:
                     manager.last_output_path = None

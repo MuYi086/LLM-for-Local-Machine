@@ -16,7 +16,7 @@ from unittest.mock import Mock, patch
 from fastapi.testclient import TestClient
 
 REPOSITORY_DIR = Path(__file__).resolve().parents[1]
-SERVICE_DIR = REPOSITORY_DIR / "model-audio" / "MERT-v2-FullSong"
+SERVICE_DIR = REPOSITORY_DIR / "model-audio" / "embedding_mert-v2-fullsong"
 TEST_ROOT = Path()
 
 
@@ -334,9 +334,9 @@ class MertV2FullSongServiceTests(unittest.TestCase):
         self.assertIn('MERT_V2_FULLSONG_PORT="${MERT_V2_FULLSONG_PORT:-8317}"', startup)
         self.assertIn('setsid uv run --no-sync --project "$MERT_V2_FULLSONG_PROJECT_DIR"', startup)
         self.assertIn("'/v1/m-a-p/MERT-v2-FullSong'", startup)
-        self.assertIn("MERT-v2-FullSong", quality_gate)
+        self.assertIn("model-audio/embedding_mert-v2-fullsong", quality_gate)
         self.assertIn("/v1/m-a-p/MERT-v2-FullSong", readme)
-        self.assertIn("model-audio/MERT-v2-FullSong/` | 8317", agent_guide)
+        self.assertIn("model-audio/embedding_mert-v2-fullsong/` | 8317", agent_guide)
         self.assertEqual(startup.count("setsid uv run --no-sync --project"), 12)
         self.assertIn('requires-python = "==3.12.13"', project)
         self.assertIn('name = "mert-v2-fullsong-service"', project)

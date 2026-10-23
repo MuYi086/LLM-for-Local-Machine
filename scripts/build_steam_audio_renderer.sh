@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SOURCE_DIR="$PROJECT_DIR/model-audio/steam_audio_renderer"
+SOURCE_DIR="$PROJECT_DIR/model-audio/spatial_steam-audio"
 BUILD_DIR="${STEAM_AUDIO_RENDERER_BUILD_DIR:-$SOURCE_DIR/build}"
 STEAM_AUDIO_SDK_DIR="${STEAM_AUDIO_SDK_DIR:-$HOME/.local/share/steam-audio/4.8.1}"
 export STEAM_AUDIO_SDK_DIR

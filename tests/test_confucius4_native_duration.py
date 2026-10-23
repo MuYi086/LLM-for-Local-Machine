@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
-WORKER_PATH = Path(__file__).parents[1] / "model-audio" / "Confucius4_TTS" / "worker.py"
+WORKER_PATH = Path(__file__).parents[1] / "model-audio" / "clone_confucius-4" / "worker.py"
 spec = importlib.util.spec_from_file_location("confucius4_native_duration_worker", WORKER_PATH)
 assert spec and spec.loader
 worker = importlib.util.module_from_spec(spec)

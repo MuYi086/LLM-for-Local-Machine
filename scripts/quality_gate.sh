@@ -9,10 +9,10 @@ bash -n start.sh
 bash scripts/test_steam_audio_renderer_core.sh
 
 service_projects=(
-    model-audio/qwen3_tts model-audio/voxcpm2 model-audio/ace_step_1_5 model-audio/YuE2-3B
-    model-audio/SheetSage2 model-audio/YuE2-Vae model-audio/MERT-v2-FullSong
-    model-audio/qwen3_voiceDesign model-audio/Confucius4_TTS model-audio/Qwen3_ASR_1.7B
-    model-audio/TIGER-DnR
+    model-audio/clone_qwen3-tts-1.7b-base model-audio/clone_voxcpm-2 model-audio/music_ace-step-1.5 model-audio/music_yue2-3b
+    model-audio/score_sheetsage-2 model-audio/codec_yue2-vae model-audio/embedding_mert-v2-fullsong
+    model-audio/design_qwen3-tts-1.7b-voicedesign model-audio/clone_confucius-4 model-audio/transcribe_qwen3-asr-1.7b
+    model-audio/separate_tiger-dnr
 )
 
 lock_projects=("${service_projects[@]}" localai_worker_bridge qa)
@@ -35,4 +35,4 @@ uv run --project qa --locked ruff format --check "${lint_paths[@]}"
 
 uv run --project qa --locked python scripts/localai/validate_capabilities.py
 uv run --project qa --locked python -m unittest discover -s tests -v
-(cd model-audio/ace_step_1_5 && uv run --project ../../qa --locked python -m unittest discover -s tests -v)
+(cd model-audio/music_ace-step-1.5 && uv run --project ../../qa --locked python -m unittest discover -s tests -v)

@@ -19,7 +19,7 @@ from unittest.mock import Mock, patch
 from fastapi.testclient import TestClient
 
 REPOSITORY_DIR = Path(__file__).resolve().parents[1]
-SERVICE_DIR = REPOSITORY_DIR / "model-audio" / "SheetSage2"
+SERVICE_DIR = REPOSITORY_DIR / "model-audio" / "score_sheetsage-2"
 TEST_ROOT = Path()
 
 
@@ -332,11 +332,11 @@ class SheetSage2ServiceTests(unittest.TestCase):
         self.assertIn('"$SHEETSAGE2_PROJECT_DIR"', startup)
         self.assertIn("'/v1/m-a-p/SheetSage2'", startup)
         self.assertIn("'/v1/m-a-p/YuE2'", startup)
-        self.assertIn("YuE2-3B", quality_gate)
-        self.assertIn("SheetSage2", quality_gate)
+        self.assertIn("model-audio/music_yue2-3b", quality_gate)
+        self.assertIn("model-audio/score_sheetsage-2", quality_gate)
         self.assertIn("/v1/m-a-p/SheetSage2", readme)
         self.assertIn("/v1/m-a-p/YuE2", readme)
-        self.assertIn("model-audio/SheetSage2/` | 8315", agent_guide)
+        self.assertIn("model-audio/score_sheetsage-2/` | 8315", agent_guide)
 
 
 if __name__ == "__main__":
