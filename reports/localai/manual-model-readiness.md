@@ -1,14 +1,14 @@
 # 本地模型镜像与外部依赖状态
 
-- 检查日期：2026-10-21
+- 检查日期：2026-10-21；MOSS/SoulX 接入状态更新于 2026-10-23
 - 检查根目录：~/hf-mirror
-- 本轮未下载模型或安装 Python 项目依赖。
+- 原始盘点未下载模型；后续接入使用已准备的本地模型，并同步独立项目的锁定依赖。
 - 处理规则：完整模型目录不存在，或服务必需辅助模型缺失时，移除该服务及其运行引用；不保留待下载的缺失模型服务。
-- 当前保留范围：11 个模型服务 uv 项目、1 个控制面，共 12 个 HTTP 进程。
+- 当前保留范围：13 个模型服务 uv 项目、1 个控制面，共 14 个 HTTP 进程。
 
 ## 当前服务模型根目录
 
-下列 11 个服务模型根目录均存在于镜像中。目录存在不等于所有权重、Python 依赖或真实推理已经验收。
+下列 13 个服务模型根目录均存在于镜像中。目录存在不等于所有权重、Python 依赖或真实推理已经验收。
 
 | 服务 | 镜像相对路径 | 目录检查 |
 | --- | --- | --- |
@@ -23,15 +23,15 @@
 | SheetSage2 | m-a-p/SheetSage2 | 存在 |
 | MERT-v2-FullSong | m-a-p/MERT-v2-FullSong | 存在 |
 | TIGER-DnR | JusperLee/TIGER-DnR | 存在 |
+| MOSS-Music-8B-Instruct GGUF | OpenMOSS/moss-music | 存在 |
+| SoulX-FlashHead | Soul-AILab/SoulX-FlashHead-1_3B | 存在；编码器在 Soul-AILab/wav2vec2-base-960h |
 
 ## 已按规则退役
 
 | 功能/制品 | 镜像检查 | 清理结果 |
 | --- | --- | --- |
 | Stable Audio 3 Medium | stabilityai/stable-audio-3-medium 不存在 | 服务目录、路由、worker、启动项、维护前缀和测试已移除 |
-| Ditto | digital-avatar/ditto-talkinghead 不存在 | 服务代码、路由、worker、启动项、维护项和测试已移除；本机忽略的运行环境残余已归入 `model-video/avatar_ditto/` |
 | Seed-VC | 主目录 Plachta/Seed-VC 存在，但必需的 openai/whisper-small 缺失；F0/SVC 另缺 44 kHz BigVGAN 和 RMVPE | 整个服务及 VC/SVC LocalAI 候选已移除 |
-| SoulX-FlashHead | 主目录存在，但必需的 facebook/wav2vec2-base-960h 缺失 | 服务代码、图片上传 API、启动项和 worker bridge 已移除；本机忽略的运行环境残余已归入 `model-video/avatar_soulx-flashhead-1.3b/` |
 | Qwen3-ASR LocalAI Q8 | GGUF 不在 hf-mirror | 只移除 LocalAI provider、候选 YAML、预检和候选测试；原生 Qwen3-ASR 服务保留 |
 | VoxCPM2 LocalAI Q8 | GGUF 不在 hf-mirror | 只移除 LocalAI provider、候选 YAML、预检和候选测试；原生 VoxCPM2 服务保留 |
 | Confucius4-TTS LocalAI GGUF | GGUF 不在 hf-mirror | 只移除 LocalAI provider、候选 YAML、预检和候选测试；原生 Confucius4-TTS 服务保留 |
@@ -65,3 +65,11 @@ LocalAI v4.11.0 二进制和 CUDA audio-cpp backend 已在仓库忽略运行目�
 
 质量门禁只验证锁、静态能力清单、无模型测试、脚本和 C++ 核心逻辑；不会下载模型、执行 CUDA 推理或证明真实输出质量。
 模型加载和端到端输出只在已有本地模型与依赖完整时单独运行。
+
+## SoulX-FlashHead 重新接入
+
+主模型位于 `$HF_MIRROR_DIR/Soul-AILab/SoulX-FlashHead-1_3B`，独立 wav2vec2 编码器
+已补齐至 `$HF_MIRROR_DIR/Soul-AILab/wav2vec2-base-960h`。服务在
+`model-video/avatar_soulx-flashhead-1.3b/` 使用独立 uv 环境、共享 GPU 队列和一次性 worker，
+默认 `8391`，生成接口 `POST /v1/soulX/flashHead`；不新增 LocalAI provider 或 worker bridge。
+文件/依赖检查与无模型合同测试不代替真实视频质量验收。

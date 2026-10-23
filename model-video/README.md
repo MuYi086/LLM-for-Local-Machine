@@ -1,19 +1,20 @@
 # 视频模型
 
-视频相关项目统一归入此目录。目前没有维护中的视频 HTTP 服务；已退役的 SoulX-FlashHead 和 Ditto
-服务源码、启动项与测试已移除，不会由 `start.sh` 启动。
+当前维护 `avatar_soulx-flashhead-1.3b/`，提供 SoulX-FlashHead 图片与音频驱动的人像视频生成。
+默认端口 `8391`，业务接口 `POST /v1/soulX/flashHead`，由根目录 `start.sh` 统一启动。
 
-本机迁入的 `.venv`、缓存和 `__pycache__` 是忽略的旧运行环境残余，不属于可复现的项目源码，
-不会随 Git 提交。以后重新启用视频模型时，应先确认模型及依赖齐全，再在此目录维护服务代码，
-并同步更新 `start.sh`、README、能力清单和质量门禁。
+## 本地依赖与运行
 
-## 本机目录命名
+| 组件 | 默认位置 |
+| --- | --- |
+| Lite/Pro 主模型与对应 VAE | `$HF_MIRROR_DIR/Soul-AILab/SoulX-FlashHead-1_3B/` |
+| facebook/wav2vec2-base-960h 音频编码器 | `$HF_MIRROR_DIR/Soul-AILab/wav2vec2-base-960h/` |
+| 官方源码 | `$HOME/LLM-depency/SoulX-FlashHead/` |
 
-目录沿用 `功能词_模型名-版本`，其中 `avatar` 表示数字人或说话头像生成：
+`HF_MIRROR_DIR` 默认 `~/hf-mirror`。模型和音频编码器均在仓库外，服务不自动下载。
+HTTP 进程只做上传、校验和生命周期管理；模型使用独立 uv 环境，在每个请求的一次性 worker 中加载。
 
-| 本机残余目录 | 原模型 | 用途 |
-| --- | --- | --- |
-| `avatar_ditto/` | Ditto | 音频驱动的说话头像 |
-| `avatar_soulx-flashhead-1.3b/` | SoulX-FlashHead 1.3B | 音频驱动的人像视频 |
+目录使用 `功能词_模型名-版本`，`avatar` 表示数字人或说话头像生成。上传素材、生成 MP4、
+虚拟环境和缓存属于本机运行数据，不随 Git 提交。
 
-这两个目录只保留本机忽略的旧运行环境，不包含维护中的服务源码；全新检出不会创建它们。
+完整的依赖、安装、接口字段、配置与测试说明见 [SoulX-FlashHead 服务文档](avatar_soulx-flashhead-1.3b/README.md)。

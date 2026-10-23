@@ -1,0 +1,35 @@
+[project]
+name = "moss-music-8b-instruct-service"
+version = "0.1.0"
+description = "MOSS-Music-8B-Instruct 本地 GGUF 音乐理解服务"
+requires-python = "==3.12.13"
+dependencies = [
+    "fastapi==0.141.1",
+    "pydantic==2.13.4",
+    "python-multipart==0.0.32",
+    "starlette==1.6.0",
+    "llm-local-runtime",
+    "uvicorn==0.52.1",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+llm-local-runtime = { path = "../../llm_local_runtime", editable = true }
+
+[dependency-groups]
+dev = ["ruff>=0.15.9"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["B008", "E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"

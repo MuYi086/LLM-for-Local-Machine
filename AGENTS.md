@@ -2,14 +2,14 @@
 
 ## 适用范围与依据
 
-本仓库提供面向本地部署的 LLM 音视频后端，当前保留语音克隆、文本音色设计、BGM、语音转写、
+本仓库提供面向本地部署的 LLM 音视频后端，当前保留音乐理解、语音克隆、文本音色设计、BGM、语音转写、
 音乐转谱、音源分离、CPU 母带和 Steam Audio 空间导出。服务采用独立 uv 项目和一次性 worker。
 文档遵循 CONSTITUTION.md 的中文优先要求；接口和配置以实际源码为准。
 README.md 提供接入、配置和运维说明，本文件记录开发边界与命令。
 
 ## 项目结构与服务速查
 
-当前维护 11 个模型服务 uv 项目与一个轻量控制面，start.sh 合计启动 12 个 HTTP 进程；
+当前维护 13 个模型服务 uv 项目与一个轻量控制面，start.sh 合计启动 14 个 HTTP 进程；
 localai_worker_bridge 是额外的非 HTTP uv 包，不计入服务数，也不常驻导入 Torch。
 原生能力和输出见 README 服务总览；端口、方法及路径以源码为准。
 区分模型原生能力、已接入接口与服务编排；各 HTTP 进程提供 GET /v1/health。
@@ -18,6 +18,7 @@ localai_worker_bridge 是额外的非 HTTP uv 包，不计入服务数，也不�
 | --- | --- | --- | --- | --- |
 | main 控制面 | 8300 | GET /v1/control；POST /v1/audio/export；POST /v1/audio/spatial/render | 控制、共享上传/检查、CPU 母带及空间导出 | 非模型服务 |
 | `model-audio/design_qwen3-tts-1.7b-voicedesign/` | 8301 | POST /v1/qwen/timbre | 文本音色设计与 TTS | 语音波形 |
+| `model-audio/analyse_moss-music-8b-Instruct/` | 8310 | POST /v1/openMoss/moss-music | 音乐描述、问答与歌词转写 | JSON 分析文本 |
 | `model-audio/music_ace-step-1.5/` | 8313 | POST /v1/aceStep/bgm | 按提示词生成 BGM；接口不接收歌词 | 音乐波形 |
 | `model-audio/music_yue2-3b/` | 8314 | POST /v1/m-a-p/YuE2 | 根据风格、歌词与可选 ABC 乐谱生成歌曲 | 48 kHz 立体声音频 |
 | `model-audio/score_sheetsage-2/` | 8315 | POST /v1/m-a-p/SheetSage2 | 音乐转为乐谱、MIDI、节拍/和弦/调性/结构与时间标注 | ABC、MIDI 与 JSON/LAB ZIP |
@@ -28,6 +29,7 @@ localai_worker_bridge 是额外的非 HTTP uv 包，不计入服务数，也不�
 | `model-audio/separate_tiger-dnr/` | 8351 | POST /v1/tigerDnr/separate | 对白/音效/音乐三路 Stem 分离 | 三路音频波形 |
 | `model-audio/clone_confucius-4/` | 8361 | POST /v1/confucius4TTS/generate | 14 语种跨语言零样本 TTS 克隆 | 语音波形 |
 | `model-audio/transcribe_qwen3-asr-1.7b/` | 8371 | POST /v1/qwen3/asr | 语种识别与语音转写 | 转写文本与语种 |
+| `model-video/avatar_soulx-flashhead-1.3b/` | 8391 | POST /v1/soulX/flashHead | 人像图片和音频驱动的单 GPU 视频生成 | 带音轨 MP4 |
 
 - main/main.py 只处理健康/控制、共享上传/检查和 CPU 导出，不加载模型包或推理。
   空间任务进度 GET /v1/audio/spatial/render/progress/{job_id} 是进程内状态。
@@ -48,7 +50,10 @@ localai_worker_bridge 是额外的非 HTTP uv 包，不计入服务数，也不�
 - qa/ 是无模型测试/Ruff 项目；scripts/quality_gate.sh 与 GitHub Actions 使用同一质量门禁。
   根目录回归使用 QA；ACE-Step 服务内测试从 model-audio/music_ace-step-1.5/ 执行。
 - model-text/scripts/training/、model-text/training/configs/ 是纯文本润色 LoRA 实验，不是语音训练或 HTTP 服务。
-- model-video/ 按模态收纳视频项目；当前没有维护中的视频 HTTP 服务，目录不计入 start.sh 的进程数。
+- model-video/avatar_soulx-flashhead-1.3b/ 维护 SoulX-FlashHead 单 GPU 人像视频服务；
+  8391 提供 POST /v1/soulX/flashHead，计入 start.sh 的 14 个 HTTP 进程。
+  主模型及 wav2vec2 编码器均放在 hf-mirror/Soul-AILab 下；保持独立 uv 环境与一次性 worker，
+  不加入 LocalAI 的五个固定 worker bridge。图片/音频使用上传逻辑标识，不能直接读取任意服务器路径。
 - 流行*模型功能简介.md、task*.md 和 `空间音频讨论/` 是调研/任务/方案资料，
   不能据此推断已实现能力。
 
@@ -66,6 +71,10 @@ YuE2-3B 使用模型目录随附的官方 `yue2_infer` 0.1.5 wheel 和本地 MOT
 YuE2-Vae 使用本地 Hugging Face remote code 与 `AutoModel`。独立 API 接收 48 kHz 立体声音频
 编码为 `[T,64]` NPY，或将该 latent 解码成 48 kHz WAV；FFmpeg/ffprobe 在 GPU 排队前负责音频预检和格式转换。
 VAE 保持 FP32，解码使用官方分块 `decode_tiled`，模型只在一次性 worker 中加载。
+
+MOSS-Music 使用本地 Q8/F16 GGUF 与固定 HOT-Step-CPP 的 `ace-caption`，不依赖 Torch。
+Python worker 通过 exec 替换为 C++ 进程，仍由父进程统一回收进程组。CPU 预检拒绝超过 420 秒输入，
+转为 16 kHz 单声道；上传与文本结果仅暂存，不长期保存。构建命令见该服务 README。
 
 MERT-v2-FullSong 使用本地官方 Transformers `AutoFeatureExtractor`/`AutoModel` 与独立 uv 环境；
 PyTorch/Torchaudio 2.6.0、Transformers 4.53.2 按模型卡固定。CPU 预检限制完整歌曲为 30–360 秒，
@@ -133,7 +142,7 @@ uv run --project qa --locked python -m unittest discover -s tests -v
   不直接覆盖 sidecar 或引用映射。
 - `full_path` 是客户端逻辑标识，不能用于直接读取服务器任意文件。参考文本可保存 sidecar；
   8300 上传不接收 `prompt_text`，ASR/TIGER 没有独立上传/检查接口。
-- 默认目录：音色 `storage/timbre/`、BGM `storage/bgm/`、普通参考音频与克隆结果
+- 默认目录：音色 `storage/timbre/`、BGM `storage/bgm/`、人像图片 `storage/flashhead/images/`、视频 `storage/video/`、普通参考音频与克隆结果
   `storage/clone/`、分离批次 `storage/separation/`、转谱 ZIP `storage/sheetsage2/`、
   YuE2-Vae latent/WAV `storage/yue2_vae/`、MERT 表征 JSON/NPZ `storage/mert_v2_fullsong/`。
   目录均可按对应配置覆盖。

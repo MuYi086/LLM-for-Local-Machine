@@ -4,7 +4,7 @@
   "repository_head": "working-tree-after-model-mirror-retirement-audit",
   "evidence_level": "E0",
   "evidence_note": "静态源码与文件系统盘点：服务能力快照由 AST 和源码路由校验。直接 LocalAI audio.cpp 候选仅保留 hf-mirror 中存在的 Qwen3-TTS Base/VoiceDesign；五个 one-shot worker bridge 固定保留在独立清单。其余缺少本地模型制品的候选已移除；原生服务和接口按模型主目录是否存在维护。audio_cpp_family_screen 仅记录固定 revision 的上游 E1 family/task 证据，不代表服务具有 LocalAI provider 或达到 E2/E3。",
-  "service_count_with_uv_projects": 11,
+  "service_count_with_uv_projects": 13,
   "services": [
     {
       "project": "Confucius4_TTS",
@@ -5075,6 +5075,723 @@
           ]
         }
       ]
+    },
+    {
+      "project": "moss_music_8b_instruct",
+      "directory": "model-audio/analyse_moss-music-8b-Instruct",
+      "ports": [
+        8310
+      ],
+      "phase": "native_only",
+      "scope": "local_audio_model",
+      "kind": "music_understanding",
+      "native_default_provider": "native_gguf",
+      "migration_status": "native_only",
+      "output": "JSON 分析文本",
+      "default_storage": null,
+      "request_schemas": {},
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/v1/health",
+          "source": "model-audio/analyse_moss-music-8b-Instruct/main.py",
+          "line": 292,
+          "parameters": [],
+          "request_schemas": []
+        },
+        {
+          "method": "POST",
+          "path": "/v1/openMoss/moss-music",
+          "source": "model-audio/analyse_moss-music-8b-Instruct/main.py",
+          "line": 312,
+          "parameters": [
+            {
+              "name": "audio",
+              "type": "UploadFile",
+              "default": "File(...)",
+              "required": true
+            },
+            {
+              "name": "prompt",
+              "type": "str",
+              "default": "Form(DEFAULT_PROMPT, min_length=1, max_length=16000)",
+              "required": false
+            },
+            {
+              "name": "max_new_tokens",
+              "type": "int",
+              "default": "Form(DEFAULT_MAX_NEW_TOKENS, ge=1, le=4096)",
+              "required": false
+            },
+            {
+              "name": "temperature",
+              "type": "float",
+              "default": "Form(DEFAULT_TEMPERATURE, ge=0, le=2, allow_inf_nan=False)",
+              "required": false
+            }
+          ],
+          "request_schemas": []
+        }
+      ],
+      "source_files": {
+        "main": "model-audio/analyse_moss-music-8b-Instruct/main.py",
+        "worker": "model-audio/analyse_moss-music-8b-Instruct/worker.py",
+        "tests": [
+          "tests/test_moss_music_service.py"
+        ]
+      },
+      "migration_field_mapping": {
+        "status": "native_only",
+        "destination_candidate": "无 LocalAI 候选；固定 HOT-Step-CPP ace-caption GGUF 一次性 worker。",
+        "routes": [
+          {
+            "method": "GET",
+            "path": "/v1/health",
+            "source": "model-audio/analyse_moss-music-8b-Instruct/main.py",
+            "line": 292,
+            "parameters": [],
+            "request_schemas": [],
+            "source_fields": [],
+            "localai_endpoint_candidate": null,
+            "field_mappings": [],
+            "status": "native_only"
+          },
+          {
+            "method": "POST",
+            "path": "/v1/openMoss/moss-music",
+            "source": "model-audio/analyse_moss-music-8b-Instruct/main.py",
+            "line": 312,
+            "parameters": [
+              {
+                "name": "audio",
+                "type": "UploadFile",
+                "default": "File(...)",
+                "required": true
+              },
+              {
+                "name": "prompt",
+                "type": "str",
+                "default": "Form(DEFAULT_PROMPT, min_length=1, max_length=16000)",
+                "required": false
+              },
+              {
+                "name": "max_new_tokens",
+                "type": "int",
+                "default": "Form(DEFAULT_MAX_NEW_TOKENS, ge=1, le=4096)",
+                "required": false
+              },
+              {
+                "name": "temperature",
+                "type": "float",
+                "default": "Form(DEFAULT_TEMPERATURE, ge=0, le=2, allow_inf_nan=False)",
+                "required": false
+              }
+            ],
+            "request_schemas": [],
+            "source_fields": [
+              {
+                "name": "audio",
+                "type": "UploadFile",
+                "default": "File(...)",
+                "required": true
+              },
+              {
+                "name": "prompt",
+                "type": "str",
+                "default": "Form(DEFAULT_PROMPT, min_length=1, max_length=16000)",
+                "required": false
+              },
+              {
+                "name": "max_new_tokens",
+                "type": "int",
+                "default": "Form(DEFAULT_MAX_NEW_TOKENS, ge=1, le=4096)",
+                "required": false
+              },
+              {
+                "name": "temperature",
+                "type": "float",
+                "default": "Form(DEFAULT_TEMPERATURE, ge=0, le=2, allow_inf_nan=False)",
+                "required": false
+              }
+            ],
+            "localai_endpoint_candidate": null,
+            "field_mappings": [
+              {
+                "source_field": "audio",
+                "destination_field": "audio",
+                "status": "native_only",
+                "verification": "原生 GGUF worker；无 LocalAI provider。字段由服务端校验后写入固定 worker 请求。"
+              },
+              {
+                "source_field": "prompt",
+                "destination_field": "prompt",
+                "status": "native_only",
+                "verification": "原生 GGUF worker；无 LocalAI provider。字段由服务端校验后写入固定 worker 请求。"
+              },
+              {
+                "source_field": "max_new_tokens",
+                "destination_field": "max_new_tokens",
+                "status": "native_only",
+                "verification": "原生 GGUF worker；无 LocalAI provider。字段由服务端校验后写入固定 worker 请求。"
+              },
+              {
+                "source_field": "temperature",
+                "destination_field": "temperature",
+                "status": "native_only",
+                "verification": "原生 GGUF worker；无 LocalAI provider。字段由服务端校验后写入固定 worker 请求。"
+              }
+            ],
+            "status": "native_only"
+          }
+        ],
+        "source_files": {
+          "main": "model-audio/analyse_moss-music-8b-Instruct/main.py",
+          "worker": "model-audio/analyse_moss-music-8b-Instruct/worker.py",
+          "tests": [
+            "tests/test_moss_music_service.py"
+          ]
+        }
+      },
+      "model_artifact_directories": [
+        {
+          "repository": "scragnog/MOSS-Music-8B-Instruct-GGUF",
+          "default_directory": "~/hf-mirror/OpenMOSS/moss-music",
+          "status_scope": "本机已核对 GGUF v3、完整文件大小与模型元数据；未执行真实推理。"
+        }
+      ],
+      "notes": "MOSS-Music-8B-Instruct Q8 LM + F16 audio tower，内嵌 tokenizer；CPU 预检后转换 16 kHz mono，拒绝超过 420 秒。上传与输出仅暂存，所有请求结束后清理。"
+    },
+    {
+      "project": "soulx_flashhead",
+      "directory": "model-video/avatar_soulx-flashhead-1.3b",
+      "ports": [
+        8391
+      ],
+      "phase": "native_only",
+      "scope": "local_video_model",
+      "kind": "audio_driven_portrait_video",
+      "native_default_provider": "native",
+      "migration_status": "native_only",
+      "output": "video/mp4，含 AAC 音轨",
+      "default_storage": "storage/video/",
+      "request_schemas": {
+        "FlashHeadRequest": {
+          "line": 156,
+          "inherits": [],
+          "fields": [
+            {
+              "name": "image_path",
+              "type": "str",
+              "default": null,
+              "default_factory": null,
+              "constraints": {
+                "min_length": "1",
+                "max_length": "1024"
+              },
+              "required": true,
+              "source": "model-video/avatar_soulx-flashhead-1.3b/main.py",
+              "line": 161
+            },
+            {
+              "name": "audio_path",
+              "type": "str",
+              "default": null,
+              "default_factory": null,
+              "constraints": {
+                "min_length": "1",
+                "max_length": "1024"
+              },
+              "required": true,
+              "source": "model-video/avatar_soulx-flashhead-1.3b/main.py",
+              "line": 162
+            },
+            {
+              "name": "model_type",
+              "type": "Literal['lite', 'pro']",
+              "default": "DEFAULT_MODEL_TYPE",
+              "default_factory": null,
+              "constraints": {},
+              "required": false,
+              "source": "model-video/avatar_soulx-flashhead-1.3b/main.py",
+              "line": 163
+            },
+            {
+              "name": "seed",
+              "type": "int",
+              "default": "DEFAULT_SEED",
+              "default_factory": null,
+              "constraints": {
+                "ge": "0",
+                "le": "2 ** 32 - 1"
+              },
+              "required": false,
+              "source": "model-video/avatar_soulx-flashhead-1.3b/main.py",
+              "line": 164
+            },
+            {
+              "name": "use_face_crop",
+              "type": "bool",
+              "default": "DEFAULT_USE_FACE_CROP",
+              "default_factory": null,
+              "constraints": {},
+              "required": false,
+              "source": "model-video/avatar_soulx-flashhead-1.3b/main.py",
+              "line": 165
+            }
+          ],
+          "source": "model-video/avatar_soulx-flashhead-1.3b/main.py"
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/v1/health",
+          "source": "model-video/avatar_soulx-flashhead-1.3b/main.py",
+          "line": 325,
+          "parameters": [],
+          "request_schemas": []
+        },
+        {
+          "method": "POST",
+          "path": "/v1/upload_audio",
+          "source": "model-video/avatar_soulx-flashhead-1.3b/main.py",
+          "line": 403,
+          "parameters": [
+            {
+              "name": "audio",
+              "type": "UploadFile",
+              "default": "File(...)",
+              "required": true
+            },
+            {
+              "name": "full_path",
+              "type": "str",
+              "default": "Form(...)",
+              "required": true
+            },
+            {
+              "name": "prompt_text",
+              "type": "str | None",
+              "default": "Form(None)",
+              "required": false
+            }
+          ],
+          "request_schemas": []
+        },
+        {
+          "method": "POST",
+          "path": "/v1/upload_image",
+          "source": "model-video/avatar_soulx-flashhead-1.3b/main.py",
+          "line": 430,
+          "parameters": [
+            {
+              "name": "image",
+              "type": "UploadFile",
+              "default": "File(...)",
+              "required": true
+            },
+            {
+              "name": "full_path",
+              "type": "str",
+              "default": "Form(...)",
+              "required": true
+            }
+          ],
+          "request_schemas": []
+        },
+        {
+          "method": "GET",
+          "path": "/v1/check/image",
+          "source": "model-video/avatar_soulx-flashhead-1.3b/main.py",
+          "line": 450,
+          "parameters": [
+            {
+              "name": "file_name",
+              "type": "str",
+              "default": null,
+              "required": true
+            }
+          ],
+          "request_schemas": []
+        },
+        {
+          "method": "GET",
+          "path": "/v1/check/audio",
+          "source": "model-video/avatar_soulx-flashhead-1.3b/main.py",
+          "line": 460,
+          "parameters": [
+            {
+              "name": "file_name",
+              "type": "str",
+              "default": null,
+              "required": true
+            }
+          ],
+          "request_schemas": []
+        },
+        {
+          "method": "POST",
+          "path": "/v1/soulX/flashHead",
+          "source": "model-video/avatar_soulx-flashhead-1.3b/main.py",
+          "line": 471,
+          "parameters": [
+            {
+              "name": "request",
+              "type": "FlashHeadRequest",
+              "default": null,
+              "required": true
+            }
+          ],
+          "request_schemas": [
+            "FlashHeadRequest"
+          ]
+        }
+      ],
+      "source_files": {
+        "main": "model-video/avatar_soulx-flashhead-1.3b/main.py",
+        "worker": "model-video/avatar_soulx-flashhead-1.3b/worker.py",
+        "runtime": "model-video/avatar_soulx-flashhead-1.3b/flashhead_runtime.py",
+        "tests": [
+          "tests/test_soulx_flashhead_migration.py"
+        ]
+      },
+      "migration_field_mapping": {
+        "status": "native_only",
+        "destination_candidate": "仅原生单 GPU worker；不加入固定五模型 worker bridge。",
+        "routes": [
+          {
+            "method": "GET",
+            "path": "/v1/health",
+            "source": "model-video/avatar_soulx-flashhead-1.3b/main.py",
+            "line": 325,
+            "parameters": [],
+            "request_schemas": [],
+            "source_fields": [],
+            "status": "native_only",
+            "localai_endpoint_candidate": null,
+            "field_mappings": []
+          },
+          {
+            "method": "POST",
+            "path": "/v1/upload_audio",
+            "source": "model-video/avatar_soulx-flashhead-1.3b/main.py",
+            "line": 403,
+            "parameters": [
+              {
+                "name": "audio",
+                "type": "UploadFile",
+                "default": "File(...)",
+                "required": true
+              },
+              {
+                "name": "full_path",
+                "type": "str",
+                "default": "Form(...)",
+                "required": true
+              },
+              {
+                "name": "prompt_text",
+                "type": "str | None",
+                "default": "Form(None)",
+                "required": false
+              }
+            ],
+            "request_schemas": [],
+            "source_fields": [
+              {
+                "name": "audio",
+                "type": "UploadFile",
+                "default": "File(...)",
+                "required": true
+              },
+              {
+                "name": "full_path",
+                "type": "str",
+                "default": "Form(...)",
+                "required": true
+              },
+              {
+                "name": "prompt_text",
+                "type": "str | None",
+                "default": "Form(None)",
+                "required": false
+              }
+            ],
+            "status": "native_only",
+            "localai_endpoint_candidate": null,
+            "field_mappings": [
+              {
+                "source_field": "audio",
+                "destination_field": "audio",
+                "status": "native_only",
+                "verification": "原生 HTTP 上传/检查或 JSON 请求字段；由服务预检后传入固定的一次性 worker，无 LocalAI provider。"
+              },
+              {
+                "source_field": "full_path",
+                "destination_field": "full_path",
+                "status": "native_only",
+                "verification": "原生 HTTP 上传/检查或 JSON 请求字段；由服务预检后传入固定的一次性 worker，无 LocalAI provider。"
+              },
+              {
+                "source_field": "prompt_text",
+                "destination_field": "prompt_text",
+                "status": "native_only",
+                "verification": "原生 HTTP 上传/检查或 JSON 请求字段；由服务预检后传入固定的一次性 worker，无 LocalAI provider。"
+              }
+            ]
+          },
+          {
+            "method": "POST",
+            "path": "/v1/upload_image",
+            "source": "model-video/avatar_soulx-flashhead-1.3b/main.py",
+            "line": 430,
+            "parameters": [
+              {
+                "name": "image",
+                "type": "UploadFile",
+                "default": "File(...)",
+                "required": true
+              },
+              {
+                "name": "full_path",
+                "type": "str",
+                "default": "Form(...)",
+                "required": true
+              }
+            ],
+            "request_schemas": [],
+            "source_fields": [
+              {
+                "name": "image",
+                "type": "UploadFile",
+                "default": "File(...)",
+                "required": true
+              },
+              {
+                "name": "full_path",
+                "type": "str",
+                "default": "Form(...)",
+                "required": true
+              }
+            ],
+            "status": "native_only",
+            "localai_endpoint_candidate": null,
+            "field_mappings": [
+              {
+                "source_field": "image",
+                "destination_field": "image",
+                "status": "native_only",
+                "verification": "原生 HTTP 上传/检查或 JSON 请求字段；由服务预检后传入固定的一次性 worker，无 LocalAI provider。"
+              },
+              {
+                "source_field": "full_path",
+                "destination_field": "full_path",
+                "status": "native_only",
+                "verification": "原生 HTTP 上传/检查或 JSON 请求字段；由服务预检后传入固定的一次性 worker，无 LocalAI provider。"
+              }
+            ]
+          },
+          {
+            "method": "GET",
+            "path": "/v1/check/image",
+            "source": "model-video/avatar_soulx-flashhead-1.3b/main.py",
+            "line": 450,
+            "parameters": [
+              {
+                "name": "file_name",
+                "type": "str",
+                "default": null,
+                "required": true
+              }
+            ],
+            "request_schemas": [],
+            "source_fields": [
+              {
+                "name": "file_name",
+                "type": "str",
+                "default": null,
+                "required": true
+              }
+            ],
+            "status": "native_only",
+            "localai_endpoint_candidate": null,
+            "field_mappings": [
+              {
+                "source_field": "file_name",
+                "destination_field": "file_name",
+                "status": "native_only",
+                "verification": "原生 HTTP 上传/检查或 JSON 请求字段；由服务预检后传入固定的一次性 worker，无 LocalAI provider。"
+              }
+            ]
+          },
+          {
+            "method": "GET",
+            "path": "/v1/check/audio",
+            "source": "model-video/avatar_soulx-flashhead-1.3b/main.py",
+            "line": 460,
+            "parameters": [
+              {
+                "name": "file_name",
+                "type": "str",
+                "default": null,
+                "required": true
+              }
+            ],
+            "request_schemas": [],
+            "source_fields": [
+              {
+                "name": "file_name",
+                "type": "str",
+                "default": null,
+                "required": true
+              }
+            ],
+            "status": "native_only",
+            "localai_endpoint_candidate": null,
+            "field_mappings": [
+              {
+                "source_field": "file_name",
+                "destination_field": "file_name",
+                "status": "native_only",
+                "verification": "原生 HTTP 上传/检查或 JSON 请求字段；由服务预检后传入固定的一次性 worker，无 LocalAI provider。"
+              }
+            ]
+          },
+          {
+            "method": "POST",
+            "path": "/v1/soulX/flashHead",
+            "source": "model-video/avatar_soulx-flashhead-1.3b/main.py",
+            "line": 471,
+            "parameters": [
+              {
+                "name": "request",
+                "type": "FlashHeadRequest",
+                "default": null,
+                "required": true
+              }
+            ],
+            "request_schemas": [
+              "FlashHeadRequest"
+            ],
+            "source_fields": [
+              {
+                "name": "image_path",
+                "type": "str",
+                "default": null,
+                "default_factory": null,
+                "constraints": {
+                  "min_length": "1",
+                  "max_length": "1024"
+                },
+                "required": true,
+                "source": "model-video/avatar_soulx-flashhead-1.3b/main.py",
+                "line": 161
+              },
+              {
+                "name": "audio_path",
+                "type": "str",
+                "default": null,
+                "default_factory": null,
+                "constraints": {
+                  "min_length": "1",
+                  "max_length": "1024"
+                },
+                "required": true,
+                "source": "model-video/avatar_soulx-flashhead-1.3b/main.py",
+                "line": 162
+              },
+              {
+                "name": "model_type",
+                "type": "Literal['lite', 'pro']",
+                "default": "DEFAULT_MODEL_TYPE",
+                "default_factory": null,
+                "constraints": {},
+                "required": false,
+                "source": "model-video/avatar_soulx-flashhead-1.3b/main.py",
+                "line": 163
+              },
+              {
+                "name": "seed",
+                "type": "int",
+                "default": "DEFAULT_SEED",
+                "default_factory": null,
+                "constraints": {
+                  "ge": "0",
+                  "le": "2 ** 32 - 1"
+                },
+                "required": false,
+                "source": "model-video/avatar_soulx-flashhead-1.3b/main.py",
+                "line": 164
+              },
+              {
+                "name": "use_face_crop",
+                "type": "bool",
+                "default": "DEFAULT_USE_FACE_CROP",
+                "default_factory": null,
+                "constraints": {},
+                "required": false,
+                "source": "model-video/avatar_soulx-flashhead-1.3b/main.py",
+                "line": 165
+              }
+            ],
+            "status": "native_only",
+            "localai_endpoint_candidate": null,
+            "field_mappings": [
+              {
+                "source_field": "image_path",
+                "destination_field": "image_path",
+                "status": "native_only",
+                "verification": "原生 HTTP 上传/检查或 JSON 请求字段；由服务预检后传入固定的一次性 worker，无 LocalAI provider。"
+              },
+              {
+                "source_field": "audio_path",
+                "destination_field": "audio_path",
+                "status": "native_only",
+                "verification": "原生 HTTP 上传/检查或 JSON 请求字段；由服务预检后传入固定的一次性 worker，无 LocalAI provider。"
+              },
+              {
+                "source_field": "model_type",
+                "destination_field": "model_type",
+                "status": "native_only",
+                "verification": "原生 HTTP 上传/检查或 JSON 请求字段；由服务预检后传入固定的一次性 worker，无 LocalAI provider。"
+              },
+              {
+                "source_field": "seed",
+                "destination_field": "seed",
+                "status": "native_only",
+                "verification": "原生 HTTP 上传/检查或 JSON 请求字段；由服务预检后传入固定的一次性 worker，无 LocalAI provider。"
+              },
+              {
+                "source_field": "use_face_crop",
+                "destination_field": "use_face_crop",
+                "status": "native_only",
+                "verification": "原生 HTTP 上传/检查或 JSON 请求字段；由服务预检后传入固定的一次性 worker，无 LocalAI provider。"
+              }
+            ]
+          }
+        ],
+        "source_files": {
+          "main": "model-video/avatar_soulx-flashhead-1.3b/main.py",
+          "worker": "model-video/avatar_soulx-flashhead-1.3b/worker.py",
+          "runtime": "model-video/avatar_soulx-flashhead-1.3b/flashhead_runtime.py",
+          "tests": [
+            "tests/test_soulx_flashhead_migration.py"
+          ]
+        }
+      },
+      "model_artifact_directories": [
+        {
+          "repository": "Soul-AILab/SoulX-FlashHead-1_3B",
+          "default_directory": "~/hf-mirror/Soul-AILab/SoulX-FlashHead-1_3B",
+          "status_scope": "本机 Lite/Pro 与对应 VAE 文件存在；真实推理未验收。"
+        },
+        {
+          "repository": "facebook/wav2vec2-base-960h",
+          "default_directory": "~/hf-mirror/Soul-AILab/wav2vec2-base-960h",
+          "status_scope": "本机配置、预处理器和权重已存在。"
+        }
+      ],
+      "notes": "恢复独立 uv/FastAPI 服务；CPU 文件预检、共享有界 GPU 队列、单请求 worker 和整组退出清理。"
     }
   ],
   "updated_on": "2026-10-22",
@@ -5198,6 +5915,22 @@
         "declared_tasks": [],
         "catalog_entry_line": null,
         "assessment": "固定 audio.cpp 虽声明对应 family，但直接 GGUF 不在 ~/hf-mirror；LocalAI provider 与候选注册已移除，仅保留原生服务。"
+      },
+      {
+        "project": "moss_music_8b_instruct",
+        "status": "no_exact_family",
+        "family": null,
+        "declared_tasks": [],
+        "catalog_entry_line": null,
+        "assessment": "固定 audio.cpp 目录没有 MOSS-Music 音乐理解 family；MOSS-TTS/ASR 不是此模型。当前由独立 HOT-Step-CPP GGUF worker 提供原生服务。"
+      },
+      {
+        "project": "soulx_flashhead",
+        "status": "excluded",
+        "family": null,
+        "declared_tasks": [],
+        "catalog_entry_line": null,
+        "assessment": "人像视频模型，不属于 audio.cpp 音频 family 筛选范围；保持原生单 GPU 服务。"
       }
     ]
   }

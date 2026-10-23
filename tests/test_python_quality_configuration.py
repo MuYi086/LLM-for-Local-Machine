@@ -10,17 +10,19 @@ from pathlib import Path
 
 REPOSITORY_DIR = Path(__file__).resolve().parents[1]
 MODEL_PROJECTS = (
-    "clone_qwen3-tts-1.7b-base",
-    "clone_voxcpm-2",
-    "music_ace-step-1.5",
-    "design_qwen3-tts-1.7b-voicedesign",
-    "clone_confucius-4",
-    "music_yue2-3b",
-    "score_sheetsage-2",
-    "codec_yue2-vae",
-    "embedding_mert-v2-fullsong",
-    "transcribe_qwen3-asr-1.7b",
-    "separate_tiger-dnr",
+    "model-video/avatar_soulx-flashhead-1.3b",
+    "model-audio/analyse_moss-music-8b-Instruct",
+    "model-audio/clone_qwen3-tts-1.7b-base",
+    "model-audio/clone_voxcpm-2",
+    "model-audio/music_ace-step-1.5",
+    "model-audio/design_qwen3-tts-1.7b-voicedesign",
+    "model-audio/clone_confucius-4",
+    "model-audio/music_yue2-3b",
+    "model-audio/score_sheetsage-2",
+    "model-audio/codec_yue2-vae",
+    "model-audio/embedding_mert-v2-fullsong",
+    "model-audio/transcribe_qwen3-asr-1.7b",
+    "model-audio/separate_tiger-dnr",
 )
 EXPECTED_RUFF_RULES = {"E", "F", "I", "UP", "B"}
 
@@ -29,7 +31,7 @@ class PythonQualityConfigurationTests(unittest.TestCase):
     def test_each_model_project_has_a_locked_ruff_baseline(self) -> None:
         for project_name in MODEL_PROJECTS:
             with self.subTest(project=project_name):
-                project_dir = REPOSITORY_DIR / "model-audio" / project_name
+                project_dir = REPOSITORY_DIR / project_name
                 configuration = tomllib.loads(
                     (project_dir / "pyproject.toml").read_text(encoding="utf-8")
                 )
@@ -63,7 +65,7 @@ class PythonQualityConfigurationTests(unittest.TestCase):
     def test_startup_uses_locked_environments_without_runtime_sync(self) -> None:
         start_script = (REPOSITORY_DIR / "start.sh").read_text(encoding="utf-8")
 
-        self.assertEqual(start_script.count("setsid uv run --no-sync --project"), 12)
+        self.assertEqual(start_script.count("setsid uv run --no-sync --project"), 14)
         self.assertNotIn("setsid uv run --project", start_script)
         self.assertEqual(start_script.count('for pid in "${pids[@]}"; do'), 3)
         self.assertNotIn('wait "$qwen3_tts_pid"', start_script)

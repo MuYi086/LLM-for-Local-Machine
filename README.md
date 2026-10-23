@@ -1,10 +1,10 @@
 # LLM Local Backend
 
-面向本地部署的 LLM 音视频后端，提供参考音频语音克隆、文本音色设计、BGM 生成、语音转写、音乐转谱、
+面向本地部署的 LLM 音视频后端，提供参考音频语音克隆、文本音色设计、BGM 生成、语音转写、音乐转谱、人像视频生成、
 三路音源分离，以及 CPU 音频母带和 Steam Audio 对象级空间导出。
 模型推理均使用本地权重。
 
-仓库包含 **11 个模型服务 uv 项目，统一启动 12 个 HTTP 进程**，其中一个是轻量控制面。
+仓库包含 **13 个模型服务 uv 项目，统一启动 14 个 HTTP 进程**，其中一个是轻量控制面。
 HTTP 进程不加载重型模型，模型推理由对应目录
 中的一次性 worker 完成；共享运行时和无模型 QA 环境分别位于 `llm_local_runtime/`、`qa/`。
 接口、路径和默认值以当前 `main.py`、`worker.py`、`pyproject.toml` 与 `start.sh` 为准。
@@ -29,6 +29,7 @@ Base/VoiceDesign 的本地模型候选及五个 one-shot worker bridge。原生 
 | --- | --- | --- | --- | --- |
 | [控制面 `main/`](main/) | 8300 | `GET /v1/control`；`POST /v1/audio/export`；`POST /v1/audio/spatial/render` | 控制、共享上传/检查、CPU 母带与 Steam Audio 空间导出（[源码](main/main.py)） | 非模型服务，响应见下节 |
 | [Qwen3-TTS 1.7B VoiceDesign `model-audio/design_qwen3-tts-1.7b-voicedesign/`](model-audio/design_qwen3-tts-1.7b-voicedesign/) | 8301 | `POST /v1/qwen/timbre` | 根据自然语言音色描述和待朗读文本生成语音，支持音色、情绪和韵律描述（[官方](https://github.com/QwenLM/Qwen3-TTS#voice-design)） | 语音波形 |
+| [MOSS-Music-8B-Instruct `model-audio/analyse_moss-music-8b-Instruct/`](model-audio/analyse_moss-music-8b-Instruct/) | 8310 | `POST /v1/openMoss/moss-music` | 上传音乐并按文字指令生成音乐描述、问答或歌词文本；使用本地完整 GGUF 与 HOT-Step-CPP | JSON 分析文本 |
 | [ACE-Step 1.5 XL Turbo `model-audio/music_ace-step-1.5/`](model-audio/music_ace-step-1.5/) | 8313 | `POST /v1/aceStep/bgm` | 按风格描述和可选音乐元数据生成 BGM；当前接口不接收歌词（[官方](https://huggingface.co/ACE-Step/acestep-v15-xl-turbo-diffusers)） | 音乐波形 |
 | [YuE2-3B `model-audio/music_yue2-3b/`](model-audio/music_yue2-3b/) | 8314 | `POST /v1/m-a-p/YuE2` | 根据风格、歌词和可选 ABC 乐谱生成带歌声与伴奏的歌曲（[官方](https://huggingface.co/m-a-p/YuE2-3B)） | 48 kHz 立体声音乐波形 |
 | [SheetSage2 `model-audio/score_sheetsage-2/`](model-audio/score_sheetsage-2/) | 8315 | `POST /v1/m-a-p/SheetSage2` | 将音乐转为可编辑乐谱、MIDI、节拍/和弦/调性/结构与时间标注（[官方](https://huggingface.co/m-a-p/SheetSage2)） | ABC、MIDI 与 JSON/LAB 标注 ZIP |
@@ -39,6 +40,7 @@ Base/VoiceDesign 的本地模型候选及五个 one-shot worker bridge。原生 
 | [TIGER-DnR `model-audio/separate_tiger-dnr/`](model-audio/separate_tiger-dnr/) | 8351 | `POST /v1/tigerDnr/separate` | 将混音分离为对白、音效、音乐三路 Stem（[官方推理](https://github.com/JusperLee/TIGER/blob/main/inference_dnr.py)） | 三路音频波形 |
 | [Confucius4-TTS `model-audio/clone_confucius-4/`](model-audio/clone_confucius-4/) | 8361 | `POST /v1/confucius4TTS/generate` | 无需参考转写的零样本克隆与跨语言 TTS，支持 14 语种及参考音频的情感迁移（[官方](https://huggingface.co/netease-youdao/Confucius4-TTS)） | 语音波形 |
 | [Qwen3-ASR-1.7B `model-audio/transcribe_qwen3-asr-1.7b/`](model-audio/transcribe_qwen3-asr-1.7b/) | 8371 | `POST /v1/qwen3/asr` | 语种识别与语音转写，支持 30 种语言和 22 种中文方言（[官方](https://huggingface.co/Qwen/Qwen3-ASR-1.7B)） | 转写文本与语种 |
+| [SoulX-FlashHead 1.3B `model-video/avatar_soulx-flashhead-1.3b/`](model-video/avatar_soulx-flashhead-1.3b/) | 8391 | `POST /v1/soulX/flashHead` | 参考人像图片和驱动音频生成带声音的 MP4；支持 Lite/Pro 单 GPU | MP4 视频 |
 
 Demo 调用对应端口并保存服务原始输出；
 都支持 `--check-only`，仅检查输入和原生服务健康状态。条件缺失时明确跳过，不写生成产物。
@@ -77,6 +79,7 @@ VoxCPM2 可控克隆使用 `control_instruction`。
 ```text
 main/                                            8300 控制面，不包含模型推理
 model-audio/                                     当前维护的音频模型服务、worker 与 renderer
+model-audio/analyse_moss-music-8b-Instruct/        MOSS 音乐理解 API 与 GGUF worker
 model-audio/spatial_steam-audio/                 独立 C++17 Steam Audio CPU renderer
 model-audio/clone_qwen3-tts-1.7b-base/           Qwen3-TTS Base 的 HTTP 服务和 worker
 model-audio/clone_voxcpm-2/                      VoxCPM2 的 HTTP 服务和克隆 worker
@@ -91,7 +94,7 @@ model-audio/separate_tiger-dnr/                  TIGER-DnR 三 Stem 分离服务
 model-audio/transcribe_qwen3-asr-1.7b/           Qwen3-ASR-1.7B 语音识别服务和 worker
 model-text/                                      有声书纯文本润色训练实验
 model-image/                                     预留图像模型目录
-model-video/                                     视频模型分类；当前无维护中的视频 HTTP 服务
+model-video/                                     SoulX-FlashHead 图片/音频驱动人像视频服务
 tests/                                           根目录无模型回归测试
 qa/                                              锁定的轻量测试与 Ruff 环境，不安装模型依赖
 llm_local_runtime/                               共享流式上传、引用存储、GPU 队列与容量工具
@@ -153,7 +156,7 @@ cd LLM-for-Local-Machine
 先为需要的服务同步锁定依赖；部署全部服务时可以执行：
 
 ```bash
-for project in model-audio/clone_qwen3-tts-1.7b-base model-audio/clone_voxcpm-2 model-audio/music_ace-step-1.5 model-audio/music_yue2-3b \
+for project in model-video/avatar_soulx-flashhead-1.3b model-audio/analyse_moss-music-8b-Instruct model-audio/clone_qwen3-tts-1.7b-base model-audio/clone_voxcpm-2 model-audio/music_ace-step-1.5 model-audio/music_yue2-3b \
   model-audio/score_sheetsage-2 model-audio/codec_yue2-vae model-audio/embedding_mert-v2-fullsong \
   model-audio/design_qwen3-tts-1.7b-voicedesign model-audio/clone_confucius-4 model-audio/transcribe_qwen3-asr-1.7b model-audio/separate_tiger-dnr; do
   uv sync --project "$project" --locked
@@ -183,6 +186,10 @@ Transformers 4.53.2。模型代码、processor 和权重来自 `$HF_MIRROR_DIR/m
 执行 `uv sync --project model-audio/embedding_mert-v2-fullsong --locked` 后由本服务自己的 worker 加载，和 SheetSage2
 使用不同的 uv 环境。
 
+MOSS-Music 使用 `$HF_MIRROR_DIR/OpenMOSS/moss-music` 的 Q8 语言模型及 F16 音频编码器，
+需要预先构建 `ace-caption`。它不加载 Torch，不在请求时编译或下载；
+[服务说明](model-audio/analyse_moss-music-8b-Instruct/README.md)提供固定源码 revision、构建命令、字段与调用示例。
+
 默认情况下 `LOCAL_FILES_ONLY=1`，本地 worker 不会从 Hugging Face 下载权重。确认模型、
 Tokenizer 和上游源码就绪后启动全部服务：
 
@@ -190,8 +197,8 @@ Tokenizer 和上游源码就绪后启动全部服务：
 bash start.sh
 ```
 
-`start.sh` 会启动 8300、8301、8313、8314、8315、8316、8317、8321、8322、8351、8361 和 8371，
-共 12 个进程；8300 使用 `model-audio/clone_qwen3-tts-1.7b-base` uv 项目中的轻量 HTTP 依赖，其余服务使用
+`start.sh` 会启动 8300、8301、8310、8313、8314、8315、8316、8317、8321、8322、8351、8361、8371 和 8391，
+共 14 个进程；8300 使用 `model-audio/clone_qwen3-tts-1.7b-base` uv 项目中的轻量 HTTP 依赖，其余服务使用
 各自的 uv 项目。启动命令统一使用 `uv run --no-sync`，不会在运行阶段联网解析依赖；
 本地 GPU 服务通过 `GPU_LOCK_FILE` 串行访问 GPU。默认最多排队 900 秒，超过时返回
 `503`；用正数 `GPU_LOCK_WAIT_TIMEOUT` 调整。共享锁实现仍兼容非正值无限等待，
@@ -658,6 +665,27 @@ curl -X POST http://127.0.0.1:8351/v1/tigerDnr/separate \
 
 当前没有独立声效生成服务；音效生成接口以服务总览中的实际注册路由为准。
 
+## MOSS-Music 音乐理解
+
+MOSS-Music-8B-Instruct 默认监听 `8310`，业务接口为 `POST /v1/openMoss/moss-music`。
+`bash start.sh` 会启动该服务，并在“模型接口与端口映射”中显示它；设置 `MOSS_MUSIC_PORT`
+可以覆盖默认端口，启动预检、服务监听和映射表会使用同一个配置值。
+
+请求使用 `multipart/form-data`，上传音乐并按 `prompt` 提问：
+
+```bash
+curl -fsS http://127.0.0.1:8310/v1/openMoss/moss-music \
+  -F 'audio=@song.wav' \
+  -F 'prompt=请分析这段音乐的乐器、人声与情绪。' \
+  -F 'max_new_tokens=1024' \
+  -F 'temperature=0'
+```
+
+`audio` 必填，默认最大 64 MiB、时长不超过 420 秒；`prompt` 可省略，默认进行中文综合分析。
+成功返回 JSON，包含 `model`、`runtime`、`text`、`duration_seconds` 和 `audio_sha256`。
+音频及推理中间文件仅暂存，请求结束后清理。健康检查为 `GET http://127.0.0.1:8310/v1/health`。
+完整构建与配置说明见 [MOSS-Music 服务文档](model-audio/analyse_moss-music-8b-Instruct/README.md)。
+
 ## ACE-Step BGM 生成
 
 ACE-Step 独立监听 `8313`，是当前保留的音乐生成服务。声效目录只包含提示词规划资料。
@@ -804,6 +832,29 @@ FFmpeg/ffprobe 和 CUDA 由 `GET /v1/health` 检查。成品原子保存到 `sto
 当前存储维护工具不会自动清理该目录。
 
 
+
+## SoulX-FlashHead 人像视频生成
+
+服务在 `8391` 提供 `POST /v1/soulX/flashHead`：先上传人像和驱动音频，再用上传时的
+`full_path` 逻辑标识生成视频。默认 Lite，支持 Pro；HTTP 进程不加载模型，推理使用独立 uv
+环境的一次性 worker，成品原子保存到 `storage/video/` 并返回 `video/mp4`。
+
+```bash
+curl -fsS http://127.0.0.1:8391/v1/upload_image \
+  -F 'image=@portrait.png;type=image/png' -F 'full_path=portrait.png'
+curl -fsS http://127.0.0.1:8391/v1/upload_audio \
+  -F 'audio=@speech.wav;type=audio/wav' -F 'full_path=speech.wav'
+curl -fsS http://127.0.0.1:8391/v1/soulX/flashHead \
+  -H 'Content-Type: application/json' \
+  -d '{"image_path":"portrait.png","audio_path":"speech.wav","model_type":"lite","seed":42}' \
+  -o talking-head.mp4
+```
+
+主模型默认位于 `$HF_MIRROR_DIR/Soul-AILab/SoulX-FlashHead-1_3B`，音频编码器默认位于
+`$HF_MIRROR_DIR/Soul-AILab/wav2vec2-base-960h`，官方源码默认位于 `$HOME/LLM-depency/SoulX-FlashHead`。
+运行前执行 `uv sync --project model-video/avatar_soulx-flashhead-1.3b --locked`。
+默认上传上限 64 MiB、驱动音频时长上限 300 秒；完整字段、预检和单 GPU 限制见
+[SoulX-FlashHead 服务说明](model-video/avatar_soulx-flashhead-1.3b/README.md)。
 
 ## 文本润色训练实验
 

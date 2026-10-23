@@ -34,20 +34,22 @@ loopback 宿主机进程组、owner watcher、readiness、TERM/KILL、进程身�
 
 ## 4. 镜像筛选与维护范围
 
-当前维护 11 个模型 uv 项目与 1 个控制面，共 12 个 HTTP 进程。当前镜像中的 11 个服务主模型根目录均存在。
+当前维护 13 个模型 uv 项目与 1 个控制面，共 14 个 HTTP 进程。当前镜像中的 13 个服务主模型根目录均存在。
 目录存在不代表所有文件、依赖、真实推理或输出质量已验收。
 
 ### 保留的 LocalAI 路径
 
 - Qwen3-TTS Base 克隆与 Qwen3 VoiceDesign 使用本地官方 Hugging Face 目录，保留直接候选 YAML、结构预检和显式 provider。
 - SheetSage2、MERT-v2-FullSong、YuE2-Vae、YuE2-3B、TIGER-DnR 使用五个固定 one-shot worker bridge ID。
+- MOSS-Music-8B-Instruct 使用本地完整 GGUF 与 HOT-Step-CPP 原版 `ace-caption`；通过独立原生 worker 提供 8310 的音乐理解 API，没有 LocalAI provider，也不加入五个固定 worker bridge。
 - 其余原生服务保持各自原生 worker；原生 provider 仍为默认值。
+
+- SoulX-FlashHead 已在补齐 `$HF_MIRROR_DIR/Soul-AILab/wav2vec2-base-960h` 后恢复独立原生服务（8391）；不接入 LocalAI，不加入五个固定 worker bridge。
 
 ### 已清理的服务与候选
 
-- Stable Audio 3 Medium 和 Ditto 的主模型目录缺失，完整服务代码和全部启动/维护/测试引用已移除。
+- Stable Audio 3 Medium 的主模型目录缺失，完整服务代码和全部启动/维护/测试引用已移除。
 - Seed-VC 主目录虽存在，但必需 Whisper-small 不存在；其 44 kHz BigVGAN/RMVPE 也缺失。VC/SVC 服务和候选已移除。
-- SoulX-FlashHead 主目录虽存在，但必需 wav2vec2-base-960h 缺失。服务、图片上传、worker bridge 和启动引用已移除。
 - Qwen3-ASR、VoxCPM2、Confucius4-TTS、ACE-Step 原生模型根目录存在；相应直接 GGUF 不在 hf-mirror，因此仅移除 LocalAI provider、GGUF 候选、注册/预检和专属测试，原生 API 保留。
 - Index 相关代码此前已按用户要求退役；task10 中列出的服务也不属于当前部署范围。
 
@@ -88,7 +90,7 @@ python3 scripts/localai/manager.py verify-worker-bridge-candidates
 UV_OFFLINE=1 bash scripts/quality_gate.sh
 ~~~
 
-能力清单当前校验 12 个服务入口、11 个模型 uv 项目、35 条路由、5 个请求 schema 和 116 个请求字段。
+能力清单当前校验 14 个服务入口、13 个模型 uv 项目、43 条路由、6 个请求 schema 和 132 个请求字段。
 quality gate 还包含 shell 语法、Steam Audio renderer 的无 SDK 核心测试、锁检查、Ruff、格式检查与两组无模型回归。
 2026-10-21 的历史 `UV_OFFLINE=1 bash scripts/quality_gate.sh` 记录为通过：13 个 uv 项目锁检查、Ruff 和 104 个 Python 文件格式检查通过；
 能力清单通过；根目录 198 项、ACE-Step 9 项无模型测试全部通过。`bash -n start.sh` 和 Steam Audio renderer
