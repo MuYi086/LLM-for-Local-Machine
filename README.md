@@ -1,10 +1,10 @@
 # LLM Local Backend
 
-面向本地部署的 LLM 音视频后端，提供参考音频语音克隆、文本音色设计、BGM 生成、语音转写、音乐转谱、人像视频生成、
+面向本地部署的 LLM 音视频后端，提供参考音频语音克隆、文本音色设计、BGM 生成、语音转写、音乐转谱、人像与图生视频、
 三路音源分离，以及 CPU 音频母带和 Steam Audio 对象级空间导出。
 模型推理均使用本地权重。
 
-仓库包含 **13 个模型服务 uv 项目，统一启动 14 个 HTTP 进程**，其中一个是轻量控制面。
+仓库包含 **16 个模型服务 uv 项目，统一启动 17 个 HTTP 进程**，其中一个是轻量控制面。
 HTTP 进程不加载重型模型，模型推理由对应目录
 中的一次性 worker 完成；共享运行时和无模型 QA 环境分别位于 `llm_local_runtime/`、`qa/`。
 接口、路径和默认值以当前 `main.py`、`worker.py`、`pyproject.toml` 与 `start.sh` 为准。
@@ -40,7 +40,10 @@ Base/VoiceDesign 的本地模型候选及五个 one-shot worker bridge。原生 
 | [TIGER-DnR `model-audio/separate_tiger-dnr/`](model-audio/separate_tiger-dnr/) | 8351 | `POST /v1/tigerDnr/separate` | 将混音分离为对白、音效、音乐三路 Stem（[官方推理](https://github.com/JusperLee/TIGER/blob/main/inference_dnr.py)） | 三路音频波形 |
 | [Confucius4-TTS `model-audio/clone_confucius-4/`](model-audio/clone_confucius-4/) | 8361 | `POST /v1/confucius4TTS/generate` | 无需参考转写的零样本克隆与跨语言 TTS，支持 14 语种及参考音频的情感迁移（[官方](https://huggingface.co/netease-youdao/Confucius4-TTS)） | 语音波形 |
 | [Qwen3-ASR-1.7B `model-audio/transcribe_qwen3-asr-1.7b/`](model-audio/transcribe_qwen3-asr-1.7b/) | 8371 | `POST /v1/qwen3/asr` | 语种识别与语音转写，支持 30 种语言和 22 种中文方言（[官方](https://huggingface.co/Qwen/Qwen3-ASR-1.7B)） | 转写文本与语种 |
+| [MSST Mega 53 `model-audio/separate_msst-mega53/`](model-audio/separate_msst-mega53/) | 8380 | `POST /v1/msst/separate` | 按调用方选择音乐声部分离，保留 residual（[官方](https://github.com/ZFTurbo/Music-Source-Separation-Training/releases/tag/v1.0.21)） | 44.1 kHz 双声道 FLOAT WAV 与元数据 ZIP |
 | [SoulX-FlashHead 1.3B `model-video/avatar_soulx-flashhead-1.3b/`](model-video/avatar_soulx-flashhead-1.3b/) | 8391 | `POST /v1/soulX/flashHead` | 参考人像图片和驱动音频生成带声音的 MP4；支持 Lite/Pro 单 GPU | MP4 视频 |
+| [HunyuanVideo-1.5 Comfy `model-video/HunyuanVideo-1.5-Comfy/`](model-video/HunyuanVideo-1.5-Comfy/) | 8393 | `POST /v1/Tencent-Hunyuan/HunyuanVideo-1.5-Comfy` | 使用 480p step-distilled FP8 权重从参考图片生成视频 | 848×480、24 FPS MP4 |
+| [Wan2.2 TI2V 5B GGUF `model-video/Wan2.2-TI2V-5B-GGUF/`](model-video/Wan2.2-TI2V-5B-GGUF/) | 8392 | `POST /v1/QuantStack/Wan2.2-TI2V-5B-GGUF` | 使用本地 Q8 GGUF 权重从文本或参考图片生成视频 | MP4 视频 |
 
 Demo 调用对应端口并保存服务原始输出；
 都支持 `--check-only`，仅检查输入和原生服务健康状态。条件缺失时明确跳过，不写生成产物。
@@ -59,6 +62,7 @@ Demo 调用对应端口并保存服务原始输出；
 | TTS 克隆、音色设计、BGM 生成 | `audio/wav` | 按用途保存 WAV |
 | SheetSage2（8315） | `application/zip`，含可用时的 ABC、MIDI、事件与窗口输出 | 原子保存到 `storage/sheetsage2/`；上传音频和 worker 临时文件请求后清理 |
 | YuE2-Vae（8316） | `audio/wav`（decode）或 `application/octet-stream`（encode NPY） | 原子保存到 `storage/yue2_vae/`；上传和 worker 临时文件请求后清理 |
+| MSST Mega 53（8380） | `application/zip`，选定声部、residual 与 manifest.json | 原子保存到 `storage/msst/`；输入与 worker 临时文件请求后清理 |
 | MERT-v2-FullSong（8317） | JSON mean embedding 或 `application/octet-stream` NPZ 逐帧特征 | 原子保存到 `storage/mert_v2_fullsong/`；请求音频和 worker 临时文件请求后清理 |
 | Qwen3-ASR | JSON 文本及上传摘要 | 请求结束后删除上传暂存和 worker 结果，不保留输入音频 |
 | TIGER-DnR | `application/zip`，含 `dialog.wav`、`effects.wav`、`music.wav` | 原子保存三路 Stem 与 ZIP 批次 |
@@ -90,11 +94,12 @@ model-audio/codec_yue2-vae/                      YuE2 acoustic latent 编码/解
 model-audio/embedding_mert-v2-fullsong/          MERT-v2-FullSong 音乐表征服务和一次性 worker
 model-audio/design_qwen3-tts-1.7b-voicedesign/   Qwen VoiceDesign 服务和 worker
 model-audio/clone_confucius-4/                   Confucius4-TTS 服务和一次性 worker
+model-audio/separate_msst-mega53/                MSST 重点音乐声部分离与一次性 worker
 model-audio/separate_tiger-dnr/                  TIGER-DnR 三 Stem 分离服务和 worker
 model-audio/transcribe_qwen3-asr-1.7b/           Qwen3-ASR-1.7B 语音识别服务和 worker
 model-text/                                      有声书纯文本润色训练实验
 model-image/                                     预留图像模型目录
-model-video/                                     SoulX-FlashHead 图片/音频驱动人像视频服务
+model-video/                                     SoulX-FlashHead、HunyuanVideo-1.5 与 Wan2.2 视频生成服务
 tests/                                           根目录无模型回归测试
 qa/                                              锁定的轻量测试与 Ruff 环境，不安装模型依赖
 llm_local_runtime/                               共享流式上传、引用存储、GPU 队列与容量工具
@@ -117,9 +122,11 @@ storage/                                         上传素材、生成音视频�
 | `storage/bgm/` | ACE-Step 与 YuE2-3B 生成的 BGM、歌曲和 OST | `BGM_STORAGE_DIR`、`ACESTEP_OUTPUT_DIR`、`YUE2_3B_OUTPUT_DIR` |
 | `storage/yue2_vae/` | YuE2-Vae 编码的 latent NPY 与解码 WAV | `YUE2_VAE_OUTPUT_DIR` |
 | `storage/sheetsage2/` | SheetSage2 转写生成的 ABC、MIDI 与标注 ZIP | `SHEETSAGE2_OUTPUT_DIR` |
+| `storage/msst/` | MSST 声部分离 ZIP；不受 WAV 自动保留策略清理 | `MSST_OUTPUT_DIR` |
 | `storage/mert_v2_fullsong/` | MERT-v2-FullSong 的整曲 JSON embedding 与逐帧 NPZ 特征 | `MERT_V2_FULLSONG_OUTPUT_DIR` |
 | `storage/clone/` | 普通参考音频与 TTS 克隆结果 | `CLONE_STORAGE_DIR`、各服务的 `*_OUTPUT_DIR` |
 | `storage/separation/` | TIGER-DnR 每次分离的 dialog、effects、music Stem 与 ZIP | `TIGER_DNR_OUTPUT_DIR` |
+| `storage/video/` | SoulX-FlashHead、HunyuanVideo-1.5 与 Wan2.2 生成的 MP4 | `SOULX_FLASHHEAD_OUTPUT_DIR`、`HUNYUAN_VIDEO_COMFY_OUTPUT_DIR`、`WAN22_TI2V_OUTPUT_DIR` |
 | `storage/training/` | 文本润色实验的数据集、adapter 和预测结果 | 训练脚本的 `--output-dir` 与训练配置 |
 | `storage/.cache/runtime/` | worker 临时文件、母带/Steam Audio 任务缓存、库缓存和共享 GPU 锁 | `RUNTIME_CACHE_DIR`、`SPATIAL_EXPORT_CACHE_DIR`、`STEAM_AUDIO_RENDER_CACHE_DIR`、`GPU_LOCK_FILE` |
 
@@ -156,9 +163,9 @@ cd LLM-for-Local-Machine
 先为需要的服务同步锁定依赖；部署全部服务时可以执行：
 
 ```bash
-for project in model-video/avatar_soulx-flashhead-1.3b model-audio/analyse_moss-music-8b-Instruct model-audio/clone_qwen3-tts-1.7b-base model-audio/clone_voxcpm-2 model-audio/music_ace-step-1.5 model-audio/music_yue2-3b \
+for project in model-video/avatar_soulx-flashhead-1.3b model-video/HunyuanVideo-1.5-Comfy model-video/Wan2.2-TI2V-5B-GGUF model-audio/analyse_moss-music-8b-Instruct model-audio/clone_qwen3-tts-1.7b-base model-audio/clone_voxcpm-2 model-audio/music_ace-step-1.5 model-audio/music_yue2-3b \
   model-audio/score_sheetsage-2 model-audio/codec_yue2-vae model-audio/embedding_mert-v2-fullsong \
-  model-audio/design_qwen3-tts-1.7b-voicedesign model-audio/clone_confucius-4 model-audio/transcribe_qwen3-asr-1.7b model-audio/separate_tiger-dnr; do
+  model-audio/design_qwen3-tts-1.7b-voicedesign model-audio/clone_confucius-4 model-audio/transcribe_qwen3-asr-1.7b model-audio/separate_tiger-dnr model-audio/separate_msst-mega53; do
   uv sync --project "$project" --locked
 done
 ```
@@ -197,8 +204,8 @@ Tokenizer 和上游源码就绪后启动全部服务：
 bash start.sh
 ```
 
-`start.sh` 会启动 8300、8301、8310、8313、8314、8315、8316、8317、8321、8322、8351、8361、8371 和 8391，
-共 14 个进程；8300 使用 `model-audio/clone_qwen3-tts-1.7b-base` uv 项目中的轻量 HTTP 依赖，其余服务使用
+`start.sh` 会启动 8300、8301、8310、8313、8314、8315、8316、8317、8321、8322、8351、8361、8371、8380、8391、8392 和 8393，
+共 17 个进程；8300 使用 `model-audio/clone_qwen3-tts-1.7b-base` uv 项目中的轻量 HTTP 依赖，其余服务使用
 各自的 uv 项目。启动命令统一使用 `uv run --no-sync`，不会在运行阶段联网解析依赖；
 本地 GPU 服务通过 `GPU_LOCK_FILE` 串行访问 GPU。默认最多排队 900 秒，超过时返回
 `503`；用正数 `GPU_LOCK_WAIT_TIMEOUT` 调整。共享锁实现仍兼容非正值无限等待，
@@ -354,6 +361,8 @@ HOST=127.0.0.1 PORT=8321 \
 | MERT-v2-FullSong | `$HF_MIRROR_DIR/m-a-p/MERT-v2-FullSong` | `MERT_V2_FULLSONG_MODEL_DIR`、`MERT_V2_FULLSONG_OUTPUT_DIR`、`MERT_V2_FULLSONG_DEVICE`、`MERT_V2_FULLSONG_REQUEST_TIMEOUT` |
 | VoxCPM2 | `$HF_MIRROR_DIR/openbmb/VoxCPM2` | `VOXCPM2_MODEL_DIR`、仓库内 `model-audio/clone_voxcpm-2/voxcpm2_helpers.py` |
 | TIGER-DnR | `$HF_MIRROR_DIR/JusperLee/TIGER-DnR` | `TIGER_DNR_MODEL_DIR`、`TIGER_DNR_SOURCE_DIR` |
+| HunyuanVideo-1.5 Comfy | `$HF_MIRROR_DIR/HunyuanVideo-1.5-Comfy` | `HUNYUAN_VIDEO_COMFY_MODEL_DIR`、`HUNYUAN_VIDEO_COMFY_CODE_PATH` |
+| Wan2.2 TI2V 5B GGUF | `$HF_MIRROR_DIR/QuantStack/Wan2.2-TI2V-5B-GGUF` | `WAN22_TI2V_MODEL_DIR`、`WAN22_TI2V_COMFYUI_CODE_PATH`、`WAN22_TI2V_GGUF_NODE_PATH` |
 
 仓库外推理源码的默认位置如下，须在请求前准备；`start.sh` 不负责拉取源码：
 
@@ -361,6 +370,8 @@ HOST=127.0.0.1 PORT=8321 \
 | --- | --- | --- |
 | Confucius4-TTS | `$HOME/LLM-depency/Confucius4-TTS` | `CONFUCIUS4_TTS_CODE_PATH` |
 | TIGER-DnR | `$HOME/.local/share/tiger-dnr/TIGER` | `TIGER_DNR_SOURCE_DIR` |
+| HunyuanVideo-1.5 Comfy | `$HOME/LLM-depency/ComfyUI` | `HUNYUAN_VIDEO_COMFY_CODE_PATH` |
+| Wan2.2 TI2V 5B GGUF | `$HOME/LLM-depency/ComfyUI` 与 `$HOME/LLM-depency/ComfyUI-GGUF` | `WAN22_TI2V_COMFYUI_CODE_PATH`、`WAN22_TI2V_GGUF_NODE_PATH` |
 
 通用配置包括 `HOST`、`PORT`、`STORAGE_DIR`、`PROMPTS_DIR`、`RUNTIME_CACHE_DIR`、
 `GPU_LOCK_FILE`、`LOCAL_FILES_ONLY` 和 `CUDA_RELEASE_DELAY`。48 kHz 导出可用
@@ -856,6 +867,49 @@ curl -fsS http://127.0.0.1:8391/v1/soulX/flashHead \
 默认上传上限 64 MiB、驱动音频时长上限 300 秒；完整字段、预检和单 GPU 限制见
 [SoulX-FlashHead 服务说明](model-video/avatar_soulx-flashhead-1.3b/README.md)。
 
+## HunyuanVideo-1.5 Comfy 图生视频
+
+服务在 `8393` 提供 `POST /v1/Tencent-Hunyuan/HunyuanVideo-1.5-Comfy`。先用 `/v1/upload_image`
+上传参考图，再传入图片逻辑路径和提示词；响应是 `video/mp4`。当前接入的是本地 480p
+step-distilled FP8 图生视频权重，输出固定为 848×480、24 FPS；步数允许 8 或 12，帧数允许
+49、73、97 或 121。HTTP 进程不加载模型，每个请求启动独立 ComfyUI 子进程和一次性 worker，
+并使用共享 GPU 锁排队。
+
+```bash
+curl -fsS http://127.0.0.1:8393/v1/upload_image \
+  -F 'image=@portrait.png;type=image/png' -F 'full_path=portrait.png'
+curl -fsS http://127.0.0.1:8393/v1/Tencent-Hunyuan/HunyuanVideo-1.5-Comfy \
+  -H 'Content-Type: application/json' \
+  -d '{"image_path":"portrait.png","prompt":"A person walks through a quiet garden at dawn, slow cinematic camera movement","seed":42,"steps":8,"num_frames":121}' \
+  -o hunyuan-video.mp4
+```
+
+默认权重位于 `$HF_MIRROR_DIR/HunyuanVideo-1.5-Comfy`，ComfyUI 源码默认位于
+`$HOME/LLM-depency/ComfyUI`。源码需包含 `HunyuanVideo15ImageToVideo` 与 `SaveVideo` 核心节点；
+服务通过一次性 extra-model-paths 配置挂载本地权重，不复制或下载模型。准备 ComfyUI
+源码后执行 `uv sync --project model-video/HunyuanVideo-1.5-Comfy --locked`。运行参数、依赖
+和完整输入约束见 [HunyuanVideo-1.5 Comfy 服务说明](model-video/HunyuanVideo-1.5-Comfy/README.md)。
+
+## Wan2.2 TI2V 5B GGUF 文生/图生视频
+
+服务在 `8392` 提供 `POST /v1/QuantStack/Wan2.2-TI2V-5B-GGUF`。请求可只传文本提示词生成视频，
+也可先通过 `/v1/upload_image` 上传参考图并传入 `image_path`。默认输出 832×480、49 帧、24 FPS；
+分辨率、帧数和采样步数可按请求调整。接口使用一次性 ComfyUI worker、共享 GPU 锁和本地 GGUF 节点，
+HTTP 进程不加载 Torch。
+
+```bash
+curl -fsS http://127.0.0.1:8392/v1/QuantStack/Wan2.2-TI2V-5B-GGUF \
+  -H 'Content-Type: application/json' \
+  -d '{"prompt":"A small boat glides across a misty lake at sunrise, slow cinematic camera movement","width":832,"height":480,"num_frames":49,"steps":20,"seed":42}' \
+  -o wan22-video.mp4
+```
+
+主模型、UMT5 FP8 文本编码器和 VAE 默认位于 `$HF_MIRROR_DIR/QuantStack/Wan2.2-TI2V-5B-GGUF`；
+ComfyUI 与 ComfyUI-GGUF 源码默认位于 `$HOME/LLM-depency/ComfyUI` 和
+`$HOME/LLM-depency/ComfyUI-GGUF`。服务将文本编码放在 CPU、分块解码 VAE，并限制分辨率面积，
+以适配 16 GB 显存。执行 `uv sync --project model-video/Wan2.2-TI2V-5B-GGUF --locked` 后启动；
+完整字段、图片输入及运行配置见 [Wan2.2 TI2V 服务说明](model-video/Wan2.2-TI2V-5B-GGUF/README.md)。
+
 ## 文本润色训练实验
 
 `model-text/scripts/training/` 与 `model-text/training/configs/` 提供有声书“原始小说片段 → 纯净可朗读文本”的
@@ -913,7 +967,7 @@ adapter、数据集和预测都写入 `storage/training/`，不提交到 Git。
   uv run --project model-audio/clone_qwen3-tts-1.7b-base python main/storage_maintenance.py --apply
   ```
 
-维护脚本处理默认音色、克隆和 BGM 目录中列出的生成 WAV 前缀：Qwen VoiceDesign、Qwen3-TTS/VoxCPM2、ACE-Step 与 YuE2-3B。它保护普通上传和仍被 .references 引用的音色，但尚不清理 Confucius4-TTS、SheetSage2 ZIP、YuE2-Vae latent/WAV、MERT-v2-FullSong JSON/NPZ、TIGER 分离批次或训练产物，也不自动遍历每个自定义输出目录。STORAGE_RETENTION_MAX_BYTES 只约束这些匹配的生成 WAV，不限制整个 storage/。修改输出目录时需同步考虑维护脚本的扫描范围。
+维护脚本处理默认音色、克隆和 BGM 目录中列出的生成 WAV 前缀：Qwen VoiceDesign、Qwen3-TTS/VoxCPM2、ACE-Step 与 YuE2-3B。它保护普通上传和仍被 .references 引用的音色，但尚不清理 Confucius4-TTS、SheetSage2 ZIP、YuE2-Vae latent/WAV、MERT-v2-FullSong JSON/NPZ、TIGER 分离批次、MSST ZIP 或训练产物，也不自动遍历每个自定义输出目录。STORAGE_RETENTION_MAX_BYTES 只约束这些匹配的生成 WAV，不限制整个 storage/。修改输出目录时需同步考虑维护脚本的扫描范围。
 
 ## 测试与开发
 
@@ -960,3 +1014,27 @@ FastAPI TestClient 回归使用 QA 的 `httpx2` 兼容依赖。不得为无模�
 
 本仓库代码采用 [Apache-2.0](LICENSE)。模型权重、上游推理源码、Steam Audio SDK 和云端
 服务各自的许可与使用条款独立适用。
+
+## MSST Mega 53 音乐分轨（8380）
+
+`model-audio/separate_msst-mega53` 提供 `POST /v1/msst/separate`。调用方上传 `audio`，
+并通过必填 `stems` 选择本地模型支持的任意非空声部子集；`GET /v1/health` 返回完整支持清单。
+模型层不固定业务推荐乐器，不默认分离全部 53 类。`chunk_seconds` 可选 5/10/20，默认 10 秒。
+
+```bash
+# 新增独立服务环境需要手动同步；外部 MSST .venv 不代替该步骤。
+uv sync --project model-audio/separate_msst-mega53 --locked
+curl --fail-with-body http://127.0.0.1:8380/v1/msst/separate \
+  -F 'audio=@song.wav' -F 'stems=guitar,strings,synth' -F 'chunk_seconds=10' -o stems.zip
+```
+
+ZIP 包含请求声部、`residual.wav` 和分轨 `manifest.json`，WAV 均为 44.1 kHz 双声道 FLOAT。
+外部源码默认位于 `~/LLM-depency/Music-Source-Separation-Training`（`MSST_SOURCE_DIR`），
+完整模型位于 `$HF_MIRROR_DIR/oulianov/mvsep_mega_53`（`MSST_MODEL_DIR`）；
+结果原子保存至 `storage/msst/`（`MSST_OUTPUT_DIR`），不由 WAV 保留策略清理。
+服务拥有独立 uv 项目与一次性 worker，沿用共享 GPU 锁；不加入 LocalAI 五个固定 bridge。
+
+业务侧按需挑选目标：吉他适合侧向定位，弦乐与合成器适合保留宽广立体声，管乐与打击乐可按配器增加；
+这是业务建议而非模型限制。模型可能产生重叠或串音，原曲不能再次叠加，丢弃提取轨须回并 residual。
+分轨元数据不能直接提交空间接口；业务方另行生成 Render Manifest v1，并将对象资产提交给
+8300 `/v1/audio/spatial/render` 完成混合与最终导出。详见 [服务配置、合同与限制](model-audio/separate_msst-mega53/README.md)。

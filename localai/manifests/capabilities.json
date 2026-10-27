@@ -4,7 +4,7 @@
   "repository_head": "working-tree-after-model-mirror-retirement-audit",
   "evidence_level": "E0",
   "evidence_note": "静态源码与文件系统盘点：服务能力快照由 AST 和源码路由校验。直接 LocalAI audio.cpp 候选仅保留 hf-mirror 中存在的 Qwen3-TTS Base/VoiceDesign；五个 one-shot worker bridge 固定保留在独立清单。其余缺少本地模型制品的候选已移除；原生服务和接口按模型主目录是否存在维护。audio_cpp_family_screen 仅记录固定 revision 的上游 E1 family/task 证据，不代表服务具有 LocalAI provider 或达到 E2/E3。",
-  "service_count_with_uv_projects": 13,
+  "service_count_with_uv_projects": 14,
   "services": [
     {
       "project": "Confucius4_TTS",
@@ -5792,6 +5792,142 @@
         }
       ],
       "notes": "恢复独立 uv/FastAPI 服务；CPU 文件预检、共享有界 GPU 队列、单请求 worker 和整组退出清理。"
+    },
+    {
+      "project": "MSST-Mega53",
+      "directory": "model-audio/separate_msst-mega53",
+      "ports": [
+        8380
+      ],
+      "phase": "native_only",
+      "scope": "local_audio_model",
+      "kind": "targeted_music_source_separation",
+      "native_default_provider": "native",
+      "migration_status": "native_only",
+      "output": "44.1 kHz FLOAT WAV 与 manifest.json ZIP",
+      "default_storage": "storage/msst/",
+      "request_schemas": {},
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/v1/health",
+          "source": "model-audio/separate_msst-mega53/main.py",
+          "line": 164,
+          "parameters": [],
+          "request_schemas": []
+        },
+        {
+          "method": "POST",
+          "path": "/v1/msst/separate",
+          "source": "model-audio/separate_msst-mega53/main.py",
+          "line": 348,
+          "parameters": [
+            {
+              "name": "audio",
+              "type": "UploadFile",
+              "default": "File(...)",
+              "required": true
+            },
+            {
+              "name": "stems",
+              "type": "str",
+              "default": "Form(...)",
+              "required": true
+            },
+            {
+              "name": "chunk_seconds",
+              "type": "int",
+              "default": "Form(DEFAULT_CHUNK_SECONDS)",
+              "required": false
+            }
+          ],
+          "request_schemas": []
+        }
+      ],
+      "migration_field_mapping": {
+        "status": "native_only",
+        "destination_candidate": "无 LocalAI provider；不加入五个固定 worker bridge。",
+        "routes": [
+          {
+            "method": "GET",
+            "path": "/v1/health",
+            "source": "model-audio/separate_msst-mega53/main.py",
+            "line": 164,
+            "parameters": [],
+            "request_schemas": [],
+            "source_fields": [],
+            "field_mappings": []
+          },
+          {
+            "method": "POST",
+            "path": "/v1/msst/separate",
+            "source": "model-audio/separate_msst-mega53/main.py",
+            "line": 348,
+            "parameters": [
+              {
+                "name": "audio",
+                "type": "UploadFile",
+                "default": "File(...)",
+                "required": true
+              },
+              {
+                "name": "stems",
+                "type": "str",
+                "default": "Form(...)",
+                "required": true
+              },
+              {
+                "name": "chunk_seconds",
+                "type": "int",
+                "default": "Form(DEFAULT_CHUNK_SECONDS)",
+                "required": false
+              }
+            ],
+            "request_schemas": [],
+            "source_fields": [
+              {
+                "name": "audio",
+                "type": "UploadFile",
+                "default": "File(...)",
+                "required": true
+              },
+              {
+                "name": "stems",
+                "type": "str",
+                "default": "Form(...)",
+                "required": true
+              },
+              {
+                "name": "chunk_seconds",
+                "type": "int",
+                "default": "Form(DEFAULT_CHUNK_SECONDS)",
+                "required": false
+              }
+            ],
+            "field_mappings": [
+              {
+                "source_field": "audio",
+                "destination_field": "service_contract.audio",
+                "status": "native_only",
+                "verification": "原生一次性 MSST worker 合同，无模型回归；真实推理待验收。"
+              },
+              {
+                "source_field": "stems",
+                "destination_field": "service_contract.stems",
+                "status": "native_only",
+                "verification": "原生一次性 MSST worker 合同，无模型回归；真实推理待验收。"
+              },
+              {
+                "source_field": "chunk_seconds",
+                "destination_field": "service_contract.chunk_seconds",
+                "status": "native_only",
+                "verification": "原生一次性 MSST worker 合同，无模型回归；真实推理待验收。"
+              }
+            ]
+          }
+        ]
+      },
+      "notes": "stems 必填，由调用方按模型配置选择；仅所选输出头进入 GPU；residual 为数学差值；真实推理尚未验收。"
     }
   ],
   "updated_on": "2026-10-22",
@@ -5931,6 +6067,14 @@
         "declared_tasks": [],
         "catalog_entry_line": null,
         "assessment": "人像视频模型，不属于 audio.cpp 音频 family 筛选范围；保持原生单 GPU 服务。"
+      },
+      {
+        "project": "MSST-Mega53",
+        "status": "excluded",
+        "family": null,
+        "declared_tasks": [],
+        "catalog_entry_line": null,
+        "assessment": "BS-RoFormer 多声部分离模型，保持原生 MSST worker，不扩展固定 LocalAI bridge。"
       }
     ]
   }

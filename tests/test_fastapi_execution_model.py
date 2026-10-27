@@ -59,6 +59,11 @@ class FastApiExecutionModelTests(unittest.TestCase):
                 "/v1/confucius4TTS/generate",
             },
             "model-audio/separate_tiger-dnr/main.py": {"/v1/health"},
+            "model-video/HunyuanVideo-1.5-Comfy/main.py": {
+                "/v1/health",
+                "/v1/check/image",
+                "/v1/Tencent-Hunyuan/HunyuanVideo-1.5-Comfy",
+            },
         }
 
         for relative_path, routes in expected_routes.items():
@@ -82,13 +87,19 @@ class FastApiExecutionModelTests(unittest.TestCase):
             "model-audio/clone_qwen3-tts-1.7b-base/main.py",
             "model-audio/clone_voxcpm-2/main.py",
             "model-audio/clone_confucius-4/main.py",
+            "model-video/HunyuanVideo-1.5-Comfy/main.py",
         }
 
         for relative_path in upload_sources:
             with self.subTest(source=relative_path):
                 source = (REPOSITORY_DIR / relative_path).read_text(encoding="utf-8")
+                upload_handler = (
+                    "store_uploaded_image"
+                    if relative_path == "model-video/HunyuanVideo-1.5-Comfy/main.py"
+                    else "store_uploaded_audio"
+                )
                 self.assertIn(
-                    "return await run_in_threadpool(store_uploaded_audio,",
+                    f"return await run_in_threadpool({upload_handler},",
                     source,
                 )
 

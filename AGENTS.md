@@ -1,15 +1,52 @@
 # 仓库开发指南
 
+
+# Music Postprocessing Rules
+
+## Skill routing
+
+- audio-analyzer:
+  仅负责音频分析，输出 JSON，不修改源音频。
+
+- mix-engineer:
+  仅负责分轨 EQ、动态处理和混音。
+  不执行最终母带标准化。
+
+- mastering-engineer:
+  唯一负责最终母带、响度及峰值控制。
+
+- ffmpeg-skill:
+  仅负责音频裁剪、探测、格式转换和通用导出。
+  不主动接管混音与母带任务。
+
+- music-evaluate:
+  仅负责质量评估和生成报告。
+  未经明确授权不得重新处理音频。
+
+- batch-processor:
+  负责批量任务执行，不决定音乐处理策略。
+
+## Execution rules
+
+1. 所有输入源文件只读。
+2. 每个处理阶段写入独立输出目录。
+3. 前一阶段通过验证后才能执行下一阶段。
+4. 同一任务不得由两个 Skill 重复执行响度归一化。
+5. 禁止多个进程同时写入同一输出文件。
+6. 默认不并行执行多个 GPU 音频模型。
+7. 全部阶段完成后执行最终质量检查。
+8. 不得把 AI 分离的估计分轨当作原生录音分轨。
+
 ## 适用范围与依据
 
 本仓库提供面向本地部署的 LLM 音视频后端，当前保留音乐理解、语音克隆、文本音色设计、BGM、语音转写、
-音乐转谱、音源分离、CPU 母带和 Steam Audio 空间导出。服务采用独立 uv 项目和一次性 worker。
+音乐转谱、音源分离、人像/图生视频、CPU 母带和 Steam Audio 空间导出。服务采用独立 uv 项目和一次性 worker。
 文档遵循 CONSTITUTION.md 的中文优先要求；接口和配置以实际源码为准。
 README.md 提供接入、配置和运维说明，本文件记录开发边界与命令。
 
 ## 项目结构与服务速查
 
-当前维护 13 个模型服务 uv 项目与一个轻量控制面，start.sh 合计启动 14 个 HTTP 进程；
+当前维护 16 个模型服务 uv 项目与一个轻量控制面，start.sh 合计启动 17 个 HTTP 进程；
 localai_worker_bridge 是额外的非 HTTP uv 包，不计入服务数，也不常驻导入 Torch。
 原生能力和输出见 README 服务总览；端口、方法及路径以源码为准。
 区分模型原生能力、已接入接口与服务编排；各 HTTP 进程提供 GET /v1/health。
@@ -29,7 +66,10 @@ localai_worker_bridge 是额外的非 HTTP uv 包，不计入服务数，也不�
 | `model-audio/separate_tiger-dnr/` | 8351 | POST /v1/tigerDnr/separate | 对白/音效/音乐三路 Stem 分离 | 三路音频波形 |
 | `model-audio/clone_confucius-4/` | 8361 | POST /v1/confucius4TTS/generate | 14 语种跨语言零样本 TTS 克隆 | 语音波形 |
 | `model-audio/transcribe_qwen3-asr-1.7b/` | 8371 | POST /v1/qwen3/asr | 语种识别与语音转写 | 转写文本与语种 |
+| `model-audio/separate_msst-mega53/` | 8380 | POST /v1/msst/separate | 按调用方选择分离音乐声部 | FLOAT WAV 与元数据 ZIP |
 | `model-video/avatar_soulx-flashhead-1.3b/` | 8391 | POST /v1/soulX/flashHead | 人像图片和音频驱动的单 GPU 视频生成 | 带音轨 MP4 |
+| `model-video/HunyuanVideo-1.5-Comfy/` | 8393 | POST /v1/Tencent-Hunyuan/HunyuanVideo-1.5-Comfy | HunyuanVideo-1.5 480p step-distilled 图生视频 | 848×480 MP4 |
+| `model-video/Wan2.2-TI2V-5B-GGUF/` | 8392 | POST /v1/QuantStack/Wan2.2-TI2V-5B-GGUF | Wan2.2 TI2V 5B GGUF 文生视频/图生视频 | MP4 视频 |
 
 - main/main.py 只处理健康/控制、共享上传/检查和 CPU 导出，不加载模型包或推理。
   空间任务进度 GET /v1/audio/spatial/render/progress/{job_id} 是进程内状态。
@@ -46,14 +86,23 @@ localai_worker_bridge 是额外的非 HTTP uv 包，不计入服务数，也不�
   localai/manifests/worker-bridge.json 固定的五个模型 ID、项目和 worker.py 入口启动一次性 worker，
   只监听 loopback，不导入 FastAPI、Torch 或模型包。新增 worker 须覆盖合同、超时、大小、
   环境白名单和异常退出清理。
+- model-audio/separate_msst-mega53/ 使用外部 MSST 源码和 hf-mirror 下的完整 Mega 53 权重；
+  调用方必须通过 stems 选择模型支持的声部，并始终保留数学 residual。
+  不加入 LocalAI 固定五个 bridge，默认 storage/msst/ ZIP 不由 WAV 保留策略清理。
 - model-audio/spatial_steam-audio/ 是 C++17 Steam Audio CPU renderer，不获取 GPU 锁；SDK 和动态库在仓库外。
 - qa/ 是无模型测试/Ruff 项目；scripts/quality_gate.sh 与 GitHub Actions 使用同一质量门禁。
   根目录回归使用 QA；ACE-Step 服务内测试从 model-audio/music_ace-step-1.5/ 执行。
 - model-text/scripts/training/、model-text/training/configs/ 是纯文本润色 LoRA 实验，不是语音训练或 HTTP 服务。
 - model-video/avatar_soulx-flashhead-1.3b/ 维护 SoulX-FlashHead 单 GPU 人像视频服务；
-  8391 提供 POST /v1/soulX/flashHead，计入 start.sh 的 14 个 HTTP 进程。
+  8391 提供 POST /v1/soulX/flashHead，计入 start.sh 的 17 个 HTTP 进程。
   主模型及 wav2vec2 编码器均放在 hf-mirror/Soul-AILab 下；保持独立 uv 环境与一次性 worker，
   不加入 LocalAI 的五个固定 worker bridge。图片/音频使用上传逻辑标识，不能直接读取任意服务器路径。
+- model-video/HunyuanVideo-1.5-Comfy/ 使用 ComfyUI 核心节点运行本地 480p step-distilled FP8 图生视频；
+  8393 提供 POST /v1/Tencent-Hunyuan/HunyuanVideo-1.5-Comfy。HTTP 层保持轻量，ComfyUI API 子进程
+  仅在一次性 worker 中启动；使用共享 GPU 锁，图片只通过上传逻辑标识读取，视频写入 storage/video/。
+- model-video/Wan2.2-TI2V-5B-GGUF/ 使用 ComfyUI 与临时白名单 ComfyUI-GGUF 节点运行 Wan2.2 TI2V；
+  8392 提供 POST /v1/QuantStack/Wan2.2-TI2V-5B-GGUF。worker 临时挂载节点源码，不修改仓库外依赖；
+  使用共享 GPU 锁，支持无图文生视频和通过上传逻辑标识输入图片，视频写入 storage/video/。
 - 流行*模型功能简介.md、task*.md 和 `空间音频讨论/` 是调研/任务/方案资料，
   不能据此推断已实现能力。
 

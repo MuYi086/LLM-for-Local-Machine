@@ -1,0 +1,80 @@
+[project]
+name = "wan22-ti2v-5b-gguf-service"
+version = "0.1.0"
+description = "LLM Local Backend Wan2.2-TI2V-5B-GGUF ComfyUI video service"
+requires-python = "==3.12.13"
+dependencies = [
+    "fastapi==0.141.1",
+    "starlette==1.6.0",
+    "uvicorn==0.52.1",
+    "pydantic==2.13.4",
+    "python-multipart==0.0.32",
+    "torch==2.7.1",
+    "torchvision==0.22.1",
+    "torchaudio==2.7.1",
+    "torchsde==0.2.6",
+    "numpy==1.26.4",
+    "einops>=0.8.1",
+    "transformers>=4.57.3,<5",
+    "tokenizers>=0.21.1",
+    "sentencepiece>=0.2.0",
+    "safetensors>=0.4.5",
+    "aiohttp>=3.11.8",
+    "yarl>=1.18.0",
+    "pyyaml>=6.0.2",
+    "pillow>=11.1.0",
+    "scipy>=1.15.3",
+    "tqdm>=4.67.1",
+    "psutil>=6.1.1",
+    "av>=17.0.0",
+    "alembic>=1.15.2",
+    "sqlalchemy>=2.0.0",
+    "filelock>=3.18.0",
+    "comfy-aimdo==0.6.0",
+    "comfy-kitchen==0.2.40",
+    "comfyui-frontend-package==1.57.4",
+    "comfyui-workflow-templates==0.11.97",
+    "comfyui-embedded-docs==0.5.15",
+    "requests>=2.32.3",
+    "simpleeval>=1.0.0",
+    "blake3>=1.0.4",
+    "gguf>=0.13.0",
+    "protobuf>=5.29.3",
+    "llm-local-runtime",
+]
+
+[dependency-groups]
+dev = ["ruff>=0.15.9"]
+
+[tool.uv]
+package = false
+index-strategy = "first-index"
+
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
+default = true
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv.sources]
+llm-local-runtime = { path = "../../llm_local_runtime", editable = true }
+torch = { index = "pytorch-cu128" }
+torchvision = { index = "pytorch-cu128" }
+torchaudio = { index = "pytorch-cu128" }
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["B008", "E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
