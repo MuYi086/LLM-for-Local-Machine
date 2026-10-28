@@ -14,6 +14,7 @@ MODEL_PROJECTS = (
     "model-video/avatar_soulx-flashhead-1.3b",
     "model-audio/analyse_moss-music-8b-Instruct",
     "model-audio/clone_qwen3-tts-1.7b-base",
+    "model-audio/indexTTS-2.5",
     "model-audio/clone_voxcpm-2",
     "model-audio/music_ace-step-1.5",
     "model-audio/design_qwen3-tts-1.7b-voicedesign",

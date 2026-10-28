@@ -24,6 +24,21 @@ main = startup_ports.main
 
 
 class StartupPortTests(unittest.TestCase):
+    def test_indextts25_is_registered_for_startup_and_port_preflight(self) -> None:
+        start_script = (Path(__file__).resolve().parents[1] / "start.sh").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn('INDEXTTS25_PORT="${INDEXTTS25_PORT:-8323}"', start_script)
+        self.assertIn(
+            'INDEXTTS25_CODE_PATH="${INDEXTTS25_CODE_PATH:-$HOME/LLM-depency/index-tts-2.5.0}"',
+            start_script,
+        )
+        self.assertIn('\'IndexTTS-2.5\' "$INDEXTTS25_HOST" "$INDEXTTS25_PORT"', start_script)
+        self.assertIn("'/v1/index-team/indexTTS-2.5'", start_script)
+        self.assertIn('setsid uv run --no-sync --project "$INDEXTTS25_PROJECT_DIR"', start_script)
+        self.assertIn('"$indextts25_pid"', start_script)
+
     def test_available_ports_are_released_after_checking(self) -> None:
         listener = MagicMock()
         listener.__enter__.return_value = listener

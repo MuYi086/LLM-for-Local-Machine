@@ -26,6 +26,7 @@ STORAGE_DIR="${STORAGE_DIR:-$PROJECT_DIR/storage}"
 export STORAGE_DIR
 # 控制面 wrapper 使用 Qwen3-TTS 的 uv 环境；重型 worker 使用各自项目环境。
 QWEN3_TTS_PROJECT_DIR="${QWEN3_TTS_PROJECT_DIR:-$PROJECT_DIR/model-audio/clone_qwen3-tts-1.7b-base}"
+INDEXTTS25_PROJECT_DIR="${INDEXTTS25_PROJECT_DIR:-$PROJECT_DIR/model-audio/indexTTS-2.5}"
 QWEN3_VOICEDESIGN_PROJECT_DIR="${QWEN3_VOICEDESIGN_PROJECT_DIR:-$PROJECT_DIR/model-audio/design_qwen3-tts-1.7b-voicedesign}"
 CONFUCIUS4_TTS_PROJECT_DIR="${CONFUCIUS4_TTS_PROJECT_DIR:-$PROJECT_DIR/model-audio/clone_confucius-4}"
 QWEN3_ASR_PROJECT_DIR="${QWEN3_ASR_PROJECT_DIR:-$PROJECT_DIR/model-audio/transcribe_qwen3-asr-1.7b}"
@@ -42,6 +43,11 @@ SOULX_FLASHHEAD_PROJECT_DIR="${SOULX_FLASHHEAD_PROJECT_DIR:-$PROJECT_DIR/model-v
 HUNYUAN_VIDEO_COMFY_PROJECT_DIR="${HUNYUAN_VIDEO_COMFY_PROJECT_DIR:-$PROJECT_DIR/model-video/HunyuanVideo-1.5-Comfy}"
 
 export HF_MIRROR_DIR="${HF_MIRROR_DIR:-$HOME/hf-mirror}"
+export INDEXTTS25_MODEL_DIR="${INDEXTTS25_MODEL_DIR:-$HF_MIRROR_DIR/IndexTeam/IndexTTS-2.5}"
+export INDEXTTS25_CODE_PATH="${INDEXTTS25_CODE_PATH:-$HOME/LLM-depency/index-tts-2.5.0}"
+export INDEXTTS25_W2V_BERT_MODEL_DIR="${INDEXTTS25_W2V_BERT_MODEL_DIR:-$HF_MIRROR_DIR/netease-youdao/facebook/w2v-bert-2.0}"
+export INDEXTTS25_CAMPPLUS_PATH="${INDEXTTS25_CAMPPLUS_PATH:-$HF_MIRROR_DIR/netease-youdao/funasr/campplus/campplus_cn_common.bin}"
+export INDEXTTS25_BIGVGAN_MODEL_DIR="${INDEXTTS25_BIGVGAN_MODEL_DIR:-$HF_MIRROR_DIR/netease-youdao/nv-community/bigvgan_v2_22khz_80band_256x}"
 export MSST_MODEL_DIR="${MSST_MODEL_DIR:-$HF_MIRROR_DIR/oulianov/mvsep_mega_53}"
 export MSST_SOURCE_DIR="${MSST_SOURCE_DIR:-$HOME/LLM-depency/Music-Source-Separation-Training}"
 export MSST_OUTPUT_DIR="${MSST_OUTPUT_DIR:-$STORAGE_DIR/msst}"
@@ -119,6 +125,9 @@ export QWEN3_TTS_OUTPUT_DIR="${QWEN3_TTS_OUTPUT_DIR:-$CLONE_STORAGE_DIR}"
 export VOXCPM2_OUTPUT_DIR="${VOXCPM2_OUTPUT_DIR:-$CLONE_STORAGE_DIR}"
 export PROMPTS_DIR="${PROMPTS_DIR:-$CLONE_STORAGE_DIR}"
 export RUNTIME_CACHE_DIR="${RUNTIME_CACHE_DIR:-$STORAGE_DIR/.cache/runtime}"
+export INDEXTTS25_OUTPUT_DIR="${INDEXTTS25_OUTPUT_DIR:-$CLONE_STORAGE_DIR}"
+export INDEXTTS25_WORKER_TMP_DIR="${INDEXTTS25_WORKER_TMP_DIR:-$RUNTIME_CACHE_DIR/index_tts25_worker}"
+export INDEXTTS25_REQUEST_TIMEOUT="${INDEXTTS25_REQUEST_TIMEOUT:-900}"
 export SPATIAL_EXPORT_CACHE_DIR="${SPATIAL_EXPORT_CACHE_DIR:-$RUNTIME_CACHE_DIR/spatial_exports}"
 export SPATIAL_EXPORT_MAX_BYTES="${SPATIAL_EXPORT_MAX_BYTES:-536870912}"
 export SPATIAL_EXPORT_TIMEOUT="${SPATIAL_EXPORT_TIMEOUT:-600}"
@@ -146,6 +155,8 @@ export HOST="${HOST:-0.0.0.0}"
 export PORT="${PORT:-8300}"
 export QWEN3_TTS_HOST="${QWEN3_TTS_HOST:-$HOST}"
 export QWEN3_TTS_PORT="${QWEN3_TTS_PORT:-8321}"
+export INDEXTTS25_HOST="${INDEXTTS25_HOST:-$HOST}"
+export INDEXTTS25_PORT="${INDEXTTS25_PORT:-8323}"
 export VOXCPM2_HOST="${VOXCPM2_HOST:-$HOST}"
 export VOXCPM2_PORT="${VOXCPM2_PORT:-8322}"
 export QWEN_VOICEDESIGN_HOST="${QWEN_VOICEDESIGN_HOST:-$HOST}"
@@ -188,6 +199,7 @@ uv run --no-sync --project "$QWEN3_TTS_PROJECT_DIR" python "$MAIN_DIR/check_port
   'SheetSage2' "$SHEETSAGE2_HOST" "$SHEETSAGE2_PORT" \
   'YuE2-Vae' "$YUE2_VAE_HOST" "$YUE2_VAE_PORT" \
   'MERT-v2-FullSong' "$MERT_V2_FULLSONG_HOST" "$MERT_V2_FULLSONG_PORT" \
+  'IndexTTS-2.5' "$INDEXTTS25_HOST" "$INDEXTTS25_PORT" \
   'Qwen3-TTS Base' "$QWEN3_TTS_HOST" "$QWEN3_TTS_PORT" \
   'Qwen VoiceDesign' "$QWEN_VOICEDESIGN_HOST" "$QWEN_VOICEDESIGN_PORT" \
   'MSST-Mega53' "$MSST_HOST" "$MSST_PORT" \
@@ -273,6 +285,10 @@ echo "GPU lock file:       $GPU_LOCK_FILE"
 echo "Spatial audio export: $SPATIAL_EXPORT_FFMPEG_BIN -> $SPATIAL_EXPORT_CACHE_DIR"
 echo "Steam Audio renderer: $STEAM_AUDIO_RENDERER_BIN -> $STEAM_AUDIO_RENDER_CACHE_DIR"
 echo "Main API:            http://$HOST:$PORT"
+echo "IndexTTS-2.5 project: $INDEXTTS25_PROJECT_DIR"
+echo "IndexTTS-2.5 model:   $INDEXTTS25_MODEL_DIR"
+echo "IndexTTS-2.5 source:  $INDEXTTS25_CODE_PATH"
+echo "IndexTTS-2.5 API:     http://$INDEXTTS25_HOST:$INDEXTTS25_PORT/v1/index-team/indexTTS-2.5"
 echo "Control route:       http://127.0.0.1:$PORT/v1/control"
 echo "Audio export route:  http://127.0.0.1:$PORT/v1/audio/export"
 echo "Formal spatial route: http://127.0.0.1:$PORT/v1/audio/spatial/render"
@@ -328,6 +344,7 @@ printf '%-24s %-6s %s\n' 'SheetSage2' "$SHEETSAGE2_PORT" '/v1/m-a-p/SheetSage2'
 printf '%-24s %-6s %s\n' 'YuE2-Vae' "$YUE2_VAE_PORT" '/v1/m-a-p/YuE2-Vae'
 printf '%-24s %-6s %s\n' 'MERT-v2-FullSong' "$MERT_V2_FULLSONG_PORT" '/v1/m-a-p/MERT-v2-FullSong'
 printf '%-24s %-6s %s\n' 'Qwen3-TTS Base' "$QWEN3_TTS_PORT" '/v1/qwen/clone'
+printf '%-24s %-6s %s\n' 'IndexTTS-2.5' "$INDEXTTS25_PORT" '/v1/index-team/indexTTS-2.5'
 printf '%-24s %-6s %s\n' 'VoxCPM2' "$VOXCPM2_PORT" '/v1/voxcpm2/clone'
 printf '%-24s %-6s %s\n' 'SoulX-FlashHead-1.3B' "$SOULX_FLASHHEAD_PORT" '/v1/soulX/flashHead'
 printf '%-24s %-6s %s\n' 'HunyuanVideo-1.5-Comfy' "$HUNYUAN_VIDEO_COMFY_PORT" '/v1/Tencent-Hunyuan/HunyuanVideo-1.5-Comfy'
@@ -345,6 +362,7 @@ sheetsage2_pid=""
 yue2_vae_pid=""
 mert_v2_fullsong_pid=""
 qwen3_tts_pid=""
+indextts25_pid=""
 voxcpm2_pid=""
 qwen_voicedesign_pid=""
 tiger_dnr_pid=""
@@ -366,6 +384,7 @@ cleanup() {
     "$yue2_vae_pid"
     "$mert_v2_fullsong_pid"
     "$qwen3_tts_pid"
+    "$indextts25_pid"
     "$qwen_voicedesign_pid"
     "$msst_pid"
     "$tiger_dnr_pid"
@@ -474,6 +493,19 @@ msst_pid=$!
 # Qwen3-TTS uv 服务：使用最终约定的 8321 端口和克隆路由。
 HOST="$QWEN3_TTS_HOST" PORT="$QWEN3_TTS_PORT" setsid uv run --no-sync --project "$QWEN3_TTS_PROJECT_DIR" python "$QWEN3_TTS_PROJECT_DIR/main.py" &
 qwen3_tts_pid=$!
+# IndexTTS-2.5 使用独立 CUDA 12.8 uv 环境和一次性推理 worker。
+INDEXTTS25_HOST="$INDEXTTS25_HOST" INDEXTTS25_PORT="$INDEXTTS25_PORT" \
+  INDEXTTS25_MODEL_DIR="$INDEXTTS25_MODEL_DIR" INDEXTTS25_CODE_PATH="$INDEXTTS25_CODE_PATH" \
+  INDEXTTS25_W2V_BERT_MODEL_DIR="$INDEXTTS25_W2V_BERT_MODEL_DIR" \
+  INDEXTTS25_CAMPPLUS_PATH="$INDEXTTS25_CAMPPLUS_PATH" \
+  INDEXTTS25_BIGVGAN_MODEL_DIR="$INDEXTTS25_BIGVGAN_MODEL_DIR" \
+  INDEXTTS25_OUTPUT_DIR="$INDEXTTS25_OUTPUT_DIR" \
+  INDEXTTS25_WORKER_TMP_DIR="$INDEXTTS25_WORKER_TMP_DIR" \
+  INDEXTTS25_REQUEST_TIMEOUT="$INDEXTTS25_REQUEST_TIMEOUT" \
+  HOST="$INDEXTTS25_HOST" PORT="$INDEXTTS25_PORT" \
+  setsid uv run --no-sync --project "$INDEXTTS25_PROJECT_DIR" \
+  python "$INDEXTTS25_PROJECT_DIR/main.py" &
+indextts25_pid=$!
 # Qwen3-TTS VoiceDesign 独立 uv 服务：使用最终约定的 8301 端口。
 QWEN_VOICEDESIGN_HOST="$QWEN_VOICEDESIGN_HOST" QWEN_VOICEDESIGN_PORT="$QWEN_VOICEDESIGN_PORT" \
   HOST="$QWEN_VOICEDESIGN_HOST" PORT="$QWEN_VOICEDESIGN_PORT" \
@@ -531,4 +563,4 @@ HUNYUAN_VIDEO_COMFY_HOST="$HUNYUAN_VIDEO_COMFY_HOST" \
   setsid uv run --no-sync --project "$HUNYUAN_VIDEO_COMFY_PROJECT_DIR" \
   python "$HUNYUAN_VIDEO_COMFY_PROJECT_DIR/main.py" &
 hunyuan_video_comfy_pid=$!
-wait -n "$msst_pid" "$soulx_flashhead_pid" "$hunyuan_video_comfy_pid" "$moss_music_pid" "$main_pid" "$acestep_pid" "$yue2_3b_pid" "$sheetsage2_pid" "$yue2_vae_pid" "$mert_v2_fullsong_pid" "$qwen3_tts_pid" "$voxcpm2_pid" "$qwen_voicedesign_pid" "$tiger_dnr_pid" "$confucius4_tts_pid" "$qwen3_asr_pid"
+wait -n "$msst_pid" "$soulx_flashhead_pid" "$hunyuan_video_comfy_pid" "$moss_music_pid" "$main_pid" "$acestep_pid" "$yue2_3b_pid" "$sheetsage2_pid" "$yue2_vae_pid" "$mert_v2_fullsong_pid" "$qwen3_tts_pid" "$indextts25_pid" "$voxcpm2_pid" "$qwen_voicedesign_pid" "$tiger_dnr_pid" "$confucius4_tts_pid" "$qwen3_asr_pid"

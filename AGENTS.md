@@ -46,7 +46,7 @@ README.md 提供接入、配置和运维说明，本文件记录开发边界与�
 
 ## 项目结构与服务速查
 
-当前维护 15 个模型服务 uv 项目与一个轻量控制面，start.sh 合计启动 16 个 HTTP 进程；
+当前维护 16 个模型服务 uv 项目与一个轻量控制面，start.sh 合计启动 17 个 HTTP 进程；
 localai_worker_bridge 是额外的非 HTTP uv 包，不计入服务数，也不常驻导入 Torch。
 原生能力和输出见 README 服务总览；端口、方法及路径以源码为准。
 区分模型原生能力、已接入接口与服务编排；各 HTTP 进程提供 GET /v1/health。
@@ -63,6 +63,7 @@ localai_worker_bridge 是额外的非 HTTP uv 包，不计入服务数，也不�
 | `model-audio/embedding_mert-v2-fullsong/` | 8317 | POST /v1/m-a-p/MERT-v2-FullSong | 完整歌曲音乐表征提取 | 整曲 embedding 或逐帧 NPZ |
 | `model-audio/clone_qwen3-tts-1.7b-base/` | 8321 | POST /v1/qwen/clone | 参考音频零样本多语言 TTS 克隆 | 语音波形 |
 | `model-audio/clone_voxcpm-2/` | 8322 | POST /v1/voxcpm2/clone | 多语种 TTS、参考克隆及指令可控克隆 | 语音波形 |
+| `model-audio/indexTTS-2.5/` | 8323 | POST /v1/index-team/indexTTS-2.5 | 参考音频零样本克隆，支持五种语言、时长和情感向量控制 | 22.05 kHz WAV |
 | `model-audio/separate_tiger-dnr/` | 8351 | POST /v1/tigerDnr/separate | 对白/音效/音乐三路 Stem 分离 | 三路音频波形 |
 | `model-audio/clone_confucius-4/` | 8361 | POST /v1/confucius4TTS/generate | 14 语种跨语言零样本 TTS 克隆 | 语音波形 |
 | `model-audio/transcribe_qwen3-asr-1.7b/` | 8371 | POST /v1/qwen3/asr | 语种识别与语音转写 | 转写文本与语种 |
@@ -88,12 +89,14 @@ localai_worker_bridge 是额外的非 HTTP uv 包，不计入服务数，也不�
 - model-audio/separate_msst-mega53/ 使用外部 MSST 源码和 hf-mirror 下的完整 Mega 53 权重；
   调用方必须通过 stems 选择模型支持的声部，并始终保留数学 residual。
   不加入 LocalAI 固定五个 bridge，默认 storage/msst/ ZIP 不由 WAV 保留策略清理。
+- model-audio/indexTTS-2.5/ 使用仓库外官方 v2.5.0 推理源码与本地完整主/辅助权重；HTTP 进程
+  只负责上传、检查、共享 GPU 排队和一次性 worker 编排。
 - model-audio/spatial_steam-audio/ 是 C++17 Steam Audio CPU renderer，不获取 GPU 锁；SDK 和动态库在仓库外。
 - qa/ 是无模型测试/Ruff 项目；scripts/quality_gate.sh 与 GitHub Actions 使用同一质量门禁。
   根目录回归使用 QA；ACE-Step 服务内测试从 model-audio/music_ace-step-1.5/ 执行。
 - model-text/scripts/training/、model-text/training/configs/ 是纯文本润色 LoRA 实验，不是语音训练或 HTTP 服务。
 - model-video/avatar_soulx-flashhead-1.3b/ 维护 SoulX-FlashHead 单 GPU 人像视频服务；
-  8391 提供 POST /v1/soulX/flashHead，计入 start.sh 的 16 个 HTTP 进程。
+  8391 提供 POST /v1/soulX/flashHead，计入 start.sh 的 17 个 HTTP 进程。
   主模型及 wav2vec2 编码器均放在 hf-mirror/Soul-AILab 下；保持独立 uv 环境与一次性 worker，
   不加入 LocalAI 的五个固定 worker bridge。图片/音频使用上传逻辑标识，不能直接读取任意服务器路径。
 - model-video/HunyuanVideo-1.5-Comfy/ 使用 ComfyUI 核心节点运行本地 480p step-distilled FP8 图生视频；

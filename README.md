@@ -4,7 +4,7 @@
 三路音源分离，以及 CPU 音频母带和 Steam Audio 对象级空间导出。
 模型推理均使用本地权重。
 
-仓库包含 **15 个模型服务 uv 项目，统一启动 16 个 HTTP 进程**，其中一个是轻量控制面。
+仓库包含 **16 个模型服务 uv 项目，统一启动 17 个 HTTP 进程**，其中一个是轻量控制面。
 HTTP 进程不加载重型模型，模型推理由对应目录
 中的一次性 worker 完成；共享运行时和无模型 QA 环境分别位于 `llm_local_runtime/`、`qa/`。
 接口、路径和默认值以当前 `main.py`、`worker.py`、`pyproject.toml` 与 `start.sh` 为准。
@@ -37,6 +37,7 @@ Base/VoiceDesign 的本地模型候选及五个 one-shot worker bridge。原生 
 | [MERT-v2-FullSong `model-audio/embedding_mert-v2-fullsong/`](model-audio/embedding_mert-v2-fullsong/) | 8317 | `POST /v1/m-a-p/MERT-v2-FullSong` | 为 30–360 秒完整歌曲提取 MERT-v2 逐帧特征和整曲表征（[官方](https://huggingface.co/m-a-p/MERT-v2-FullSong)） | 1024 维 JSON embedding 或 25 Hz 特征 NPZ |
 | [Qwen3-TTS 1.7B Base `model-audio/clone_qwen3-tts-1.7b-base/`](model-audio/clone_qwen3-tts-1.7b-base/) | 8321 | `POST /v1/qwen/clone` | 参考音频条件下的零样本音色克隆与多语言 TTS（[官方](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-Base)） | 语音波形 |
 | [VoxCPM2 `model-audio/clone_voxcpm-2/`](model-audio/clone_voxcpm-2/) | 8322 | `POST /v1/voxcpm2/clone` | 30 语种 TTS、文本描述音色设计、参考音频克隆，以及带风格指令的可控克隆（[官方](https://huggingface.co/openbmb/VoxCPM2)） | 语音波形 |
+| [IndexTTS-2.5 `model-audio/indexTTS-2.5/`](model-audio/indexTTS-2.5/) | 8323 | `POST /v1/index-team/indexTTS-2.5` | 参考音频零样本克隆，支持五种语言、时长和情感向量控制（[官方](https://github.com/index-tts/index-tts/releases/tag/v2.5.0)） | 22.05 kHz WAV |
 | [TIGER-DnR `model-audio/separate_tiger-dnr/`](model-audio/separate_tiger-dnr/) | 8351 | `POST /v1/tigerDnr/separate` | 将混音分离为对白、音效、音乐三路 Stem（[官方推理](https://github.com/JusperLee/TIGER/blob/main/inference_dnr.py)） | 三路音频波形 |
 | [Confucius4-TTS `model-audio/clone_confucius-4/`](model-audio/clone_confucius-4/) | 8361 | `POST /v1/confucius4TTS/generate` | 无需参考转写的零样本克隆与跨语言 TTS，支持 14 语种及参考音频的情感迁移（[官方](https://huggingface.co/netease-youdao/Confucius4-TTS)） | 语音波形 |
 | [Qwen3-ASR-1.7B `model-audio/transcribe_qwen3-asr-1.7b/`](model-audio/transcribe_qwen3-asr-1.7b/) | 8371 | `POST /v1/qwen3/asr` | 语种识别与语音转写，支持 30 种语言和 22 种中文方言（[官方](https://huggingface.co/Qwen/Qwen3-ASR-1.7B)） | 转写文本与语种 |
@@ -86,6 +87,7 @@ model-audio/analyse_moss-music-8b-Instruct/        MOSS 音乐理解 API 与 GGU
 model-audio/spatial_steam-audio/                 独立 C++17 Steam Audio CPU renderer
 model-audio/clone_qwen3-tts-1.7b-base/           Qwen3-TTS Base 的 HTTP 服务和 worker
 model-audio/clone_voxcpm-2/                      VoxCPM2 的 HTTP 服务和克隆 worker
+model-audio/indexTTS-2.5/                        IndexTTS-2.5 HTTP 服务和一次性 worker
 model-audio/music_ace-step-1.5/                  ACE-Step 1.5 BGM 服务和 worker
 model-audio/music_yue2-3b/                       YuE2-3B 歌曲生成服务和一次性 worker
 model-audio/score_sheetsage-2/                   SheetSage2 音乐转谱服务和一次性 worker
@@ -162,7 +164,7 @@ cd LLM-for-Local-Machine
 先为需要的服务同步锁定依赖；部署全部服务时可以执行：
 
 ```bash
-for project in model-video/avatar_soulx-flashhead-1.3b model-video/HunyuanVideo-1.5-Comfy model-audio/analyse_moss-music-8b-Instruct model-audio/clone_qwen3-tts-1.7b-base model-audio/clone_voxcpm-2 model-audio/music_ace-step-1.5 model-audio/music_yue2-3b \
+for project in model-video/avatar_soulx-flashhead-1.3b model-video/HunyuanVideo-1.5-Comfy model-audio/analyse_moss-music-8b-Instruct model-audio/clone_qwen3-tts-1.7b-base model-audio/clone_voxcpm-2 model-audio/indexTTS-2.5 model-audio/music_ace-step-1.5 model-audio/music_yue2-3b \
   model-audio/score_sheetsage-2 model-audio/codec_yue2-vae model-audio/embedding_mert-v2-fullsong \
   model-audio/design_qwen3-tts-1.7b-voicedesign model-audio/clone_confucius-4 model-audio/transcribe_qwen3-asr-1.7b model-audio/separate_tiger-dnr model-audio/separate_msst-mega53; do
   uv sync --project "$project" --locked
@@ -203,8 +205,8 @@ Tokenizer 和上游源码就绪后启动全部服务：
 bash start.sh
 ```
 
-`start.sh` 会启动 8300、8301、8310、8313、8314、8315、8316、8317、8321、8322、8351、8361、8371、8380、8391 和 8392，
-共 16 个进程；8300 使用 `model-audio/clone_qwen3-tts-1.7b-base` uv 项目中的轻量 HTTP 依赖，其余服务使用
+`start.sh` 会启动 8300、8301、8310、8313、8314、8315、8316、8317、8321、8322、8323、8351、8361、8371、8380、8391 和 8392，
+共 17 个进程；8300 使用 `model-audio/clone_qwen3-tts-1.7b-base` uv 项目中的轻量 HTTP 依赖，其余服务使用
 各自的 uv 项目。启动命令统一使用 `uv run --no-sync`，不会在运行阶段联网解析依赖；
 本地 GPU 服务通过 `GPU_LOCK_FILE` 串行访问 GPU。默认最多排队 900 秒，超过时返回
 `503`；用正数 `GPU_LOCK_WAIT_TIMEOUT` 调整。共享锁实现仍兼容非正值无限等待，
@@ -329,7 +331,7 @@ LocalAI 请求持有共享 `GPU_LOCK_FILE`，完成后请求 `/backend/shutdown`
 
 ```bash
 curl -fsS http://127.0.0.1:8300/v1/control
-for port in 8300 8301 8313 8314 8315 8316 8317 8321 8322 8351 8361 8371; do
+for port in 8300 8301 8313 8314 8315 8316 8317 8321 8322 8323 8351 8361 8371; do
   curl -fsS "http://127.0.0.1:${port}/v1/health" >/dev/null && echo "${port}: ok"
 done
 ```
@@ -350,6 +352,7 @@ HOST=127.0.0.1 PORT=8321 \
 | 服务 | 默认权重 | 权重覆盖变量与额外配置 |
 | --- | --- | --- |
 | Qwen3-TTS Base | `$HF_MIRROR_DIR/Qwen/Qwen3-TTS-12Hz-1.7B-Base` | `QWEN3_TTS_MODEL_DIR` |
+| IndexTTS-2.5 | `$HF_MIRROR_DIR/IndexTeam/IndexTTS-2.5` | `INDEXTTS25_MODEL_DIR`、`INDEXTTS25_W2V_BERT_MODEL_DIR`、`INDEXTTS25_CAMPPLUS_PATH`、`INDEXTTS25_BIGVGAN_MODEL_DIR` |
 | Qwen VoiceDesign | `$HF_MIRROR_DIR/Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign` | `QWEN_VOICEDESIGN_MODEL_DIR` |
 | Confucius4-TTS | `$HF_MIRROR_DIR/netease-youdao/Confucius4-TTS` | `CONFUCIUS4_TTS_MODEL_DIR`、`CONFUCIUS4_TTS_CODE_PATH`、`CONFUCIUS4_TTS_W2V_BERT_MODEL_DIR`、`CONFUCIUS4_TTS_VOCODER_MODEL_DIR`、`CONFUCIUS4_TTS_STYLE_ENCODER_CHECKPOINT` |
 | Qwen3-ASR-1.7B | `$HF_MIRROR_DIR/Qwen/Qwen3-ASR-1.7B` | `QWEN3_ASR_MODEL_DIR` |
@@ -367,6 +370,7 @@ HOST=127.0.0.1 PORT=8321 \
 | 服务 | 外部源码默认路径 | 覆盖变量 |
 | --- | --- | --- |
 | Confucius4-TTS | `$HOME/LLM-depency/Confucius4-TTS` | `CONFUCIUS4_TTS_CODE_PATH` |
+| IndexTTS-2.5 | `$HOME/LLM-depency/index-tts-2.5.0`（tag `v2.5.0`） | `INDEXTTS25_CODE_PATH` |
 | TIGER-DnR | `$HOME/.local/share/tiger-dnr/TIGER` | `TIGER_DNR_SOURCE_DIR` |
 | HunyuanVideo-1.5 Comfy | `$HOME/LLM-depency/ComfyUI` | `HUNYUAN_VIDEO_COMFY_CODE_PATH` |
 
@@ -477,6 +481,31 @@ worker 使用官方 S2A 的 `target_feat_len` 指定 Mel 帧数，完整保留 T
 生成长度，仍须对输出执行语义和时长验收。`GET /v1/health` 的
 `runtime.native_vocalization_duration=true` 表示已加载支持此字段的 HTTP 版本；更新后需要
 重新运行 `bash start.sh`，仅修改 worker 文件不能更新已启动的接口校验。
+
+## IndexTTS-2.5 零样本克隆
+
+IndexTTS-2.5 在 `8323` 提供 `POST /v1/index-team/indexTTS-2.5`。服务使用官方 `v2.5.0`
+推理源码（仓库外）以及本地 IndexTTS、Wav2Vec2-BERT、CAMPPlus 和 BigVGAN 权重；路径和
+覆盖变量见[模型路径表](#模型路径与主要配置)与[服务 README](model-audio/indexTTS-2.5/README.md)。
+服务固定使用独立 Python `3.12.13` / CUDA 12.8 uv 环境。上游打包元数据限定 Python `<3.12`，
+因此本项目从已检出的源码导入推理入口，不安装上游包；API 会在离线模式下运行一次性 worker。
+尚未准备的源码或资源会在健康检查中显示为 unavailable，请求预检返回 `503`。
+
+先通过共享接口上传参考音频，再用返回的逻辑 `audio_path` 调用生成路由。成功返回 `audio/wav`，
+并原子保存到 `storage/clone/`；`INDEXTTS25_OUTPUT_DIR` 可覆盖输出目录。
+
+```bash
+curl -fsS http://127.0.0.1:8323/v1/upload_audio \
+  -F 'audio=@reference.wav;type=audio/wav' -F 'full_path=reference.wav'
+curl -fsS http://127.0.0.1:8323/v1/index-team/indexTTS-2.5 \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"你好，欢迎使用。","audio_path":"reference.wav","lang":"ZH"}' \
+  -o index-tts-25.wav
+```
+
+`lang` 支持 `ZH`、`EN`、`JA`、`ES`、`AR`；`duration_factor` 范围为 0.5–2.0。可选
+`emo_vector` 是 8 个 `[0, 1.2]` 数值，顺序为 happy、angry、sad、afraid、disgusted、
+melancholic、surprised、calm；`emo_alpha` 范围为 0–1。情感文本模型未启用。
 
 ## Qwen3-ASR 语音识别
 
@@ -944,7 +973,7 @@ adapter、数据集和预测都写入 `storage/training/`，不提交到 Git。
   uv run --project model-audio/clone_qwen3-tts-1.7b-base python main/storage_maintenance.py --apply
   ```
 
-维护脚本处理默认音色、克隆和 BGM 目录中列出的生成 WAV 前缀：Qwen VoiceDesign、Qwen3-TTS/VoxCPM2、ACE-Step 与 YuE2-3B。它保护普通上传和仍被 .references 引用的音色，但尚不清理 Confucius4-TTS、SheetSage2 ZIP、YuE2-Vae latent/WAV、MERT-v2-FullSong JSON/NPZ、TIGER 分离批次、MSST ZIP 或训练产物，也不自动遍历每个自定义输出目录。STORAGE_RETENTION_MAX_BYTES 只约束这些匹配的生成 WAV，不限制整个 storage/。修改输出目录时需同步考虑维护脚本的扫描范围。
+维护脚本处理默认音色、克隆和 BGM 目录中列出的生成 WAV 前缀：Qwen VoiceDesign、Qwen3-TTS、VoxCPM2、IndexTTS-2.5、ACE-Step 与 YuE2-3B。它保护普通上传和仍被 .references 引用的音色，但尚不清理 Confucius4-TTS、SheetSage2 ZIP、YuE2-Vae latent/WAV、MERT-v2-FullSong JSON/NPZ、TIGER 分离批次、MSST ZIP 或训练产物，也不自动遍历每个自定义输出目录。STORAGE_RETENTION_MAX_BYTES 只约束这些匹配的生成 WAV，不限制整个 storage/。修改输出目录时需同步考虑维护脚本的扫描范围。
 
 ## 测试与开发
 

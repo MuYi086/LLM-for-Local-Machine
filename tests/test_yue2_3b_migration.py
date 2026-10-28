@@ -320,6 +320,7 @@ class YuE2ThreeBMigrationTests(unittest.TestCase):
         self.assertEqual(startup.count("setsid uv run --no-sync --project"), 17)
         self.assertIn("model-audio/music_yue2-3b", quality_gate)
         self.assertIn('"yue2_3b_"', maintenance)
+        self.assertIn('"indexTTS25_"', maintenance)
         self.assertIn("YuE2-3B 歌曲生成", readme)
 
         configuration = (SERVICE_DIR / "pyproject.toml").read_text(encoding="utf-8")

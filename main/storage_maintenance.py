@@ -40,7 +40,7 @@ def main() -> int:
     planned = prune_generated_outputs(
         {
             timbre_dir: ("qwen_voicedesign_",),
-            clone_dir: ("qwen3_tts_", "voxcpm2_"),
+            clone_dir: ("qwen3_tts_", "voxcpm2_", "indexTTS25_"),
             bgm_dir: ("ace_step_1_5_", "yue2_3b_"),
         },
         retention_hours=float(status["retention_hours"]),
