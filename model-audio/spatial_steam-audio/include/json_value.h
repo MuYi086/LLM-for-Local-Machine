@@ -26,6 +26,7 @@ public:
     bool is_string() const;
     bool is_number() const;
     bool is_bool() const;
+    bool is_null() const;
     const Object& as_object() const;
     const Array& as_array() const;
     const std::string& as_string() const;

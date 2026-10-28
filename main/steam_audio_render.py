@@ -364,7 +364,7 @@ class SteamAudioRenderProcessor:
                     f"耗时 {_format_duration(normalization_elapsed)}",
                 )
 
-            payload = normalized_manifest.model_dump(mode="json")
+            payload = normalized_manifest.model_dump(mode="json", exclude_none=True)
             with temporary_manifest_path.open("w", encoding="utf-8") as destination:
                 json.dump(payload, destination, ensure_ascii=False, separators=(",", ":"))
                 destination.flush()

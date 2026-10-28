@@ -58,7 +58,7 @@ public:
         const std::vector<float>& interleaved,
         std::size_t frame_count,
         float gain);
-    void finalize();
+    void finalize(bool normalize_peak = true);
 
 private:
     std::filesystem::path output_path_;

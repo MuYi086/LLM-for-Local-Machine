@@ -15,6 +15,7 @@ bool Value::is_array() const { return std::holds_alternative<Array>(storage_); }
 bool Value::is_string() const { return std::holds_alternative<std::string>(storage_); }
 bool Value::is_number() const { return std::holds_alternative<double>(storage_); }
 bool Value::is_bool() const { return std::holds_alternative<bool>(storage_); }
+bool Value::is_null() const { return std::holds_alternative<std::nullptr_t>(storage_); }
 
 const Value::Object& Value::as_object() const {
     if (!is_object()) throw ParseError("expected JSON object");

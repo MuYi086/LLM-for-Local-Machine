@@ -3,6 +3,7 @@
 #include <cassert>
 #include <cmath>
 #include <filesystem>
+#include <stdexcept>
 #include <vector>
 
 int main() {
@@ -23,6 +24,16 @@ int main() {
     assert(std::abs(audio.samples[3]) < 1e-6f);
     assert(std::abs(audio.samples[4] - 0.98f) < 1e-5f);
     assert(std::abs(audio.samples[5] - 0.98f) < 1e-5f);
+    std::filesystem::remove(path);
+    {
+        llm_local::FloatWavMixer mixer(path, 48000, 2, 1);
+        mixer.mix_frames(0, {2.0f, -3.0f}, 1, 1.0f);
+        mixer.finalize(false);
+    }
+    const auto linear = llm_local::read_wav(path);
+    if (linear.samples != std::vector<float>{2.0f, -3.0f}) {
+        throw std::runtime_error("linear float output must retain headroom without scaling");
+    }
     std::filesystem::remove(path);
     return 0;
 }

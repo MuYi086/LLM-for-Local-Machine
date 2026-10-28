@@ -18,6 +18,7 @@ g++ -std=c++17 -Wall -Wextra -Wpedantic -Werror \
   -I "$renderer_dir/include" \
   "$renderer_dir/src/json_value.cpp" \
   "$renderer_dir/src/render_manifest.cpp" \
+  "$renderer_dir/src/trajectory.cpp" \
   "$renderer_dir/tests/render_manifest_test.cpp" \
   -o "$test_build_dir/render_manifest_test"
 "$test_build_dir/render_manifest_test"
@@ -28,3 +29,11 @@ g++ -std=c++17 -Wall -Wextra -Wpedantic -Werror \
   "$renderer_dir/tests/audio_io_test.cpp" \
   -o "$test_build_dir/audio_io_test"
 "$test_build_dir/audio_io_test"
+
+g++ -std=c++17 -Wall -Wextra -Wpedantic -Werror \
+  -I "$renderer_dir/include" \
+  "$renderer_dir/src/json_value.cpp" \
+  "$renderer_dir/src/trajectory.cpp" \
+  "$renderer_dir/tests/trajectory_test.cpp" \
+  -o "$test_build_dir/trajectory_test"
+"$test_build_dir/trajectory_test"

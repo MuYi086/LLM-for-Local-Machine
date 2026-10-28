@@ -27,6 +27,7 @@ add_library(llm_local_spatial_core
     src/json_value.cpp
     src/render_manifest.cpp
     src/spatial_mapping.cpp
+    src/trajectory.cpp
 )
 target_include_directories(llm_local_spatial_core PUBLIC include "${STEAM_AUDIO_INCLUDE_DIR}")
 target_link_libraries(llm_local_spatial_core PUBLIC "${STEAM_AUDIO_LIBRARY}")
@@ -56,6 +57,7 @@ if(BUILD_TESTING)
         tests/render_manifest_test.cpp
         src/json_value.cpp
         src/render_manifest.cpp
+        src/trajectory.cpp
     )
     target_include_directories(render-manifest-tests PRIVATE include)
     add_test(NAME render-manifest-tests COMMAND render-manifest-tests)
@@ -63,4 +65,8 @@ if(BUILD_TESTING)
     add_executable(audio-io-tests tests/audio_io_test.cpp src/audio_io.cpp)
     target_include_directories(audio-io-tests PRIVATE include)
     add_test(NAME audio-io-tests COMMAND audio-io-tests)
+
+    add_executable(trajectory-tests tests/trajectory_test.cpp src/trajectory.cpp src/json_value.cpp)
+    target_include_directories(trajectory-tests PRIVATE include)
+    add_test(NAME trajectory-tests COMMAND trajectory-tests)
 endif()

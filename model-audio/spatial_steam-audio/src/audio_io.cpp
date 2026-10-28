@@ -191,7 +191,9 @@ FloatWavMixer::FloatWavMixer(
       channels_(channels),
       total_frames_(total_frames) {
     if (channels != 2 || total_frames == 0) throw AudioIoError("mixer requires non-empty stereo output");
-    std::filesystem::create_directories(output_path.parent_path());
+    if (!output_path.parent_path().empty()) {
+        std::filesystem::create_directories(output_path.parent_path());
+    }
     file_.open(temporary_path_, std::ios::binary | std::ios::in | std::ios::out | std::ios::trunc);
     if (!file_) throw AudioIoError("cannot create output WAV");
     write_header(file_, sample_rate, channels, total_frames);
@@ -239,7 +241,7 @@ void FloatWavMixer::mix_frames(
     if (!file_) throw AudioIoError("cannot write output mix region");
 }
 
-void FloatWavMixer::finalize() {
+void FloatWavMixer::finalize(bool normalize_peak) {
     file_.flush();
     file_.close();
     std::fstream scan(temporary_path_, std::ios::binary | std::ios::in | std::ios::out);
@@ -260,7 +262,7 @@ void FloatWavMixer::finalize() {
         }
         remaining -= count;
     }
-    if (peak > 0.98f) {
+    if (normalize_peak && peak > 0.98f) {
         const auto scale = 0.98f / peak;
         remaining = total_frames_ * channels_;
         std::uint64_t sample_offset = 0;

@@ -8,6 +8,7 @@ from pathlib import PurePath
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from spatial_trajectory import Trajectory
 
 MANIFEST_VERSION = "1.0"
 MAX_TIMELINE_MS = 2 * 60 * 60 * 1000
@@ -81,6 +82,14 @@ class SpatialPlan(StrictModel):
     ] = "none"
     spatial_blend: Literal["subtle", "medium", "strong", "full"] = "medium"
     source: Literal["default", "rule", "llm", "user"] = "default"
+    trajectory: Trajectory | None = None
+
+    @model_validator(mode="after")
+    def validate_trajectory_mode(self) -> SpatialPlan:
+        """显式轨迹仅用于点声源，不能与旧运动预设同时指定。"""
+        if self.trajectory is not None and (self.mode != "point" or self.movement != "static"):
+            raise ValueError("trajectory 要求 mode=point 且 movement=static")
+        return self
 
 
 class SpatialSource(StrictModel):

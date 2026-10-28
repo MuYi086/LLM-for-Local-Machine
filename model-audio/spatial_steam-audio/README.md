@@ -67,3 +67,9 @@ Manifest 总时间线。
 
 当前阶段使用内置或显式 SOFA HRTF、距离和空气吸收，不启用 reflections、occlusion、
 transmission 或 GPU 射线追踪。语义字段已经保留，后续能力必须通过独立开关和测试增加。
+
+## 通用空间轨迹
+
+支持静态、直线、靠近、远离、圆周与关键帧六类轨迹。HTTP 可选 `spatial.trajectory`，音乐可使用单位增益原生 CLI；合同、坐标和示例见[轨迹文档](../../docs/spatial-trajectories.md)。
+
+音乐调用可在单声源 `--trajectory` 模式使用 `--distance-exponent 0.15` 减弱音量起伏；默认 1 保留物理距离衰减。此选项不扩展 HTTP Manifest。详见上方轨迹文档。

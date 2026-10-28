@@ -3,6 +3,7 @@
 #include <cassert>
 #include <filesystem>
 #include <fstream>
+#include <stdexcept>
 #include <string>
 
 namespace {
@@ -37,6 +38,16 @@ int main() {
     assert(manifest.sources.size() == 1);
     assert(manifest.sources.front().spatial.location == "rear_right");
     std::filesystem::remove(valid_path);
+    auto with_trajectory = valid;
+    const auto field = with_trajectory.find("\"source\":\"rule\"");
+    with_trajectory.insert(field, R"json("trajectory":{"type":"circular","radius_m":2,"duration_seconds":4,"repeat":"loop"},)json");
+    const auto trajectory_path = write_manifest(with_trajectory, "llm-local-render-manifest-trajectory.json");
+    const auto with_path = llm_local::load_manifest(trajectory_path);
+    if (!with_path.sources.front().spatial.trajectory ||
+        with_path.sources.front().spatial.trajectory->type != "circular") {
+        throw std::runtime_error("manifest lost the explicit trajectory");
+    }
+    std::filesystem::remove(trajectory_path);
 
     const auto unsafe = valid.find("source_0000.wav");
     auto unsafe_manifest = valid;

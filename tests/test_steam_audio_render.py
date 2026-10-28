@@ -124,6 +124,16 @@ class SteamAudioRenderProcessorTests(unittest.TestCase):
             )
             ffmpeg_commands: list[list[str]] = []
             renderer_manifest: dict[str, object] = {}
+            trajectory = {
+                "type": "linear",
+                "start_m": [-2, 0, -1],
+                "end_m": [2, 0, -1],
+                "duration_seconds": 1.5,
+                "repeat": "ping_pong",
+            }
+            payload = render_manifest().model_dump(mode="json")
+            payload["sources"][0]["spatial"]["trajectory"] = trajectory
+            with_path = SpatialRenderManifest.model_validate(payload)
 
             def fake_ffmpeg(command: list[str]) -> str:
                 ffmpeg_commands.append(command)
@@ -147,7 +157,7 @@ class SteamAudioRenderProcessorTests(unittest.TestCase):
             ):
                 progress_updates: list[tuple[str, int, str]] = []
                 result = processor.render(
-                    render_manifest(),
+                    with_path,
                     staged_assets,
                     profile="immersive",
                     output_format="wav",
@@ -176,6 +186,12 @@ class SteamAudioRenderProcessorTests(unittest.TestCase):
             self.assertEqual(normalized_sources[0]["asset_filename"], "source_0000.wav")
             self.assertEqual(normalized_sources[0]["trim_start_ms"], 0)
             self.assertEqual(normalized_sources[0]["playback_rate"], 1.0)
+            self.assertEqual(normalized_sources[0]["start_ms"], 250)
+            self.assertEqual(
+                normalized_sources[0]["spatial"]["trajectory"]["duration_seconds"], 1.5
+            )
+            self.assertEqual(normalized_sources[0]["spatial"]["trajectory"]["start_m"], [-2, 0, -1])
+            self.assertNotIn("trajectory", normalized_sources[1]["spatial"])
             self.assertFalse(normalized_sources[1]["loop"])
             self.assertTrue(result.path.is_file())
             self.assertTrue(all(not staged.path.exists() for staged in staged_assets.values()))

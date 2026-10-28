@@ -71,7 +71,7 @@ SpatialPlan parse_spatial(const json::Value& value) {
     const auto& object = value.as_object();
     reject_unknown_fields(
         object,
-        {"mode", "location", "distance", "movement", "occlusion", "spatial_blend", "source"});
+        {"mode", "location", "distance", "movement", "occlusion", "spatial_blend", "source", "trajectory"});
     SpatialPlan plan{
         require_string(object, "mode"),
         require_string(object, "location"),
@@ -97,6 +97,13 @@ SpatialPlan parse_spatial(const json::Value& value) {
         plan.occlusion,
         {"none", "wooden_door", "solid_door", "drywall", "concrete_wall", "floor_ceiling"});
     require_enum("spatial_blend", plan.spatial_blend, {"subtle", "medium", "strong", "full"});
+    const auto trajectory = object.find("trajectory");
+    if (trajectory != object.end() && !trajectory->second.is_null()) {
+        if (plan.mode != "point" || plan.movement != "static") {
+            throw ManifestError("trajectory requires mode=point and movement=static");
+        }
+        plan.trajectory = parse_trajectory(trajectory->second);
+    }
     return plan;
 }
 
@@ -185,6 +192,8 @@ RenderManifest load_manifest(const std::filesystem::path& path) {
         return manifest;
     } catch (const json::ParseError& error) {
         throw ManifestError(std::string("invalid JSON: ") + error.what());
+    } catch (const TrajectoryError& error) {
+        throw ManifestError(std::string("invalid trajectory: ") + error.what());
     }
 }
 

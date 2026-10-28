@@ -3377,7 +3377,30 @@
             "status_code"
           ]
         }
-      ]
+      ],
+      "spatial_trajectory_contract": {
+        "manifest_version": "1.0",
+        "field": "sources[].spatial.trajectory",
+        "types": [
+          "static",
+          "linear",
+          "approach",
+          "recede",
+          "circular",
+          "waypoints"
+        ],
+        "coordinates": "x right, y up, z back; metres; source-local seconds",
+        "schema_source": "main/spatial_trajectory.py",
+        "documentation": "docs/spatial-trajectories.md",
+        "native_cli_distance_exponent": {
+          "range": [
+            0,
+            1
+          ],
+          "default": 1,
+          "scope": "single-source --trajectory CLI only; HTTP unchanged"
+        }
+      }
     },
     {
       "project": "qwen3_tts",

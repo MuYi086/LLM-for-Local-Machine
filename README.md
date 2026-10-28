@@ -1044,3 +1044,7 @@ ZIP 包含请求声部、`residual.wav` 和分轨 `manifest.json`，WAV 均为 4
 这是业务建议而非模型限制。模型可能产生重叠或串音，原曲不能再次叠加，丢弃提取轨须回并 residual。
 分轨元数据不能直接提交空间接口；业务方另行生成 Render Manifest v1，并将对象资产提交给
 8300 `/v1/audio/spatial/render` 完成混合与最终导出。详见 [服务配置、合同与限制](model-audio/separate_msst-mega53/README.md)。
+
+## 通用空间轨迹
+
+支持静态、直线、靠近、远离、圆周与关键帧六类轨迹。HTTP 可选 `spatial.trajectory`，音乐可使用单位增益原生 CLI；合同、坐标和示例见[轨迹文档](docs/spatial-trajectories.md)。

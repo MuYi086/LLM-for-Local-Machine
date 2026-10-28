@@ -1,7 +1,10 @@
 #pragma once
 
+#include "trajectory.h"
+
 #include <cstdint>
 #include <filesystem>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -15,6 +18,7 @@ struct SpatialPlan {
     std::string movement;
     std::string occlusion;
     std::string spatial_blend;
+    std::optional<Trajectory> trajectory{};
 };
 
 struct RenderSource {
