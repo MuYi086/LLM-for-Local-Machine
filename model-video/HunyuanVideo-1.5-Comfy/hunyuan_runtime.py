@@ -14,6 +14,20 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+DEFAULT_WIDTH = 848
+DEFAULT_HEIGHT = 480
+MAX_OUTPUT_PIXELS = DEFAULT_WIDTH * DEFAULT_HEIGHT
+
+
+def validate_output_dimensions(width: int, height: int) -> None:
+    """验证 480p 输出尺寸，限制空间尺寸与总像素量。"""
+    if not (256 <= width <= 1280 and 256 <= height <= 1280):
+        raise ValueError("输出宽高必须在 256 到 1280 像素之间。")
+    if width % 16 or height % 16:
+        raise ValueError("输出宽高必须是 16 的倍数。")
+    if width * height > MAX_OUTPUT_PIXELS:
+        raise ValueError("输出像素总量不能超过默认 848×480 分辨率。")
+
 
 def cuda_status() -> dict[str, Any]:
     """通过 nvidia-smi 读取 GPU 状态，不在 HTTP 进程初始化 CUDA。"""

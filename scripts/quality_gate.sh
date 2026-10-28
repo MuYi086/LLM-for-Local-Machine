@@ -10,7 +10,6 @@ bash scripts/test_steam_audio_renderer_core.sh
 
 service_projects=(
     model-video/HunyuanVideo-1.5-Comfy
-    model-video/Wan2.2-TI2V-5B-GGUF
     model-video/avatar_soulx-flashhead-1.3b
     model-audio/analyse_moss-music-8b-Instruct
     model-audio/clone_qwen3-tts-1.7b-base model-audio/clone_voxcpm-2 model-audio/music_ace-step-1.5 model-audio/music_yue2-3b

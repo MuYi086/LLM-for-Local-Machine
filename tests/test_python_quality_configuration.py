@@ -11,7 +11,6 @@ from pathlib import Path
 REPOSITORY_DIR = Path(__file__).resolve().parents[1]
 MODEL_PROJECTS = (
     "model-video/HunyuanVideo-1.5-Comfy",
-    "model-video/Wan2.2-TI2V-5B-GGUF",
     "model-video/avatar_soulx-flashhead-1.3b",
     "model-audio/analyse_moss-music-8b-Instruct",
     "model-audio/clone_qwen3-tts-1.7b-base",

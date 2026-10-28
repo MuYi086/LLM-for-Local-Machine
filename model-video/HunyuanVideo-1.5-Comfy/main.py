@@ -29,7 +29,7 @@ from llm_local_runtime import (
     storage_disk_status,
 )
 from llm_local_runtime import gpu_runtime_lock as shared_gpu_runtime_lock
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from starlette.concurrency import run_in_threadpool
 
 from hunyuan_runtime import (
@@ -40,6 +40,7 @@ from hunyuan_runtime import (
     persist_video,
     positive_float,
     terminate_process_group,
+    validate_output_dimensions,
     validate_video,
 )
 
@@ -75,7 +76,7 @@ UPLOAD_STAGING_DIR = RUNTIME_CACHE_DIR / "uploads"
 WORKER_SCRIPT = str(PROJECT_DIR / "worker.py")
 FFPROBE_BIN = os.getenv("HUNYUAN_VIDEO_COMFY_FFPROBE_BIN", "ffprobe")
 API_HOST = os.getenv("HUNYUAN_VIDEO_COMFY_HOST", os.getenv("HOST", "0.0.0.0"))
-API_PORT = int(os.getenv("HUNYUAN_VIDEO_COMFY_PORT", os.getenv("PORT", "8393")))
+API_PORT = int(os.getenv("HUNYUAN_VIDEO_COMFY_PORT", os.getenv("PORT", "8392")))
 REQUEST_TIMEOUT = float(os.getenv("HUNYUAN_VIDEO_COMFY_REQUEST_TIMEOUT", "2400"))
 GPU_LOCK_WAIT_TIMEOUT = float(os.getenv("GPU_LOCK_WAIT_TIMEOUT", "900"))
 CUDA_RELEASE_DELAY = float(os.getenv("CUDA_RELEASE_DELAY", "2.0"))
@@ -84,6 +85,8 @@ LOCAL_FILES_ONLY = os.getenv("LOCAL_FILES_ONLY", "1").lower() in {"1", "true", "
 DEFAULT_STEPS = int(os.getenv("HUNYUAN_VIDEO_COMFY_STEPS", "8"))
 DEFAULT_FRAMES = int(os.getenv("HUNYUAN_VIDEO_COMFY_FRAMES", "121"))
 DEFAULT_SEED = int(os.getenv("HUNYUAN_VIDEO_COMFY_SEED", "42"))
+DEFAULT_WIDTH = 848
+DEFAULT_HEIGHT = 480
 
 REQUIRED_MODEL_FILES = {
     "diffusion_model": Path(MODEL_DIR)
@@ -127,8 +130,8 @@ if not math.isfinite(CUDA_RELEASE_DELAY) or CUDA_RELEASE_DELAY < 0:
     raise ValueError("CUDA_RELEASE_DELAY 不能为负数。")
 if not CUDA_VISIBLE_DEVICES or "," in CUDA_VISIBLE_DEVICES:
     raise ValueError("HunyuanVideo-1.5 Comfy 必须指定单个可见 CUDA 设备。")
-if DEFAULT_STEPS not in {8, 12} or DEFAULT_FRAMES not in {49, 73, 97, 121}:
-    raise ValueError("默认采样步数必须是 8/12，帧数必须是 49/73/97/121。")
+if DEFAULT_STEPS not in {8, 12} or DEFAULT_FRAMES not in {49, 81, 97, 121}:
+    raise ValueError("默认采样步数必须是 8/12，帧数必须是 49/81/97/121。")
 if not 0 <= DEFAULT_SEED <= 2**64 - 1:
     raise ValueError("HUNYUAN_VIDEO_COMFY_SEED 必须在 uint64 范围内。")
 
@@ -154,7 +157,15 @@ class HunyuanVideoRequest(BaseModel):
     negative_prompt: str = Field(default="", max_length=4_000)
     seed: int = Field(default=DEFAULT_SEED, ge=0, le=2**64 - 1)
     steps: Literal[8, 12] = DEFAULT_STEPS
-    num_frames: Literal[49, 73, 97, 121] = DEFAULT_FRAMES
+    width: int = Field(default=DEFAULT_WIDTH, ge=256, le=1280)
+    height: int = Field(default=DEFAULT_HEIGHT, ge=256, le=1280)
+    num_frames: Literal[49, 81, 97, 121] = DEFAULT_FRAMES
+
+    @model_validator(mode="after")
+    def output_dimensions_are_supported(self) -> HunyuanVideoRequest:
+        """在 GPU 排队前限制分辨率、对齐方式和总像素量。"""
+        validate_output_dimensions(self.width, self.height)
+        return self
 
 
 def module_available(module_name: str) -> bool:
@@ -386,9 +397,10 @@ def health() -> dict[str, Any]:
             "default_steps": DEFAULT_STEPS,
             "supported_steps": [8, 12],
             "default_frames": DEFAULT_FRAMES,
-            "supported_frames": [49, 73, 97, 121],
+            "supported_frames": [49, 81, 97, 121],
             "frame_rate": 24,
-            "resolution": "848x480",
+            "resolution": f"{DEFAULT_WIDTH}x{DEFAULT_HEIGHT}",
+            "max_output_pixels": 848 * 480,
             "gpu_scheduling": "shared exclusive file lock",
         },
         "last_errors": {"hunyuan_video_comfy": manager.last_error},

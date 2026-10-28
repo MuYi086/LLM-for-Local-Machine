@@ -40,7 +40,6 @@ TIGER_DNR_PROJECT_DIR="${TIGER_DNR_PROJECT_DIR:-$PROJECT_DIR/model-audio/separat
 MOSS_MUSIC_PROJECT_DIR="${MOSS_MUSIC_PROJECT_DIR:-$PROJECT_DIR/model-audio/analyse_moss-music-8b-Instruct}"
 SOULX_FLASHHEAD_PROJECT_DIR="${SOULX_FLASHHEAD_PROJECT_DIR:-$PROJECT_DIR/model-video/avatar_soulx-flashhead-1.3b}"
 HUNYUAN_VIDEO_COMFY_PROJECT_DIR="${HUNYUAN_VIDEO_COMFY_PROJECT_DIR:-$PROJECT_DIR/model-video/HunyuanVideo-1.5-Comfy}"
-WAN22_TI2V_PROJECT_DIR="${WAN22_TI2V_PROJECT_DIR:-$PROJECT_DIR/model-video/Wan2.2-TI2V-5B-GGUF}"
 
 export HF_MIRROR_DIR="${HF_MIRROR_DIR:-$HOME/hf-mirror}"
 export MSST_MODEL_DIR="${MSST_MODEL_DIR:-$HF_MIRROR_DIR/oulianov/mvsep_mega_53}"
@@ -51,9 +50,6 @@ export SOULX_FLASHHEAD_WAV2VEC_DIR="${SOULX_FLASHHEAD_WAV2VEC_DIR:-$HF_MIRROR_DI
 export SOULX_FLASHHEAD_CODE_PATH="${SOULX_FLASHHEAD_CODE_PATH:-$HOME/LLM-depency/SoulX-FlashHead}"
 export HUNYUAN_VIDEO_COMFY_MODEL_DIR="${HUNYUAN_VIDEO_COMFY_MODEL_DIR:-$HF_MIRROR_DIR/HunyuanVideo-1.5-Comfy}"
 export HUNYUAN_VIDEO_COMFY_CODE_PATH="${HUNYUAN_VIDEO_COMFY_CODE_PATH:-$HOME/LLM-depency/ComfyUI}"
-export WAN22_TI2V_MODEL_DIR="${WAN22_TI2V_MODEL_DIR:-$HF_MIRROR_DIR/QuantStack/Wan2.2-TI2V-5B-GGUF}"
-export WAN22_TI2V_COMFYUI_CODE_PATH="${WAN22_TI2V_COMFYUI_CODE_PATH:-$HOME/LLM-depency/ComfyUI}"
-export WAN22_TI2V_GGUF_NODE_PATH="${WAN22_TI2V_GGUF_NODE_PATH:-$HOME/LLM-depency/ComfyUI-GGUF}"
 export MOSS_MUSIC_MODEL_DIR="${MOSS_MUSIC_MODEL_DIR:-$HF_MIRROR_DIR/OpenMOSS/moss-music}"
 export MOSS_MUSIC_CAPTION_BIN="${MOSS_MUSIC_CAPTION_BIN:-$HOME/.local/share/moss-music/build/ace-caption}"
 export QWEN_VOICEDESIGN_MODEL_DIR="${QWEN_VOICEDESIGN_MODEL_DIR:-$HF_MIRROR_DIR/Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign}"
@@ -163,9 +159,7 @@ export QWEN3_ASR_PORT="${QWEN3_ASR_PORT:-8371}"
 export SOULX_FLASHHEAD_HOST="${SOULX_FLASHHEAD_HOST:-$HOST}"
 export SOULX_FLASHHEAD_PORT="${SOULX_FLASHHEAD_PORT:-8391}"
 export HUNYUAN_VIDEO_COMFY_HOST="${HUNYUAN_VIDEO_COMFY_HOST:-$HOST}"
-export HUNYUAN_VIDEO_COMFY_PORT="${HUNYUAN_VIDEO_COMFY_PORT:-8393}"
-export WAN22_TI2V_HOST="${WAN22_TI2V_HOST:-$HOST}"
-export WAN22_TI2V_PORT="${WAN22_TI2V_PORT:-8392}"
+export HUNYUAN_VIDEO_COMFY_PORT="${HUNYUAN_VIDEO_COMFY_PORT:-8392}"
 export MOSS_MUSIC_HOST="${MOSS_MUSIC_HOST:-$HOST}"
 export MOSS_MUSIC_PORT="${MOSS_MUSIC_PORT:-8310}"
 export ACESTEP_HOST="${ACESTEP_HOST:-$HOST}"
@@ -201,7 +195,6 @@ uv run --no-sync --project "$QWEN3_TTS_PROJECT_DIR" python "$MAIN_DIR/check_port
   'Confucius4-TTS' "$CONFUCIUS4_TTS_HOST" "$CONFUCIUS4_TTS_PORT" \
   'Qwen3-ASR' "$QWEN3_ASR_HOST" "$QWEN3_ASR_PORT" \
   'VoxCPM2' "$VOXCPM2_HOST" "$VOXCPM2_PORT" \
-  'Wan2.2-TI2V-5B-GGUF' "$WAN22_TI2V_HOST" "$WAN22_TI2V_PORT" \
   'HunyuanVideo-1.5-Comfy' "$HUNYUAN_VIDEO_COMFY_HOST" "$HUNYUAN_VIDEO_COMFY_PORT"
 
 export HF_MODULES_CACHE="${HF_MODULES_CACHE:-$RUNTIME_CACHE_DIR/hf_modules}"
@@ -225,10 +218,6 @@ echo "SoulX-FlashHead model:         $SOULX_FLASHHEAD_MODEL_DIR"
 echo "HunyuanVideo-1.5 Comfy project: $HUNYUAN_VIDEO_COMFY_PROJECT_DIR"
 echo "HunyuanVideo-1.5 Comfy model:   $HUNYUAN_VIDEO_COMFY_MODEL_DIR"
 echo "HunyuanVideo-1.5 ComfyUI code:  $HUNYUAN_VIDEO_COMFY_CODE_PATH"
-echo "Wan2.2 TI2V project:             $WAN22_TI2V_PROJECT_DIR"
-echo "Wan2.2 TI2V model:               $WAN22_TI2V_MODEL_DIR"
-echo "Wan2.2 TI2V ComfyUI code:        $WAN22_TI2V_COMFYUI_CODE_PATH"
-echo "Wan2.2 TI2V GGUF node:           $WAN22_TI2V_GGUF_NODE_PATH"
 echo "SoulX-FlashHead wav2vec:       $SOULX_FLASHHEAD_WAV2VEC_DIR"
 echo "MOSS-Music uv project:         $MOSS_MUSIC_PROJECT_DIR"
 echo "MOSS-Music model:              $MOSS_MUSIC_MODEL_DIR"
@@ -318,7 +307,6 @@ echo "YuE2-Vae route:         http://127.0.0.1:$YUE2_VAE_PORT/v1/m-a-p/YuE2-Vae"
 echo "MERT-v2-FullSong route: http://127.0.0.1:$MERT_V2_FULLSONG_PORT/v1/m-a-p/MERT-v2-FullSong"
 echo "SoulX-FlashHead route: http://127.0.0.1:$SOULX_FLASHHEAD_PORT/v1/soulX/flashHead"
 echo "HunyuanVideo-1.5 route: http://127.0.0.1:$HUNYUAN_VIDEO_COMFY_PORT/v1/Tencent-Hunyuan/HunyuanVideo-1.5-Comfy"
-echo "Wan2.2 TI2V route: http://127.0.0.1:$WAN22_TI2V_PORT/v1/QuantStack/Wan2.2-TI2V-5B-GGUF"
 echo "MOSS-Music route:      http://127.0.0.1:$MOSS_MUSIC_PORT/v1/openMoss/moss-music"
 echo "Qwen timbre route:   http://127.0.0.1:$QWEN_VOICEDESIGN_PORT/v1/qwen/timbre"
 echo "TIGER-DnR route:     http://127.0.0.1:$TIGER_DNR_PORT/v1/tigerDnr/separate"
@@ -343,14 +331,12 @@ printf '%-24s %-6s %s\n' 'Qwen3-TTS Base' "$QWEN3_TTS_PORT" '/v1/qwen/clone'
 printf '%-24s %-6s %s\n' 'VoxCPM2' "$VOXCPM2_PORT" '/v1/voxcpm2/clone'
 printf '%-24s %-6s %s\n' 'SoulX-FlashHead-1.3B' "$SOULX_FLASHHEAD_PORT" '/v1/soulX/flashHead'
 printf '%-24s %-6s %s\n' 'HunyuanVideo-1.5-Comfy' "$HUNYUAN_VIDEO_COMFY_PORT" '/v1/Tencent-Hunyuan/HunyuanVideo-1.5-Comfy'
-printf '%-24s %-6s %s\n' 'Wan2.2-TI2V-5B-GGUF' "$WAN22_TI2V_PORT" '/v1/QuantStack/Wan2.2-TI2V-5B-GGUF'
 echo "=================================================="
 
 cd "$PROJECT_DIR"
 
 soulx_flashhead_pid=""
 hunyuan_video_comfy_pid=""
-wan22_ti2v_pid=""
 moss_music_pid=""
 main_pid=""
 acestep_pid=""
@@ -372,7 +358,6 @@ cleanup() {
   local pids=(
     "$soulx_flashhead_pid"
     "$hunyuan_video_comfy_pid"
-    "$wan22_ti2v_pid"
     "$moss_music_pid"
     "$main_pid"
     "$acestep_pid"
@@ -546,14 +531,4 @@ HUNYUAN_VIDEO_COMFY_HOST="$HUNYUAN_VIDEO_COMFY_HOST" \
   setsid uv run --no-sync --project "$HUNYUAN_VIDEO_COMFY_PROJECT_DIR" \
   python "$HUNYUAN_VIDEO_COMFY_PROJECT_DIR/main.py" &
 hunyuan_video_comfy_pid=$!
-# Wan2.2 TI2V GGUF uses a separate uv environment and loads only the whitelisted GGUF node.
-WAN22_TI2V_HOST="$WAN22_TI2V_HOST" \
-  WAN22_TI2V_PORT="$WAN22_TI2V_PORT" \
-  WAN22_TI2V_MODEL_DIR="$WAN22_TI2V_MODEL_DIR" \
-  WAN22_TI2V_COMFYUI_CODE_PATH="$WAN22_TI2V_COMFYUI_CODE_PATH" \
-  WAN22_TI2V_GGUF_NODE_PATH="$WAN22_TI2V_GGUF_NODE_PATH" \
-  HOST="$WAN22_TI2V_HOST" PORT="$WAN22_TI2V_PORT" \
-  setsid uv run --no-sync --project "$WAN22_TI2V_PROJECT_DIR" \
-  python "$WAN22_TI2V_PROJECT_DIR/main.py" &
-wan22_ti2v_pid=$!
-wait -n "$msst_pid" "$soulx_flashhead_pid" "$hunyuan_video_comfy_pid" "$wan22_ti2v_pid" "$moss_music_pid" "$main_pid" "$acestep_pid" "$yue2_3b_pid" "$sheetsage2_pid" "$yue2_vae_pid" "$mert_v2_fullsong_pid" "$qwen3_tts_pid" "$voxcpm2_pid" "$qwen_voicedesign_pid" "$tiger_dnr_pid" "$confucius4_tts_pid" "$qwen3_asr_pid"
+wait -n "$msst_pid" "$soulx_flashhead_pid" "$hunyuan_video_comfy_pid" "$moss_music_pid" "$main_pid" "$acestep_pid" "$yue2_3b_pid" "$sheetsage2_pid" "$yue2_vae_pid" "$mert_v2_fullsong_pid" "$qwen3_tts_pid" "$voxcpm2_pid" "$qwen_voicedesign_pid" "$tiger_dnr_pid" "$confucius4_tts_pid" "$qwen3_asr_pid"

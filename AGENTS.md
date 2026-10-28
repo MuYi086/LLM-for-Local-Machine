@@ -46,7 +46,7 @@ README.md 提供接入、配置和运维说明，本文件记录开发边界与�
 
 ## 项目结构与服务速查
 
-当前维护 16 个模型服务 uv 项目与一个轻量控制面，start.sh 合计启动 17 个 HTTP 进程；
+当前维护 15 个模型服务 uv 项目与一个轻量控制面，start.sh 合计启动 16 个 HTTP 进程；
 localai_worker_bridge 是额外的非 HTTP uv 包，不计入服务数，也不常驻导入 Torch。
 原生能力和输出见 README 服务总览；端口、方法及路径以源码为准。
 区分模型原生能力、已接入接口与服务编排；各 HTTP 进程提供 GET /v1/health。
@@ -68,8 +68,7 @@ localai_worker_bridge 是额外的非 HTTP uv 包，不计入服务数，也不�
 | `model-audio/transcribe_qwen3-asr-1.7b/` | 8371 | POST /v1/qwen3/asr | 语种识别与语音转写 | 转写文本与语种 |
 | `model-audio/separate_msst-mega53/` | 8380 | POST /v1/msst/separate | 按调用方选择分离音乐声部 | FLOAT WAV 与元数据 ZIP |
 | `model-video/avatar_soulx-flashhead-1.3b/` | 8391 | POST /v1/soulX/flashHead | 人像图片和音频驱动的单 GPU 视频生成 | 带音轨 MP4 |
-| `model-video/HunyuanVideo-1.5-Comfy/` | 8393 | POST /v1/Tencent-Hunyuan/HunyuanVideo-1.5-Comfy | HunyuanVideo-1.5 480p step-distilled 图生视频 | 848×480 MP4 |
-| `model-video/Wan2.2-TI2V-5B-GGUF/` | 8392 | POST /v1/QuantStack/Wan2.2-TI2V-5B-GGUF | Wan2.2 TI2V 5B GGUF 文生视频/图生视频 | MP4 视频 |
+| `model-video/HunyuanVideo-1.5-Comfy/` | 8392 | POST /v1/Tencent-Hunyuan/HunyuanVideo-1.5-Comfy | HunyuanVideo-1.5 480p step-distilled 图生视频 | 848×480 MP4 |
 
 - main/main.py 只处理健康/控制、共享上传/检查和 CPU 导出，不加载模型包或推理。
   空间任务进度 GET /v1/audio/spatial/render/progress/{job_id} 是进程内状态。
@@ -94,15 +93,12 @@ localai_worker_bridge 是额外的非 HTTP uv 包，不计入服务数，也不�
   根目录回归使用 QA；ACE-Step 服务内测试从 model-audio/music_ace-step-1.5/ 执行。
 - model-text/scripts/training/、model-text/training/configs/ 是纯文本润色 LoRA 实验，不是语音训练或 HTTP 服务。
 - model-video/avatar_soulx-flashhead-1.3b/ 维护 SoulX-FlashHead 单 GPU 人像视频服务；
-  8391 提供 POST /v1/soulX/flashHead，计入 start.sh 的 17 个 HTTP 进程。
+  8391 提供 POST /v1/soulX/flashHead，计入 start.sh 的 16 个 HTTP 进程。
   主模型及 wav2vec2 编码器均放在 hf-mirror/Soul-AILab 下；保持独立 uv 环境与一次性 worker，
   不加入 LocalAI 的五个固定 worker bridge。图片/音频使用上传逻辑标识，不能直接读取任意服务器路径。
 - model-video/HunyuanVideo-1.5-Comfy/ 使用 ComfyUI 核心节点运行本地 480p step-distilled FP8 图生视频；
-  8393 提供 POST /v1/Tencent-Hunyuan/HunyuanVideo-1.5-Comfy。HTTP 层保持轻量，ComfyUI API 子进程
+  8392 提供 POST /v1/Tencent-Hunyuan/HunyuanVideo-1.5-Comfy。HTTP 层保持轻量，ComfyUI API 子进程
   仅在一次性 worker 中启动；使用共享 GPU 锁，图片只通过上传逻辑标识读取，视频写入 storage/video/。
-- model-video/Wan2.2-TI2V-5B-GGUF/ 使用 ComfyUI 与临时白名单 ComfyUI-GGUF 节点运行 Wan2.2 TI2V；
-  8392 提供 POST /v1/QuantStack/Wan2.2-TI2V-5B-GGUF。worker 临时挂载节点源码，不修改仓库外依赖；
-  使用共享 GPU 锁，支持无图文生视频和通过上传逻辑标识输入图片，视频写入 storage/video/。
 - 流行*模型功能简介.md、task*.md 和 `空间音频讨论/` 是调研/任务/方案资料，
   不能据此推断已实现能力。
 

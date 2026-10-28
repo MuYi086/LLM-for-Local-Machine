@@ -19,6 +19,8 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+from hunyuan_runtime import DEFAULT_HEIGHT, DEFAULT_WIDTH, validate_output_dimensions
+
 MODEL_FILES = {
     "diffusion_model": "hunyuanvideo1.5_480p_i2v_step_distilled_fp8_scaled.safetensors",
     "qwen_encoder": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
@@ -92,9 +94,12 @@ def build_workflow(payload: dict[str, Any], image_name: str, prefix: str) -> dic
         raise ValueError("prompt 不能为空。")
     negative_prompt = str(payload.get("negative_prompt") or "")
     steps = int(payload.get("steps", 8))
+    width = int(payload.get("width", DEFAULT_WIDTH))
+    height = int(payload.get("height", DEFAULT_HEIGHT))
     frames = int(payload.get("num_frames", 121))
-    if steps not in {8, 12} or frames not in {49, 73, 97, 121}:
-        raise ValueError("step-distilled 模型只允许 8/12 步和 49/73/97/121 帧。")
+    validate_output_dimensions(width, height)
+    if steps not in {8, 12} or frames not in {49, 81, 97, 121}:
+        raise ValueError("step-distilled 模型只允许 8/12 步和 49/81/97/121 帧。")
     return {
         "1": {
             "class_type": "UNETLoader",
@@ -136,8 +141,8 @@ def build_workflow(payload: dict[str, Any], image_name: str, prefix: str) -> dic
                 "vae": ["4", 0],
                 "start_image": ["5", 0],
                 "clip_vision_output": ["7", 0],
-                "width": 848,
-                "height": 480,
+                "width": width,
+                "height": height,
                 "length": frames,
                 "batch_size": 1,
             },

@@ -49,7 +49,7 @@ class HunyuanVideoComfyTests(unittest.TestCase):
             "HUNYUAN_VIDEO_COMFY_OUTPUT_DIR": str(self.root / "storage/video"),
             "HUNYUAN_VIDEO_COMFY_WORKER_TMP_DIR": str(self.root / "worker"),
             "HUNYUAN_VIDEO_COMFY_REQUEST_TIMEOUT": "5",
-            "HUNYUAN_VIDEO_COMFY_PORT": "8393",
+            "HUNYUAN_VIDEO_COMFY_PORT": "8392",
             "GPU_LOCK_WAIT_TIMEOUT": "900",
             "CUDA_RELEASE_DELAY": "0",
             "LOCAL_FILES_ONLY": "1",
@@ -90,12 +90,13 @@ class HunyuanVideoComfyTests(unittest.TestCase):
         ):
             response = self.client.get("/v1/health")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(self.main.API_PORT, 8393)
+        self.assertEqual(self.main.API_PORT, 8392)
         self.assertTrue(response.json()["available"]["selected_provider_ready"])
         self.assertEqual(response.json()["runtime"]["resolution"], "848x480")
+        self.assertEqual(response.json()["runtime"]["supported_frames"], [49, 81, 97, 121])
         self.assertIn(ROUTE, {route.path for route in self.main.app.routes})
         start_script = (REPOSITORY_DIR / "start.sh").read_text(encoding="utf-8")
-        self.assertIn('HUNYUAN_VIDEO_COMFY_PORT="${HUNYUAN_VIDEO_COMFY_PORT:-8393}"', start_script)
+        self.assertIn('HUNYUAN_VIDEO_COMFY_PORT="${HUNYUAN_VIDEO_COMFY_PORT:-8392}"', start_script)
         self.assertIn(ROUTE, start_script)
         self.assertIn('"$hunyuan_video_comfy_pid"', start_script)
 
@@ -121,6 +122,8 @@ class HunyuanVideoComfyTests(unittest.TestCase):
             {"steps": 4},
             {"steps": 10},
             {"num_frames": 50},
+            {"width": 481},
+            {"width": 1280, "height": 832},
             {"unknown": True},
         ):
             with self.subTest(extra=extra), patch.object(self.main, "gpu_runtime_lock") as lock:
@@ -186,18 +189,34 @@ class HunyuanVideoComfyTests(unittest.TestCase):
         ):
             response = self.client.post(
                 ROUTE,
-                json={"image_path": "portrait.png", "prompt": "a quiet garden", "steps": 12},
+                json={
+                    "image_path": "portrait.png",
+                    "prompt": "a quiet garden",
+                    "steps": 12,
+                    "width": 480,
+                    "height": 832,
+                    "num_frames": 81,
+                },
             )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers["content-type"], "video/mp4")
         self.assertEqual(response.content, MP4_BYTES)
         run_worker.assert_called_once()
         self.assertEqual(run_worker.call_args.args[0]["steps"], 12)
+        self.assertEqual(run_worker.call_args.args[0]["width"], 480)
+        self.assertEqual(run_worker.call_args.args[0]["height"], 832)
+        self.assertEqual(run_worker.call_args.args[0]["num_frames"], 81)
         wait_after_release.assert_called_once()
 
     def test_workflow_uses_local_step_distilled_i2v_components(self) -> None:
         workflow = self.worker.build_workflow(
-            {"prompt": "a red balloon floats over a city", "steps": 8, "num_frames": 73},
+            {
+                "prompt": "a red balloon floats over a city",
+                "steps": 12,
+                "width": 480,
+                "height": 832,
+                "num_frames": 81,
+            },
             "input.png",
             "hunyuan_video_1_5/test",
         )
@@ -206,12 +225,23 @@ class HunyuanVideoComfyTests(unittest.TestCase):
             "hunyuanvideo1.5_480p_i2v_step_distilled_fp8_scaled.safetensors",
         )
         self.assertEqual(workflow["3"]["inputs"]["type"], "hunyuan_video_15")
-        self.assertEqual(workflow["10"]["inputs"]["width"], 848)
-        self.assertEqual(workflow["10"]["inputs"]["height"], 480)
-        self.assertEqual(workflow["10"]["inputs"]["length"], 73)
-        self.assertEqual(workflow["11"]["inputs"]["steps"], 8)
+        self.assertEqual(workflow["10"]["inputs"]["width"], 480)
+        self.assertEqual(workflow["10"]["inputs"]["height"], 832)
+        self.assertEqual(workflow["10"]["inputs"]["length"], 81)
+        self.assertEqual(workflow["11"]["inputs"]["steps"], 12)
         self.assertEqual(workflow["11"]["inputs"]["cfg"], 1)
         self.assertEqual(workflow["14"]["class_type"], "SaveVideo")
+        with self.assertRaisesRegex(ValueError, "像素总量"):
+            self.worker.build_workflow(
+                {
+                    "prompt": "a red balloon floats over a city",
+                    "width": 1280,
+                    "height": 832,
+                    "num_frames": 81,
+                },
+                "input.png",
+                "hunyuan_video_1_5/test",
+            )
 
 
 if __name__ == "__main__":
