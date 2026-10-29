@@ -6,8 +6,6 @@ import importlib.util
 import unittest
 from pathlib import Path
 
-import yaml
-
 BENCHMARK_DIR = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = BENCHMARK_DIR / "kandinsky6/benchmark.py"
 SPEC = importlib.util.spec_from_file_location("kandinsky6_benchmark_test", SCRIPT_PATH)
@@ -19,16 +17,17 @@ SPEC.loader.exec_module(benchmark)
 class Kandinsky6BenchmarkTests(unittest.TestCase):
     """无需 Torch、CUDA 或模型即可验证对照矩阵和本地文件合同。"""
 
-    def test_kandinsky_uses_same_inputs_and_video_conditions_as_hunyuan(self) -> None:
-        hunyuan = yaml.safe_load((BENCHMARK_DIR / "config.yaml").read_text(encoding="utf-8"))
+    def test_fixed_scene_seed_matrix_and_video_conditions(self) -> None:
         kandinsky = benchmark.load_config()
 
-        self.assertEqual(kandinsky["seeds"], hunyuan["seeds"])
-        self.assertEqual(kandinsky["width"], hunyuan["width"])
-        self.assertEqual(kandinsky["height"], hunyuan["height"])
-        self.assertEqual(kandinsky["fps_target"], hunyuan["fps_target"])
-        self.assertEqual(kandinsky["frames"], hunyuan["frames"])
-        self.assertEqual(kandinsky["scenes"], hunyuan["scenes"])
+        self.assertEqual(kandinsky["seeds"], [42, 1234, 2026])
+        self.assertEqual(kandinsky["width"], 480)
+        self.assertEqual(kandinsky["height"], 832)
+        self.assertEqual(kandinsky["fps_target"], 24)
+        self.assertEqual(kandinsky["frames"], 121)
+        self.assertEqual(
+            set(kandinsky["scenes"]), {"rainy_city", "windy_portrait", "calm_mountains"}
+        )
         self.assertEqual(len(benchmark.trials(kandinsky)), 9)
 
     def test_model_specific_distilled_settings_and_video_only_mode(self) -> None:

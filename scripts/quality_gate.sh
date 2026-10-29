@@ -9,7 +9,6 @@ bash -n start.sh
 bash scripts/test_steam_audio_renderer_core.sh
 
 service_projects=(
-    model-video/HunyuanVideo-1.5-Comfy
     model-video/avatar_soulx-flashhead-1.3b
     model-video/Kandinsky-6.0-Lite-Distill-BF16
     model-audio/analyse_moss-music-8b-Instruct
@@ -33,12 +32,16 @@ for project in "${lock_projects[@]}"; do
         exit 1
     fi
 done
-# `tests/i2v-benchmark/` 是独立实验项目，不属于 QA 根目录回归环境。
-lint_paths+=(tests/*.py)
+lint_paths+=(
+    tests/*.py
+    tests/i2v-benchmark/kandinsky6/benchmark.py
+    tests/i2v-benchmark/tests/test_kandinsky6.py
+)
 
 uv run --project qa --locked ruff check "${lint_paths[@]}"
 uv run --project qa --locked ruff format --check "${lint_paths[@]}"
 
 uv run --project qa --locked python scripts/localai/validate_capabilities.py
 uv run --project qa --locked python -m unittest discover -s tests -v
+uv run --project qa --locked python -m unittest discover -s tests/i2v-benchmark/tests -v
 (cd model-audio/music_ace-step-1.5 && uv run --project ../../qa --locked python -m unittest discover -s tests -v)

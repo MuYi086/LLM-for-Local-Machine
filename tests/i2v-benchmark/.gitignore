@@ -3,5 +3,3 @@ __pycache__/
 .pytest_cache/
 results/
 assets/
-workflows/*.api.json
-templates/*.ui.json

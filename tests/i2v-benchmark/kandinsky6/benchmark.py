@@ -52,7 +52,7 @@ SCORE_FIELDS = ["blind_id", "visual_quality", "motion_stability", "prompt_adhere
 
 
 def load_config() -> dict[str, Any]:
-    """读取与 Hunyuan 基准隔离的 Kandinsky 条件配置。"""
+    """读取 Kandinsky 基准的固定条件配置。"""
     return json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
 
 
@@ -92,7 +92,7 @@ def trials(config: dict[str, Any]) -> list[tuple[str, str, int]]:
 def build_payload(
     config: dict[str, Any], scene: str, seed: int, image_file: Path
 ) -> dict[str, Any]:
-    """生成与 Hunyuan 基准相同画幅、帧率、帧数和输入条件的 worker 请求。"""
+    """生成固定画幅、帧率、帧数和输入条件的 worker 请求。"""
     scenario = config["scenes"][scene]
     return {
         "model_dir": str(model_dir(config)),
@@ -146,7 +146,7 @@ def _load_service_main(config: dict[str, Any]):
 
 
 def _gpu_snapshot() -> tuple[int | None, float | None]:
-    """读取与 Hunyuan 基准一致的全卡显存和利用率采样。"""
+    """读取全卡显存和利用率采样。"""
     try:
         result = subprocess.run(
             [
@@ -179,7 +179,7 @@ def _wsl_memory_used_mib() -> float | None:
 
 
 class Telemetry:
-    """按 Hunyuan 基准采样 GPU 全卡显存、利用率和 WSL 已用内存。"""
+    """采样 GPU 全卡显存、利用率和 WSL 已用内存。"""
 
     def __init__(self, interval: float, outfile: Path) -> None:
         self.interval = interval
@@ -304,7 +304,7 @@ def preflight(_: argparse.Namespace | None = None) -> None:
     for scene, scenario in config["scenes"].items():
         image_path = benchmark_path(config, scenario["image"])
         if not image_path.is_file():
-            raise RuntimeError(f"缺少 Hunyuan 基准场景图片 {scene}: {image_path}")
+            raise RuntimeError(f"缺少场景图片 {scene}: {image_path}")
         with Image.open(image_path) as image:
             image.verify()
         with Image.open(image_path) as image:
@@ -360,7 +360,7 @@ def probe_video(file: Path) -> dict[str, Any]:
 
 
 def validate_video(file: Path, config: dict[str, Any]) -> dict[str, Any]:
-    """要求生成结果满足 Hunyuan 基准使用的输出规格。"""
+    """校验生成视频的分辨率、帧数、帧率和音轨。"""
     if not file.is_file() or file.stat().st_size < 4096:
         raise RuntimeError("输出 MP4 缺失或小于 4 KiB。")
     metadata = probe_video(file)
@@ -381,7 +381,7 @@ def validate_video(file: Path, config: dict[str, Any]) -> dict[str, Any]:
 
 
 def _load_pipeline(config: dict[str, Any]):
-    """加载一次 BF16 pipeline，保持模型驻留以对齐 ComfyUI 热运行口径。"""
+    """加载一次 BF16 pipeline，记录同一进程中的热运行耗时。"""
     import torch
     from diffusers import Kandinsky6TI2VAPipeline
 
@@ -420,7 +420,7 @@ def _generate(pipeline: Any, config: dict[str, Any], scene: str, seed: int, outp
 
 
 def run(args: argparse.Namespace) -> None:
-    """运行 Hunyuan 相同的 9 条输入矩阵并保存指标、视频与逐次显存采样。"""
+    """运行 3 场景 × 3 seed 矩阵并保存指标、视频与逐次显存采样。"""
     preflight(args)
     config = load_config()
     results = output_root(config)
@@ -586,7 +586,7 @@ def report(_: argparse.Namespace | None = None) -> None:
         "",
         f"生成时间：{now()}",
         "",
-        "口径：3 场景 × 3 seed = 9 条计划；同 Hunyuan 基准使用相同输入、480×832、24 FPS、121 帧。",
+        "口径：3 场景 × 3 seed = 9 条计划；输出为 480×832、24 FPS、121 帧。",
         "Kandinsky 使用蒸馏 checkpoint 原生的 10 步、guidance=1.0，音频采样关闭。",
         "此脚本在一个 benchmark 进程中驻留 pipeline，以便分别记录冷启动和同进程热运行。",
         "正式 HTTP 服务为一次性 worker；两者的生命周期不同，壁钟时间不代表服务接口耗时。",

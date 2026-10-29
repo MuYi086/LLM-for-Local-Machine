@@ -41,7 +41,6 @@ TIGER_DNR_PROJECT_DIR="${TIGER_DNR_PROJECT_DIR:-$PROJECT_DIR/model-audio/separat
 MOSS_MUSIC_PROJECT_DIR="${MOSS_MUSIC_PROJECT_DIR:-$PROJECT_DIR/model-audio/analyse_moss-music-8b-Instruct}"
 MOSS_SOUNDEFFECT_V2_PROJECT_DIR="${MOSS_SOUNDEFFECT_V2_PROJECT_DIR:-$PROJECT_DIR/model-audio/soundEffect-v2.0}"
 SOULX_FLASHHEAD_PROJECT_DIR="${SOULX_FLASHHEAD_PROJECT_DIR:-$PROJECT_DIR/model-video/avatar_soulx-flashhead-1.3b}"
-HUNYUAN_VIDEO_COMFY_PROJECT_DIR="${HUNYUAN_VIDEO_COMFY_PROJECT_DIR:-$PROJECT_DIR/model-video/HunyuanVideo-1.5-Comfy}"
 KANDINSKY6_PROJECT_DIR="${KANDINSKY6_PROJECT_DIR:-$PROJECT_DIR/model-video/Kandinsky-6.0-Lite-Distill-BF16}"
 
 export HF_MIRROR_DIR="${HF_MIRROR_DIR:-$HOME/hf-mirror}"
@@ -56,8 +55,6 @@ export MSST_OUTPUT_DIR="${MSST_OUTPUT_DIR:-$STORAGE_DIR/msst}"
 export SOULX_FLASHHEAD_MODEL_DIR="${SOULX_FLASHHEAD_MODEL_DIR:-$HF_MIRROR_DIR/Soul-AILab/SoulX-FlashHead-1_3B}"
 export SOULX_FLASHHEAD_WAV2VEC_DIR="${SOULX_FLASHHEAD_WAV2VEC_DIR:-$HF_MIRROR_DIR/Soul-AILab/wav2vec2-base-960h}"
 export SOULX_FLASHHEAD_CODE_PATH="${SOULX_FLASHHEAD_CODE_PATH:-$HOME/LLM-depency/SoulX-FlashHead}"
-export HUNYUAN_VIDEO_COMFY_MODEL_DIR="${HUNYUAN_VIDEO_COMFY_MODEL_DIR:-$HF_MIRROR_DIR/HunyuanVideo-1.5-Comfy}"
-export HUNYUAN_VIDEO_COMFY_CODE_PATH="${HUNYUAN_VIDEO_COMFY_CODE_PATH:-$HOME/LLM-depency/ComfyUI}"
 export KANDINSKY6_MODEL_DIR="${KANDINSKY6_MODEL_DIR:-$HF_MIRROR_DIR/kandinskylab}"
 export MOSS_MUSIC_MODEL_DIR="${MOSS_MUSIC_MODEL_DIR:-$HF_MIRROR_DIR/OpenMOSS/moss-music}"
 export MOSS_MUSIC_CAPTION_BIN="${MOSS_MUSIC_CAPTION_BIN:-$HOME/.local/share/moss-music/build/ace-caption}"
@@ -175,8 +172,6 @@ export QWEN3_ASR_HOST="${QWEN3_ASR_HOST:-$HOST}"
 export QWEN3_ASR_PORT="${QWEN3_ASR_PORT:-8371}"
 export SOULX_FLASHHEAD_HOST="${SOULX_FLASHHEAD_HOST:-$HOST}"
 export SOULX_FLASHHEAD_PORT="${SOULX_FLASHHEAD_PORT:-8391}"
-export HUNYUAN_VIDEO_COMFY_HOST="${HUNYUAN_VIDEO_COMFY_HOST:-$HOST}"
-export HUNYUAN_VIDEO_COMFY_PORT="${HUNYUAN_VIDEO_COMFY_PORT:-8392}"
 export KANDINSKY6_HOST="${KANDINSKY6_HOST:-$HOST}"
 export KANDINSKY6_PORT="${KANDINSKY6_PORT:-8369}"
 export MOSS_MUSIC_HOST="${MOSS_MUSIC_HOST:-$HOST}"
@@ -218,7 +213,6 @@ uv run --no-sync --project "$QWEN3_TTS_PROJECT_DIR" python "$MAIN_DIR/check_port
   'Confucius4-TTS' "$CONFUCIUS4_TTS_HOST" "$CONFUCIUS4_TTS_PORT" \
   'Qwen3-ASR' "$QWEN3_ASR_HOST" "$QWEN3_ASR_PORT" \
   'VoxCPM2' "$VOXCPM2_HOST" "$VOXCPM2_PORT" \
-  'HunyuanVideo-1.5-Comfy' "$HUNYUAN_VIDEO_COMFY_HOST" "$HUNYUAN_VIDEO_COMFY_PORT" \
   'Kandinsky-6.0-Lite-Distill-BF16' "$KANDINSKY6_HOST" "$KANDINSKY6_PORT"
 
 export HF_MODULES_CACHE="${HF_MODULES_CACHE:-$RUNTIME_CACHE_DIR/hf_modules}"
@@ -239,9 +233,6 @@ echo "=================================================="
 echo "Control-plane uv project: $QWEN3_TTS_PROJECT_DIR"
 echo "SoulX-FlashHead project:       $SOULX_FLASHHEAD_PROJECT_DIR"
 echo "SoulX-FlashHead model:         $SOULX_FLASHHEAD_MODEL_DIR"
-echo "HunyuanVideo-1.5 Comfy project: $HUNYUAN_VIDEO_COMFY_PROJECT_DIR"
-echo "HunyuanVideo-1.5 Comfy model:   $HUNYUAN_VIDEO_COMFY_MODEL_DIR"
-echo "HunyuanVideo-1.5 ComfyUI code:  $HUNYUAN_VIDEO_COMFY_CODE_PATH"
 echo "Kandinsky 6 project:             $KANDINSKY6_PROJECT_DIR"
 echo "Kandinsky 6 model:               $KANDINSKY6_MODEL_DIR"
 echo "SoulX-FlashHead wav2vec:       $SOULX_FLASHHEAD_WAV2VEC_DIR"
@@ -340,7 +331,6 @@ echo "SheetSage2 route:       http://127.0.0.1:$SHEETSAGE2_PORT/v1/m-a-p/SheetSa
 echo "YuE2-Vae route:         http://127.0.0.1:$YUE2_VAE_PORT/v1/m-a-p/YuE2-Vae"
 echo "MERT-v2-FullSong route: http://127.0.0.1:$MERT_V2_FULLSONG_PORT/v1/m-a-p/MERT-v2-FullSong"
 echo "SoulX-FlashHead route: http://127.0.0.1:$SOULX_FLASHHEAD_PORT/v1/soulX/flashHead"
-echo "HunyuanVideo-1.5 route: http://127.0.0.1:$HUNYUAN_VIDEO_COMFY_PORT/v1/Tencent-Hunyuan/HunyuanVideo-1.5-Comfy"
 echo "Kandinsky 6 route: http://127.0.0.1:$KANDINSKY6_PORT/v1/kandinskylab/Kandinsky-6.0-Lite-Distill-BF16"
 echo "MOSS-Music route:      http://127.0.0.1:$MOSS_MUSIC_PORT/v1/openMoss/moss-music"
 echo "MOSS-SoundEffect route: http://127.0.0.1:$MOSS_SOUNDEFFECT_V2_PORT/v1/moss/soundEffect-v2.0"
@@ -368,14 +358,12 @@ printf '%-24s %-6s %s\n' 'Qwen3-TTS Base' "$QWEN3_TTS_PORT" '/v1/qwen/clone'
 printf '%-24s %-6s %s\n' 'IndexTTS-2.5' "$INDEXTTS25_PORT" '/v1/index-team/indexTTS-2.5'
 printf '%-24s %-6s %s\n' 'VoxCPM2' "$VOXCPM2_PORT" '/v1/voxcpm2/clone'
 printf '%-24s %-6s %s\n' 'SoulX-FlashHead-1.3B' "$SOULX_FLASHHEAD_PORT" '/v1/soulX/flashHead'
-printf '%-24s %-6s %s\n' 'HunyuanVideo-1.5-Comfy' "$HUNYUAN_VIDEO_COMFY_PORT" '/v1/Tencent-Hunyuan/HunyuanVideo-1.5-Comfy'
 printf '%-24s %-6s %s\n' 'Kandinsky-6 Lite BF16' "$KANDINSKY6_PORT" '/v1/kandinskylab/Kandinsky-6.0-Lite-Distill-BF16'
 echo "=================================================="
 
 cd "$PROJECT_DIR"
 
 soulx_flashhead_pid=""
-hunyuan_video_comfy_pid=""
 kandinsky6_pid=""
 moss_music_pid=""
 moss_soundeffect_v2_pid=""
@@ -399,7 +387,6 @@ cleanup() {
   local status=$?
   local pids=(
     "$soulx_flashhead_pid"
-    "$hunyuan_video_comfy_pid"
     "$kandinsky6_pid"
     "$moss_music_pid"
     "$moss_soundeffect_v2_pid"
@@ -590,15 +577,6 @@ HOST="$SOULX_FLASHHEAD_HOST" PORT="$SOULX_FLASHHEAD_PORT" \
   setsid uv run --no-sync --project "$SOULX_FLASHHEAD_PROJECT_DIR" \
   python "$SOULX_FLASHHEAD_PROJECT_DIR/main.py" &
 soulx_flashhead_pid=$!
-# HunyuanVideo-1.5 Comfy 独立 uv API；ComfyUI 与权重只在一次性 worker 请求期间启动。
-HUNYUAN_VIDEO_COMFY_HOST="$HUNYUAN_VIDEO_COMFY_HOST" \
-  HUNYUAN_VIDEO_COMFY_PORT="$HUNYUAN_VIDEO_COMFY_PORT" \
-  HUNYUAN_VIDEO_COMFY_MODEL_DIR="$HUNYUAN_VIDEO_COMFY_MODEL_DIR" \
-  HUNYUAN_VIDEO_COMFY_CODE_PATH="$HUNYUAN_VIDEO_COMFY_CODE_PATH" \
-  HOST="$HUNYUAN_VIDEO_COMFY_HOST" PORT="$HUNYUAN_VIDEO_COMFY_PORT" \
-  setsid uv run --no-sync --project "$HUNYUAN_VIDEO_COMFY_PROJECT_DIR" \
-  python "$HUNYUAN_VIDEO_COMFY_PROJECT_DIR/main.py" &
-hunyuan_video_comfy_pid=$!
 # Kandinsky 6 Lite uses its own one-shot Diffusers worker environment.
 KANDINSKY6_HOST="$KANDINSKY6_HOST" KANDINSKY6_PORT="$KANDINSKY6_PORT" \
   KANDINSKY6_MODEL_DIR="$KANDINSKY6_MODEL_DIR" \
@@ -606,4 +584,4 @@ KANDINSKY6_HOST="$KANDINSKY6_HOST" KANDINSKY6_PORT="$KANDINSKY6_PORT" \
   setsid uv run --no-sync --project "$KANDINSKY6_PROJECT_DIR" \
   python "$KANDINSKY6_PROJECT_DIR/main.py" &
 kandinsky6_pid=$!
-wait -n "$msst_pid" "$soulx_flashhead_pid" "$hunyuan_video_comfy_pid" "$kandinsky6_pid" "$moss_music_pid" "$moss_soundeffect_v2_pid" "$main_pid" "$acestep_pid" "$yue2_3b_pid" "$sheetsage2_pid" "$yue2_vae_pid" "$mert_v2_fullsong_pid" "$qwen3_tts_pid" "$indextts25_pid" "$voxcpm2_pid" "$qwen_voicedesign_pid" "$tiger_dnr_pid" "$confucius4_tts_pid" "$qwen3_asr_pid"
+wait -n "$msst_pid" "$soulx_flashhead_pid" "$kandinsky6_pid" "$moss_music_pid" "$moss_soundeffect_v2_pid" "$main_pid" "$acestep_pid" "$yue2_3b_pid" "$sheetsage2_pid" "$yue2_vae_pid" "$mert_v2_fullsong_pid" "$qwen3_tts_pid" "$indextts25_pid" "$voxcpm2_pid" "$qwen_voicedesign_pid" "$tiger_dnr_pid" "$confucius4_tts_pid" "$qwen3_asr_pid"
