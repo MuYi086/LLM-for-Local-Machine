@@ -26,6 +26,7 @@ MODEL_PROJECTS = (
     "model-audio/transcribe_qwen3-asr-1.7b",
     "model-audio/separate_tiger-dnr",
     "model-audio/separate_msst-mega53",
+    "model-audio/soundEffect-v2.0",
 )
 EXPECTED_RUFF_RULES = {"E", "F", "I", "UP", "B"}
 
@@ -68,7 +69,7 @@ class PythonQualityConfigurationTests(unittest.TestCase):
     def test_startup_uses_locked_environments_without_runtime_sync(self) -> None:
         start_script = (REPOSITORY_DIR / "start.sh").read_text(encoding="utf-8")
 
-        self.assertEqual(start_script.count("setsid uv run --no-sync --project"), 17)
+        self.assertEqual(start_script.count("setsid uv run --no-sync --project"), 18)
         self.assertNotIn("setsid uv run --project", start_script)
         self.assertEqual(start_script.count('for pid in "${pids[@]}"; do'), 3)
         self.assertNotIn('wait "$qwen3_tts_pid"', start_script)

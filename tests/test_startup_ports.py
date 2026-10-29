@@ -24,6 +24,23 @@ main = startup_ports.main
 
 
 class StartupPortTests(unittest.TestCase):
+    def test_moss_soundeffect_is_registered_for_startup_and_port_preflight(self) -> None:
+        start_script = (Path(__file__).resolve().parents[1] / "start.sh").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn('MOSS_SOUNDEFFECT_V2_PORT="${MOSS_SOUNDEFFECT_V2_PORT:-8362}"', start_script)
+        self.assertIn(
+            '\'MOSS-SoundEffect-v2.0\' "$MOSS_SOUNDEFFECT_V2_HOST" "$MOSS_SOUNDEFFECT_V2_PORT"',
+            start_script,
+        )
+        self.assertIn("'/v1/moss/soundEffect-v2.0'", start_script)
+        self.assertIn(
+            'setsid uv run --no-sync --project "$MOSS_SOUNDEFFECT_V2_PROJECT_DIR"',
+            start_script,
+        )
+        self.assertIn('"$moss_soundeffect_v2_pid"', start_script)
+
     def test_indextts25_is_registered_for_startup_and_port_preflight(self) -> None:
         start_script = (Path(__file__).resolve().parents[1] / "start.sh").read_text(
             encoding="utf-8"

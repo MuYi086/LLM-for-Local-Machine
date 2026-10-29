@@ -46,7 +46,7 @@ README.md 提供接入、配置和运维说明，本文件记录开发边界与�
 
 ## 项目结构与服务速查
 
-当前维护 16 个模型服务 uv 项目与一个轻量控制面，start.sh 合计启动 17 个 HTTP 进程；
+当前维护 17 个模型服务 uv 项目与一个轻量控制面，start.sh 合计启动 18 个 HTTP 进程；
 localai_worker_bridge 是额外的非 HTTP uv 包，不计入服务数，也不常驻导入 Torch。
 原生能力和输出见 README 服务总览；端口、方法及路径以源码为准。
 区分模型原生能力、已接入接口与服务编排；各 HTTP 进程提供 GET /v1/health。
@@ -56,6 +56,7 @@ localai_worker_bridge 是额外的非 HTTP uv 包，不计入服务数，也不�
 | main 控制面 | 8300 | GET /v1/control；POST /v1/audio/export；POST /v1/audio/spatial/render | 控制、共享上传/检查、CPU 母带及空间导出 | 非模型服务 |
 | `model-audio/design_qwen3-tts-1.7b-voicedesign/` | 8301 | POST /v1/qwen/timbre | 文本音色设计与 TTS | 语音波形 |
 | `model-audio/analyse_moss-music-8b-Instruct/` | 8310 | POST /v1/openMoss/moss-music | 音乐描述、问答与歌词转写 | JSON 分析文本 |
+| `model-audio/soundEffect-v2.0/` | 8362 | POST /v1/moss/soundEffect-v2.0 | 根据文本提示词生成最长 30 秒的环境音效 | 48 kHz 单声道 WAV |
 | `model-audio/music_ace-step-1.5/` | 8313 | POST /v1/aceStep/bgm | 按提示词生成 BGM；接口不接收歌词 | 音乐波形 |
 | `model-audio/music_yue2-3b/` | 8314 | POST /v1/m-a-p/YuE2 | 根据风格、歌词与可选 ABC 乐谱生成歌曲 | 48 kHz 立体声音频 |
 | `model-audio/score_sheetsage-2/` | 8315 | POST /v1/m-a-p/SheetSage2 | 音乐转为乐谱、MIDI、节拍/和弦/调性/结构与时间标注 | ABC、MIDI 与 JSON/LAB ZIP |
@@ -91,12 +92,14 @@ localai_worker_bridge 是额外的非 HTTP uv 包，不计入服务数，也不�
   不加入 LocalAI 固定五个 bridge，默认 storage/msst/ ZIP 不由 WAV 保留策略清理。
 - model-audio/indexTTS-2.5/ 使用仓库外官方 v2.5.0 推理源码与本地完整主/辅助权重；HTTP 进程
   只负责上传、检查、共享 GPU 排队和一次性 worker 编排。
+- model-audio/soundEffect-v2.0/ 使用仓库外固定 revision 的官方 MOSS-TTS 推理源码与完整本地快照；
+  HTTP 进程只负责请求校验、共享 GPU 排队与一次性 worker 编排。
 - model-audio/spatial_steam-audio/ 是 C++17 Steam Audio CPU renderer，不获取 GPU 锁；SDK 和动态库在仓库外。
 - qa/ 是无模型测试/Ruff 项目；scripts/quality_gate.sh 与 GitHub Actions 使用同一质量门禁。
   根目录回归使用 QA；ACE-Step 服务内测试从 model-audio/music_ace-step-1.5/ 执行。
 - model-text/scripts/training/、model-text/training/configs/ 是纯文本润色 LoRA 实验，不是语音训练或 HTTP 服务。
 - model-video/avatar_soulx-flashhead-1.3b/ 维护 SoulX-FlashHead 单 GPU 人像视频服务；
-  8391 提供 POST /v1/soulX/flashHead，计入 start.sh 的 17 个 HTTP 进程。
+  8391 提供 POST /v1/soulX/flashHead，计入 start.sh 的 18 个 HTTP 进程。
   主模型及 wav2vec2 编码器均放在 hf-mirror/Soul-AILab 下；保持独立 uv 环境与一次性 worker，
   不加入 LocalAI 的五个固定 worker bridge。图片/音频使用上传逻辑标识，不能直接读取任意服务器路径。
 - model-video/HunyuanVideo-1.5-Comfy/ 使用 ComfyUI 核心节点运行本地 480p step-distilled FP8 图生视频；

@@ -1,0 +1,67 @@
+[project]
+name = "moss-soundeffect-v2-service"
+version = "0.1.0"
+description = "MOSS-SoundEffect v2.0 本地文本音效生成 HTTP 服务"
+requires-python = "==3.12.13"
+dependencies = [
+    "accelerate==1.13.0",
+    "diffusers==0.37.1",
+    "descript-audiotools==0.7.2",
+    "einops==0.8.2",
+    "fastapi==0.141.1",
+    "ftfy==6.3.1",
+    "imageio==2.37.3",
+    "llm-local-runtime",
+    "numpy==1.26.4",
+    "pillow==12.2.0",
+    "pydantic==2.13.4",
+    "regex==2026.4.4",
+    "safetensors==0.7.0",
+    "soundfile==0.13.1",
+    "torch==2.9.0+cu128",
+    "torchaudio==2.9.0+cu128",
+    "torchcodec==0.8.0",
+    "torchvision==0.24.0+cu128",
+    "tqdm==4.67.3",
+    "transformers==4.57.1",
+    "typing-extensions>=4.10",
+    "uvicorn==0.52.1",
+]
+
+[tool.uv]
+package = false
+index-strategy = "first-index"
+environments = ["sys_platform == 'linux' and platform_machine == 'x86_64'"]
+
+[dependency-groups]
+dev = ["ruff>=0.15.9"]
+
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
+default = true
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://mirrors.aliyun.com/pytorch-wheels/cu128/"
+format = "flat"
+explicit = true
+
+[tool.uv.sources]
+llm-local-runtime = { path = "../../llm_local_runtime", editable = true }
+torch = { index = "pytorch-cu128" }
+torchaudio = { index = "pytorch-cu128" }
+torchvision = { index = "pytorch-cu128" }
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["B008", "E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"

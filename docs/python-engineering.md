@@ -38,7 +38,7 @@ bash scripts/quality_gate.sh
 ```
 
 统一入口先运行 `bash -n start.sh` 和不依赖 Steam Audio SDK 的三个 C++ 核心测试，
-再检查 14 个模型服务项目与 QA 的锁文件，使用轻量 QA 环境执行 Ruff、格式检查和两组单元测试。
+再检查 17 个模型服务项目与 QA 的锁文件，使用轻量 QA 环境执行 Ruff、格式检查和两组单元测试。
 GitHub Actions 调用同一脚本，不需要模型环境或 CUDA；需要 `uv` 与 `g++`。
 锁检查仍可能访问 Git/wheel 元数据；已有完整缓存时可用 `UV_OFFLINE=1`，
 离线模式不能代替首次准备依赖元数据。
@@ -46,12 +46,13 @@ GitHub Actions 调用同一脚本，不需要模型环境或 CUDA；需要 `uv` 
 只检查改动文件时使用锁定的 QA Ruff，例如：
 
 ```bash
-uv run --project qa --locked ruff check main llm_local_runtime tests
-uv run --project qa --locked ruff format --check main llm_local_runtime tests
+uv run --project qa --locked ruff check main llm_local_runtime tests/*.py
+uv run --project qa --locked ruff format --check main llm_local_runtime tests/*.py
 ```
 
-完整 Ruff 路径以 `scripts/quality_gate.sh` 为准；当前不包含 `model-text/scripts/training/`，
-修改这些脚本时需显式加入文件路径检查。
+完整 Ruff 路径以 `scripts/quality_gate.sh` 为准；根目录回归只检查 `tests/*.py`，独立的
+`tests/i2v-benchmark/` 项目不属于 QA 质量门禁；当前也不包含 `model-text/scripts/training/`，
+修改这些独立项目时需显式加入对应文件路径检查。
 
 修复格式时使用 `ruff format .`；只使用 `ruff check --fix` 的安全修复，
 并审阅每项行为相关改动。不要使用无规则号的 `noqa`；必要的例外必须写明

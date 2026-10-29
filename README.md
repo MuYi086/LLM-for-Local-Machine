@@ -4,7 +4,7 @@
 三路音源分离，以及 CPU 音频母带和 Steam Audio 对象级空间导出。
 模型推理均使用本地权重。
 
-仓库包含 **16 个模型服务 uv 项目，统一启动 17 个 HTTP 进程**，其中一个是轻量控制面。
+仓库包含 **17 个模型服务 uv 项目，统一启动 18 个 HTTP 进程**，其中一个是轻量控制面。
 HTTP 进程不加载重型模型，模型推理由对应目录
 中的一次性 worker 完成；共享运行时和无模型 QA 环境分别位于 `llm_local_runtime/`、`qa/`。
 接口、路径和默认值以当前 `main.py`、`worker.py`、`pyproject.toml` 与 `start.sh` 为准。
@@ -30,6 +30,7 @@ Base/VoiceDesign 的本地模型候选及五个 one-shot worker bridge。原生 
 | [控制面 `main/`](main/) | 8300 | `GET /v1/control`；`POST /v1/audio/export`；`POST /v1/audio/spatial/render` | 控制、共享上传/检查、CPU 母带与 Steam Audio 空间导出（[源码](main/main.py)） | 非模型服务，响应见下节 |
 | [Qwen3-TTS 1.7B VoiceDesign `model-audio/design_qwen3-tts-1.7b-voicedesign/`](model-audio/design_qwen3-tts-1.7b-voicedesign/) | 8301 | `POST /v1/qwen/timbre` | 根据自然语言音色描述和待朗读文本生成语音，支持音色、情绪和韵律描述（[官方](https://github.com/QwenLM/Qwen3-TTS#voice-design)） | 语音波形 |
 | [MOSS-Music-8B-Instruct `model-audio/analyse_moss-music-8b-Instruct/`](model-audio/analyse_moss-music-8b-Instruct/) | 8310 | `POST /v1/openMoss/moss-music` | 上传音乐并按文字指令生成音乐描述、问答或歌词文本；使用本地完整 GGUF 与 HOT-Step-CPP | JSON 分析文本 |
+| [MOSS-SoundEffect v2.0 `model-audio/soundEffect-v2.0/`](model-audio/soundEffect-v2.0/) | 8362 | `POST /v1/moss/soundEffect-v2.0` | 根据中英文提示词生成最长 30 秒的环境音效（[模型卡](https://huggingface.co/OpenMOSS-Team/MOSS-SoundEffect-v2.0)） | 48 kHz 单声道 WAV |
 | [ACE-Step 1.5 XL Turbo `model-audio/music_ace-step-1.5/`](model-audio/music_ace-step-1.5/) | 8313 | `POST /v1/aceStep/bgm` | 按风格描述和可选音乐元数据生成 BGM；当前接口不接收歌词（[官方](https://huggingface.co/ACE-Step/acestep-v15-xl-turbo-diffusers)） | 音乐波形 |
 | [YuE2-3B `model-audio/music_yue2-3b/`](model-audio/music_yue2-3b/) | 8314 | `POST /v1/m-a-p/YuE2` | 根据风格、歌词和可选 ABC 乐谱生成带歌声与伴奏的歌曲（[官方](https://huggingface.co/m-a-p/YuE2-3B)） | 48 kHz 立体声音乐波形 |
 | [SheetSage2 `model-audio/score_sheetsage-2/`](model-audio/score_sheetsage-2/) | 8315 | `POST /v1/m-a-p/SheetSage2` | 将音乐转为可编辑乐谱、MIDI、节拍/和弦/调性/结构与时间标注（[官方](https://huggingface.co/m-a-p/SheetSage2)） | ABC、MIDI 与 JSON/LAB 标注 ZIP |
@@ -84,6 +85,7 @@ VoxCPM2 可控克隆使用 `control_instruction`。
 main/                                            8300 控制面，不包含模型推理
 model-audio/                                     当前维护的音频模型服务、worker 与 renderer
 model-audio/analyse_moss-music-8b-Instruct/        MOSS 音乐理解 API 与 GGUF worker
+model-audio/soundEffect-v2.0/                   MOSS-SoundEffect 文本音效生成 API 与 worker
 model-audio/spatial_steam-audio/                 独立 C++17 Steam Audio CPU renderer
 model-audio/clone_qwen3-tts-1.7b-base/           Qwen3-TTS Base 的 HTTP 服务和 worker
 model-audio/clone_voxcpm-2/                      VoxCPM2 的 HTTP 服务和克隆 worker
@@ -205,8 +207,8 @@ Tokenizer 和上游源码就绪后启动全部服务：
 bash start.sh
 ```
 
-`start.sh` 会启动 8300、8301、8310、8313、8314、8315、8316、8317、8321、8322、8323、8351、8361、8371、8380、8391 和 8392，
-共 17 个进程；8300 使用 `model-audio/clone_qwen3-tts-1.7b-base` uv 项目中的轻量 HTTP 依赖，其余服务使用
+`start.sh` 会启动 8300、8301、8310、8313、8314、8315、8316、8317、8321、8322、8323、8351、8361、8362、8371、8380、8391 和 8392，
+共 18 个进程；8300 使用 `model-audio/clone_qwen3-tts-1.7b-base` uv 项目中的轻量 HTTP 依赖，其余服务使用
 各自的 uv 项目。启动命令统一使用 `uv run --no-sync`，不会在运行阶段联网解析依赖；
 本地 GPU 服务通过 `GPU_LOCK_FILE` 串行访问 GPU。默认最多排队 900 秒，超过时返回
 `503`；用正数 `GPU_LOCK_WAIT_TIMEOUT` 调整。共享锁实现仍兼容非正值无限等待，
@@ -361,6 +363,7 @@ HOST=127.0.0.1 PORT=8321 \
 | YuE2-Vae | `$HF_MIRROR_DIR/m-a-p/YuE2-Vae` | `YUE2_VAE_MODEL_DIR`、`YUE2_VAE_OUTPUT_DIR`、`YUE2_VAE_DEVICE`、`YUE2_VAE_REQUEST_TIMEOUT`、`YUE2_VAE_MAX_AUDIO_SECONDS` |
 | SheetSage2 | `$HF_MIRROR_DIR/m-a-p/SheetSage2` 与 `$HF_MIRROR_DIR/m-a-p/MERT-v2-FullSong` | `SHEETSAGE2_MODEL_DIR`、`SHEETSAGE2_BASE_MODEL_DIR`、`SHEETSAGE2_OUTPUT_DIR`、`SHEETSAGE2_DEVICE`、`SHEETSAGE2_DTYPE`、`SHEETSAGE2_PRESET`、`SHEETSAGE2_REQUEST_TIMEOUT` |
 | MERT-v2-FullSong | `$HF_MIRROR_DIR/m-a-p/MERT-v2-FullSong` | `MERT_V2_FULLSONG_MODEL_DIR`、`MERT_V2_FULLSONG_OUTPUT_DIR`、`MERT_V2_FULLSONG_DEVICE`、`MERT_V2_FULLSONG_REQUEST_TIMEOUT` |
+| MOSS-SoundEffect v2.0 | `$HF_MIRROR_DIR/OpenMOSS/MOSS-SoundEffect-v2.0` | `MOSS_SOUNDEFFECT_V2_MODEL_DIR`、`MOSS_SOUNDEFFECT_V2_CODE_PATH`、`MOSS_SOUNDEFFECT_V2_OUTPUT_DIR` |
 | VoxCPM2 | `$HF_MIRROR_DIR/openbmb/VoxCPM2` | `VOXCPM2_MODEL_DIR`、仓库内 `model-audio/clone_voxcpm-2/voxcpm2_helpers.py` |
 | TIGER-DnR | `$HF_MIRROR_DIR/JusperLee/TIGER-DnR` | `TIGER_DNR_MODEL_DIR`、`TIGER_DNR_SOURCE_DIR` |
 | HunyuanVideo-1.5 Comfy | `$HF_MIRROR_DIR/HunyuanVideo-1.5-Comfy` | `HUNYUAN_VIDEO_COMFY_MODEL_DIR`、`HUNYUAN_VIDEO_COMFY_CODE_PATH` |
@@ -373,6 +376,7 @@ HOST=127.0.0.1 PORT=8321 \
 | IndexTTS-2.5 | `$HOME/LLM-depency/index-tts-2.5.0`（tag `v2.5.0`） | `INDEXTTS25_CODE_PATH` |
 | TIGER-DnR | `$HOME/.local/share/tiger-dnr/TIGER` | `TIGER_DNR_SOURCE_DIR` |
 | HunyuanVideo-1.5 Comfy | `$HOME/LLM-depency/ComfyUI` | `HUNYUAN_VIDEO_COMFY_CODE_PATH` |
+| MOSS-SoundEffect v2.0 | `$HOME/LLM-depency/MOSS-TTS/moss_soundeffect_v2`（固定 revision `934d6826b084c46a0d033402174d5f8ac4ed2519`） | `MOSS_SOUNDEFFECT_V2_CODE_PATH` |
 
 通用配置包括 `HOST`、`PORT`、`STORAGE_DIR`、`PROMPTS_DIR`、`RUNTIME_CACHE_DIR`、
 `GPU_LOCK_FILE`、`LOCAL_FILES_ONLY` 和 `CUDA_RELEASE_DELAY`。48 kHz 导出可用
@@ -698,9 +702,36 @@ curl -X POST http://127.0.0.1:8351/v1/tigerDnr/separate \
   -o tiger-dnr-stems.zip
 ```
 
-## 声效提示词资料
+## MOSS-SoundEffect v2.0 音效生成
 
-当前没有独立声效生成服务；音效生成接口以服务总览中的实际注册路由为准。
+MOSS-SoundEffect v2.0 默认监听 `8362`，路由为 `POST /v1/moss/soundEffect-v2.0`。
+服务接收 JSON 提示词与采样参数，按本地模型快照生成 48 kHz 单声道 WAV，并原子保存到
+`storage/sound_effect_v2/`。默认时长为 10 秒，最长 30 秒；每个请求通过共享 GPU 锁启动并退出独立 worker。
+
+官方源码不复制进仓库。先在仓库外准备固定 revision，再同步独立 uv 环境：
+
+```bash
+mkdir -p "$HOME/LLM-depency/MOSS-TTS"
+git -C "$HOME/LLM-depency/MOSS-TTS" init
+git -C "$HOME/LLM-depency/MOSS-TTS" remote add origin https://github.com/OpenMOSS/MOSS-TTS.git
+git -C "$HOME/LLM-depency/MOSS-TTS" fetch --filter=blob:none --depth=1 origin 934d6826b084c46a0d033402174d5f8ac4ed2519
+git -C "$HOME/LLM-depency/MOSS-TTS" sparse-checkout init --cone
+git -C "$HOME/LLM-depency/MOSS-TTS" sparse-checkout set moss_soundeffect_v2
+git -C "$HOME/LLM-depency/MOSS-TTS" checkout --detach FETCH_HEAD
+uv sync --project model-audio/soundEffect-v2.0 --locked
+```
+
+模型默认目录为 `$HF_MIRROR_DIR/OpenMOSS/MOSS-SoundEffect-v2.0`。健康检查只核对四个权重文件的完整大小、
+配置文件、依赖、官方源码和 GPU；不会加载模型。请求示例：
+
+```bash
+curl -fsS http://127.0.0.1:8362/v1/moss/soundEffect-v2.0 \
+  -H 'Content-Type: application/json' \
+  -d '{"prompt":"Rain falling steadily on a metal roof","seconds":8,"seed":42}' \
+  -o sound-effect.wav
+```
+
+字段边界和配置见 [MOSS-SoundEffect 服务说明](model-audio/soundEffect-v2.0/README.md)。
 
 ## MOSS-Music 音乐理解
 
@@ -725,7 +756,7 @@ curl -fsS http://127.0.0.1:8310/v1/openMoss/moss-music \
 
 ## ACE-Step BGM 生成
 
-ACE-Step 独立监听 `8313`，是当前保留的音乐生成服务。声效目录只包含提示词规划资料。
+ACE-Step 独立监听 `8313`，是当前保留的音乐生成服务。
 服务默认使用 BF16、model CPU
 offload、VAE tiling 和一次性 worker，生成结果保存到 `storage/bgm/`，前端可直接把返回
 的标准 48 kHz 双声道 WAV 写入已有 `bgmLibrary`。
@@ -988,6 +1019,7 @@ bash scripts/quality_gate.sh
 `localai_worker_bridge` 与 QA 锁文件、Ruff 和格式，最后执行根目录和 ACE-Step 的无模型测试。
 所有当前维护的 uv 项目都必须存在并通过锁检查；缺失项目会使门禁失败。
 GitHub Actions 使用同一脚本；需要 `uv` 和 `g++`，不需要 CUDA 或 Steam Audio SDK。
+Ruff 检查仓库服务、共享运行时和根目录 `tests/*.py`；独立的 `tests/i2v-benchmark/` 项目不属于此门禁。
 锁文件检查仍可能访问 Git/wheel 元数据，初次运行需具备这些依赖来源的网络或本地缓存。
 已有完整缓存时可运行 `UV_OFFLINE=1 bash scripts/quality_gate.sh`。
 

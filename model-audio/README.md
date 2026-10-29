@@ -3,7 +3,7 @@
 此目录集中维护当前启用的音频模型服务，以及 CPU 空间音频 renderer。权重仍由
 `$HF_MIRROR_DIR` 指向的仓库外目录提供；LocalAI 管理与分发代码保留在根目录 `localai/`。
 
-当前模型服务包括 MOSS-Music-8B-Instruct、 Qwen3-TTS Base/VoiceDesign、IndexTTS-2.5、ACE-Step、YuE2-3B、SheetSage2、YuE2-Vae、
+当前模型服务包括 MOSS-Music-8B-Instruct、MOSS-SoundEffect v2.0、Qwen3-TTS Base/VoiceDesign、IndexTTS-2.5、ACE-Step、YuE2-3B、SheetSage2、YuE2-Vae、
 MERT-v2-FullSong、VoxCPM2、TIGER-DnR、Confucius4-TTS 和 Qwen3-ASR。Qwen3-ASR 按输入模态归入
 音频模型。`model-audio/spatial_steam-audio/` 是 CPU 空间音频处理程序，不加载 AI 模型。
 
@@ -15,6 +15,7 @@ MERT-v2-FullSong、VoxCPM2、TIGER-DnR、Confucius4-TTS 和 Qwen3-ASR。Qwen3-AS
 | 目录 | 功能词含义 | 主要用途 |
 | --- | --- | --- |
 | `analyse_moss-music-8b-Instruct/` | analyse：音乐理解 | 上传音乐并生成分析或问答文本 |
+| `soundEffect-v2.0/` | generate：音效生成 | 根据文字提示词生成最长 30 秒环境音效 |
 | `clone_confucius-4/` | clone：语音克隆 | 跨语言零样本 TTS |
 | `clone_qwen3-tts-1.7b-base/` | clone：语音克隆 | 参考音频驱动的多语言 TTS |
 | `clone_voxcpm-2/` | clone：语音克隆 | 多语种 TTS、参考及可控克隆 |

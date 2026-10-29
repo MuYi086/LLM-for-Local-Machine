@@ -16,7 +16,7 @@ service_projects=(
     model-audio/indexTTS-2.5
     model-audio/score_sheetsage-2 model-audio/codec_yue2-vae model-audio/embedding_mert-v2-fullsong
     model-audio/design_qwen3-tts-1.7b-voicedesign model-audio/clone_confucius-4 model-audio/transcribe_qwen3-asr-1.7b
-    model-audio/separate_tiger-dnr model-audio/separate_msst-mega53
+    model-audio/separate_tiger-dnr model-audio/separate_msst-mega53 model-audio/soundEffect-v2.0
 )
 
 lock_projects=("${service_projects[@]}" localai_worker_bridge qa)
@@ -32,7 +32,8 @@ for project in "${lock_projects[@]}"; do
         exit 1
     fi
 done
-lint_paths+=(tests)
+# `tests/i2v-benchmark/` 是独立实验项目，不属于 QA 根目录回归环境。
+lint_paths+=(tests/*.py)
 
 uv run --project qa --locked ruff check "${lint_paths[@]}"
 uv run --project qa --locked ruff format --check "${lint_paths[@]}"

@@ -39,6 +39,7 @@ VOXCPM2_PROJECT_DIR="${VOXCPM2_PROJECT_DIR:-$PROJECT_DIR/model-audio/clone_voxcp
 MSST_PROJECT_DIR="${MSST_PROJECT_DIR:-$PROJECT_DIR/model-audio/separate_msst-mega53}"
 TIGER_DNR_PROJECT_DIR="${TIGER_DNR_PROJECT_DIR:-$PROJECT_DIR/model-audio/separate_tiger-dnr}"
 MOSS_MUSIC_PROJECT_DIR="${MOSS_MUSIC_PROJECT_DIR:-$PROJECT_DIR/model-audio/analyse_moss-music-8b-Instruct}"
+MOSS_SOUNDEFFECT_V2_PROJECT_DIR="${MOSS_SOUNDEFFECT_V2_PROJECT_DIR:-$PROJECT_DIR/model-audio/soundEffect-v2.0}"
 SOULX_FLASHHEAD_PROJECT_DIR="${SOULX_FLASHHEAD_PROJECT_DIR:-$PROJECT_DIR/model-video/avatar_soulx-flashhead-1.3b}"
 HUNYUAN_VIDEO_COMFY_PROJECT_DIR="${HUNYUAN_VIDEO_COMFY_PROJECT_DIR:-$PROJECT_DIR/model-video/HunyuanVideo-1.5-Comfy}"
 
@@ -58,6 +59,9 @@ export HUNYUAN_VIDEO_COMFY_MODEL_DIR="${HUNYUAN_VIDEO_COMFY_MODEL_DIR:-$HF_MIRRO
 export HUNYUAN_VIDEO_COMFY_CODE_PATH="${HUNYUAN_VIDEO_COMFY_CODE_PATH:-$HOME/LLM-depency/ComfyUI}"
 export MOSS_MUSIC_MODEL_DIR="${MOSS_MUSIC_MODEL_DIR:-$HF_MIRROR_DIR/OpenMOSS/moss-music}"
 export MOSS_MUSIC_CAPTION_BIN="${MOSS_MUSIC_CAPTION_BIN:-$HOME/.local/share/moss-music/build/ace-caption}"
+export MOSS_SOUNDEFFECT_V2_MODEL_DIR="${MOSS_SOUNDEFFECT_V2_MODEL_DIR:-$HF_MIRROR_DIR/OpenMOSS/MOSS-SoundEffect-v2.0}"
+export MOSS_SOUNDEFFECT_V2_CODE_PATH="${MOSS_SOUNDEFFECT_V2_CODE_PATH:-$HOME/LLM-depency/MOSS-TTS/moss_soundeffect_v2}"
+export MOSS_SOUNDEFFECT_V2_OUTPUT_DIR="${MOSS_SOUNDEFFECT_V2_OUTPUT_DIR:-$STORAGE_DIR/sound_effect_v2}"
 export QWEN_VOICEDESIGN_MODEL_DIR="${QWEN_VOICEDESIGN_MODEL_DIR:-$HF_MIRROR_DIR/Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign}"
 export TIGER_DNR_MODEL_DIR="${TIGER_DNR_MODEL_DIR:-$HF_MIRROR_DIR/JusperLee/TIGER-DnR}"
 export TIGER_DNR_SOURCE_DIR="${TIGER_DNR_SOURCE_DIR:-$HOME/.local/share/tiger-dnr/TIGER}"
@@ -173,6 +177,8 @@ export HUNYUAN_VIDEO_COMFY_HOST="${HUNYUAN_VIDEO_COMFY_HOST:-$HOST}"
 export HUNYUAN_VIDEO_COMFY_PORT="${HUNYUAN_VIDEO_COMFY_PORT:-8392}"
 export MOSS_MUSIC_HOST="${MOSS_MUSIC_HOST:-$HOST}"
 export MOSS_MUSIC_PORT="${MOSS_MUSIC_PORT:-8310}"
+export MOSS_SOUNDEFFECT_V2_HOST="${MOSS_SOUNDEFFECT_V2_HOST:-$HOST}"
+export MOSS_SOUNDEFFECT_V2_PORT="${MOSS_SOUNDEFFECT_V2_PORT:-8362}"
 export ACESTEP_HOST="${ACESTEP_HOST:-$HOST}"
 export ACESTEP_PORT="${ACESTEP_PORT:-8313}"
 export YUE2_3B_HOST="${YUE2_3B_HOST:-$HOST}"
@@ -194,6 +200,7 @@ uv run --no-sync --project "$QWEN3_TTS_PROJECT_DIR" python "$MAIN_DIR/check_port
   'Control-plane' "$HOST" "$PORT" \
   'SoulX-FlashHead' "$SOULX_FLASHHEAD_HOST" "$SOULX_FLASHHEAD_PORT" \
   'MOSS-Music' "$MOSS_MUSIC_HOST" "$MOSS_MUSIC_PORT" \
+  'MOSS-SoundEffect-v2.0' "$MOSS_SOUNDEFFECT_V2_HOST" "$MOSS_SOUNDEFFECT_V2_PORT" \
   'ACE-Step' "$ACESTEP_HOST" "$ACESTEP_PORT" \
   'YuE2-3B' "$YUE2_3B_HOST" "$YUE2_3B_PORT" \
   'SheetSage2' "$SHEETSAGE2_HOST" "$SHEETSAGE2_PORT" \
@@ -234,6 +241,10 @@ echo "SoulX-FlashHead wav2vec:       $SOULX_FLASHHEAD_WAV2VEC_DIR"
 echo "MOSS-Music uv project:         $MOSS_MUSIC_PROJECT_DIR"
 echo "MOSS-Music model:              $MOSS_MUSIC_MODEL_DIR"
 echo "MOSS-Music API:                http://$MOSS_MUSIC_HOST:$MOSS_MUSIC_PORT/v1/openMoss/moss-music"
+echo "MOSS-SoundEffect project:      $MOSS_SOUNDEFFECT_V2_PROJECT_DIR"
+echo "MOSS-SoundEffect model:        $MOSS_SOUNDEFFECT_V2_MODEL_DIR"
+echo "MOSS-SoundEffect source:       $MOSS_SOUNDEFFECT_V2_CODE_PATH"
+echo "MOSS-SoundEffect API:          http://$MOSS_SOUNDEFFECT_V2_HOST:$MOSS_SOUNDEFFECT_V2_PORT/v1/moss/soundEffect-v2.0"
 echo "ACE-Step uv project:           $ACESTEP_PROJECT_DIR"
 echo "ACE-Step model:                $ACESTEP_MODEL_DIR"
 echo "ACE-Step BGM storage:          $BGM_STORAGE_DIR"
@@ -324,6 +335,7 @@ echo "MERT-v2-FullSong route: http://127.0.0.1:$MERT_V2_FULLSONG_PORT/v1/m-a-p/M
 echo "SoulX-FlashHead route: http://127.0.0.1:$SOULX_FLASHHEAD_PORT/v1/soulX/flashHead"
 echo "HunyuanVideo-1.5 route: http://127.0.0.1:$HUNYUAN_VIDEO_COMFY_PORT/v1/Tencent-Hunyuan/HunyuanVideo-1.5-Comfy"
 echo "MOSS-Music route:      http://127.0.0.1:$MOSS_MUSIC_PORT/v1/openMoss/moss-music"
+echo "MOSS-SoundEffect route: http://127.0.0.1:$MOSS_SOUNDEFFECT_V2_PORT/v1/moss/soundEffect-v2.0"
 echo "Qwen timbre route:   http://127.0.0.1:$QWEN_VOICEDESIGN_PORT/v1/qwen/timbre"
 echo "TIGER-DnR route:     http://127.0.0.1:$TIGER_DNR_PORT/v1/tigerDnr/separate"
 echo "Qwen3-TTS clone:     http://127.0.0.1:$QWEN3_TTS_PORT/v1/qwen/clone"
@@ -334,6 +346,7 @@ printf '%-24s %-6s %s\n' '服务' '端口' '最终接口'
 printf '%-24s %-6s %s\n' '控制面' "$PORT" '/v1/control'
 printf '%-24s %-6s %s\n' 'Qwen3-TTS VoiceDesign' "$QWEN_VOICEDESIGN_PORT" '/v1/qwen/timbre'
 printf '%-24s %-6s %s\n' 'MOSS-Music-8B-Instruct' "$MOSS_MUSIC_PORT" '/v1/openMoss/moss-music'
+printf '%-24s %-6s %s\n' 'MOSS-SoundEffect-v2.0' "$MOSS_SOUNDEFFECT_V2_PORT" '/v1/moss/soundEffect-v2.0'
 printf '%-24s %-6s %s\n' 'MSST-Mega53' "$MSST_PORT" '/v1/msst/separate'
 printf '%-24s %-6s %s\n' 'TIGER-DnR' "$TIGER_DNR_PORT" '/v1/tigerDnr/separate'
 printf '%-24s %-6s %s\n' 'Confucius4-TTS' "$CONFUCIUS4_TTS_PORT" '/v1/confucius4TTS/generate'
@@ -355,6 +368,7 @@ cd "$PROJECT_DIR"
 soulx_flashhead_pid=""
 hunyuan_video_comfy_pid=""
 moss_music_pid=""
+moss_soundeffect_v2_pid=""
 main_pid=""
 acestep_pid=""
 yue2_3b_pid=""
@@ -377,6 +391,7 @@ cleanup() {
     "$soulx_flashhead_pid"
     "$hunyuan_video_comfy_pid"
     "$moss_music_pid"
+    "$moss_soundeffect_v2_pid"
     "$main_pid"
     "$acestep_pid"
     "$yue2_3b_pid"
@@ -549,6 +564,16 @@ HOST="$MOSS_MUSIC_HOST" PORT="$MOSS_MUSIC_PORT" \
   setsid uv run --no-sync --project "$MOSS_MUSIC_PROJECT_DIR" \
   python "$MOSS_MUSIC_PROJECT_DIR/main.py" &
 moss_music_pid=$!
+# MOSS-SoundEffect v2.0 按文本生成音效，每个请求在独立 worker 中加载官方 pipeline。
+MOSS_SOUNDEFFECT_V2_HOST="$MOSS_SOUNDEFFECT_V2_HOST" \
+  MOSS_SOUNDEFFECT_V2_PORT="$MOSS_SOUNDEFFECT_V2_PORT" \
+  MOSS_SOUNDEFFECT_V2_MODEL_DIR="$MOSS_SOUNDEFFECT_V2_MODEL_DIR" \
+  MOSS_SOUNDEFFECT_V2_CODE_PATH="$MOSS_SOUNDEFFECT_V2_CODE_PATH" \
+  MOSS_SOUNDEFFECT_V2_OUTPUT_DIR="$MOSS_SOUNDEFFECT_V2_OUTPUT_DIR" \
+  HOST="$MOSS_SOUNDEFFECT_V2_HOST" PORT="$MOSS_SOUNDEFFECT_V2_PORT" \
+  setsid uv run --no-sync --project "$MOSS_SOUNDEFFECT_V2_PROJECT_DIR" \
+  python "$MOSS_SOUNDEFFECT_V2_PROJECT_DIR/main.py" &
+moss_soundeffect_v2_pid=$!
 # SoulX 独立环境，仅请求时启动一次性视频 worker。
 HOST="$SOULX_FLASHHEAD_HOST" PORT="$SOULX_FLASHHEAD_PORT" \
   setsid uv run --no-sync --project "$SOULX_FLASHHEAD_PROJECT_DIR" \
@@ -563,4 +588,4 @@ HUNYUAN_VIDEO_COMFY_HOST="$HUNYUAN_VIDEO_COMFY_HOST" \
   setsid uv run --no-sync --project "$HUNYUAN_VIDEO_COMFY_PROJECT_DIR" \
   python "$HUNYUAN_VIDEO_COMFY_PROJECT_DIR/main.py" &
 hunyuan_video_comfy_pid=$!
-wait -n "$msst_pid" "$soulx_flashhead_pid" "$hunyuan_video_comfy_pid" "$moss_music_pid" "$main_pid" "$acestep_pid" "$yue2_3b_pid" "$sheetsage2_pid" "$yue2_vae_pid" "$mert_v2_fullsong_pid" "$qwen3_tts_pid" "$indextts25_pid" "$voxcpm2_pid" "$qwen_voicedesign_pid" "$tiger_dnr_pid" "$confucius4_tts_pid" "$qwen3_asr_pid"
+wait -n "$msst_pid" "$soulx_flashhead_pid" "$hunyuan_video_comfy_pid" "$moss_music_pid" "$moss_soundeffect_v2_pid" "$main_pid" "$acestep_pid" "$yue2_3b_pid" "$sheetsage2_pid" "$yue2_vae_pid" "$mert_v2_fullsong_pid" "$qwen3_tts_pid" "$indextts25_pid" "$voxcpm2_pid" "$qwen_voicedesign_pid" "$tiger_dnr_pid" "$confucius4_tts_pid" "$qwen3_asr_pid"
