@@ -56,6 +56,20 @@ class StartupPortTests(unittest.TestCase):
         self.assertIn('setsid uv run --no-sync --project "$INDEXTTS25_PROJECT_DIR"', start_script)
         self.assertIn('"$indextts25_pid"', start_script)
 
+    def test_kandinsky6_is_registered_for_startup_and_port_preflight(self) -> None:
+        start_script = (Path(__file__).resolve().parents[1] / "start.sh").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn('KANDINSKY6_PORT="${KANDINSKY6_PORT:-8369}"', start_script)
+        self.assertIn(
+            '\'Kandinsky-6.0-Lite-Distill-BF16\' "$KANDINSKY6_HOST" "$KANDINSKY6_PORT"',
+            start_script,
+        )
+        self.assertIn("'/v1/kandinskylab/Kandinsky-6.0-Lite-Distill-BF16'", start_script)
+        self.assertIn('setsid uv run --no-sync --project "$KANDINSKY6_PROJECT_DIR"', start_script)
+        self.assertIn('"$kandinsky6_pid"', start_script)
+
     def test_available_ports_are_released_after_checking(self) -> None:
         listener = MagicMock()
         listener.__enter__.return_value = listener

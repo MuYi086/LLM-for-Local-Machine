@@ -4,7 +4,7 @@
 三路音源分离，以及 CPU 音频母带和 Steam Audio 对象级空间导出。
 模型推理均使用本地权重。
 
-仓库包含 **17 个模型服务 uv 项目，统一启动 18 个 HTTP 进程**，其中一个是轻量控制面。
+仓库包含 **18 个模型服务 uv 项目，统一启动 19 个 HTTP 进程**，其中一个是轻量控制面。
 HTTP 进程不加载重型模型，模型推理由对应目录
 中的一次性 worker 完成；共享运行时和无模型 QA 环境分别位于 `llm_local_runtime/`、`qa/`。
 接口、路径和默认值以当前 `main.py`、`worker.py`、`pyproject.toml` 与 `start.sh` 为准。
@@ -45,6 +45,7 @@ Base/VoiceDesign 的本地模型候选及五个 one-shot worker bridge。原生 
 | [MSST Mega 53 `model-audio/separate_msst-mega53/`](model-audio/separate_msst-mega53/) | 8380 | `POST /v1/msst/separate` | 按调用方选择音乐声部分离，保留 residual（[官方](https://github.com/ZFTurbo/Music-Source-Separation-Training/releases/tag/v1.0.21)） | 44.1 kHz 双声道 FLOAT WAV 与元数据 ZIP |
 | [SoulX-FlashHead 1.3B `model-video/avatar_soulx-flashhead-1.3b/`](model-video/avatar_soulx-flashhead-1.3b/) | 8391 | `POST /v1/soulX/flashHead` | 参考人像图片和驱动音频生成带声音的 MP4；支持 Lite/Pro 单 GPU | MP4 视频 |
 | [HunyuanVideo-1.5 Comfy `model-video/HunyuanVideo-1.5-Comfy/`](model-video/HunyuanVideo-1.5-Comfy/) | 8392 | `POST /v1/Tencent-Hunyuan/HunyuanVideo-1.5-Comfy` | 使用 480p step-distilled FP8 权重从参考图片生成视频 | 848×480、24 FPS MP4 |
+| [Kandinsky 6 Lite 蒸馏版 `model-video/Kandinsky-6.0-Lite-Distill-BF16/`](model-video/Kandinsky-6.0-Lite-Distill-BF16/) | 8369 | `POST /v1/kandinskylab/Kandinsky-6.0-Lite-Distill-BF16` | 使用 BF16 蒸馏权重从参考图片生成 5 秒视频（[官方模型卡](https://huggingface.co/kandinskylab/Kandinsky-6.0-Lite-distill-5s-Diffusers)） | 864×480、24 FPS MP4 |
 
 Demo 调用对应端口并保存服务原始输出；
 都支持 `--check-only`，仅检查输入和原生服务健康状态。条件缺失时明确跳过，不写生成产物。
@@ -129,7 +130,7 @@ storage/                                         上传素材、生成音视频�
 | `storage/mert_v2_fullsong/` | MERT-v2-FullSong 的整曲 JSON embedding 与逐帧 NPZ 特征 | `MERT_V2_FULLSONG_OUTPUT_DIR` |
 | `storage/clone/` | 普通参考音频与 TTS 克隆结果 | `CLONE_STORAGE_DIR`、各服务的 `*_OUTPUT_DIR` |
 | `storage/separation/` | TIGER-DnR 每次分离的 dialog、effects、music Stem 与 ZIP | `TIGER_DNR_OUTPUT_DIR` |
-| `storage/video/` | SoulX-FlashHead 与 HunyuanVideo-1.5 生成的 MP4 | `SOULX_FLASHHEAD_OUTPUT_DIR`、`HUNYUAN_VIDEO_COMFY_OUTPUT_DIR` |
+| `storage/video/` | SoulX-FlashHead、HunyuanVideo-1.5 与 Kandinsky 6 生成的 MP4 | `SOULX_FLASHHEAD_OUTPUT_DIR`、`HUNYUAN_VIDEO_COMFY_OUTPUT_DIR`、`KANDINSKY6_OUTPUT_DIR` |
 | `storage/training/` | 文本润色实验的数据集、adapter 和预测结果 | 训练脚本的 `--output-dir` 与训练配置 |
 | `storage/.cache/runtime/` | worker 临时文件、母带/Steam Audio 任务缓存、库缓存和共享 GPU 锁 | `RUNTIME_CACHE_DIR`、`SPATIAL_EXPORT_CACHE_DIR`、`STEAM_AUDIO_RENDER_CACHE_DIR`、`GPU_LOCK_FILE` |
 
@@ -166,7 +167,7 @@ cd LLM-for-Local-Machine
 先为需要的服务同步锁定依赖；部署全部服务时可以执行：
 
 ```bash
-for project in model-video/avatar_soulx-flashhead-1.3b model-video/HunyuanVideo-1.5-Comfy model-audio/analyse_moss-music-8b-Instruct model-audio/clone_qwen3-tts-1.7b-base model-audio/clone_voxcpm-2 model-audio/indexTTS-2.5 model-audio/music_ace-step-1.5 model-audio/music_yue2-3b \
+for project in model-video/avatar_soulx-flashhead-1.3b model-video/HunyuanVideo-1.5-Comfy model-video/Kandinsky-6.0-Lite-Distill-BF16 model-audio/analyse_moss-music-8b-Instruct model-audio/clone_qwen3-tts-1.7b-base model-audio/clone_voxcpm-2 model-audio/indexTTS-2.5 model-audio/music_ace-step-1.5 model-audio/music_yue2-3b \
   model-audio/score_sheetsage-2 model-audio/codec_yue2-vae model-audio/embedding_mert-v2-fullsong \
   model-audio/design_qwen3-tts-1.7b-voicedesign model-audio/clone_confucius-4 model-audio/transcribe_qwen3-asr-1.7b model-audio/separate_tiger-dnr model-audio/separate_msst-mega53; do
   uv sync --project "$project" --locked
@@ -207,8 +208,8 @@ Tokenizer 和上游源码就绪后启动全部服务：
 bash start.sh
 ```
 
-`start.sh` 会启动 8300、8301、8310、8313、8314、8315、8316、8317、8321、8322、8323、8351、8361、8362、8371、8380、8391 和 8392，
-共 18 个进程；8300 使用 `model-audio/clone_qwen3-tts-1.7b-base` uv 项目中的轻量 HTTP 依赖，其余服务使用
+`start.sh` 会启动 8300、8301、8310、8313、8314、8315、8316、8317、8321、8322、8323、8351、8361、8362、8369、8371、8380、8391 和 8392，
+共 19 个进程；8300 使用 `model-audio/clone_qwen3-tts-1.7b-base` uv 项目中的轻量 HTTP 依赖，其余服务使用
 各自的 uv 项目。启动命令统一使用 `uv run --no-sync`，不会在运行阶段联网解析依赖；
 本地 GPU 服务通过 `GPU_LOCK_FILE` 串行访问 GPU。默认最多排队 900 秒，超过时返回
 `503`；用正数 `GPU_LOCK_WAIT_TIMEOUT` 调整。共享锁实现仍兼容非正值无限等待，
@@ -367,6 +368,7 @@ HOST=127.0.0.1 PORT=8321 \
 | VoxCPM2 | `$HF_MIRROR_DIR/openbmb/VoxCPM2` | `VOXCPM2_MODEL_DIR`、仓库内 `model-audio/clone_voxcpm-2/voxcpm2_helpers.py` |
 | TIGER-DnR | `$HF_MIRROR_DIR/JusperLee/TIGER-DnR` | `TIGER_DNR_MODEL_DIR`、`TIGER_DNR_SOURCE_DIR` |
 | HunyuanVideo-1.5 Comfy | `$HF_MIRROR_DIR/HunyuanVideo-1.5-Comfy` | `HUNYUAN_VIDEO_COMFY_MODEL_DIR`、`HUNYUAN_VIDEO_COMFY_CODE_PATH` |
+| Kandinsky 6 Lite 蒸馏版 | `$HF_MIRROR_DIR/kandinskylab` | `KANDINSKY6_MODEL_DIR` |
 
 仓库外推理源码的默认位置如下，须在请求前准备；`start.sh` 不负责拉取源码：
 
@@ -946,6 +948,27 @@ curl -fsS http://127.0.0.1:8392/v1/Tencent-Hunyuan/HunyuanVideo-1.5-Comfy \
 服务通过一次性 extra-model-paths 配置挂载本地权重，不复制或下载模型。准备 ComfyUI
 源码后执行 `uv sync --project model-video/HunyuanVideo-1.5-Comfy --locked`。运行参数、依赖
 和完整输入约束见 [HunyuanVideo-1.5 Comfy 服务说明](model-video/HunyuanVideo-1.5-Comfy/README.md)。
+
+## Kandinsky 6 Lite 蒸馏版图生视频
+
+服务在 `8369` 提供 `POST /v1/kandinskylab/Kandinsky-6.0-Lite-Distill-BF16`。先用
+`/v1/upload_image` 上传参考图片，再传入上传时的图片逻辑路径和提示词，成功响应为 `video/mp4`。
+服务固定以 BF16、10 步、`guidance_scale=1.0`、864×480、121 帧生成无音轨视频；HTTP 进程不加载模型，
+每次请求启动一次性 Diffusers worker 并通过共享 GPU 锁排队。
+
+```bash
+curl -fsS http://127.0.0.1:8369/v1/upload_image \
+  -F 'image=@portrait.png;type=image/png' -F 'full_path=portrait.png'
+curl -fsS http://127.0.0.1:8369/v1/kandinskylab/Kandinsky-6.0-Lite-Distill-BF16 \
+  -H 'Content-Type: application/json' \
+  -d '{"image_path":"portrait.png","prompt":"A red dragon slowly unfolds its wings in a sunlit cave","seed":42}' \
+  -o kandinsky6-video.mp4
+```
+
+权重默认位于 `$HF_MIRROR_DIR/kandinskylab`，与当前本地 Diffusers 快照结构一致。先执行
+`uv sync --project model-video/Kandinsky-6.0-Lite-Distill-BF16 --locked`；模型完整性、运行依赖和
+CUDA 状态可通过 `GET /v1/health` 查看。完整接口约定见
+[Kandinsky 6 服务说明](model-video/Kandinsky-6.0-Lite-Distill-BF16/README.md)。
 
 ## 文本润色训练实验
 

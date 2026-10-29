@@ -1,0 +1,32 @@
+{
+  "model": "kandinsky6_lite_distill_bf16",
+  "model_project": "model-video/Kandinsky-6.0-Lite-Distill-BF16",
+  "model_dir": "~/hf-mirror/kandinskylab",
+  "output_dir": "results/kandinsky6",
+  "sample_interval_s": 0.5,
+  "job_timeout_s": 7200,
+  "width": 480,
+  "height": 832,
+  "fps_target": 24,
+  "frames": 121,
+  "seeds": [42, 1234, 2026],
+  "num_inference_steps": 10,
+  "guidance_scale": 1.0,
+  "sample_audio": false,
+  "expand_prompts": false,
+  "cuda_visible_devices": "0",
+  "scenes": {
+    "rainy_city": {
+      "image": "assets/rainy_city.png",
+      "prompt": "Cinematic rainy night city street, a lonely person walks away from the camera under neon reflections. Slow forward camera dolly, realistic gentle rainfall, subtle puddle ripples, preserve the subject identity and architecture, moody music-video visual, no text or subtitles."
+    },
+    "windy_portrait": {
+      "image": "assets/windy_portrait.png",
+      "prompt": "A cinematic portrait in warm autumn sunlight. Natural wind moves hair and light clothing gently; subject slowly turns their head, subtle expressive movement, stable facial anatomy, shallow depth of field, slow handheld camera drift, no text or subtitles."
+    },
+    "calm_mountains": {
+      "image": "assets/calm_mountains.png",
+      "prompt": "A cinematic mountain valley at sunrise, layered mist and clouds flow slowly between mountains, warm golden rays change subtly, slow aerial push-in, detailed natural landscape, stable horizon and terrain, peaceful instrumental music mood, no text or subtitles."
+    }
+  }
+}

@@ -46,7 +46,7 @@ README.md 提供接入、配置和运维说明，本文件记录开发边界与�
 
 ## 项目结构与服务速查
 
-当前维护 17 个模型服务 uv 项目与一个轻量控制面，start.sh 合计启动 18 个 HTTP 进程；
+当前维护 18 个模型服务 uv 项目与一个轻量控制面，start.sh 合计启动 19 个 HTTP 进程；
 localai_worker_bridge 是额外的非 HTTP uv 包，不计入服务数，也不常驻导入 Torch。
 原生能力和输出见 README 服务总览；端口、方法及路径以源码为准。
 区分模型原生能力、已接入接口与服务编排；各 HTTP 进程提供 GET /v1/health。
@@ -71,6 +71,7 @@ localai_worker_bridge 是额外的非 HTTP uv 包，不计入服务数，也不�
 | `model-audio/separate_msst-mega53/` | 8380 | POST /v1/msst/separate | 按调用方选择分离音乐声部 | FLOAT WAV 与元数据 ZIP |
 | `model-video/avatar_soulx-flashhead-1.3b/` | 8391 | POST /v1/soulX/flashHead | 人像图片和音频驱动的单 GPU 视频生成 | 带音轨 MP4 |
 | `model-video/HunyuanVideo-1.5-Comfy/` | 8392 | POST /v1/Tencent-Hunyuan/HunyuanVideo-1.5-Comfy | HunyuanVideo-1.5 480p step-distilled 图生视频 | 848×480 MP4 |
+| `model-video/Kandinsky-6.0-Lite-Distill-BF16/` | 8369 | POST /v1/kandinskylab/Kandinsky-6.0-Lite-Distill-BF16 | Kandinsky 6 Lite BF16 蒸馏图生视频 | 864×480、24 FPS 无音轨 MP4 |
 
 - main/main.py 只处理健康/控制、共享上传/检查和 CPU 导出，不加载模型包或推理。
   空间任务进度 GET /v1/audio/spatial/render/progress/{job_id} 是进程内状态。
@@ -99,12 +100,15 @@ localai_worker_bridge 是额外的非 HTTP uv 包，不计入服务数，也不�
   根目录回归使用 QA；ACE-Step 服务内测试从 model-audio/music_ace-step-1.5/ 执行。
 - model-text/scripts/training/、model-text/training/configs/ 是纯文本润色 LoRA 实验，不是语音训练或 HTTP 服务。
 - model-video/avatar_soulx-flashhead-1.3b/ 维护 SoulX-FlashHead 单 GPU 人像视频服务；
-  8391 提供 POST /v1/soulX/flashHead，计入 start.sh 的 18 个 HTTP 进程。
+  8391 提供 POST /v1/soulX/flashHead，计入 start.sh 的 19 个 HTTP 进程。
   主模型及 wav2vec2 编码器均放在 hf-mirror/Soul-AILab 下；保持独立 uv 环境与一次性 worker，
   不加入 LocalAI 的五个固定 worker bridge。图片/音频使用上传逻辑标识，不能直接读取任意服务器路径。
 - model-video/HunyuanVideo-1.5-Comfy/ 使用 ComfyUI 核心节点运行本地 480p step-distilled FP8 图生视频；
   8392 提供 POST /v1/Tencent-Hunyuan/HunyuanVideo-1.5-Comfy。HTTP 层保持轻量，ComfyUI API 子进程
   仅在一次性 worker 中启动；使用共享 GPU 锁，图片只通过上传逻辑标识读取，视频写入 storage/video/。
+- model-video/Kandinsky-6.0-Lite-Distill-BF16/ 使用 `~/hf-mirror/kandinskylab` 的完整 Diffusers 快照；
+  8369 提供 POST /v1/kandinskylab/Kandinsky-6.0-Lite-Distill-BF16。HTTP 层不导入 Torch/Diffusers，
+  由一次性 worker 使用 BF16、10 步和共享 GPU 锁生成无音轨视频；图片只通过上传逻辑标识读取。
 - 流行*模型功能简介.md、task*.md 和 `空间音频讨论/` 是调研/任务/方案资料，
   不能据此推断已实现能力。
 
