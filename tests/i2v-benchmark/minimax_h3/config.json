@@ -1,0 +1,13 @@
+{
+  "model": "minimax_h3_16g_hifi",
+  "shared_conditions": "../kandinsky6/config.json",
+  "service_url": "http://127.0.0.1:8392",
+  "output_dir": "results/minimax_h3",
+  "sample_interval_s": 0.5,
+  "request_timeout_s": 3000,
+  "duration_seconds": 5.0,
+  "native_steps": 20,
+  "include_audio": true,
+  "expected_audio_streams": 1,
+  "min_free_vram_mib": 13000
+}

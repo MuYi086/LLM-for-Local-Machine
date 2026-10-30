@@ -23,7 +23,9 @@ from typing import Any
 TEST_DIR = Path(__file__).resolve().parent
 BENCHMARK_DIR = TEST_DIR.parent
 REPOSITORY_DIR = BENCHMARK_DIR.parents[1]
-CONFIG_PATH = TEST_DIR / "config.json"
+CONFIG_PATH = Path(
+    os.environ.get("KANDINSKY6_BENCHMARK_CONFIG", str(TEST_DIR / "config.json"))
+).expanduser().resolve()
 RUN_FIELDS = [
     "run_id",
     "model",
@@ -52,7 +54,7 @@ SCORE_FIELDS = ["blind_id", "visual_quality", "motion_stability", "prompt_adhere
 
 
 def load_config() -> dict[str, Any]:
-    """读取 Kandinsky 基准的固定条件配置。"""
+    """读取 Kandinsky 基准条件配置，可通过环境变量选择隔离批次。"""
     return json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
 
 
@@ -83,7 +85,7 @@ def model_dir(config: dict[str, Any]) -> Path:
 
 
 def trials(config: dict[str, Any]) -> list[tuple[str, str, int]]:
-    """按场景名和 seed 稳定生成 9 条测试计划。"""
+    """按场景名和 seed 稳定生成测试计划。"""
     return [
         (config["model"], scene, seed) for scene in config["scenes"] for seed in config["seeds"]
     ]
@@ -121,6 +123,8 @@ def _configure_service_environment(config: dict[str, Any]) -> None:
     os.environ["KANDINSKY6_IMAGE_DIR"] = str(cache / "images")
     os.environ["KANDINSKY6_OUTPUT_DIR"] = str(root / "service-output")
     os.environ["KANDINSKY6_WORKER_TMP_DIR"] = str(cache / "worker")
+    os.environ["GPU_LOCK_FILE"] = str(repository_path("storage/.cache/runtime/gpu-runtime.lock"))
+    os.environ["GPU_LOCK_WAIT_TIMEOUT"] = "900"
     os.environ["LOCAL_FILES_ONLY"] = "1"
 
 
@@ -256,6 +260,25 @@ def preflight(_: argparse.Namespace | None = None) -> None:
 
     if not shutil.which("nvidia-smi"):
         raise RuntimeError("缺少 nvidia-smi；请在 WSL 中检查 NVIDIA 驱动和 CUDA。")
+    gpu_free = subprocess.run(
+        [
+            "nvidia-smi",
+            "--query-gpu=memory.free",
+            "--format=csv,noheader,nounits",
+            "--id=0",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=8,
+    ).stdout.strip()
+    free_mib = int(gpu_free.splitlines()[0])
+    minimum_free_mib = int(config.get("min_free_vram_mib", 10000))
+    if free_mib < minimum_free_mib:
+        raise RuntimeError(
+            f"当前空闲显存 {free_mib} MiB，低于 Kandinsky 安全门槛 "
+            f"{minimum_free_mib} MiB；未开始推理。"
+        )
     if not shutil.which("ffprobe"):
         raise RuntimeError("缺少 ffprobe；请先安装 FFmpeg。")
     service = _load_service_main(config)
@@ -287,6 +310,7 @@ def preflight(_: argparse.Namespace | None = None) -> None:
     print("PyTorch:", importlib.metadata.version("torch"))
     print("Diffusers:", importlib.metadata.version("diffusers"))
     print("模型目录:", model_dir(config))
+    print(f"空闲显存: {free_mib} MiB；安全门槛: {minimum_free_mib} MiB")
     print(f"模型文件: {len(service.REQUIRED_MODEL_FILES)} 项齐全")
 
     manifest = [
@@ -310,7 +334,8 @@ def preflight(_: argparse.Namespace | None = None) -> None:
         with Image.open(image_path) as image:
             print(f"场景 {scene}: {image.width}x{image.height} {image.mode}")
     print(
-        "条件: 3 场景 × 3 seed = 9 次，"
+        f"条件: {len(config['scenes'])} 场景 × {len(config['seeds'])} seed = "
+        f"{len(trials(config))} 次，"
         f"{config['width']}x{config['height']}，{config['fps_target']} FPS，"
         f"{config['frames']} 帧，{config['num_inference_steps']} 步，"
         f"guidance={config['guidance_scale']}。"
@@ -420,9 +445,16 @@ def _generate(pipeline: Any, config: dict[str, Any], scene: str, seed: int, outp
 
 
 def run(args: argparse.Namespace) -> None:
-    """运行 3 场景 × 3 seed 矩阵并保存指标、视频与逐次显存采样。"""
+    """运行配置中的场景/seed 矩阵并保存指标、视频与逐次显存采样。"""
     preflight(args)
     config = load_config()
+    service = _load_service_main(config)
+    with service.gpu_runtime_lock("i2v-benchmark-kandinsky6"):
+        _run_matrix(args, config, service)
+
+
+def _run_matrix(args: argparse.Namespace, config: dict[str, Any], service: Any) -> None:
+    """在共享 GPU 锁内执行矩阵并在结束时释放 CUDA 资源。"""
     results = output_root(config)
     videos_dir = results / "videos"
     rows_path = results / "runs.csv"
@@ -512,6 +544,7 @@ def run(args: argparse.Namespace) -> None:
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
                 torch.cuda.ipc_collect()
+            service.wait_after_cuda_release()
     print("Results:", rows_path)
 
 
@@ -567,6 +600,7 @@ def review_sheet(_: argparse.Namespace | None = None) -> None:
 def report(_: argparse.Namespace | None = None) -> None:
     """从真实 CSV 运行记录生成时长、显存和盲评分摘要。"""
     config = load_config()
+    planned = len(trials(config))
     results = output_root(config)
     rows = read_csv(results / "runs.csv")
     if not rows:
@@ -586,14 +620,16 @@ def report(_: argparse.Namespace | None = None) -> None:
         "",
         f"生成时间：{now()}",
         "",
-        "口径：3 场景 × 3 seed = 9 条计划；输出为 480×832、24 FPS、121 帧。",
+        f"口径：{len(config['scenes'])} 场景 × {len(config['seeds'])} seed = "
+        f"{planned} 条计划；输出为 {config['width']}×{config['height']}、"
+        f"{config['fps_target']} FPS、{config['frames']} 帧。",
         "Kandinsky 使用蒸馏 checkpoint 原生的 10 步、guidance=1.0，音频采样关闭。",
         "此脚本在一个 benchmark 进程中驻留 pipeline，以便分别记录冷启动和同进程热运行。",
         "正式 HTTP 服务为一次性 worker；两者的生命周期不同，壁钟时间不代表服务接口耗时。",
         "",
         "| 成功/计划 | 失败 | 冷启动秒 | 热运行中位秒 | GPU 峰值 MiB | WSL RAM 峰值 MiB | 已评分/成功 |",
         "|---:|---:|---:|---:|---:|---:|---:|",
-        f"| {len(successes)}/9 | {len(failures)} | {med(cold)} | {med(warm)} | "
+        f"| {len(successes)}/{planned} | {len(failures)} | {med(cold)} | {med(warm)} | "
         f"{max((int(row['gpu_peak_mib']) for row in rows if row.get('gpu_peak_mib')), default=0)} | "
         f"{max((float(row['wsl_mem_peak_mib']) for row in rows if row.get('wsl_mem_peak_mib')), default=0):.1f} | "
         f"{len(scored)}/{len(successes)} |",

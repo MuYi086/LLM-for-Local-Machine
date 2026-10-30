@@ -42,6 +42,7 @@ MOSS_MUSIC_PROJECT_DIR="${MOSS_MUSIC_PROJECT_DIR:-$PROJECT_DIR/model-audio/analy
 MOSS_SOUNDEFFECT_V2_PROJECT_DIR="${MOSS_SOUNDEFFECT_V2_PROJECT_DIR:-$PROJECT_DIR/model-audio/soundEffect-v2.0}"
 SOULX_FLASHHEAD_PROJECT_DIR="${SOULX_FLASHHEAD_PROJECT_DIR:-$PROJECT_DIR/model-video/avatar_soulx-flashhead-1.3b}"
 KANDINSKY6_PROJECT_DIR="${KANDINSKY6_PROJECT_DIR:-$PROJECT_DIR/model-video/Kandinsky-6.0-Lite-Distill-BF16}"
+MINIMAX_H3_PROJECT_DIR="${MINIMAX_H3_PROJECT_DIR:-$PROJECT_DIR/model-video/MiniMax-H3-16G-HiFi}"
 
 export HF_MIRROR_DIR="${HF_MIRROR_DIR:-$HOME/hf-mirror}"
 export INDEXTTS25_MODEL_DIR="${INDEXTTS25_MODEL_DIR:-$HF_MIRROR_DIR/IndexTeam/IndexTTS-2.5}"
@@ -56,6 +57,9 @@ export SOULX_FLASHHEAD_MODEL_DIR="${SOULX_FLASHHEAD_MODEL_DIR:-$HF_MIRROR_DIR/So
 export SOULX_FLASHHEAD_WAV2VEC_DIR="${SOULX_FLASHHEAD_WAV2VEC_DIR:-$HF_MIRROR_DIR/Soul-AILab/wav2vec2-base-960h}"
 export SOULX_FLASHHEAD_CODE_PATH="${SOULX_FLASHHEAD_CODE_PATH:-$HOME/LLM-depency/SoulX-FlashHead}"
 export KANDINSKY6_MODEL_DIR="${KANDINSKY6_MODEL_DIR:-$HF_MIRROR_DIR/kandinskylab}"
+export MINIMAX_H3_MODEL_DIR="${MINIMAX_H3_MODEL_DIR:-$HF_MIRROR_DIR/minimax/MiniMax-H3-16G-HiFi}"
+export MINIMAX_H3_COMFYUI_CODE_PATH="${MINIMAX_H3_COMFYUI_CODE_PATH:-$HOME/LLM-depency/MiniMax-H3-ComfyUI}"
+export MINIMAX_H3_COMFYUI_PYTHON="${MINIMAX_H3_COMFYUI_PYTHON:-$MINIMAX_H3_COMFYUI_CODE_PATH/.venv/bin/python}"
 export MOSS_MUSIC_MODEL_DIR="${MOSS_MUSIC_MODEL_DIR:-$HF_MIRROR_DIR/OpenMOSS/moss-music}"
 export MOSS_MUSIC_CAPTION_BIN="${MOSS_MUSIC_CAPTION_BIN:-$HOME/.local/share/moss-music/build/ace-caption}"
 export MOSS_SOUNDEFFECT_V2_MODEL_DIR="${MOSS_SOUNDEFFECT_V2_MODEL_DIR:-$HF_MIRROR_DIR/OpenMOSS/MOSS-SoundEffect-v2.0}"
@@ -174,6 +178,8 @@ export SOULX_FLASHHEAD_HOST="${SOULX_FLASHHEAD_HOST:-$HOST}"
 export SOULX_FLASHHEAD_PORT="${SOULX_FLASHHEAD_PORT:-8391}"
 export KANDINSKY6_HOST="${KANDINSKY6_HOST:-$HOST}"
 export KANDINSKY6_PORT="${KANDINSKY6_PORT:-8369}"
+export MINIMAX_H3_HOST="${MINIMAX_H3_HOST:-$HOST}"
+export MINIMAX_H3_PORT="${MINIMAX_H3_PORT:-8392}"
 export MOSS_MUSIC_HOST="${MOSS_MUSIC_HOST:-$HOST}"
 export MOSS_MUSIC_PORT="${MOSS_MUSIC_PORT:-8310}"
 export MOSS_SOUNDEFFECT_V2_HOST="${MOSS_SOUNDEFFECT_V2_HOST:-$HOST}"
@@ -213,7 +219,8 @@ uv run --no-sync --project "$QWEN3_TTS_PROJECT_DIR" python "$MAIN_DIR/check_port
   'Confucius4-TTS' "$CONFUCIUS4_TTS_HOST" "$CONFUCIUS4_TTS_PORT" \
   'Qwen3-ASR' "$QWEN3_ASR_HOST" "$QWEN3_ASR_PORT" \
   'VoxCPM2' "$VOXCPM2_HOST" "$VOXCPM2_PORT" \
-  'Kandinsky-6.0-Lite-Distill-BF16' "$KANDINSKY6_HOST" "$KANDINSKY6_PORT"
+  'Kandinsky-6.0-Lite-Distill-BF16' "$KANDINSKY6_HOST" "$KANDINSKY6_PORT" \
+  'MiniMax-H3-16G-HiFi' "$MINIMAX_H3_HOST" "$MINIMAX_H3_PORT"
 
 export HF_MODULES_CACHE="${HF_MODULES_CACHE:-$RUNTIME_CACHE_DIR/hf_modules}"
 export NUMBA_CACHE_DIR="${NUMBA_CACHE_DIR:-$RUNTIME_CACHE_DIR/numba}"
@@ -235,6 +242,10 @@ echo "SoulX-FlashHead project:       $SOULX_FLASHHEAD_PROJECT_DIR"
 echo "SoulX-FlashHead model:         $SOULX_FLASHHEAD_MODEL_DIR"
 echo "Kandinsky 6 project:             $KANDINSKY6_PROJECT_DIR"
 echo "Kandinsky 6 model:               $KANDINSKY6_MODEL_DIR"
+echo "MiniMax H3 project:              $MINIMAX_H3_PROJECT_DIR"
+echo "MiniMax H3 model:                $MINIMAX_H3_MODEL_DIR"
+echo "MiniMax H3 ComfyUI:              $MINIMAX_H3_COMFYUI_CODE_PATH"
+echo "MiniMax H3 ComfyUI Python:       $MINIMAX_H3_COMFYUI_PYTHON"
 echo "SoulX-FlashHead wav2vec:       $SOULX_FLASHHEAD_WAV2VEC_DIR"
 echo "MOSS-Music uv project:         $MOSS_MUSIC_PROJECT_DIR"
 echo "MOSS-Music model:              $MOSS_MUSIC_MODEL_DIR"
@@ -332,6 +343,7 @@ echo "YuE2-Vae route:         http://127.0.0.1:$YUE2_VAE_PORT/v1/m-a-p/YuE2-Vae"
 echo "MERT-v2-FullSong route: http://127.0.0.1:$MERT_V2_FULLSONG_PORT/v1/m-a-p/MERT-v2-FullSong"
 echo "SoulX-FlashHead route: http://127.0.0.1:$SOULX_FLASHHEAD_PORT/v1/soulX/flashHead"
 echo "Kandinsky 6 route: http://127.0.0.1:$KANDINSKY6_PORT/v1/kandinskylab/Kandinsky-6.0-Lite-Distill-BF16"
+echo "MiniMax H3 route: http://127.0.0.1:$MINIMAX_H3_PORT/v1/minimax/H3-16G-HiFi"
 echo "MOSS-Music route:      http://127.0.0.1:$MOSS_MUSIC_PORT/v1/openMoss/moss-music"
 echo "MOSS-SoundEffect route: http://127.0.0.1:$MOSS_SOUNDEFFECT_V2_PORT/v1/moss/soundEffect-v2.0"
 echo "Qwen timbre route:   http://127.0.0.1:$QWEN_VOICEDESIGN_PORT/v1/qwen/timbre"
@@ -359,12 +371,14 @@ printf '%-24s %-6s %s\n' 'IndexTTS-2.5' "$INDEXTTS25_PORT" '/v1/index-team/index
 printf '%-24s %-6s %s\n' 'VoxCPM2' "$VOXCPM2_PORT" '/v1/voxcpm2/clone'
 printf '%-24s %-6s %s\n' 'SoulX-FlashHead-1.3B' "$SOULX_FLASHHEAD_PORT" '/v1/soulX/flashHead'
 printf '%-24s %-6s %s\n' 'Kandinsky-6 Lite BF16' "$KANDINSKY6_PORT" '/v1/kandinskylab/Kandinsky-6.0-Lite-Distill-BF16'
+printf '%-24s %-6s %s\n' 'MiniMax H3 16G HiFi' "$MINIMAX_H3_PORT" '/v1/minimax/H3-16G-HiFi'
 echo "=================================================="
 
 cd "$PROJECT_DIR"
 
 soulx_flashhead_pid=""
 kandinsky6_pid=""
+minimax_h3_pid=""
 moss_music_pid=""
 moss_soundeffect_v2_pid=""
 main_pid=""
@@ -388,6 +402,7 @@ cleanup() {
   local pids=(
     "$soulx_flashhead_pid"
     "$kandinsky6_pid"
+    "$minimax_h3_pid"
     "$moss_music_pid"
     "$moss_soundeffect_v2_pid"
     "$main_pid"
@@ -584,4 +599,13 @@ KANDINSKY6_HOST="$KANDINSKY6_HOST" KANDINSKY6_PORT="$KANDINSKY6_PORT" \
   setsid uv run --no-sync --project "$KANDINSKY6_PROJECT_DIR" \
   python "$KANDINSKY6_PROJECT_DIR/main.py" &
 kandinsky6_pid=$!
-wait -n "$msst_pid" "$soulx_flashhead_pid" "$kandinsky6_pid" "$moss_music_pid" "$moss_soundeffect_v2_pid" "$main_pid" "$acestep_pid" "$yue2_3b_pid" "$sheetsage2_pid" "$yue2_vae_pid" "$mert_v2_fullsong_pid" "$qwen3_tts_pid" "$indextts25_pid" "$voxcpm2_pid" "$qwen_voicedesign_pid" "$tiger_dnr_pid" "$confucius4_tts_pid" "$qwen3_asr_pid"
+# MiniMax H3 API 仅管理请求；模型与 ComfyUI 只在一次性 worker 中启动。
+MINIMAX_H3_HOST="$MINIMAX_H3_HOST" MINIMAX_H3_PORT="$MINIMAX_H3_PORT" \
+  MINIMAX_H3_MODEL_DIR="$MINIMAX_H3_MODEL_DIR" \
+  MINIMAX_H3_COMFYUI_CODE_PATH="$MINIMAX_H3_COMFYUI_CODE_PATH" \
+  MINIMAX_H3_COMFYUI_PYTHON="$MINIMAX_H3_COMFYUI_PYTHON" \
+  HOST="$MINIMAX_H3_HOST" PORT="$MINIMAX_H3_PORT" \
+  setsid uv run --no-sync --project "$MINIMAX_H3_PROJECT_DIR" \
+  python "$MINIMAX_H3_PROJECT_DIR/main.py" &
+minimax_h3_pid=$!
+wait -n "$msst_pid" "$soulx_flashhead_pid" "$kandinsky6_pid" "$minimax_h3_pid" "$moss_music_pid" "$moss_soundeffect_v2_pid" "$main_pid" "$acestep_pid" "$yue2_3b_pid" "$sheetsage2_pid" "$yue2_vae_pid" "$mert_v2_fullsong_pid" "$qwen3_tts_pid" "$indextts25_pid" "$voxcpm2_pid" "$qwen_voicedesign_pid" "$tiger_dnr_pid" "$confucius4_tts_pid" "$qwen3_asr_pid"

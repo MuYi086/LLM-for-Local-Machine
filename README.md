@@ -4,7 +4,7 @@
 三路音源分离，以及 CPU 音频母带和 Steam Audio 对象级空间导出。
 模型推理均使用本地权重。
 
-仓库包含 **17 个模型服务 uv 项目，统一启动 18 个 HTTP 进程**，其中一个是轻量控制面。
+仓库包含 **18 个模型服务 uv 项目，统一启动 19 个 HTTP 进程**，其中一个是轻量控制面。
 HTTP 进程不加载重型模型，模型推理由对应目录
 中的一次性 worker 完成；共享运行时和无模型 QA 环境分别位于 `llm_local_runtime/`、`qa/`。
 接口、路径和默认值以当前 `main.py`、`worker.py`、`pyproject.toml` 与 `start.sh` 为准。
@@ -45,6 +45,7 @@ Base/VoiceDesign 的本地模型候选及五个 one-shot worker bridge。原生 
 | [MSST Mega 53 `model-audio/separate_msst-mega53/`](model-audio/separate_msst-mega53/) | 8380 | `POST /v1/msst/separate` | 按调用方选择音乐声部分离，保留 residual（[官方](https://github.com/ZFTurbo/Music-Source-Separation-Training/releases/tag/v1.0.21)） | 44.1 kHz 双声道 FLOAT WAV 与元数据 ZIP |
 | [SoulX-FlashHead 1.3B `model-video/avatar_soulx-flashhead-1.3b/`](model-video/avatar_soulx-flashhead-1.3b/) | 8391 | `POST /v1/soulX/flashHead` | 参考人像图片和驱动音频生成带声音的 MP4；支持 Lite/Pro 单 GPU | MP4 视频 |
 | [Kandinsky 6 Lite 蒸馏版 `model-video/Kandinsky-6.0-Lite-Distill-BF16/`](model-video/Kandinsky-6.0-Lite-Distill-BF16/) | 8369 | `POST /v1/kandinskylab/Kandinsky-6.0-Lite-Distill-BF16` | 使用 BF16 蒸馏权重从参考图片生成 5 秒视频（[官方模型卡](https://huggingface.co/kandinskylab/Kandinsky-6.0-Lite-distill-5s-Diffusers)） | 864×480、24 FPS MP4 |
+| [MiniMax H3 16G HiFi `model-video/MiniMax-H3-16G-HiFi/`](model-video/MiniMax-H3-16G-HiFi/) | 8392 | `POST /v1/minimax/H3-16G-HiFi` | FL2VA 首尾帧或 Ref2VA 参考图生成视频，可选 H3 原生音轨（[模型卡](https://modelscope.cn/models/l1ngzi/MiniMax-H3-16G-HiFi)） | 默认无音轨；请求 `include_audio=true` 时输出带音轨 MP4 |
 
 Demo 调用对应端口并保存服务原始输出；
 都支持 `--check-only`，仅检查输入和原生服务健康状态。条件缺失时明确跳过，不写生成产物。
@@ -102,7 +103,7 @@ model-audio/separate_tiger-dnr/                  TIGER-DnR 三 Stem 分离服务
 model-audio/transcribe_qwen3-asr-1.7b/           Qwen3-ASR-1.7B 语音识别服务和 worker
 model-text/                                      有声书纯文本润色训练实验
 model-image/                                     预留图像模型目录
-model-video/                                     SoulX-FlashHead 与 Kandinsky 6 视频生成服务
+model-video/                                     SoulX-FlashHead、Kandinsky 6 与 MiniMax H3 视频生成服务
 tests/                                           根目录无模型回归测试
 qa/                                              锁定的轻量测试与 Ruff 环境，不安装模型依赖
 llm_local_runtime/                               共享流式上传、引用存储、GPU 队列与容量工具
@@ -129,7 +130,7 @@ storage/                                         上传素材、生成音视频�
 | `storage/mert_v2_fullsong/` | MERT-v2-FullSong 的整曲 JSON embedding 与逐帧 NPZ 特征 | `MERT_V2_FULLSONG_OUTPUT_DIR` |
 | `storage/clone/` | 普通参考音频与 TTS 克隆结果 | `CLONE_STORAGE_DIR`、各服务的 `*_OUTPUT_DIR` |
 | `storage/separation/` | TIGER-DnR 每次分离的 dialog、effects、music Stem 与 ZIP | `TIGER_DNR_OUTPUT_DIR` |
-| `storage/video/` | SoulX-FlashHead 与 Kandinsky 6 生成的 MP4 | `SOULX_FLASHHEAD_OUTPUT_DIR`、`KANDINSKY6_OUTPUT_DIR` |
+| `storage/video/` | SoulX-FlashHead、Kandinsky 6 与 MiniMax H3 生成的 MP4 | `SOULX_FLASHHEAD_OUTPUT_DIR`、`KANDINSKY6_OUTPUT_DIR`、`MINIMAX_H3_OUTPUT_DIR` |
 | `storage/training/` | 文本润色实验的数据集、adapter 和预测结果 | 训练脚本的 `--output-dir` 与训练配置 |
 | `storage/.cache/runtime/` | worker 临时文件、母带/Steam Audio 任务缓存、库缓存和共享 GPU 锁 | `RUNTIME_CACHE_DIR`、`SPATIAL_EXPORT_CACHE_DIR`、`STEAM_AUDIO_RENDER_CACHE_DIR`、`GPU_LOCK_FILE` |
 
@@ -166,7 +167,7 @@ cd LLM-for-Local-Machine
 先为需要的服务同步锁定依赖；部署全部服务时可以执行：
 
 ```bash
-for project in model-video/avatar_soulx-flashhead-1.3b model-video/Kandinsky-6.0-Lite-Distill-BF16 model-audio/analyse_moss-music-8b-Instruct model-audio/clone_qwen3-tts-1.7b-base model-audio/clone_voxcpm-2 model-audio/indexTTS-2.5 model-audio/music_ace-step-1.5 model-audio/music_yue2-3b \
+for project in model-video/avatar_soulx-flashhead-1.3b model-video/Kandinsky-6.0-Lite-Distill-BF16 model-video/MiniMax-H3-16G-HiFi model-audio/analyse_moss-music-8b-Instruct model-audio/clone_qwen3-tts-1.7b-base model-audio/clone_voxcpm-2 model-audio/indexTTS-2.5 model-audio/music_ace-step-1.5 model-audio/music_yue2-3b \
   model-audio/score_sheetsage-2 model-audio/codec_yue2-vae model-audio/embedding_mert-v2-fullsong \
   model-audio/design_qwen3-tts-1.7b-voicedesign model-audio/clone_confucius-4 model-audio/transcribe_qwen3-asr-1.7b model-audio/separate_tiger-dnr model-audio/separate_msst-mega53; do
   uv sync --project "$project" --locked
@@ -207,8 +208,8 @@ Tokenizer 和上游源码就绪后启动全部服务：
 bash start.sh
 ```
 
-`start.sh` 会启动 8300、8301、8310、8313、8314、8315、8316、8317、8321、8322、8323、8351、8361、8362、8369、8371、8380 和 8391，
-共 18 个进程；8300 使用 `model-audio/clone_qwen3-tts-1.7b-base` uv 项目中的轻量 HTTP 依赖，其余服务使用
+`start.sh` 会启动 8300、8301、8310、8313、8314、8315、8316、8317、8321、8322、8323、8351、8361、8362、8369、8371、8380、8391 和 8392，
+共 19 个进程；8300 使用 `model-audio/clone_qwen3-tts-1.7b-base` uv 项目中的轻量 HTTP 依赖，其余服务使用
 各自的 uv 项目。启动命令统一使用 `uv run --no-sync`，不会在运行阶段联网解析依赖；
 本地 GPU 服务通过 `GPU_LOCK_FILE` 串行访问 GPU。默认最多排队 900 秒，超过时返回
 `503`；用正数 `GPU_LOCK_WAIT_TIMEOUT` 调整。共享锁实现仍兼容非正值无限等待，
@@ -367,6 +368,7 @@ HOST=127.0.0.1 PORT=8321 \
 | VoxCPM2 | `$HF_MIRROR_DIR/openbmb/VoxCPM2` | `VOXCPM2_MODEL_DIR`、仓库内 `model-audio/clone_voxcpm-2/voxcpm2_helpers.py` |
 | TIGER-DnR | `$HF_MIRROR_DIR/JusperLee/TIGER-DnR` | `TIGER_DNR_MODEL_DIR`、`TIGER_DNR_SOURCE_DIR` |
 | Kandinsky 6 Lite 蒸馏版 | `$HF_MIRROR_DIR/kandinskylab` | `KANDINSKY6_MODEL_DIR` |
+| MiniMax H3 16G HiFi | `$HF_MIRROR_DIR/minimax/MiniMax-H3-16G-HiFi` | `MINIMAX_H3_MODEL_DIR` |
 
 仓库外推理源码的默认位置如下，须在请求前准备；`start.sh` 不负责拉取源码：
 
@@ -376,6 +378,7 @@ HOST=127.0.0.1 PORT=8321 \
 | IndexTTS-2.5 | `$HOME/LLM-depency/index-tts-2.5.0`（tag `v2.5.0`） | `INDEXTTS25_CODE_PATH` |
 | TIGER-DnR | `$HOME/.local/share/tiger-dnr/TIGER` | `TIGER_DNR_SOURCE_DIR` |
 | MOSS-SoundEffect v2.0 | `$HOME/LLM-depency/MOSS-TTS/moss_soundeffect_v2`（固定 revision `934d6826b084c46a0d033402174d5f8ac4ed2519`） | `MOSS_SOUNDEFFECT_V2_CODE_PATH` |
+| MiniMax H3 ComfyUI | `$HOME/LLM-depency/MiniMax-H3-ComfyUI`（ComfyUI `v0.37.0`） | `MINIMAX_H3_COMFYUI_CODE_PATH`、`MINIMAX_H3_COMFYUI_PYTHON` |
 
 通用配置包括 `HOST`、`PORT`、`STORAGE_DIR`、`PROMPTS_DIR`、`RUNTIME_CACHE_DIR`、
 `GPU_LOCK_FILE`、`LOCAL_FILES_ONLY` 和 `CUDA_RELEASE_DELAY`。48 kHz 导出可用
@@ -943,6 +946,13 @@ curl -fsS http://127.0.0.1:8369/v1/kandinskylab/Kandinsky-6.0-Lite-Distill-BF16 
 `uv sync --project model-video/Kandinsky-6.0-Lite-Distill-BF16 --locked`；模型完整性、运行依赖和
 CUDA 状态可通过 `GET /v1/health` 查看。完整接口约定见
 [Kandinsky 6 服务说明](model-video/Kandinsky-6.0-Lite-Distill-BF16/README.md)。
+
+## MiniMax H3 16G HiFi 图生视频
+
+服务在 `8392` 提供 `POST /v1/minimax/H3-16G-HiFi`，支持 FL2VA 首尾帧生成与 Ref2VA 多参考图生成。`include_audio` 默认 `false`，输出无音轨 MP4；设为 `true` 才封装 H3 原生音轨。默认 960×544、约 5.17 秒、24 FPS、20 步；分辨率、时长和空闲显存设有请求门槛。模型权重默认位于 `$HF_MIRROR_DIR/minimax/MiniMax-H3-16G-HiFi`。
+
+推理使用仓库外的 ComfyUI `v0.37.0` 与模型仓库提供的 `ComfyUI-sol-attn-main.zip`，其 Python/CUDA 依赖按服务说明单独安装。先执行 `uv sync --project model-video/MiniMax-H3-16G-HiFi --locked`，再按
+[MiniMax H3 服务说明](model-video/MiniMax-H3-16G-HiFi/README.md)准备 ComfyUI 和调用接口。`GET /v1/health` 检查权重、节点、依赖及 GPU 状态；完整准备不等于已完成真实生成验证。
 
 ## 文本润色训练实验
 

@@ -1,0 +1,42 @@
+[project]
+name = "minimax-h3-16g-hifi-service"
+version = "0.1.0"
+description = "LLM Local Backend MiniMax H3 16G HiFi ComfyUI API service"
+requires-python = "==3.12.13"
+dependencies = [
+    "fastapi==0.141.1",
+    "starlette==1.6.0",
+    "uvicorn==0.52.1",
+    "pydantic==2.13.4",
+    "python-multipart==0.0.32",
+    "pillow>=11.1.0",
+    "llm-local-runtime",
+]
+
+[dependency-groups]
+dev = ["ruff>=0.15.9"]
+
+[tool.uv]
+package = false
+index-strategy = "first-index"
+
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
+default = true
+
+[tool.uv.sources]
+llm-local-runtime = { path = "../../llm_local_runtime", editable = true }
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["B008", "E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
