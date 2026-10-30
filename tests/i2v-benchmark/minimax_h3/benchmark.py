@@ -1,4 +1,4 @@
-"""通过本地 MiniMax H3 API 执行与 Kandinsky 相同输入的 I2V 基准。"""
+"""通过本地 MiniMax H3 API 执行独立的 I2V 基准。"""
 
 from __future__ import annotations
 
@@ -25,9 +25,11 @@ from urllib.request import Request, urlopen
 
 TEST_DIR = Path(__file__).resolve().parent
 BENCHMARK_DIR = TEST_DIR.parent
-CONFIG_PATH = Path(
-    os.environ.get("MINIMAX_H3_BENCHMARK_CONFIG", str(TEST_DIR / "config.json"))
-).expanduser().resolve()
+CONFIG_PATH = (
+    Path(os.environ.get("MINIMAX_H3_BENCHMARK_CONFIG", str(TEST_DIR / "config.json")))
+    .expanduser()
+    .resolve()
+)
 RUN_FIELDS = [
     "run_id",
     "model",
@@ -72,16 +74,13 @@ class BenchmarkBlocked(RuntimeError):
 
 
 def load_config() -> dict[str, Any]:
-    """读取 H3 设置并从 Kandinsky 配置载入完全相同的场景素材。"""
+    """读取 H3 设置和独立场景素材配置。"""
     config = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
-    shared_path = (TEST_DIR / config["shared_conditions"]).resolve()
-    shared = json.loads(shared_path.read_text(encoding="utf-8"))
-    config["shared"] = shared
+    conditions_path = (TEST_DIR / config["shared_conditions"]).resolve()
+    conditions = json.loads(conditions_path.read_text(encoding="utf-8"))
     for field in ("width", "height", "fps_target", "seeds", "scenes"):
-        config[field] = shared[field]
-    config["service_url"] = os.getenv(
-        "MINIMAX_H3_BENCHMARK_URL", config["service_url"]
-    ).rstrip("/")
+        config[field] = conditions[field]
+    config["service_url"] = os.getenv("MINIMAX_H3_BENCHMARK_URL", config["service_url"]).rstrip("/")
     return config
 
 
@@ -103,9 +102,7 @@ def output_root(config: dict[str, Any]) -> Path:
 def trials(config: dict[str, Any]) -> list[tuple[str, str, int]]:
     """按共享配置的场景顺序和 seed 稳定生成测试计划。"""
     return [
-        (config["model"], scene, seed)
-        for scene in config["scenes"]
-        for seed in config["seeds"]
+        (config["model"], scene, seed) for scene in config["scenes"] for seed in config["seeds"]
     ]
 
 
@@ -115,9 +112,7 @@ def expected_frame_count(config: dict[str, Any]) -> int:
     return frame_count + (5 - frame_count % 17) % 17
 
 
-def build_request(
-    config: dict[str, Any], scene: str, seed: int, image_path: str
-) -> dict[str, Any]:
+def build_request(config: dict[str, Any], scene: str, seed: int, image_path: str) -> dict[str, Any]:
     """构造使用共享提示词/seed/画幅的 H3 原生 FL2VA 请求。"""
     return {
         "mode": "fl2va",
@@ -170,7 +165,7 @@ def _require_ready(config: dict[str, Any], health: dict[str, Any]) -> None:
             f"{health.get('runtime', {}).get('steps')} != {config['native_steps']}。"
         )
     if health.get("runtime", {}).get("frame_rate") != config["fps_target"]:
-        raise BenchmarkBlocked("H3 服务输出帧率与 Kandinsky 对照配置不一致。")
+        raise BenchmarkBlocked("H3 服务输出帧率与基准配置不一致。")
     free_mib = int(health.get("gpu_memory", {}).get("free_mib", 0))
     if free_mib < config["min_free_vram_mib"]:
         raise BenchmarkBlocked(
@@ -182,9 +177,7 @@ def _require_ready(config: dict[str, Any], health: dict[str, Any]) -> None:
 def _write_json(path: Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(path.name + ".tmp")
-    temporary.write_text(
-        json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-    )
+    temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     temporary.replace(path)
 
 
@@ -199,7 +192,7 @@ def _write_manifest(config: dict[str, Any], health: dict[str, Any]) -> None:
 
 
 def preflight(_: argparse.Namespace | None = None) -> tuple[dict[str, Any], dict[str, Any]]:
-    """检查本地素材、Kandinsky 基线、H3 健康状态和显存，不生成视频。"""
+    """检查本地素材、H3 健康状态和显存，不生成视频。"""
     config = load_config()
     if not shutil.which("nvidia-smi"):
         raise BenchmarkBlocked("缺少 nvidia-smi。")
@@ -214,16 +207,6 @@ def preflight(_: argparse.Namespace | None = None) -> tuple[dict[str, Any], dict
         image = benchmark_path(scenario["image"])
         if not image.is_file():
             raise BenchmarkBlocked(f"缺少场景图片 {scene}: {image}")
-
-    kandinsky_results = benchmark_path(config["shared"]["output_dir"])
-    kandinsky_rows = read_csv(kandinsky_results / "runs.csv")
-    successful = {row["run_id"] for row in kandinsky_rows if row.get("status") == "success"}
-    for scene in config["scenes"]:
-        for seed in config["seeds"]:
-            run_id = f"{config['shared']['model']}__{scene}__s{seed}"
-            video = kandinsky_results / "videos" / f"{run_id}.mp4"
-            if run_id not in successful or not video.is_file():
-                raise BenchmarkBlocked(f"Kandinsky 对照样本不完整: {run_id}")
 
     health = service_health(config)
     _require_ready(config, health)
@@ -356,9 +339,7 @@ def _multipart_image(image_path: Path, logical_path: str) -> tuple[bytes, str]:
     return body, f"multipart/form-data; boundary={boundary}"
 
 
-def upload_image(
-    config: dict[str, Any], image_path: Path, logical_path: str
-) -> None:
+def upload_image(config: dict[str, Any], image_path: Path, logical_path: str) -> None:
     """上传一张只读基准输入图，供 H3 API 使用逻辑路径引用。"""
     body, content_type = _multipart_image(image_path, logical_path)
     result = _http_json(
@@ -484,15 +465,13 @@ def validate_video(path: Path, config: dict[str, Any]) -> dict[str, Any]:
         raise RuntimeError(f"H3 输出分辨率 {actual_size}，目标为 {target_size}。")
     if metadata["frames"] != expected_frame_count(config):
         raise RuntimeError(
-            f"H3 输出 {metadata['frames']} 帧，预期原生帧网格为 "
-            f"{expected_frame_count(config)} 帧。"
+            f"H3 输出 {metadata['frames']} 帧，预期原生帧网格为 {expected_frame_count(config)} 帧。"
         )
     if abs(metadata["fps"] - config["fps_target"]) > 0.5:
         raise RuntimeError(f"H3 输出 {metadata['fps']} FPS，与目标不符。")
     if metadata["audio_streams"] != config["expected_audio_streams"]:
         raise RuntimeError(
-            f"H3 音轨数为 {metadata['audio_streams']}，"
-            f"预期 {config['expected_audio_streams']}。"
+            f"H3 音轨数为 {metadata['audio_streams']}，预期 {config['expected_audio_streams']}。"
         )
     return metadata
 
@@ -638,152 +617,110 @@ def _median(values: list[float]) -> str:
     return f"{median(values):.2f}" if values else "待测"
 
 
-def comparison_page(config: dict[str, Any]) -> Path:
-    """生成按场景和 seed 对齐的 Kandinsky/H3 视频对照页。"""
+def video_gallery(config: dict[str, Any]) -> Path:
+    """生成按场景和 seed 排列的 H3 视频画廊。"""
     results = output_root(config)
-    kandinsky = benchmark_path(config["shared"]["output_dir"])
     h3_rows = _successful(read_csv(results / "runs.csv"))
-    kandinsky_rows = _successful(read_csv(kandinsky / "runs.csv"))
     cards = []
     for scene in config["scenes"]:
         for seed in config["seeds"]:
-            kandinsky_id = f"{config['shared']['model']}__{scene}__s{seed}"
             h3_id = f"{config['model']}__{scene}__s{seed}"
-            kandinsky_row = kandinsky_rows.get(kandinsky_id)
             h3_row = h3_rows.get(h3_id)
-            kandinsky_video = (
-                os.path.relpath(benchmark_path(kandinsky_row["output"]), start=results)
-                if kandinsky_row
-                else ""
-            )
-            h3_video = (
-                f"videos/{Path(h3_row['output']).name}" if h3_row else ""
-            )
+            h3_video = f"videos/{Path(h3_row['output']).name}" if h3_row else ""
             prompt = html.escape(config["scenes"][scene]["prompt"])
             cards.append(
                 "<section>"
                 f"<h2>{html.escape(scene)} · seed {seed}</h2>"
-                f"<p>{prompt}</p><div class='pair'>"
-                f"<article><h3>Kandinsky 6</h3>{_video_element(kandinsky_video)}</article>"
-                f"<article><h3>MiniMax H3</h3>{_video_element(h3_video)}</article>"
-                "</div></section>"
+                f"<p>{prompt}</p>{_video_element(h3_video)}</section>"
             )
-    page = """<!doctype html><meta charset="utf-8"><title>Kandinsky 6 vs MiniMax H3</title>
+    page = """<!doctype html><meta charset="utf-8"><title>MiniMax H3 视频基准</title>
 <style>body{font:16px system-ui,sans-serif;background:#17191d;color:#eee;margin:2rem}
 section{margin:2rem 0;padding:1rem;border:1px solid #444;border-radius:8px}
-.pair{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1rem}
-video{width:100%;max-width:480px;background:#000}p{max-width:1000px;line-height:1.5;color:#ccc}</style>
-<h1>Kandinsky 6 Lite vs MiniMax H3 16G HiFi</h1>
-<p>相同输入图片、提示词、seed 和 480×832 输出画幅。H3 使用原生 20 步，输出 124 帧并带音轨；
-Kandinsky 使用 10 步，输出 121 帧且无音轨。</p>""" + "".join(cards)
-    path = results / "comparison.html"
+video{width:100%;max-width:720px;background:#000}p{max-width:1000px;line-height:1.5;color:#ccc}</style>
+<h1>MiniMax H3 16G HiFi I2V 基准</h1>
+<p>按场景和 seed 播放 H3 输出；提示词、分辨率、帧率和原生音频设置来自本基准配置。</p>""" + "".join(
+        cards
+    )
+    path = results / "gallery.html"
     path.write_text(page, encoding="utf-8")
     return path
 
 
 def report(_: argparse.Namespace | None = None) -> None:
-    """汇总 H3 速度/显存并与现有 Kandinsky CSV 对照。"""
+    """汇总 H3 基准的生成状态、耗时和 GPU 显存。"""
     config = load_config()
     results = output_root(config)
     h3_rows_all = read_csv(results / "runs.csv")
     if not h3_rows_all:
         raise RuntimeError("没有 H3 运行记录；先执行 run。")
-    kandinsky_root = benchmark_path(config["shared"]["output_dir"])
-    kandinsky_rows_all = read_csv(kandinsky_root / "runs.csv")
     h3_successes = [row for row in h3_rows_all if row.get("status") == "success"]
     h3_failures = [row for row in h3_rows_all if row.get("status") != "success"]
-    kandinsky_successes = [
-        row for row in kandinsky_rows_all if row.get("status") == "success"
-    ]
     h3_times = [float(row["wall_seconds"]) for row in h3_successes if row.get("wall_seconds")]
     h3_peaks = [int(row["gpu_peak_mib"]) for row in h3_rows_all if row.get("gpu_peak_mib")]
     h3_deltas = [
-        int(row["gpu_delta_peak_mib"])
-        for row in h3_rows_all
-        if row.get("gpu_delta_peak_mib")
-    ]
-    kandinsky_cold = [
-        float(row["wall_seconds"])
-        for row in kandinsky_successes
-        if row.get("model_load_seconds") and row.get("wall_seconds")
-    ]
-    kandinsky_warm = [
-        float(row["wall_seconds"])
-        for row in kandinsky_successes
-        if not row.get("model_load_seconds") and row.get("wall_seconds")
+        int(row["gpu_delta_peak_mib"]) for row in h3_rows_all if row.get("gpu_delta_peak_mib")
     ]
     h3_success_map = _successful(h3_rows_all)
-    kandinsky_success_map = _successful(kandinsky_rows_all)
     planned = len(trials(config))
     lines = [
         "# MiniMax H3 16G HiFi I2V 基准报告",
         "",
         f"生成时间：{now()}",
         "",
-        "## 对照条件",
+        "## 测试条件",
         "",
-        f"复用 Kandinsky 的 {len(config['scenes'])} 张输入图、提示词和 "
-        f"{len(config['seeds'])} 个 seed；共同输出画幅 {config['width']}×{config['height']}，"
-        f"{config['fps_target']} FPS。H3 请求显式覆盖服务默认 960×544 画幅，使用原生 "
-        f"{config['native_steps']} 步、"
-        f"5 秒请求、{expected_frame_count(config)} 帧（约 5.17 秒）和原生音轨；"
-        "Kandinsky 为 10 步、121 帧（约 5.04 秒）、无音轨。",
-        "H3 的壁钟时间是完整 API 请求时间，包含每次 ComfyUI 子进程启动、模型加载、推理、视频返回和服务清理。",
-        "Kandinsky 在单进程内驻留 pipeline，报告分别列冷启动与热运行；比较时应以 H3 请求时间对照 Kandinsky 热运行，"
-        "同时参考 Kandinsky 冷启动。",
+        f"{len(config['scenes'])} 个场景 × {len(config['seeds'])} 个 seed；输出画幅 "
+        f"{config['width']}×{config['height']}，{config['fps_target']} FPS。H3 使用 "
+        f"{config['native_steps']} 步、{config['duration_seconds']} 秒请求、"
+        f"{expected_frame_count(config)} 帧（约 5.17 秒），"
+        f"{'封装原生音轨' if config['include_audio'] else '不封装音轨'}。",
+        "壁钟时间是完整 API 请求时间，包含 ComfyUI 子进程启动、模型加载、推理、视频返回和服务清理。",
         "显存是 nvidia-smi 全卡用量，以 benchmark 采样到的峰值计；delta 为峰值减去请求前全卡基线，"
         "不是框架报告的模型专属 allocated memory。",
         "",
         "## 汇总",
         "",
-        "| 模型 | 成功/计划 | 失败/阻塞 | 冷启动中位秒 | 后续/请求中位秒 | GPU 峰值 MiB | GPU 增量峰值中位 MiB |",
-        "|---|---:|---:|---:|---:|---:|---:|",
-        f"| Kandinsky 6 | {len(kandinsky_successes)}/{planned} | "
-        f"{len(kandinsky_rows_all) - len(kandinsky_successes)} | {_median(kandinsky_cold)} | "
-        f"{_median(kandinsky_warm)} | "
-        f"{max((int(row['gpu_peak_mib']) for row in kandinsky_successes if row.get('gpu_peak_mib')), default=0)} | "
-        f"{_median([float(row['gpu_delta_peak_mib']) for row in kandinsky_successes if row.get('gpu_delta_peak_mib')])} |",
-        f"| MiniMax H3 | {len(h3_successes)}/{planned} | {len(h3_failures)} | "
-        f"每条请求均为一次性 worker | {_median(h3_times)} | "
+        "| 成功/计划 | 失败/阻塞 | 请求中位秒 | GPU 峰值 MiB | GPU 增量峰值中位 MiB |",
+        "|---:|---:|---:|---:|---:|",
+        f"| {len(h3_successes)}/{planned} | {len(h3_failures)} | {_median(h3_times)} | "
         f"{max(h3_peaks, default=0)} | {_median([float(value) for value in h3_deltas])} |",
         "",
-        "## 同图同 seed 结果",
+        "## 逐场景结果",
         "",
-        "| 场景 | Seed | Kandinsky 秒 | H3 API 秒 | Kandinsky GPU 峰值 MiB | H3 GPU 峰值 MiB | H3 视频帧/音轨 |",
-        "|---|---:|---:|---:|---:|---:|---|",
+        "| 场景 | Seed | 状态 | API 秒 | GPU 峰值 MiB | 视频帧/音轨 |",
+        "|---|---:|---|---:|---:|---|",
     ]
     for scene in config["scenes"]:
         for seed in config["seeds"]:
-            kandinsky_id = f"{config['shared']['model']}__{scene}__s{seed}"
             h3_id = f"{config['model']}__{scene}__s{seed}"
-            kandinsky_row = kandinsky_success_map.get(kandinsky_id, {})
-            h3_row = h3_success_map.get(h3_id, {})
+            h3_row = h3_success_map.get(h3_id) or next(
+                (row for row in h3_rows_all if row.get("run_id") == h3_id), {}
+            )
             h3_shape = (
                 f"{h3_row.get('frames', '')} 帧 / {h3_row.get('audio_streams', '')} 音轨"
-                if h3_row
-                else h3_row.get("status", "待测")
+                if h3_row.get("status") == "success"
+                else "—"
             )
             lines.append(
-                f"| {scene} | {seed} | {kandinsky_row.get('wall_seconds', '—')} | "
-                f"{h3_row.get('wall_seconds', '—')} | {kandinsky_row.get('gpu_peak_mib', '—')} | "
-                f"{h3_row.get('gpu_peak_mib', '—')} | {h3_shape} |"
+                f"| {scene} | {seed} | {h3_row.get('status', '待测')} | "
+                f"{h3_row.get('wall_seconds', '—')} | {h3_row.get('gpu_peak_mib', '—')} | "
+                f"{h3_shape} |"
             )
     lines.extend(
         [
             "",
-            "## 人工画面比较",
+            "## 视频回看",
             "",
-            "打开 [`comparison.html`](comparison.html) 可按相同场景和 seed 并排播放两个模型的视频。"
-            "本报告不自动判断画质；构图、主体稳定性、运动自然度和提示词符合度需要结合视频人工比较。",
+            "打开 [`gallery.html`](gallery.html) 可按场景和 seed 回看 H3 视频。",
             "",
             "H3 逐样本状态和采样明细见 `runs.csv` 与 `gpu/`；视频在 `videos/`。",
         ]
     )
     report_path = results / "report.md"
     report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    comparison_path = comparison_page(config)
+    gallery_path = video_gallery(config)
     print("Saved", report_path)
-    print("Saved", comparison_path)
+    print("Saved", gallery_path)
 
 
 def main() -> None:
@@ -793,7 +730,7 @@ def main() -> None:
     commands.add_parser("preflight", help="检查 H3 API、共享素材、CUDA 和安全显存门槛")
     run_parser = commands.add_parser("run", help="运行相同图片/提示词/seed 的 H3 原生矩阵")
     run_parser.add_argument("--limit", type=int, default=None)
-    commands.add_parser("report", help="生成与 Kandinsky 同图同 seed 的性能和画面比较")
+    commands.add_parser("report", help="生成 H3 基准报告和视频画廊")
     args = parser.parse_args()
     actions = {"preflight": preflight, "run": run, "report": report}
     try:

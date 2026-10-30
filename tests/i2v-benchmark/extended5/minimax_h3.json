@@ -1,6 +1,6 @@
 {
   "model": "minimax_h3_16g_hifi",
-  "shared_conditions": "../extended5/kandinsky6.json",
+  "shared_conditions": "../extended5/shared_conditions.json",
   "service_url": "http://127.0.0.1:8392",
   "output_dir": "results/extended5/minimax_h3",
   "sample_interval_s": 0.5,

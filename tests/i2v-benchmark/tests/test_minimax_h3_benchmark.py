@@ -17,13 +17,11 @@ SPEC.loader.exec_module(benchmark)
 
 
 class MiniMaxH3BenchmarkTests(unittest.TestCase):
-    """无需 CUDA 或权重即可验证 H3 对照条件。"""
+    """无需 CUDA 或权重即可验证 H3 基准配置。"""
 
-    def test_reuses_kandinsky_scenes_seeds_and_shared_video_geometry(self) -> None:
+    def test_loads_independent_scenes_seeds_and_video_geometry(self) -> None:
         config = benchmark.load_config()
-        source = json.loads(
-            (BENCHMARK_DIR / "kandinsky6/config.json").read_text(encoding="utf-8")
-        )
+        source = json.loads((BENCHMARK_DIR / "minimax_h3/scenes.json").read_text(encoding="utf-8"))
 
         self.assertEqual(config["scenes"], source["scenes"])
         self.assertEqual(config["seeds"], source["seeds"])

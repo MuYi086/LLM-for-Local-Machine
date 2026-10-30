@@ -11,7 +11,6 @@ from pathlib import Path
 REPOSITORY_DIR = Path(__file__).resolve().parents[1]
 MODEL_PROJECTS = (
     "model-video/avatar_soulx-flashhead-1.3b",
-    "model-video/Kandinsky-6.0-Lite-Distill-BF16",
     "model-video/MiniMax-H3-16G-HiFi",
     "model-audio/analyse_moss-music-8b-Instruct",
     "model-audio/clone_qwen3-tts-1.7b-base",
@@ -70,7 +69,7 @@ class PythonQualityConfigurationTests(unittest.TestCase):
     def test_startup_uses_locked_environments_without_runtime_sync(self) -> None:
         start_script = (REPOSITORY_DIR / "start.sh").read_text(encoding="utf-8")
 
-        self.assertEqual(start_script.count("setsid uv run --no-sync --project"), 19)
+        self.assertEqual(start_script.count("setsid uv run --no-sync --project"), 18)
         self.assertNotIn("setsid uv run --project", start_script)
         self.assertEqual(start_script.count('for pid in "${pids[@]}"; do'), 3)
         self.assertNotIn('wait "$qwen3_tts_pid"', start_script)

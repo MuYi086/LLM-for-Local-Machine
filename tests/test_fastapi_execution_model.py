@@ -59,11 +59,6 @@ class FastApiExecutionModelTests(unittest.TestCase):
                 "/v1/confucius4TTS/generate",
             },
             "model-audio/separate_tiger-dnr/main.py": {"/v1/health"},
-            "model-video/Kandinsky-6.0-Lite-Distill-BF16/main.py": {
-                "/v1/health",
-                "/v1/check/image",
-                "/v1/kandinskylab/Kandinsky-6.0-Lite-Distill-BF16",
-            },
             "model-video/MiniMax-H3-16G-HiFi/main.py": {
                 "/v1/health",
                 "/v1/check/image",
@@ -92,7 +87,6 @@ class FastApiExecutionModelTests(unittest.TestCase):
             "model-audio/clone_qwen3-tts-1.7b-base/main.py",
             "model-audio/clone_voxcpm-2/main.py",
             "model-audio/clone_confucius-4/main.py",
-            "model-video/Kandinsky-6.0-Lite-Distill-BF16/main.py",
             "model-video/MiniMax-H3-16G-HiFi/main.py",
         }
 
@@ -101,11 +95,7 @@ class FastApiExecutionModelTests(unittest.TestCase):
                 source = (REPOSITORY_DIR / relative_path).read_text(encoding="utf-8")
                 upload_handler = (
                     "store_uploaded_image"
-                    if relative_path
-                    in {
-                        "model-video/Kandinsky-6.0-Lite-Distill-BF16/main.py",
-                        "model-video/MiniMax-H3-16G-HiFi/main.py",
-                    }
+                    if relative_path == "model-video/MiniMax-H3-16G-HiFi/main.py"
                     else "store_uploaded_audio"
                 )
                 self.assertIn(
