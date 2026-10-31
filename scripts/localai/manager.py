@@ -38,11 +38,6 @@ QWEN3_TTS_MODEL_FILES = (
 QWEN3_VOICEDESIGN_MODEL_NAME = "llm-local.qwen3-tts.1p7b-voicedesign"
 QWEN3_VOICEDESIGN_CONFIG_PATH = ROOT / "localai/manifests/qwen3-tts-voicedesign-candidate.yaml"
 WORKER_BRIDGE_CANDIDATES = {
-    "llm-local.sheetsage2.worker.v1": ROOT / "localai/manifests/sheetsage2-worker-candidate.yaml",
-    "llm-local.mert-v2-fullsong.worker.v1": ROOT
-    / "localai/manifests/mert-v2-fullsong-worker-candidate.yaml",
-    "llm-local.yue2-vae.worker.v1": ROOT / "localai/manifests/yue2-vae-worker-candidate.yaml",
-    "llm-local.yue2-3b.worker.v1": ROOT / "localai/manifests/yue2-3b-worker-candidate.yaml",
     "llm-local.tiger-dnr.worker.v1": ROOT / "localai/manifests/tiger-dnr-worker-candidate.yaml",
 }
 WORKER_BRIDGE_MANIFEST_PATH = ROOT / "localai/manifests/worker-bridge.json"

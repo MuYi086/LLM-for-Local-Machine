@@ -1,4 +1,0 @@
-name: llm-local.yue2-vae.worker.v1
-backend: llm-local-worker
-parameters:
-  model: llm-local.yue2-vae.worker.v1

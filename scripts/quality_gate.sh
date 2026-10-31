@@ -9,12 +9,10 @@ bash -n start.sh
 bash scripts/test_steam_audio_renderer_core.sh
 
 service_projects=(
-    model-video/avatar_soulx-flashhead-1.3b
     model-video/MiniMax-H3-16G-HiFi
     model-audio/analyse_moss-music-8b-Instruct
-    model-audio/clone_qwen3-tts-1.7b-base model-audio/clone_voxcpm-2 model-audio/music_ace-step-1.5 model-audio/music_yue2-3b
+    model-audio/clone_qwen3-tts-1.7b-base
     model-audio/indexTTS-2.5
-    model-audio/score_sheetsage-2 model-audio/codec_yue2-vae model-audio/embedding_mert-v2-fullsong
     model-audio/design_qwen3-tts-1.7b-voicedesign model-audio/clone_confucius-4 model-audio/transcribe_qwen3-asr-1.7b
     model-audio/separate_tiger-dnr model-audio/separate_msst-mega53 model-audio/soundEffect-v2.0
 )
@@ -44,4 +42,3 @@ uv run --project qa --locked ruff format --check "${lint_paths[@]}"
 uv run --project qa --locked python scripts/localai/validate_capabilities.py
 uv run --project qa --locked python -m unittest discover -s tests -v
 uv run --project qa --locked python -m unittest discover -s tests/i2v-benchmark/tests -v
-(cd model-audio/music_ace-step-1.5 && uv run --project ../../qa --locked python -m unittest discover -s tests -v)

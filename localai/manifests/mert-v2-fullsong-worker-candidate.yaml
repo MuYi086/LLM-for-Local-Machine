@@ -1,4 +1,0 @@
-name: llm-local.mert-v2-fullsong.worker.v1
-backend: llm-local-worker
-parameters:
-  model: llm-local.mert-v2-fullsong.worker.v1

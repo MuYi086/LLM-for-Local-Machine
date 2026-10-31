@@ -2,7 +2,7 @@
 
 - 状态：`implemented_unverified`
 - 日期：2026-10-21
-- 适用范围：Qwen3-TTS Base/VoiceDesign 直接 provider 与五个 one-shot worker bridge
+- 适用范围：Qwen3-TTS Base/VoiceDesign 直接 provider 与一个 one-shot worker bridge
 - 部署路线：LocalAI 和 gRPC bridge 使用宿主机进程，不使用 Docker
 - 固定版本：LocalAI `v4.11.0`、audio.cpp `9a02e61326aaaf9d462b584ca5e0daba22c0abfc`
 
@@ -10,7 +10,7 @@
 
 LocalAI 使用宿主机独立进程组运行；固定 CUDA backend 已在本机完成构建、打包和安装。管理器校验
 LocalAI 版本、backend 入口、文件树 SHA-256 和路径边界，不负责下载模型或第三方源码。LocalAI
-只绑定 loopback，模型注册限于当前两个 Qwen3-TTS 候选和五个登记的 worker bridge ID。
+只绑定 loopback，模型注册限于当前两个 Qwen3-TTS 候选和一个登记的 worker bridge ID。
 
 请求方在进入 LocalAI 前获取共享 `GPU_LOCK_FILE`。直接模型候选在请求结束时调用
 `/backend/shutdown`；worker bridge 请求通过 LocalAI 调度对应项目的一次性 worker，worker 退出后

@@ -142,13 +142,13 @@ class LocalAIManagerTests(unittest.TestCase):
         manager.register_worker_bridge_candidates()
         manager.verify_worker_bridge_candidates()
 
-        for model_name in (
-            "llm-local.sheetsage2.worker.v1",
-            "llm-local.mert-v2-fullsong.worker.v1",
-            "llm-local.yue2-vae.worker.v1",
-            "llm-local.yue2-3b.worker.v1",
+        model_names = {
             "llm-local.tiger-dnr.worker.v1",
-        ):
+        }
+        self.assertEqual(
+            {candidate.stem for candidate in manager.models_dir.glob("*.yaml")}, model_names
+        )
+        for model_name in model_names:
             installed = self.data_dir / "models" / f"{model_name}.yaml"
             self.assertTrue(installed.is_file())
             self.assertIn("backend: llm-local-worker", installed.read_text(encoding="utf-8"))
@@ -156,7 +156,7 @@ class LocalAIManagerTests(unittest.TestCase):
     def test_worker_bridge_candidate_verification_rejects_modified_yaml(self) -> None:
         manager = self.manager()
         manager.register_worker_bridge_candidates()
-        candidate = self.data_dir / "models/llm-local.sheetsage2.worker.v1.yaml"
+        candidate = self.data_dir / "models/llm-local.tiger-dnr.worker.v1.yaml"
         candidate.write_text(candidate.read_text(encoding="utf-8") + "# changed\n")
 
         with self.assertRaisesRegex(LocalAIManagerError, "YAML 不匹配"):
@@ -360,7 +360,7 @@ class LocalAIManagerTests(unittest.TestCase):
                     worker.wait(timeout=2)
 
     def test_manager_reaps_tagged_descendant_after_worker_parent_exits(self) -> None:
-        worker_script = REPOSITORY_DIR / "model-audio/score_sheetsage-2/worker.py"
+        worker_script = REPOSITORY_DIR / "model-audio/separate_tiger-dnr/worker.py"
         descendant = subprocess.Popen(
             [sys.executable, "-c", "import time; time.sleep(60)"],
             env={

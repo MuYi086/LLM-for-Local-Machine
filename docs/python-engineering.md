@@ -38,7 +38,7 @@ bash scripts/quality_gate.sh
 ```
 
 统一入口先运行 `bash -n start.sh` 和不依赖 Steam Audio SDK 的三个 C++ 核心测试，
-再检查 17 个模型服务项目与 QA 的锁文件，使用轻量 QA 环境执行 Ruff、格式检查和两组单元测试。
+再检查当前维护的模型服务项目、worker bridge 与 QA 的锁文件，使用轻量 QA 环境执行 Ruff、格式检查和两组单元测试。
 GitHub Actions 调用同一脚本，不需要模型环境或 CUDA；需要 `uv` 与 `g++`。
 锁检查仍可能访问 Git/wheel 元数据；已有完整缓存时可用 `UV_OFFLINE=1`，
 离线模式不能代替首次准备依赖元数据。
@@ -75,16 +75,15 @@ uv run --project qa --locked ruff format --check main llm_local_runtime tests/*.
 ## 测试
 
 静态检查和单元测试必须不下载权重、不依赖 CUDA，也不调用真实外部模型服务。
-先运行根目录迁移测试，再运行含有专属测试的服务：
+运行根目录与 MiniMax H3 基准的无模型测试：
 
 ```bash
 bash -n start.sh
 uv run --project qa --locked python -m unittest discover -s tests -v
-(cd model-audio/music_ace-step-1.5 && uv run --project ../../qa --locked python -m unittest discover -s tests -v)
+uv run --project qa --locked python -m unittest discover -s tests/i2v-benchmark/tests -v
 ```
 
 FastAPI TestClient 回归依赖 QA 的 `httpx2` 兼容组合；不得恢复已弃用的旧客户端版本。
-从服务目录运行两组专属测试，可避免同名 `runtime` 模块导入冲突。
 真实模型演示和文本润色训练/预测均由操作者单独运行，
 不属于无模型质量门禁；训练脚本的纯文本逻辑由根目录测试覆盖。
 

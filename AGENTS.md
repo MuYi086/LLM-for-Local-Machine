@@ -39,14 +39,14 @@
 
 ## 适用范围与依据
 
-本仓库提供面向本地部署的 LLM 音视频后端，当前保留音乐理解、语音克隆、文本音色设计、BGM、语音转写、
-音乐转谱、音源分离、人像/图生视频、CPU 母带和 Steam Audio 空间导出。服务采用独立 uv 项目和一次性 worker。
+本仓库提供面向本地部署的 LLM 音视频后端，当前保留音乐理解、语音克隆、文本音色设计、音效生成、语音转写、
+音源分离、图生视频、CPU 母带和 Steam Audio 空间导出。服务采用独立 uv 项目和一次性 worker。
 文档遵循 CONSTITUTION.md 的中文优先要求；接口和配置以实际源码为准。
 README.md 提供接入、配置和运维说明，本文件记录开发边界与命令。
 
 ## 项目结构与服务速查
 
-当前维护 17 个模型服务 uv 项目与一个轻量控制面，start.sh 合计启动 18 个 HTTP 进程；
+当前维护 10 个模型服务 uv 项目与一个轻量控制面，start.sh 合计启动 11 个 HTTP 进程；
 localai_worker_bridge 是额外的非 HTTP uv 包，不计入服务数，也不常驻导入 Torch。
 原生能力和输出见 README 服务总览；端口、方法及路径以源码为准。
 区分模型原生能力、已接入接口与服务编排；各 HTTP 进程提供 GET /v1/health。
@@ -57,19 +57,12 @@ localai_worker_bridge 是额外的非 HTTP uv 包，不计入服务数，也不�
 | `model-audio/design_qwen3-tts-1.7b-voicedesign/` | 8301 | POST /v1/qwen/timbre | 文本音色设计与 TTS | 语音波形 |
 | `model-audio/analyse_moss-music-8b-Instruct/` | 8310 | POST /v1/openMoss/moss-music | 音乐描述、问答与歌词转写 | JSON 分析文本 |
 | `model-audio/soundEffect-v2.0/` | 8362 | POST /v1/moss/soundEffect-v2.0 | 根据文本提示词生成最长 30 秒的环境音效 | 48 kHz 单声道 WAV |
-| `model-audio/music_ace-step-1.5/` | 8313 | POST /v1/aceStep/bgm | 按提示词生成 BGM；接口不接收歌词 | 音乐波形 |
-| `model-audio/music_yue2-3b/` | 8314 | POST /v1/m-a-p/YuE2 | 根据风格、歌词与可选 ABC 乐谱生成歌曲 | 48 kHz 立体声音频 |
-| `model-audio/score_sheetsage-2/` | 8315 | POST /v1/m-a-p/SheetSage2 | 音乐转为乐谱、MIDI、节拍/和弦/调性/结构与时间标注 | ABC、MIDI 与 JSON/LAB ZIP |
-| `model-audio/codec_yue2-vae/` | 8316 | POST /v1/m-a-p/YuE2-Vae | YuE2 acoustic latent 编码与分块解码 | [T,64] NPY 或 48 kHz WAV |
-| `model-audio/embedding_mert-v2-fullsong/` | 8317 | POST /v1/m-a-p/MERT-v2-FullSong | 完整歌曲音乐表征提取 | 整曲 embedding 或逐帧 NPZ |
 | `model-audio/clone_qwen3-tts-1.7b-base/` | 8321 | POST /v1/qwen/clone | 参考音频零样本多语言 TTS 克隆 | 语音波形 |
-| `model-audio/clone_voxcpm-2/` | 8322 | POST /v1/voxcpm2/clone | 多语种 TTS、参考克隆及指令可控克隆 | 语音波形 |
 | `model-audio/indexTTS-2.5/` | 8323 | POST /v1/index-team/indexTTS-2.5 | 参考音频零样本克隆，支持五种语言、时长和情感向量控制 | 22.05 kHz WAV |
 | `model-audio/separate_tiger-dnr/` | 8351 | POST /v1/tigerDnr/separate | 对白/音效/音乐三路 Stem 分离 | 三路音频波形 |
 | `model-audio/clone_confucius-4/` | 8361 | POST /v1/confucius4TTS/generate | 14 语种跨语言零样本 TTS 克隆 | 语音波形 |
 | `model-audio/transcribe_qwen3-asr-1.7b/` | 8371 | POST /v1/qwen3/asr | 语种识别与语音转写 | 转写文本与语种 |
 | `model-audio/separate_msst-mega53/` | 8380 | POST /v1/msst/separate | 按调用方选择分离音乐声部 | FLOAT WAV 与元数据 ZIP |
-| `model-video/avatar_soulx-flashhead-1.3b/` | 8391 | POST /v1/soulX/flashHead | 人像图片和音频驱动的单 GPU 视频生成 | 带音轨 MP4 |
 | `model-video/MiniMax-H3-16G-HiFi/` | 8392 | POST /v1/minimax/H3-16G-HiFi | MiniMax H3 FL2VA/Ref2VA 图生视频 | 默认无音轨；`include_audio=true` 时输出原生音轨 MP4 |
 
 - main/main.py 只处理健康/控制、共享上传/检查和 CPU 导出，不加载模型包或推理。
@@ -81,27 +74,23 @@ localai_worker_bridge 是额外的非 HTTP uv 包，不计入服务数，也不�
   GPU 锁旁的 .quarantine 标记必须保留；运维需通过 scripts/localai/recover_quarantine.py
   解除隔离，并确认受管进程组退出、loopback API 端口关闭。
 - scripts/localai/manager.py 校验宿主机 LocalAI 固定版本、audio.cpp backend 文件指纹、
-  Qwen3-TTS 候选与五个 worker bridge；本项目使用 Linux 裸机，不使用 Docker。
+  Qwen3-TTS 候选与 TIGER-DnR worker bridge；本项目使用 Linux 裸机，不使用 Docker。
   更新服务 API 后须同步 localai/manifests/capabilities.json 并运行能力清单校验。
 - localai_worker_bridge/ 只依赖轻量 gateway/runtime 与 gRPC；按
-  localai/manifests/worker-bridge.json 固定的五个模型 ID、项目和 worker.py 入口启动一次性 worker，
+  localai/manifests/worker-bridge.json 固定的 TIGER-DnR 模型 ID、项目和 worker.py 入口启动一次性 worker，
   只监听 loopback，不导入 FastAPI、Torch 或模型包。新增 worker 须覆盖合同、超时、大小、
   环境白名单和异常退出清理。
 - model-audio/separate_msst-mega53/ 使用外部 MSST 源码和 hf-mirror 下的完整 Mega 53 权重；
   调用方必须通过 stems 选择模型支持的声部，并始终保留数学 residual。
-  不加入 LocalAI 固定五个 bridge，默认 storage/msst/ ZIP 不由 WAV 保留策略清理。
+  不加入 LocalAI worker bridge，默认 storage/msst/ ZIP 不由 WAV 保留策略清理。
 - model-audio/indexTTS-2.5/ 使用仓库外官方 v2.5.0 推理源码与本地完整主/辅助权重；HTTP 进程
   只负责上传、检查、共享 GPU 排队和一次性 worker 编排。
 - model-audio/soundEffect-v2.0/ 使用仓库外固定 revision 的官方 MOSS-TTS 推理源码与完整本地快照；
   HTTP 进程只负责请求校验、共享 GPU 排队与一次性 worker 编排。
 - model-audio/spatial_steam-audio/ 是 C++17 Steam Audio CPU renderer，不获取 GPU 锁；SDK 和动态库在仓库外。
 - qa/ 是无模型测试/Ruff 项目；scripts/quality_gate.sh 与 GitHub Actions 使用同一质量门禁。
-  根目录回归使用 QA；ACE-Step 服务内测试从 model-audio/music_ace-step-1.5/ 执行。
+  根目录与 MiniMax H3 基准的无模型回归使用 QA。
 - model-text/scripts/training/、model-text/training/configs/ 是纯文本润色 LoRA 实验，不是语音训练或 HTTP 服务。
-- model-video/avatar_soulx-flashhead-1.3b/ 维护 SoulX-FlashHead 单 GPU 人像视频服务；
-  8391 提供 POST /v1/soulX/flashHead，计入 start.sh 的 18 个 HTTP 进程。
-  主模型及 wav2vec2 编码器均放在 hf-mirror/Soul-AILab 下；保持独立 uv 环境与一次性 worker，
-  不加入 LocalAI 的五个固定 worker bridge。图片/音频使用上传逻辑标识，不能直接读取任意服务器路径。
 - model-video/MiniMax-H3-16G-HiFi/ 使用 `~/hf-mirror/minimax/MiniMax-H3-16G-HiFi` 的完整 HiFi 权重，
   以及仓库外固定版本 ComfyUI 和权重仓库配套自定义节点；8392 提供 POST /v1/minimax/H3-16G-HiFi。
   轻量 HTTP 层使用共享 GPU 锁和空闲显存门槛，每次请求由一次性 worker 启动 loopback ComfyUI，
@@ -117,26 +106,10 @@ renderer 构建需要 CMake 3.17+ 和 C++17。
 
 按照 README 准备权重与外部源码，再执行 `uv sync --project <dir> --locked`。
 修改依赖后在对应项目执行 `uv lock`，提交 `pyproject.toml` 与 `uv.lock`，并用 `uv lock --check` 验证。
-YuE2-3B 使用模型目录随附的官方 `yue2_infer` 0.1.5 wheel 和本地 MOT/VAE 权重；按模型卡准备
-24 GB GPU 及 24 GB 可用主机内存，服务请求不下载模型。
-
-YuE2-Vae 使用本地 Hugging Face remote code 与 `AutoModel`。独立 API 接收 48 kHz 立体声音频
-编码为 `[T,64]` NPY，或将该 latent 解码成 48 kHz WAV；FFmpeg/ffprobe 在 GPU 排队前负责音频预检和格式转换。
-VAE 保持 FP32，解码使用官方分块 `decode_tiled`，模型只在一次性 worker 中加载。
 
 MOSS-Music 使用本地 Q8/F16 GGUF 与固定 HOT-Step-CPP 的 `ace-caption`，不依赖 Torch。
 Python worker 通过 exec 替换为 C++ 进程，仍由父进程统一回收进程组。CPU 预检拒绝超过 420 秒输入，
 转为 16 kHz 单声道；上传与文本结果仅暂存，不长期保存。构建命令见该服务 README。
-
-MERT-v2-FullSong 使用本地官方 Transformers `AutoFeatureExtractor`/`AutoModel` 与独立 uv 环境；
-PyTorch/Torchaudio 2.6.0、Transformers 4.53.2 按模型卡固定。CPU 预检限制完整歌曲为 30–360 秒，
-FFmpeg 转为 24 kHz 单声道后，worker 输出掩码平均 JSON embedding 或逐帧 NPZ；成品写入
-`MERT_V2_FULLSONG_OUTPUT_DIR`，不由 WAV 保留策略自动清理。
-
-SheetSage2 使用 Hugging Face 本地快照的官方 Transformers remote code 和 `AutoModel` 接口；
-除 SheetSage2 adapter 外，还须在 `SHEETSAGE2_BASE_MODEL_DIR` 准备其配置固定 revision 的
-MERT-v2-FullSong 父模型。服务用一次性 worker 推理，默认 FFmpeg 解码，ZIP 成品写入
-`SHEETSAGE2_OUTPUT_DIR`；请求音频暂存仅用于推理并在请求结束后删除。
 
 `bash start.sh` 在 `model-audio/clone_qwen3-tts-1.7b-base` 环境启动 8300，其他进程使用各自服务环境；端口/路径可通过
 环境变量覆盖。启动统一使用 `uv run --no-sync`，并将 `llm_local_runtime/src` 加入 `PYTHONPATH`
@@ -151,13 +124,13 @@ bash scripts/quality_gate.sh
 curl -fsS http://127.0.0.1:8300/v1/control
 ```
 
-质量门禁包含无 SDK 的三个 C++ 核心测试、全部服务/bridge/QA 锁检查、Ruff 与格式检查及三组无模型测试。缺失任何当前维护项目都会使门禁失败。
+质量门禁包含无 SDK 的三个 C++ 核心测试、全部服务/bridge/QA 锁检查、Ruff 与格式检查及两组无模型测试。缺失任何当前维护项目都会使门禁失败。
 锁校验可能读取 Git/wheel 元数据；已有完整缓存时可设置 `UV_OFFLINE=1` 运行。
 单独执行测试必须用 QA，不能通过模型环境安装依赖来运行根目录回归：
 
 ```bash
 uv run --project qa --locked python -m unittest discover -s tests -v
-(cd model-audio/music_ace-step-1.5 && uv run --project ../../qa --locked python -m unittest discover -s tests -v)
+uv run --project qa --locked python -m unittest discover -s tests/i2v-benchmark/tests -v
 ```
 
 测试不得下载权重、依赖 CUDA、调用外部模型服务或执行真实模型；应 mock worker、subprocess、
@@ -177,8 +150,7 @@ uv run --project qa --locked python -m unittest discover -s tests -v
   共享运行参数，不应新增静默推理覆盖。现有部分服务的默认参数还由脚本导出，改默认值须核对两处。
 - `~/hf-mirror` 是模型维护范围的本地依据；新服务及现有服务的可选 provider 必须具有完整主模型和必需辅助权重，缺失时不得保留等待用户下载的运行代码。LocalAI/audio.cpp 的上游 family 支持声明不等于本地模型可用。
 - 不恢复已从仓库移除的服务，不新增旧接口别名、集中式 `api/` 或 Conda 回退。若模型目录和依赖重新准备，先单独评估维护范围及完整运行合同。
-- Qwen/VoxCPM2 克隆拒绝 `style_prompt`。VoxCPM2 `controllable` 模式使用
-  `control_instruction`，与 `prompt_text` 互斥且忽略 sidecar；`nonverbal_tags` 最多一个白名单标签。
+- Qwen3-TTS 克隆拒绝 `style_prompt`。
 - Confucius4 默认 `lang=zh`，参考 sidecar 不参与推理。Qwen3-ASR/TIGER 直接接收 multipart `audio`，
   输入只暂存；ASR 返回 JSON，TIGER 返回 ZIP 并原子保存分离批次。
 - 正式 `balanced`/`immersive` 必须保留对象边界，走 `/v1/audio/spatial/render` 的 Manifest v1
@@ -194,9 +166,8 @@ uv run --project qa --locked python -m unittest discover -s tests -v
   不直接覆盖 sidecar 或引用映射。
 - `full_path` 是客户端逻辑标识，不能用于直接读取服务器任意文件。参考文本可保存 sidecar；
   8300 上传不接收 `prompt_text`，ASR/TIGER 没有独立上传/检查接口。
-- 默认目录：音色 `storage/timbre/`、BGM `storage/bgm/`、人像图片 `storage/flashhead/images/`、视频 `storage/video/`、普通参考音频与克隆结果
-  `storage/clone/`、分离批次 `storage/separation/`、转谱 ZIP `storage/sheetsage2/`、
-  YuE2-Vae latent/WAV `storage/yue2_vae/`、MERT 表征 JSON/NPZ `storage/mert_v2_fullsong/`。
+- 默认目录：音色 `storage/timbre/`、视频 `storage/video/`、普通参考音频与克隆结果
+  `storage/clone/`、分离批次 `storage/separation/`。
   目录均可按对应配置覆盖。
 - 设计 WAV 只保留在 `storage/timbre/`。通过共享 `AudioReferenceStore` 同步到其他服务时，
   同内容上传只在 `storage/timbre/.references/` 保存小型引用映射/文本，不在 clone 再复制 WAV。

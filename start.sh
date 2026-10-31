@@ -30,17 +30,10 @@ INDEXTTS25_PROJECT_DIR="${INDEXTTS25_PROJECT_DIR:-$PROJECT_DIR/model-audio/index
 QWEN3_VOICEDESIGN_PROJECT_DIR="${QWEN3_VOICEDESIGN_PROJECT_DIR:-$PROJECT_DIR/model-audio/design_qwen3-tts-1.7b-voicedesign}"
 CONFUCIUS4_TTS_PROJECT_DIR="${CONFUCIUS4_TTS_PROJECT_DIR:-$PROJECT_DIR/model-audio/clone_confucius-4}"
 QWEN3_ASR_PROJECT_DIR="${QWEN3_ASR_PROJECT_DIR:-$PROJECT_DIR/model-audio/transcribe_qwen3-asr-1.7b}"
-ACESTEP_PROJECT_DIR="${ACESTEP_PROJECT_DIR:-$PROJECT_DIR/model-audio/music_ace-step-1.5}"
-YUE2_3B_PROJECT_DIR="${YUE2_3B_PROJECT_DIR:-$PROJECT_DIR/model-audio/music_yue2-3b}"
-SHEETSAGE2_PROJECT_DIR="${SHEETSAGE2_PROJECT_DIR:-$PROJECT_DIR/model-audio/score_sheetsage-2}"
-YUE2_VAE_PROJECT_DIR="${YUE2_VAE_PROJECT_DIR:-$PROJECT_DIR/model-audio/codec_yue2-vae}"
-MERT_V2_FULLSONG_PROJECT_DIR="${MERT_V2_FULLSONG_PROJECT_DIR:-$PROJECT_DIR/model-audio/embedding_mert-v2-fullsong}"
-VOXCPM2_PROJECT_DIR="${VOXCPM2_PROJECT_DIR:-$PROJECT_DIR/model-audio/clone_voxcpm-2}"
 MSST_PROJECT_DIR="${MSST_PROJECT_DIR:-$PROJECT_DIR/model-audio/separate_msst-mega53}"
 TIGER_DNR_PROJECT_DIR="${TIGER_DNR_PROJECT_DIR:-$PROJECT_DIR/model-audio/separate_tiger-dnr}"
 MOSS_MUSIC_PROJECT_DIR="${MOSS_MUSIC_PROJECT_DIR:-$PROJECT_DIR/model-audio/analyse_moss-music-8b-Instruct}"
 MOSS_SOUNDEFFECT_V2_PROJECT_DIR="${MOSS_SOUNDEFFECT_V2_PROJECT_DIR:-$PROJECT_DIR/model-audio/soundEffect-v2.0}"
-SOULX_FLASHHEAD_PROJECT_DIR="${SOULX_FLASHHEAD_PROJECT_DIR:-$PROJECT_DIR/model-video/avatar_soulx-flashhead-1.3b}"
 MINIMAX_H3_PROJECT_DIR="${MINIMAX_H3_PROJECT_DIR:-$PROJECT_DIR/model-video/MiniMax-H3-16G-HiFi}"
 
 export HF_MIRROR_DIR="${HF_MIRROR_DIR:-$HOME/hf-mirror}"
@@ -52,9 +45,6 @@ export INDEXTTS25_BIGVGAN_MODEL_DIR="${INDEXTTS25_BIGVGAN_MODEL_DIR:-$HF_MIRROR_
 export MSST_MODEL_DIR="${MSST_MODEL_DIR:-$HF_MIRROR_DIR/oulianov/mvsep_mega_53}"
 export MSST_SOURCE_DIR="${MSST_SOURCE_DIR:-$HOME/LLM-depency/Music-Source-Separation-Training}"
 export MSST_OUTPUT_DIR="${MSST_OUTPUT_DIR:-$STORAGE_DIR/msst}"
-export SOULX_FLASHHEAD_MODEL_DIR="${SOULX_FLASHHEAD_MODEL_DIR:-$HF_MIRROR_DIR/Soul-AILab/SoulX-FlashHead-1_3B}"
-export SOULX_FLASHHEAD_WAV2VEC_DIR="${SOULX_FLASHHEAD_WAV2VEC_DIR:-$HF_MIRROR_DIR/Soul-AILab/wav2vec2-base-960h}"
-export SOULX_FLASHHEAD_CODE_PATH="${SOULX_FLASHHEAD_CODE_PATH:-$HOME/LLM-depency/SoulX-FlashHead}"
 export MINIMAX_H3_MODEL_DIR="${MINIMAX_H3_MODEL_DIR:-$HF_MIRROR_DIR/minimax/MiniMax-H3-16G-HiFi}"
 export MINIMAX_H3_COMFYUI_CODE_PATH="${MINIMAX_H3_COMFYUI_CODE_PATH:-$HOME/LLM-depency/MiniMax-H3-ComfyUI}"
 export MINIMAX_H3_COMFYUI_PYTHON="${MINIMAX_H3_COMFYUI_PYTHON:-$MINIMAX_H3_COMFYUI_CODE_PATH/.venv/bin/python}"
@@ -85,49 +75,18 @@ export LLM_LOCAL_QWEN3_TTS_PROVIDER="${LLM_LOCAL_QWEN3_TTS_PROVIDER:-$LLM_LOCAL_
 export LLM_LOCAL_QWEN3_TTS_MODEL="${LLM_LOCAL_QWEN3_TTS_MODEL:-llm-local.qwen3-tts.1p7b-base}"
 export LLM_LOCAL_QWEN3_VOICEDESIGN_PROVIDER="${LLM_LOCAL_QWEN3_VOICEDESIGN_PROVIDER:-$LLM_LOCAL_INFERENCE_PROVIDER}"
 export LLM_LOCAL_QWEN3_VOICEDESIGN_MODEL="${LLM_LOCAL_QWEN3_VOICEDESIGN_MODEL:-llm-local.qwen3-tts.1p7b-voicedesign}"
-export LLM_LOCAL_SHEETSAGE2_PROVIDER="${LLM_LOCAL_SHEETSAGE2_PROVIDER:-$LLM_LOCAL_INFERENCE_PROVIDER}"
-export LLM_LOCAL_SHEETSAGE2_MODEL="${LLM_LOCAL_SHEETSAGE2_MODEL:-llm-local.sheetsage2.worker.v1}"
-export LLM_LOCAL_MERT_V2_FULLSONG_PROVIDER="${LLM_LOCAL_MERT_V2_FULLSONG_PROVIDER:-$LLM_LOCAL_INFERENCE_PROVIDER}"
-export LLM_LOCAL_MERT_V2_FULLSONG_MODEL="${LLM_LOCAL_MERT_V2_FULLSONG_MODEL:-llm-local.mert-v2-fullsong.worker.v1}"
-export LLM_LOCAL_YUE2_VAE_PROVIDER="${LLM_LOCAL_YUE2_VAE_PROVIDER:-$LLM_LOCAL_INFERENCE_PROVIDER}"
-export LLM_LOCAL_YUE2_VAE_MODEL="${LLM_LOCAL_YUE2_VAE_MODEL:-llm-local.yue2-vae.worker.v1}"
-export LLM_LOCAL_YUE2_3B_PROVIDER="${LLM_LOCAL_YUE2_3B_PROVIDER:-$LLM_LOCAL_INFERENCE_PROVIDER}"
-export LLM_LOCAL_YUE2_3B_MODEL="${LLM_LOCAL_YUE2_3B_MODEL:-llm-local.yue2-3b.worker.v1}"
-export YUE2_3B_REQUEST_TIMEOUT="${YUE2_3B_REQUEST_TIMEOUT:-1800}"
 export LLM_LOCAL_TIGER_DNR_PROVIDER="${LLM_LOCAL_TIGER_DNR_PROVIDER:-$LLM_LOCAL_INFERENCE_PROVIDER}"
 export LLM_LOCAL_TIGER_DNR_MODEL="${LLM_LOCAL_TIGER_DNR_MODEL:-llm-local.tiger-dnr.worker.v1}"
 export LLM_LOCALAI_ARTIFACT_DIR="${LLM_LOCALAI_ARTIFACT_DIR:-${RUNTIME_CACHE_DIR:-$STORAGE_DIR/.cache/runtime}/localai_artifacts}"
 export LLM_LOCALAI_CONNECT_TIMEOUT="${LLM_LOCALAI_CONNECT_TIMEOUT:-5}"
 export LLM_LOCALAI_CLEANUP_TIMEOUT="${LLM_LOCALAI_CLEANUP_TIMEOUT:-30}"
-export ACESTEP_MODEL_DIR="${ACESTEP_MODEL_DIR:-$HF_MIRROR_DIR/ACE-Step/acestep-v15-xl-turbo-diffusers}"
-export YUE2_3B_MODEL_DIR="${YUE2_3B_MODEL_DIR:-$HF_MIRROR_DIR/m-a-p/YuE2-3B}"
-export YUE2_VAE_MODEL_DIR="${YUE2_VAE_MODEL_DIR:-$HF_MIRROR_DIR/m-a-p/YuE2-Vae}"
-export SHEETSAGE2_MODEL_DIR="${SHEETSAGE2_MODEL_DIR:-$HF_MIRROR_DIR/m-a-p/SheetSage2}"
-export SHEETSAGE2_BASE_MODEL_DIR="${SHEETSAGE2_BASE_MODEL_DIR:-$HF_MIRROR_DIR/m-a-p/MERT-v2-FullSong}"
-export MERT_V2_FULLSONG_MODEL_DIR="${MERT_V2_FULLSONG_MODEL_DIR:-$HF_MIRROR_DIR/m-a-p/MERT-v2-FullSong}"
-export BGM_STORAGE_DIR="${BGM_STORAGE_DIR:-$STORAGE_DIR/bgm}"
-export ACESTEP_OUTPUT_DIR="${ACESTEP_OUTPUT_DIR:-$BGM_STORAGE_DIR}"
-export YUE2_3B_OUTPUT_DIR="${YUE2_3B_OUTPUT_DIR:-$BGM_STORAGE_DIR}"
-export SHEETSAGE2_OUTPUT_DIR="${SHEETSAGE2_OUTPUT_DIR:-$STORAGE_DIR/sheetsage2}"
-export YUE2_VAE_OUTPUT_DIR="${YUE2_VAE_OUTPUT_DIR:-$STORAGE_DIR/yue2_vae}"
-export MERT_V2_FULLSONG_OUTPUT_DIR="${MERT_V2_FULLSONG_OUTPUT_DIR:-$STORAGE_DIR/mert_v2_fullsong}"
-export ACESTEP_DEVICE="${ACESTEP_DEVICE:-cuda}"
-export ACESTEP_DTYPE="${ACESTEP_DTYPE:-bfloat16}"
-export ACESTEP_OFFLOAD="${ACESTEP_OFFLOAD:-model}"
-export ACESTEP_VAE_TILING="${ACESTEP_VAE_TILING:-1}"
-export ACESTEP_DEFAULT_SECONDS="${ACESTEP_DEFAULT_SECONDS:-60}"
-export ACESTEP_DEFAULT_STEPS="${ACESTEP_DEFAULT_STEPS:-8}"
-export ACESTEP_DEFAULT_SEED="${ACESTEP_DEFAULT_SEED:--1}"
-export ACESTEP_REQUEST_TIMEOUT="${ACESTEP_REQUEST_TIMEOUT:-1800}"
 export QWEN3_TTS_MODEL_DIR="${QWEN3_TTS_MODEL_DIR:-$HF_MIRROR_DIR/Qwen/Qwen3-TTS-12Hz-1.7B-Base}"
-export VOXCPM2_MODEL_DIR="${VOXCPM2_MODEL_DIR:-$HF_MIRROR_DIR/openbmb/VoxCPM2}"
 export QWEN_LIBS="${QWEN_LIBS:-$QWEN3_TTS_PROJECT_DIR/vendor/qwen_libs}"
 export TIMBRE_STORAGE_DIR="${TIMBRE_STORAGE_DIR:-$STORAGE_DIR/timbre}"
 export CLONE_STORAGE_DIR="${CLONE_STORAGE_DIR:-$STORAGE_DIR/clone}"
 export CONFUCIUS4_TTS_OUTPUT_DIR="${CONFUCIUS4_TTS_OUTPUT_DIR:-$CLONE_STORAGE_DIR}"
 export TIGER_DNR_OUTPUT_DIR="${TIGER_DNR_OUTPUT_DIR:-$STORAGE_DIR/separation}"
 export QWEN3_TTS_OUTPUT_DIR="${QWEN3_TTS_OUTPUT_DIR:-$CLONE_STORAGE_DIR}"
-export VOXCPM2_OUTPUT_DIR="${VOXCPM2_OUTPUT_DIR:-$CLONE_STORAGE_DIR}"
 export PROMPTS_DIR="${PROMPTS_DIR:-$CLONE_STORAGE_DIR}"
 export RUNTIME_CACHE_DIR="${RUNTIME_CACHE_DIR:-$STORAGE_DIR/.cache/runtime}"
 export INDEXTTS25_OUTPUT_DIR="${INDEXTTS25_OUTPUT_DIR:-$CLONE_STORAGE_DIR}"
@@ -150,9 +109,6 @@ export GPU_LOCK_FILE="${GPU_LOCK_FILE:-$RUNTIME_CACHE_DIR/gpu-runtime.lock}"
 export LOCAL_FILES_ONLY="${LOCAL_FILES_ONLY:-1}"
 # 集中在 model-audio/clone_qwen3-tts-1.7b-base/main.py；
 # 此处只保留环境、模型路径等启动路由配置，避免覆盖 API 内可直接调试的值。
-# VoxCPM2 的默认生成参数集中在 model-audio/clone_voxcpm-2/main.py；此处不再写入默认值，
-# 因此直接修改 API 顶部常量即可生效。外部显式设置的 VOXCPM2_* 环境变量会原样继承并覆盖 API 默认值。
-# VoxCPM2 只使用仓库内独立 uv 项目，旧 Conda wrapper 已移除。
 export QWEN3_TTS_USE_QWEN_LIBS="${QWEN3_TTS_USE_QWEN_LIBS:-0}"
 export CUDA_RELEASE_DELAY="${CUDA_RELEASE_DELAY:-2.0}"
 
@@ -162,8 +118,6 @@ export QWEN3_TTS_HOST="${QWEN3_TTS_HOST:-$HOST}"
 export QWEN3_TTS_PORT="${QWEN3_TTS_PORT:-8321}"
 export INDEXTTS25_HOST="${INDEXTTS25_HOST:-$HOST}"
 export INDEXTTS25_PORT="${INDEXTTS25_PORT:-8323}"
-export VOXCPM2_HOST="${VOXCPM2_HOST:-$HOST}"
-export VOXCPM2_PORT="${VOXCPM2_PORT:-8322}"
 export QWEN_VOICEDESIGN_HOST="${QWEN_VOICEDESIGN_HOST:-$HOST}"
 export QWEN_VOICEDESIGN_PORT="${QWEN_VOICEDESIGN_PORT:-8301}"
 export TIGER_DNR_HOST="${TIGER_DNR_HOST:-$HOST}"
@@ -172,26 +126,12 @@ export CONFUCIUS4_TTS_HOST="${CONFUCIUS4_TTS_HOST:-$HOST}"
 export CONFUCIUS4_TTS_PORT="${CONFUCIUS4_TTS_PORT:-8361}"
 export QWEN3_ASR_HOST="${QWEN3_ASR_HOST:-$HOST}"
 export QWEN3_ASR_PORT="${QWEN3_ASR_PORT:-8371}"
-export SOULX_FLASHHEAD_HOST="${SOULX_FLASHHEAD_HOST:-$HOST}"
-export SOULX_FLASHHEAD_PORT="${SOULX_FLASHHEAD_PORT:-8391}"
 export MINIMAX_H3_HOST="${MINIMAX_H3_HOST:-$HOST}"
 export MINIMAX_H3_PORT="${MINIMAX_H3_PORT:-8392}"
 export MOSS_MUSIC_HOST="${MOSS_MUSIC_HOST:-$HOST}"
 export MOSS_MUSIC_PORT="${MOSS_MUSIC_PORT:-8310}"
 export MOSS_SOUNDEFFECT_V2_HOST="${MOSS_SOUNDEFFECT_V2_HOST:-$HOST}"
 export MOSS_SOUNDEFFECT_V2_PORT="${MOSS_SOUNDEFFECT_V2_PORT:-8362}"
-export ACESTEP_HOST="${ACESTEP_HOST:-$HOST}"
-export ACESTEP_PORT="${ACESTEP_PORT:-8313}"
-export YUE2_3B_HOST="${YUE2_3B_HOST:-$HOST}"
-export YUE2_3B_PORT="${YUE2_3B_PORT:-8314}"
-export SHEETSAGE2_HOST="${SHEETSAGE2_HOST:-$HOST}"
-export SHEETSAGE2_PORT="${SHEETSAGE2_PORT:-8315}"
-export YUE2_VAE_HOST="${YUE2_VAE_HOST:-$HOST}"
-export YUE2_VAE_PORT="${YUE2_VAE_PORT:-8316}"
-export MERT_V2_FULLSONG_HOST="${MERT_V2_FULLSONG_HOST:-$HOST}"
-export MERT_V2_FULLSONG_PORT="${MERT_V2_FULLSONG_PORT:-8317}"
-export MERT_V2_FULLSONG_DEVICE="${MERT_V2_FULLSONG_DEVICE:-cuda:0}"
-export MERT_V2_FULLSONG_REQUEST_TIMEOUT="${MERT_V2_FULLSONG_REQUEST_TIMEOUT:-900}"
 
 export MSST_HOST="${MSST_HOST:-$HOST}"
 export MSST_PORT="${MSST_PORT:-8380}"
@@ -199,14 +139,8 @@ export MSST_PORT="${MSST_PORT:-8380}"
 # 先检查整组监听地址；重复启动或配置内端口冲突时不创建任何服务进程。
 uv run --no-sync --project "$QWEN3_TTS_PROJECT_DIR" python "$MAIN_DIR/check_ports.py" \
   'Control-plane' "$HOST" "$PORT" \
-  'SoulX-FlashHead' "$SOULX_FLASHHEAD_HOST" "$SOULX_FLASHHEAD_PORT" \
   'MOSS-Music' "$MOSS_MUSIC_HOST" "$MOSS_MUSIC_PORT" \
   'MOSS-SoundEffect-v2.0' "$MOSS_SOUNDEFFECT_V2_HOST" "$MOSS_SOUNDEFFECT_V2_PORT" \
-  'ACE-Step' "$ACESTEP_HOST" "$ACESTEP_PORT" \
-  'YuE2-3B' "$YUE2_3B_HOST" "$YUE2_3B_PORT" \
-  'SheetSage2' "$SHEETSAGE2_HOST" "$SHEETSAGE2_PORT" \
-  'YuE2-Vae' "$YUE2_VAE_HOST" "$YUE2_VAE_PORT" \
-  'MERT-v2-FullSong' "$MERT_V2_FULLSONG_HOST" "$MERT_V2_FULLSONG_PORT" \
   'IndexTTS-2.5' "$INDEXTTS25_HOST" "$INDEXTTS25_PORT" \
   'Qwen3-TTS Base' "$QWEN3_TTS_HOST" "$QWEN3_TTS_PORT" \
   'Qwen VoiceDesign' "$QWEN_VOICEDESIGN_HOST" "$QWEN_VOICEDESIGN_PORT" \
@@ -214,7 +148,6 @@ uv run --no-sync --project "$QWEN3_TTS_PROJECT_DIR" python "$MAIN_DIR/check_port
   'TIGER-DnR' "$TIGER_DNR_HOST" "$TIGER_DNR_PORT" \
   'Confucius4-TTS' "$CONFUCIUS4_TTS_HOST" "$CONFUCIUS4_TTS_PORT" \
   'Qwen3-ASR' "$QWEN3_ASR_HOST" "$QWEN3_ASR_PORT" \
-  'VoxCPM2' "$VOXCPM2_HOST" "$VOXCPM2_PORT" \
   'MiniMax-H3-16G-HiFi' "$MINIMAX_H3_HOST" "$MINIMAX_H3_PORT"
 
 export HF_MODULES_CACHE="${HF_MODULES_CACHE:-$RUNTIME_CACHE_DIR/hf_modules}"
@@ -233,13 +166,10 @@ echo "=================================================="
 echo "   LLM Local Backend"
 echo "=================================================="
 echo "Control-plane uv project: $QWEN3_TTS_PROJECT_DIR"
-echo "SoulX-FlashHead project:       $SOULX_FLASHHEAD_PROJECT_DIR"
-echo "SoulX-FlashHead model:         $SOULX_FLASHHEAD_MODEL_DIR"
 echo "MiniMax H3 project:              $MINIMAX_H3_PROJECT_DIR"
 echo "MiniMax H3 model:                $MINIMAX_H3_MODEL_DIR"
 echo "MiniMax H3 ComfyUI:              $MINIMAX_H3_COMFYUI_CODE_PATH"
 echo "MiniMax H3 ComfyUI Python:       $MINIMAX_H3_COMFYUI_PYTHON"
-echo "SoulX-FlashHead wav2vec:       $SOULX_FLASHHEAD_WAV2VEC_DIR"
 echo "MOSS-Music uv project:         $MOSS_MUSIC_PROJECT_DIR"
 echo "MOSS-Music model:              $MOSS_MUSIC_MODEL_DIR"
 echo "MOSS-Music API:                http://$MOSS_MUSIC_HOST:$MOSS_MUSIC_PORT/v1/openMoss/moss-music"
@@ -247,24 +177,6 @@ echo "MOSS-SoundEffect project:      $MOSS_SOUNDEFFECT_V2_PROJECT_DIR"
 echo "MOSS-SoundEffect model:        $MOSS_SOUNDEFFECT_V2_MODEL_DIR"
 echo "MOSS-SoundEffect source:       $MOSS_SOUNDEFFECT_V2_CODE_PATH"
 echo "MOSS-SoundEffect API:          http://$MOSS_SOUNDEFFECT_V2_HOST:$MOSS_SOUNDEFFECT_V2_PORT/v1/moss/soundEffect-v2.0"
-echo "ACE-Step uv project:           $ACESTEP_PROJECT_DIR"
-echo "ACE-Step model:                $ACESTEP_MODEL_DIR"
-echo "ACE-Step BGM storage:          $BGM_STORAGE_DIR"
-echo "ACE-Step runtime:              $ACESTEP_DTYPE / offload=$ACESTEP_OFFLOAD"
-echo "YuE2-3B uv project:            $YUE2_3B_PROJECT_DIR"
-echo "YuE2-3B model:                 $YUE2_3B_MODEL_DIR"
-echo "YuE2 VAE model:                $YUE2_VAE_MODEL_DIR"
-echo "YuE2-3B BGM storage:           $YUE2_3B_OUTPUT_DIR"
-echo "SheetSage2 uv project:         $SHEETSAGE2_PROJECT_DIR"
-echo "SheetSage2 model:              $SHEETSAGE2_MODEL_DIR"
-echo "MERT-v2 FullSong model:        $SHEETSAGE2_BASE_MODEL_DIR"
-echo "SheetSage2 output:             $SHEETSAGE2_OUTPUT_DIR"
-echo "YuE2-Vae uv project:           $YUE2_VAE_PROJECT_DIR"
-echo "YuE2-Vae model:                $YUE2_VAE_MODEL_DIR"
-echo "YuE2-Vae output:               $YUE2_VAE_OUTPUT_DIR"
-echo "MERT-v2-FullSong uv project:   $MERT_V2_FULLSONG_PROJECT_DIR"
-echo "MERT-v2-FullSong model:        $MERT_V2_FULLSONG_MODEL_DIR"
-echo "MERT-v2-FullSong output:       $MERT_V2_FULLSONG_OUTPUT_DIR"
 echo "Qwen3-TTS uv project:  $QWEN3_TTS_PROJECT_DIR"
 echo "Qwen3-TTS model:     $QWEN3_TTS_MODEL_DIR"
 echo "Qwen VoiceDesign uv project: $QWEN3_VOICEDESIGN_PROJECT_DIR"
@@ -282,9 +194,6 @@ echo "Confucius4-TTS Wav2Vec2-BERT:        $CONFUCIUS4_TTS_W2V_BERT_MODEL_DIR"
 echo "Confucius4-TTS BigVGAN:              $CONFUCIUS4_TTS_VOCODER_MODEL_DIR"
 echo "Qwen3-ASR uv project:                $QWEN3_ASR_PROJECT_DIR"
 echo "Qwen3-ASR model:                     $QWEN3_ASR_MODEL_DIR"
-echo "VoxCPM2 uv project:  $VOXCPM2_PROJECT_DIR"
-echo "VoxCPM2 model:       $VOXCPM2_MODEL_DIR"
-echo "VoxCPM2 config:      managed by $VOXCPM2_PROJECT_DIR/main.py"
 echo "Qwen3-TTS config:    managed by model-audio/clone_qwen3-tts-1.7b-base/main.py"
 echo "Qwen sidecar libs:   $QWEN_LIBS"
 echo "LocalAI managed/base URL: $LLM_LOCALAI_MANAGED / $LLM_LOCALAI_BASE_URL"
@@ -305,16 +214,6 @@ echo "IndexTTS-2.5 API:     http://$INDEXTTS25_HOST:$INDEXTTS25_PORT/v1/index-te
 echo "Control route:       http://127.0.0.1:$PORT/v1/control"
 echo "Audio export route:  http://127.0.0.1:$PORT/v1/audio/export"
 echo "Formal spatial route: http://127.0.0.1:$PORT/v1/audio/spatial/render"
-echo "ACE-Step BGM API:             http://$ACESTEP_HOST:$ACESTEP_PORT"
-echo "ACE-Step BGM health:           http://127.0.0.1:$ACESTEP_PORT/v1/health"
-echo "YuE2-3B music API:             http://$YUE2_3B_HOST:$YUE2_3B_PORT"
-echo "YuE2-3B health:                http://127.0.0.1:$YUE2_3B_PORT/v1/health"
-echo "SheetSage2 API:                http://$SHEETSAGE2_HOST:$SHEETSAGE2_PORT"
-echo "SheetSage2 health:             http://127.0.0.1:$SHEETSAGE2_PORT/v1/health"
-echo "YuE2-Vae API:                  http://$YUE2_VAE_HOST:$YUE2_VAE_PORT"
-echo "YuE2-Vae health:               http://127.0.0.1:$YUE2_VAE_PORT/v1/health"
-echo "MERT-v2-FullSong API:          http://$MERT_V2_FULLSONG_HOST:$MERT_V2_FULLSONG_PORT"
-echo "MERT-v2-FullSong health:       http://127.0.0.1:$MERT_V2_FULLSONG_PORT/v1/health"
 echo "Qwen3-TTS API:       http://$QWEN3_TTS_HOST:$QWEN3_TTS_PORT"
 echo "Qwen3-TTS health:    http://127.0.0.1:$QWEN3_TTS_PORT/v1/health"
 echo "Qwen VoiceDesign API: http://$QWEN_VOICEDESIGN_HOST:$QWEN_VOICEDESIGN_PORT"
@@ -325,23 +224,14 @@ echo "Confucius4-TTS API: http://$CONFUCIUS4_TTS_HOST:$CONFUCIUS4_TTS_PORT"
 echo "Confucius4-TTS health: http://127.0.0.1:$CONFUCIUS4_TTS_PORT/v1/health"
 echo "Qwen3-ASR API: http://$QWEN3_ASR_HOST:$QWEN3_ASR_PORT"
 echo "Qwen3-ASR health: http://127.0.0.1:$QWEN3_ASR_PORT/v1/health"
-echo "VoxCPM2 API:         http://$VOXCPM2_HOST:$VOXCPM2_PORT"
-echo "VoxCPM2 health:      http://127.0.0.1:$VOXCPM2_PORT/v1/health"
 echo "Confucius4-TTS route: http://127.0.0.1:$CONFUCIUS4_TTS_PORT/v1/confucius4TTS/generate"
 echo "Qwen3-ASR route: http://127.0.0.1:$QWEN3_ASR_PORT/v1/qwen3/asr"
-echo "ACE-Step BGM route:     http://127.0.0.1:$ACESTEP_PORT/v1/aceStep/bgm"
-echo "YuE2-3B music route:    http://127.0.0.1:$YUE2_3B_PORT/v1/m-a-p/YuE2"
-echo "SheetSage2 route:       http://127.0.0.1:$SHEETSAGE2_PORT/v1/m-a-p/SheetSage2"
-echo "YuE2-Vae route:         http://127.0.0.1:$YUE2_VAE_PORT/v1/m-a-p/YuE2-Vae"
-echo "MERT-v2-FullSong route: http://127.0.0.1:$MERT_V2_FULLSONG_PORT/v1/m-a-p/MERT-v2-FullSong"
-echo "SoulX-FlashHead route: http://127.0.0.1:$SOULX_FLASHHEAD_PORT/v1/soulX/flashHead"
 echo "MiniMax H3 route: http://127.0.0.1:$MINIMAX_H3_PORT/v1/minimax/H3-16G-HiFi"
 echo "MOSS-Music route:      http://127.0.0.1:$MOSS_MUSIC_PORT/v1/openMoss/moss-music"
 echo "MOSS-SoundEffect route: http://127.0.0.1:$MOSS_SOUNDEFFECT_V2_PORT/v1/moss/soundEffect-v2.0"
 echo "Qwen timbre route:   http://127.0.0.1:$QWEN_VOICEDESIGN_PORT/v1/qwen/timbre"
 echo "TIGER-DnR route:     http://127.0.0.1:$TIGER_DNR_PORT/v1/tigerDnr/separate"
 echo "Qwen3-TTS clone:     http://127.0.0.1:$QWEN3_TTS_PORT/v1/qwen/clone"
-echo "VoxCPM2 clone:       http://127.0.0.1:$VOXCPM2_PORT/v1/voxcpm2/clone"
 echo ""
 echo "模型接口与端口映射"
 printf '%-24s %-6s %s\n' '服务' '端口' '最终接口'
@@ -353,33 +243,19 @@ printf '%-24s %-6s %s\n' 'MSST-Mega53' "$MSST_PORT" '/v1/msst/separate'
 printf '%-24s %-6s %s\n' 'TIGER-DnR' "$TIGER_DNR_PORT" '/v1/tigerDnr/separate'
 printf '%-24s %-6s %s\n' 'Confucius4-TTS' "$CONFUCIUS4_TTS_PORT" '/v1/confucius4TTS/generate'
 printf '%-24s %-6s %s\n' 'Qwen3-ASR-1.7B' "$QWEN3_ASR_PORT" '/v1/qwen3/asr'
-printf '%-24s %-6s %s\n' 'ACE-Step 1.5 XL Turbo' "$ACESTEP_PORT" '/v1/aceStep/bgm'
-printf '%-24s %-6s %s\n' 'YuE2-3B' "$YUE2_3B_PORT" '/v1/m-a-p/YuE2'
-printf '%-24s %-6s %s\n' 'SheetSage2' "$SHEETSAGE2_PORT" '/v1/m-a-p/SheetSage2'
-printf '%-24s %-6s %s\n' 'YuE2-Vae' "$YUE2_VAE_PORT" '/v1/m-a-p/YuE2-Vae'
-printf '%-24s %-6s %s\n' 'MERT-v2-FullSong' "$MERT_V2_FULLSONG_PORT" '/v1/m-a-p/MERT-v2-FullSong'
 printf '%-24s %-6s %s\n' 'Qwen3-TTS Base' "$QWEN3_TTS_PORT" '/v1/qwen/clone'
 printf '%-24s %-6s %s\n' 'IndexTTS-2.5' "$INDEXTTS25_PORT" '/v1/index-team/indexTTS-2.5'
-printf '%-24s %-6s %s\n' 'VoxCPM2' "$VOXCPM2_PORT" '/v1/voxcpm2/clone'
-printf '%-24s %-6s %s\n' 'SoulX-FlashHead-1.3B' "$SOULX_FLASHHEAD_PORT" '/v1/soulX/flashHead'
 printf '%-24s %-6s %s\n' 'MiniMax H3 16G HiFi' "$MINIMAX_H3_PORT" '/v1/minimax/H3-16G-HiFi'
 echo "=================================================="
 
 cd "$PROJECT_DIR"
 
-soulx_flashhead_pid=""
 minimax_h3_pid=""
 moss_music_pid=""
 moss_soundeffect_v2_pid=""
 main_pid=""
-acestep_pid=""
-yue2_3b_pid=""
-sheetsage2_pid=""
-yue2_vae_pid=""
-mert_v2_fullsong_pid=""
 qwen3_tts_pid=""
 indextts25_pid=""
-voxcpm2_pid=""
 qwen_voicedesign_pid=""
 tiger_dnr_pid=""
 msst_pid=""
@@ -390,16 +266,10 @@ localai_managed_started=0
 cleanup() {
   local status=$?
   local pids=(
-    "$soulx_flashhead_pid"
     "$minimax_h3_pid"
     "$moss_music_pid"
     "$moss_soundeffect_v2_pid"
     "$main_pid"
-    "$acestep_pid"
-    "$yue2_3b_pid"
-    "$sheetsage2_pid"
-    "$yue2_vae_pid"
-    "$mert_v2_fullsong_pid"
     "$qwen3_tts_pid"
     "$indextts25_pid"
     "$qwen_voicedesign_pid"
@@ -407,7 +277,6 @@ cleanup() {
     "$tiger_dnr_pid"
     "$confucius4_tts_pid"
     "$qwen3_asr_pid"
-    "$voxcpm2_pid"
   )
   trap - INT TERM EXIT
 
@@ -450,10 +319,6 @@ if [[ "${LLM_LOCALAI_ENABLED,,}" == "true" || "${LLM_LOCALAI_ENABLED}" == "1" ||
   fi
   if [[ "${LLM_LOCAL_QWEN3_TTS_PROVIDER,,}" == "localai" || \
     "${LLM_LOCAL_QWEN3_VOICEDESIGN_PROVIDER,,}" == "localai" || \
-    "${LLM_LOCAL_SHEETSAGE2_PROVIDER,,}" == "localai" || \
-    "${LLM_LOCAL_MERT_V2_FULLSONG_PROVIDER,,}" == "localai" || \
-    "${LLM_LOCAL_YUE2_VAE_PROVIDER,,}" == "localai" || \
-    "${LLM_LOCAL_YUE2_3B_PROVIDER,,}" == "localai" || \
     "${LLM_LOCAL_TIGER_DNR_PROVIDER,,}" == "localai" ]]; then
     uv run --no-sync --project "$QWEN3_TTS_PROJECT_DIR" \
       python "$PROJECT_DIR/scripts/localai/preflight.py"
@@ -463,47 +328,6 @@ fi
 # 主控制面负责 8300 控制路由，只使用 Qwen3-TTS uv 环境中的轻量 HTTP 依赖。
 setsid uv run --no-sync --project "$QWEN3_TTS_PROJECT_DIR" python "$MAIN_DIR/main.py" &
 main_pid=$!
-# ACE-Step 1.5 是独立的一次性 worker uv 服务；启动前必须手动同步依赖，
-# --no-sync 确保启动过程保持离线。
-HOST="$ACESTEP_HOST" PORT="$ACESTEP_PORT" \
-  setsid uv run --no-sync --project "$ACESTEP_PROJECT_DIR" \
-  python "$ACESTEP_PROJECT_DIR/main.py" &
-acestep_pid=$!
-# YuE2-3B 是独立的一次性 worker uv 服务；服务使用本地 MOT/VAE 权重并通过 GPU 锁排队。
-YUE2_3B_HOST="$YUE2_3B_HOST" YUE2_3B_PORT="$YUE2_3B_PORT" \
-  YUE2_3B_MODEL_DIR="$YUE2_3B_MODEL_DIR" YUE2_VAE_MODEL_DIR="$YUE2_VAE_MODEL_DIR" \
-  YUE2_3B_OUTPUT_DIR="$YUE2_3B_OUTPUT_DIR" \
-  HOST="$YUE2_3B_HOST" PORT="$YUE2_3B_PORT" \
-  setsid uv run --no-sync --project "$YUE2_3B_PROJECT_DIR" \
-  python "$YUE2_3B_PROJECT_DIR/main.py" &
-yue2_3b_pid=$!
-# SheetSage2 独立 uv 服务：8315 接收音乐并返回 ABC、MIDI 与事件标注 ZIP。
-SHEETSAGE2_HOST="$SHEETSAGE2_HOST" SHEETSAGE2_PORT="$SHEETSAGE2_PORT" \
-  SHEETSAGE2_MODEL_DIR="$SHEETSAGE2_MODEL_DIR" \
-  SHEETSAGE2_BASE_MODEL_DIR="$SHEETSAGE2_BASE_MODEL_DIR" \
-  SHEETSAGE2_OUTPUT_DIR="$SHEETSAGE2_OUTPUT_DIR" \
-  HOST="$SHEETSAGE2_HOST" PORT="$SHEETSAGE2_PORT" \
-  setsid uv run --no-sync --project "$SHEETSAGE2_PROJECT_DIR" \
-  python "$SHEETSAGE2_PROJECT_DIR/main.py" &
-sheetsage2_pid=$!
-# YuE2-Vae 在 8316 独立提供 acoustic latent 编码和 48 kHz 音频解码。
-YUE2_VAE_HOST="$YUE2_VAE_HOST" YUE2_VAE_PORT="$YUE2_VAE_PORT" \
-  YUE2_VAE_MODEL_DIR="$YUE2_VAE_MODEL_DIR" \
-  YUE2_VAE_OUTPUT_DIR="$YUE2_VAE_OUTPUT_DIR" \
-  HOST="$YUE2_VAE_HOST" PORT="$YUE2_VAE_PORT" \
-  setsid uv run --no-sync --project "$YUE2_VAE_PROJECT_DIR" \
-  python "$YUE2_VAE_PROJECT_DIR/main.py" &
-yue2_vae_pid=$!
-# MERT-v2-FullSong 独立提供完整歌曲音乐表征与逐帧特征，使用官方 Transformers 调用。
-MERT_V2_FULLSONG_HOST="$MERT_V2_FULLSONG_HOST" MERT_V2_FULLSONG_PORT="$MERT_V2_FULLSONG_PORT" \
-  MERT_V2_FULLSONG_MODEL_DIR="$MERT_V2_FULLSONG_MODEL_DIR" \
-  MERT_V2_FULLSONG_OUTPUT_DIR="$MERT_V2_FULLSONG_OUTPUT_DIR" \
-  MERT_V2_FULLSONG_DEVICE="$MERT_V2_FULLSONG_DEVICE" \
-  MERT_V2_FULLSONG_REQUEST_TIMEOUT="$MERT_V2_FULLSONG_REQUEST_TIMEOUT" \
-  HOST="$MERT_V2_FULLSONG_HOST" PORT="$MERT_V2_FULLSONG_PORT" \
-  setsid uv run --no-sync --project "$MERT_V2_FULLSONG_PROJECT_DIR" \
-  python "$MERT_V2_FULLSONG_PROJECT_DIR/main.py" &
-mert_v2_fullsong_pid=$!
 # MSST 重点音乐声部分离，独立 uv 环境与一次性 GPU worker。
 setsid uv run --no-sync --project "$MSST_PROJECT_DIR" python "$MSST_PROJECT_DIR/main.py" &
 msst_pid=$!
@@ -557,10 +381,6 @@ QWEN3_ASR_HOST="$QWEN3_ASR_HOST" QWEN3_ASR_PORT="$QWEN3_ASR_PORT" \
   setsid uv run --no-sync --project "$QWEN3_ASR_PROJECT_DIR" \
   python "$QWEN3_ASR_PROJECT_DIR/main.py" &
 qwen3_asr_pid=$!
-HOST="$VOXCPM2_HOST" PORT="$VOXCPM2_PORT" \
-  setsid uv run --no-sync --project "$VOXCPM2_PROJECT_DIR" \
-  python "$VOXCPM2_PROJECT_DIR/main.py" &
-voxcpm2_pid=$!
 # MOSS 音乐理解：一次性 GGUF worker；HTTP 进程不常驻加载模型。
 HOST="$MOSS_MUSIC_HOST" PORT="$MOSS_MUSIC_PORT" \
   setsid uv run --no-sync --project "$MOSS_MUSIC_PROJECT_DIR" \
@@ -576,11 +396,6 @@ MOSS_SOUNDEFFECT_V2_HOST="$MOSS_SOUNDEFFECT_V2_HOST" \
   setsid uv run --no-sync --project "$MOSS_SOUNDEFFECT_V2_PROJECT_DIR" \
   python "$MOSS_SOUNDEFFECT_V2_PROJECT_DIR/main.py" &
 moss_soundeffect_v2_pid=$!
-# SoulX 独立环境，仅请求时启动一次性视频 worker。
-HOST="$SOULX_FLASHHEAD_HOST" PORT="$SOULX_FLASHHEAD_PORT" \
-  setsid uv run --no-sync --project "$SOULX_FLASHHEAD_PROJECT_DIR" \
-  python "$SOULX_FLASHHEAD_PROJECT_DIR/main.py" &
-soulx_flashhead_pid=$!
 # MiniMax H3 API 仅管理请求；模型与 ComfyUI 只在一次性 worker 中启动。
 MINIMAX_H3_HOST="$MINIMAX_H3_HOST" MINIMAX_H3_PORT="$MINIMAX_H3_PORT" \
   MINIMAX_H3_MODEL_DIR="$MINIMAX_H3_MODEL_DIR" \
@@ -590,4 +405,4 @@ MINIMAX_H3_HOST="$MINIMAX_H3_HOST" MINIMAX_H3_PORT="$MINIMAX_H3_PORT" \
   setsid uv run --no-sync --project "$MINIMAX_H3_PROJECT_DIR" \
   python "$MINIMAX_H3_PROJECT_DIR/main.py" &
 minimax_h3_pid=$!
-wait -n "$msst_pid" "$soulx_flashhead_pid" "$minimax_h3_pid" "$moss_music_pid" "$moss_soundeffect_v2_pid" "$main_pid" "$acestep_pid" "$yue2_3b_pid" "$sheetsage2_pid" "$yue2_vae_pid" "$mert_v2_fullsong_pid" "$qwen3_tts_pid" "$indextts25_pid" "$voxcpm2_pid" "$qwen_voicedesign_pid" "$tiger_dnr_pid" "$confucius4_tts_pid" "$qwen3_asr_pid"
+wait -n "$msst_pid" "$minimax_h3_pid" "$moss_music_pid" "$moss_soundeffect_v2_pid" "$main_pid" "$qwen3_tts_pid" "$indextts25_pid" "$qwen_voicedesign_pid" "$tiger_dnr_pid" "$confucius4_tts_pid" "$qwen3_asr_pid"

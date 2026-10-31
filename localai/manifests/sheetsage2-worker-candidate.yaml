@@ -1,4 +1,0 @@
-name: llm-local.sheetsage2.worker.v1
-backend: llm-local-worker
-parameters:
-  model: llm-local.sheetsage2.worker.v1

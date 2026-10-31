@@ -59,21 +59,13 @@ class LocalAIWorkerBridgeTests(unittest.TestCase):
         self.assertEqual(
             set(specs),
             {
-                "llm-local.sheetsage2.worker.v1",
-                "llm-local.mert-v2-fullsong.worker.v1",
-                "llm-local.yue2-vae.worker.v1",
-                "llm-local.yue2-3b.worker.v1",
                 "llm-local.tiger-dnr.worker.v1",
             },
         )
-        self.assertEqual(
-            specs["llm-local.mert-v2-fullsong.worker.v1"].output_suffixes,
-            {"embedding": ".json", "frames": ".npz"},
-        )
-        self.assertEqual(
-            specs["llm-local.yue2-vae.worker.v1"].output_suffixes,
-            {"decode": ".wav", "encode": ".npy"},
-        )
+        tiger = specs["llm-local.tiger-dnr.worker.v1"]
+        self.assertEqual(tiger.project.name, "separate_tiger-dnr")
+        self.assertEqual(tiger.output_argument, "--output-zip")
+        self.assertEqual(tiger.output_suffix, ".zip")
 
     def test_decode_enforces_protocol_identity_and_shape(self) -> None:
         request = decode_request(envelope(), model_identity="llm-local.test.echo")

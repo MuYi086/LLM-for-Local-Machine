@@ -28,7 +28,6 @@ def main() -> int:
     storage_dir = expand_path(os.getenv("STORAGE_DIR", "storage"))
     timbre_dir = expand_path(os.getenv("TIMBRE_STORAGE_DIR", str(storage_dir / "timbre")))
     clone_dir = expand_path(os.getenv("CLONE_STORAGE_DIR", str(storage_dir / "clone")))
-    bgm_dir = expand_path(os.getenv("BGM_STORAGE_DIR", str(storage_dir / "bgm")))
     status = storage_disk_status(storage_dir)
     print(status)
     if not status["retention_enabled"]:
@@ -40,8 +39,7 @@ def main() -> int:
     planned = prune_generated_outputs(
         {
             timbre_dir: ("qwen_voicedesign_",),
-            clone_dir: ("qwen3_tts_", "voxcpm2_", "indexTTS25_"),
-            bgm_dir: ("ace_step_1_5_", "yue2_3b_"),
+            clone_dir: ("qwen3_tts_", "indexTTS25_"),
         },
         retention_hours=float(status["retention_hours"]),
         retention_max_bytes=int(status["retention_max_bytes"]),

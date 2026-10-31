@@ -47,11 +47,6 @@ class FastApiExecutionModelTests(unittest.TestCase):
                 "/v1/check/audio",
                 "/v1/qwen/clone",
             },
-            "model-audio/clone_voxcpm-2/main.py": {"/v1/health", "/v1/check/audio"},
-            "model-audio/music_ace-step-1.5/main.py": {
-                "/v1/health",
-                "/v1/aceStep/bgm",
-            },
             "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py": {"/v1/health"},
             "model-audio/clone_confucius-4/main.py": {
                 "/v1/health",
@@ -74,18 +69,10 @@ class FastApiExecutionModelTests(unittest.TestCase):
                     {route: "FunctionDef" for route in routes},
                 )
 
-        voxcpm2_source = (REPOSITORY_DIR / "model-audio/clone_voxcpm-2/main.py").read_text(
-            encoding="utf-8"
-        )
-        self.assertIn(
-            "return await run_in_threadpool(synthesize_voxcpm2_payload, data)", voxcpm2_source
-        )
-
     def test_async_upload_routes_offload_filesystem_work(self) -> None:
         upload_sources = {
             "main/main.py",
             "model-audio/clone_qwen3-tts-1.7b-base/main.py",
-            "model-audio/clone_voxcpm-2/main.py",
             "model-audio/clone_confucius-4/main.py",
             "model-video/MiniMax-H3-16G-HiFi/main.py",
         }

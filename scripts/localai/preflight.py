@@ -39,30 +39,6 @@ def main() -> int:
             "voice-design",
         ),
         (
-            "LLM_LOCAL_SHEETSAGE2_PROVIDER",
-            "llm-local.sheetsage2.worker.v1",
-            float(os.getenv("SHEETSAGE2_REQUEST_TIMEOUT", "1800")),
-            "sheetsage2-worker",
-        ),
-        (
-            "LLM_LOCAL_MERT_V2_FULLSONG_PROVIDER",
-            "llm-local.mert-v2-fullsong.worker.v1",
-            float(os.getenv("MERT_V2_FULLSONG_REQUEST_TIMEOUT", "900")),
-            "mert-v2-fullsong-worker",
-        ),
-        (
-            "LLM_LOCAL_YUE2_VAE_PROVIDER",
-            "llm-local.yue2-vae.worker.v1",
-            float(os.getenv("YUE2_VAE_REQUEST_TIMEOUT", "900")),
-            "yue2-vae-worker",
-        ),
-        (
-            "LLM_LOCAL_YUE2_3B_PROVIDER",
-            "llm-local.yue2-3b.worker.v1",
-            float(os.getenv("YUE2_3B_REQUEST_TIMEOUT", "1800")),
-            "yue2-3b-worker",
-        ),
-        (
             "LLM_LOCAL_TIGER_DNR_PROVIDER",
             "llm-local.tiger-dnr.worker.v1",
             float(os.getenv("TIGER_DNR_REQUEST_TIMEOUT", "900")),
@@ -77,10 +53,6 @@ def main() -> int:
         return 0
     manager = LocalAIManager()
     worker_tasks = {
-        "sheetsage2-worker",
-        "mert-v2-fullsong-worker",
-        "yue2-vae-worker",
-        "yue2-3b-worker",
         "tiger-dnr-worker",
     }
     if any(task in worker_tasks for _, _, _, task in selected):

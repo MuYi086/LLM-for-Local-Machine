@@ -204,7 +204,7 @@
       }
     ],
     "status": "candidate_incomplete",
-    "reason": "当前本地制品存在，两个 Qwen 直接候选通过一次短句调用；完整质量、资源、长文本和五个 bridge 真实权重验收仍待进行。",
+    "reason": "当前本地制品存在，两个 Qwen 直接候选通过一次短句调用；完整质量、资源、长文本和TIGER-DnR bridge 真实权重验收仍待进行。",
     "local_model_directory_check": {
       "active_model_roots_present": 11,
       "active_model_roots_expected": 11,
@@ -321,7 +321,7 @@
     "required_runtime_entrypoint": "backends/audio-cpp/run.sh"
   },
   "model_runtime_validation_pending": [
-    "扩展两个 Qwen 候选的长文本、多语种、异常退出及音质/克隆相似度验收；五个 bridge 仍需使用真实权重验收。",
+    "扩展两个 Qwen 候选的长文本、多语种、异常退出及音质/克隆相似度验收；TIGER-DnR bridge 仍需使用真实权重验收。",
     "使用有授权参考文本的多长度、多语种样本重复测量 Qwen3-ASR native 基线。"
   ],
   "post_upgrade_review": {
@@ -333,7 +333,6 @@
       "command": "UV_OFFLINE=1 bash scripts/quality_gate.sh",
       "passed": true,
       "root_tests": 205,
-      "ace_step_tests": 9,
       "lock_projects": 13,
       "formatted_python_files": 107
     },
