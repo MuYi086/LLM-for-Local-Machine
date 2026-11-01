@@ -46,7 +46,7 @@ README.md 提供接入、配置和运维说明，本文件记录开发边界与�
 
 ## 项目结构与服务速查
 
-当前维护 10 个模型服务 uv 项目与一个轻量控制面，start.sh 合计启动 11 个 HTTP 进程；
+当前维护 11 个模型服务 uv 项目与一个轻量控制面，start.sh 合计启动 12 个 HTTP 进程；
 localai_worker_bridge 是额外的非 HTTP uv 包，不计入服务数，也不常驻导入 Torch。
 原生能力和输出见 README 服务总览；端口、方法及路径以源码为准。
 区分模型原生能力、已接入接口与服务编排；各 HTTP 进程提供 GET /v1/health。
@@ -63,6 +63,7 @@ localai_worker_bridge 是额外的非 HTTP uv 包，不计入服务数，也不�
 | `model-audio/clone_confucius-4/` | 8361 | POST /v1/confucius4TTS/generate | 14 语种跨语言零样本 TTS 克隆 | 语音波形 |
 | `model-audio/transcribe_qwen3-asr-1.7b/` | 8371 | POST /v1/qwen3/asr | 语种识别与语音转写 | 转写文本与语种 |
 | `model-audio/separate_msst-mega53/` | 8380 | POST /v1/msst/separate | 按调用方选择分离音乐声部 | FLOAT WAV 与元数据 ZIP |
+| `model-video/LongCat-Video-Avatar-1.5-Quanto-Int8/` | 8390 | POST /v1/meituan/LongCat-Video-Avatar-1.5-Quanto-Int8 | 参考图、音频与文本驱动单人视频，按时长延续生成 | 带输入音轨的 MP4 |
 | `model-video/MiniMax-H3-16G-HiFi/` | 8392 | POST /v1/minimax/H3-16G-HiFi | MiniMax H3 FL2VA/Ref2VA 图生视频 | 默认无音轨；`include_audio=true` 时输出原生音轨 MP4 |
 
 - main/main.py 只处理健康/控制、共享上传/检查和 CPU 导出，不加载模型包或推理。
@@ -95,6 +96,10 @@ localai_worker_bridge 是额外的非 HTTP uv 包，不计入服务数，也不�
   以及仓库外固定版本 ComfyUI 和权重仓库配套自定义节点；8392 提供 POST /v1/minimax/H3-16G-HiFi。
   轻量 HTTP 层使用共享 GPU 锁和空闲显存门槛，每次请求由一次性 worker 启动 loopback ComfyUI，
   最多生成 960×544、5 秒视频；参考图只通过上传逻辑标识读取。
+- model-video/LongCat-Video-Avatar-1.5-Quanto-Int8/ 使用 `$HF_MIRROR_DIR/meituan/LongCat-Video-Avatar-1.5` 的 Quanto DiT/T5、DMD LoRA、Whisper，
+  以及 `$HF_MIRROR_DIR/meituan/LongCat-Video` 的基础 VAE；8390 通过 WanGP `shared.api.init()` 与 `submit_task()` 调用 `longcat_avatar_v1_5`，使用 WanGP 自带 MMGP Profile 4 和 SDPA attention。
+  `start.sh` 先运行 `configure_wangp.py`，只在 WanGP `ckpts/` 与 `loras/` 下建立指向已有权重的软链接，并维护 WanGP `wgp_config.json`；推理 worker 使用 WanGP 独立 Python 环境。
+  WanGP 强制启用 `KI` 参考图模式，API 必须提供已上传图片的逻辑标识。HTTP 层共享 GPU 锁，默认单卡至少留有 10,000 MiB 显存；每个请求启动一次性 worker，最多覆盖约 16.52 秒音频，结果通过 ffprobe 确认含视频与音轨后原子保存。
 - 流行*模型功能简介.md、task*.md 和 `空间音频讨论/` 是调研/任务/方案资料，
   不能据此推断已实现能力。
 

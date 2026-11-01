@@ -59,6 +59,12 @@ class FastApiExecutionModelTests(unittest.TestCase):
                 "/v1/check/image",
                 "/v1/minimax/H3-16G-HiFi",
             },
+            "model-video/LongCat-Video-Avatar-1.5-Quanto-Int8/main.py": {
+                "/v1/health",
+                "/v1/check/audio",
+                "/v1/check/image",
+                "/v1/meituan/LongCat-Video-Avatar-1.5-Quanto-Int8",
+            },
         }
 
         for relative_path, routes in expected_routes.items():
@@ -75,20 +81,26 @@ class FastApiExecutionModelTests(unittest.TestCase):
             "model-audio/clone_qwen3-tts-1.7b-base/main.py",
             "model-audio/clone_confucius-4/main.py",
             "model-video/MiniMax-H3-16G-HiFi/main.py",
+            "model-video/LongCat-Video-Avatar-1.5-Quanto-Int8/main.py",
         }
 
         for relative_path in upload_sources:
             with self.subTest(source=relative_path):
                 source = (REPOSITORY_DIR / relative_path).read_text(encoding="utf-8")
-                upload_handler = (
-                    "store_uploaded_image"
-                    if relative_path == "model-video/MiniMax-H3-16G-HiFi/main.py"
-                    else "store_uploaded_audio"
+                upload_handlers = (
+                    ("store_uploaded_audio", "store_uploaded_image")
+                    if relative_path == "model-video/LongCat-Video-Avatar-1.5-Quanto-Int8/main.py"
+                    else (
+                        ("store_uploaded_image",)
+                        if relative_path == "model-video/MiniMax-H3-16G-HiFi/main.py"
+                        else ("store_uploaded_audio",)
+                    )
                 )
-                self.assertIn(
-                    f"return await run_in_threadpool({upload_handler},",
-                    source,
-                )
+                for upload_handler in upload_handlers:
+                    self.assertRegex(
+                        source,
+                        rf"return await run_in_threadpool\(\s*{upload_handler},",
+                    )
 
 
 if __name__ == "__main__":

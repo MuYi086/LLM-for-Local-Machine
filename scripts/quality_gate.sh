@@ -9,6 +9,7 @@ bash -n start.sh
 bash scripts/test_steam_audio_renderer_core.sh
 
 service_projects=(
+    model-video/LongCat-Video-Avatar-1.5-Quanto-Int8
     model-video/MiniMax-H3-16G-HiFi
     model-audio/analyse_moss-music-8b-Instruct
     model-audio/clone_qwen3-tts-1.7b-base

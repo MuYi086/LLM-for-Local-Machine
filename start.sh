@@ -24,6 +24,7 @@ export PYTHONPATH="$LLM_LOCAL_RUNTIME_SRC:$INFERENCE_GATEWAY_SRC:$LOCALAI_WORKER
 # 所有服务共享同一个存储根目录；启动脚本只做路由和运行环境配置。
 STORAGE_DIR="${STORAGE_DIR:-$PROJECT_DIR/storage}"
 export STORAGE_DIR
+export RUNTIME_CACHE_DIR="${RUNTIME_CACHE_DIR:-$STORAGE_DIR/.cache/runtime}"
 # 控制面 wrapper 使用 Qwen3-TTS 的 uv 环境；重型 worker 使用各自项目环境。
 QWEN3_TTS_PROJECT_DIR="${QWEN3_TTS_PROJECT_DIR:-$PROJECT_DIR/model-audio/clone_qwen3-tts-1.7b-base}"
 INDEXTTS25_PROJECT_DIR="${INDEXTTS25_PROJECT_DIR:-$PROJECT_DIR/model-audio/indexTTS-2.5}"
@@ -35,6 +36,7 @@ TIGER_DNR_PROJECT_DIR="${TIGER_DNR_PROJECT_DIR:-$PROJECT_DIR/model-audio/separat
 MOSS_MUSIC_PROJECT_DIR="${MOSS_MUSIC_PROJECT_DIR:-$PROJECT_DIR/model-audio/analyse_moss-music-8b-Instruct}"
 MOSS_SOUNDEFFECT_V2_PROJECT_DIR="${MOSS_SOUNDEFFECT_V2_PROJECT_DIR:-$PROJECT_DIR/model-audio/soundEffect-v2.0}"
 MINIMAX_H3_PROJECT_DIR="${MINIMAX_H3_PROJECT_DIR:-$PROJECT_DIR/model-video/MiniMax-H3-16G-HiFi}"
+LONGCAT_AVATAR_PROJECT_DIR="${LONGCAT_AVATAR_PROJECT_DIR:-$PROJECT_DIR/model-video/LongCat-Video-Avatar-1.5-Quanto-Int8}"
 
 export HF_MIRROR_DIR="${HF_MIRROR_DIR:-$HOME/hf-mirror}"
 export INDEXTTS25_MODEL_DIR="${INDEXTTS25_MODEL_DIR:-$HF_MIRROR_DIR/IndexTeam/IndexTTS-2.5}"
@@ -48,6 +50,18 @@ export MSST_OUTPUT_DIR="${MSST_OUTPUT_DIR:-$STORAGE_DIR/msst}"
 export MINIMAX_H3_MODEL_DIR="${MINIMAX_H3_MODEL_DIR:-$HF_MIRROR_DIR/minimax/MiniMax-H3-16G-HiFi}"
 export MINIMAX_H3_COMFYUI_CODE_PATH="${MINIMAX_H3_COMFYUI_CODE_PATH:-$HOME/LLM-depency/MiniMax-H3-ComfyUI}"
 export MINIMAX_H3_COMFYUI_PYTHON="${MINIMAX_H3_COMFYUI_PYTHON:-$MINIMAX_H3_COMFYUI_CODE_PATH/.venv/bin/python}"
+export LONGCAT_AVATAR_MODEL_DIR="${LONGCAT_AVATAR_MODEL_DIR:-$HF_MIRROR_DIR/meituan/LongCat-Video-Avatar-1.5}"
+export LONGCAT_AVATAR_BASE_MODEL_DIR="${LONGCAT_AVATAR_BASE_MODEL_DIR:-$HF_MIRROR_DIR/meituan/LongCat-Video}"
+export LONGCAT_AVATAR_WANGP_DIR="${LONGCAT_AVATAR_WANGP_DIR:-$HOME/LLM-depency/WanGP}"
+export LONGCAT_AVATAR_WANGP_PYTHON="${LONGCAT_AVATAR_WANGP_PYTHON:-$LONGCAT_AVATAR_WANGP_DIR/.venv/bin/python}"
+export LONGCAT_AVATAR_AUDIO_DIR="${LONGCAT_AVATAR_AUDIO_DIR:-$STORAGE_DIR/longcat_avatar/audio}"
+export LONGCAT_AVATAR_IMAGE_DIR="${LONGCAT_AVATAR_IMAGE_DIR:-$STORAGE_DIR/longcat_avatar/images}"
+export LONGCAT_AVATAR_OUTPUT_DIR="${LONGCAT_AVATAR_OUTPUT_DIR:-$STORAGE_DIR/video/longcat_avatar}"
+export LONGCAT_AVATAR_WORKER_TMP_DIR="${LONGCAT_AVATAR_WORKER_TMP_DIR:-$RUNTIME_CACHE_DIR/longcat_avatar_worker}"
+export LONGCAT_AVATAR_REQUEST_TIMEOUT="${LONGCAT_AVATAR_REQUEST_TIMEOUT:-1800}"
+export LONGCAT_AVATAR_CUDA_VISIBLE_DEVICES="${LONGCAT_AVATAR_CUDA_VISIBLE_DEVICES:-0}"
+export LONGCAT_AVATAR_MEMORY_PROFILE="${LONGCAT_AVATAR_MEMORY_PROFILE:-4}"
+export LONGCAT_AVATAR_MIN_FREE_VRAM_MIB="${LONGCAT_AVATAR_MIN_FREE_VRAM_MIB:-10000}"
 export MOSS_MUSIC_MODEL_DIR="${MOSS_MUSIC_MODEL_DIR:-$HF_MIRROR_DIR/OpenMOSS/moss-music}"
 export MOSS_MUSIC_CAPTION_BIN="${MOSS_MUSIC_CAPTION_BIN:-$HOME/.local/share/moss-music/build/ace-caption}"
 export MOSS_SOUNDEFFECT_V2_MODEL_DIR="${MOSS_SOUNDEFFECT_V2_MODEL_DIR:-$HF_MIRROR_DIR/OpenMOSS/MOSS-SoundEffect-v2.0}"
@@ -88,7 +102,6 @@ export CONFUCIUS4_TTS_OUTPUT_DIR="${CONFUCIUS4_TTS_OUTPUT_DIR:-$CLONE_STORAGE_DI
 export TIGER_DNR_OUTPUT_DIR="${TIGER_DNR_OUTPUT_DIR:-$STORAGE_DIR/separation}"
 export QWEN3_TTS_OUTPUT_DIR="${QWEN3_TTS_OUTPUT_DIR:-$CLONE_STORAGE_DIR}"
 export PROMPTS_DIR="${PROMPTS_DIR:-$CLONE_STORAGE_DIR}"
-export RUNTIME_CACHE_DIR="${RUNTIME_CACHE_DIR:-$STORAGE_DIR/.cache/runtime}"
 export INDEXTTS25_OUTPUT_DIR="${INDEXTTS25_OUTPUT_DIR:-$CLONE_STORAGE_DIR}"
 export INDEXTTS25_WORKER_TMP_DIR="${INDEXTTS25_WORKER_TMP_DIR:-$RUNTIME_CACHE_DIR/index_tts25_worker}"
 export INDEXTTS25_REQUEST_TIMEOUT="${INDEXTTS25_REQUEST_TIMEOUT:-900}"
@@ -128,6 +141,8 @@ export QWEN3_ASR_HOST="${QWEN3_ASR_HOST:-$HOST}"
 export QWEN3_ASR_PORT="${QWEN3_ASR_PORT:-8371}"
 export MINIMAX_H3_HOST="${MINIMAX_H3_HOST:-$HOST}"
 export MINIMAX_H3_PORT="${MINIMAX_H3_PORT:-8392}"
+export LONGCAT_AVATAR_HOST="${LONGCAT_AVATAR_HOST:-$HOST}"
+export LONGCAT_AVATAR_PORT="${LONGCAT_AVATAR_PORT:-8390}"
 export MOSS_MUSIC_HOST="${MOSS_MUSIC_HOST:-$HOST}"
 export MOSS_MUSIC_PORT="${MOSS_MUSIC_PORT:-8310}"
 export MOSS_SOUNDEFFECT_V2_HOST="${MOSS_SOUNDEFFECT_V2_HOST:-$HOST}"
@@ -148,7 +163,18 @@ uv run --no-sync --project "$QWEN3_TTS_PROJECT_DIR" python "$MAIN_DIR/check_port
   'TIGER-DnR' "$TIGER_DNR_HOST" "$TIGER_DNR_PORT" \
   'Confucius4-TTS' "$CONFUCIUS4_TTS_HOST" "$CONFUCIUS4_TTS_PORT" \
   'Qwen3-ASR' "$QWEN3_ASR_HOST" "$QWEN3_ASR_PORT" \
-  'MiniMax-H3-16G-HiFi' "$MINIMAX_H3_HOST" "$MINIMAX_H3_PORT"
+  'MiniMax-H3-16G-HiFi' "$MINIMAX_H3_HOST" "$MINIMAX_H3_PORT" \
+  'LongCat-Video-Avatar-1.5-Quanto-Int8' "$LONGCAT_AVATAR_HOST" "$LONGCAT_AVATAR_PORT"
+
+# WanGP 使用自带 MMGP 的 Profile 4；首次启动补齐只读权重链接并写入低显存配置。
+CUDA_VISIBLE_DEVICES="$LONGCAT_AVATAR_CUDA_VISIBLE_DEVICES" \
+  LONGCAT_AVATAR_WANGP_DIR="$LONGCAT_AVATAR_WANGP_DIR" \
+  LONGCAT_AVATAR_WANGP_PYTHON="$LONGCAT_AVATAR_WANGP_PYTHON" \
+  LONGCAT_AVATAR_MODEL_DIR="$LONGCAT_AVATAR_MODEL_DIR" \
+  LONGCAT_AVATAR_BASE_MODEL_DIR="$LONGCAT_AVATAR_BASE_MODEL_DIR" \
+  LONGCAT_AVATAR_MEMORY_PROFILE="$LONGCAT_AVATAR_MEMORY_PROFILE" \
+  "$LONGCAT_AVATAR_WANGP_PYTHON" \
+  "$LONGCAT_AVATAR_PROJECT_DIR/configure_wangp.py"
 
 export HF_MODULES_CACHE="${HF_MODULES_CACHE:-$RUNTIME_CACHE_DIR/hf_modules}"
 export NUMBA_CACHE_DIR="${NUMBA_CACHE_DIR:-$RUNTIME_CACHE_DIR/numba}"
@@ -170,6 +196,12 @@ echo "MiniMax H3 project:              $MINIMAX_H3_PROJECT_DIR"
 echo "MiniMax H3 model:                $MINIMAX_H3_MODEL_DIR"
 echo "MiniMax H3 ComfyUI:              $MINIMAX_H3_COMFYUI_CODE_PATH"
 echo "MiniMax H3 ComfyUI Python:       $MINIMAX_H3_COMFYUI_PYTHON"
+echo "LongCat Avatar uv project:      $LONGCAT_AVATAR_PROJECT_DIR"
+echo "LongCat Avatar model:           $LONGCAT_AVATAR_MODEL_DIR"
+echo "LongCat base model:             $LONGCAT_AVATAR_BASE_MODEL_DIR"
+echo "LongCat Avatar WanGP:           $LONGCAT_AVATAR_WANGP_DIR"
+echo "LongCat Avatar WanGP Python:    $LONGCAT_AVATAR_WANGP_PYTHON"
+echo "LongCat Avatar MMGP profile:    $LONGCAT_AVATAR_MEMORY_PROFILE"
 echo "MOSS-Music uv project:         $MOSS_MUSIC_PROJECT_DIR"
 echo "MOSS-Music model:              $MOSS_MUSIC_MODEL_DIR"
 echo "MOSS-Music API:                http://$MOSS_MUSIC_HOST:$MOSS_MUSIC_PORT/v1/openMoss/moss-music"
@@ -227,6 +259,7 @@ echo "Qwen3-ASR health: http://127.0.0.1:$QWEN3_ASR_PORT/v1/health"
 echo "Confucius4-TTS route: http://127.0.0.1:$CONFUCIUS4_TTS_PORT/v1/confucius4TTS/generate"
 echo "Qwen3-ASR route: http://127.0.0.1:$QWEN3_ASR_PORT/v1/qwen3/asr"
 echo "MiniMax H3 route: http://127.0.0.1:$MINIMAX_H3_PORT/v1/minimax/H3-16G-HiFi"
+echo "LongCat Avatar route: http://127.0.0.1:$LONGCAT_AVATAR_PORT/v1/meituan/LongCat-Video-Avatar-1.5-Quanto-Int8"
 echo "MOSS-Music route:      http://127.0.0.1:$MOSS_MUSIC_PORT/v1/openMoss/moss-music"
 echo "MOSS-SoundEffect route: http://127.0.0.1:$MOSS_SOUNDEFFECT_V2_PORT/v1/moss/soundEffect-v2.0"
 echo "Qwen timbre route:   http://127.0.0.1:$QWEN_VOICEDESIGN_PORT/v1/qwen/timbre"
@@ -246,11 +279,13 @@ printf '%-24s %-6s %s\n' 'Qwen3-ASR-1.7B' "$QWEN3_ASR_PORT" '/v1/qwen3/asr'
 printf '%-24s %-6s %s\n' 'Qwen3-TTS Base' "$QWEN3_TTS_PORT" '/v1/qwen/clone'
 printf '%-24s %-6s %s\n' 'IndexTTS-2.5' "$INDEXTTS25_PORT" '/v1/index-team/indexTTS-2.5'
 printf '%-24s %-6s %s\n' 'MiniMax H3 16G HiFi' "$MINIMAX_H3_PORT" '/v1/minimax/H3-16G-HiFi'
+printf '%-24s %-6s %s\n' 'LongCat Avatar 1.5 Quanto-Int8' "$LONGCAT_AVATAR_PORT" '/v1/meituan/LongCat-Video-Avatar-1.5-Quanto-Int8'
 echo "=================================================="
 
 cd "$PROJECT_DIR"
 
 minimax_h3_pid=""
+longcat_avatar_pid=""
 moss_music_pid=""
 moss_soundeffect_v2_pid=""
 main_pid=""
@@ -267,6 +302,7 @@ cleanup() {
   local status=$?
   local pids=(
     "$minimax_h3_pid"
+    "$longcat_avatar_pid"
     "$moss_music_pid"
     "$moss_soundeffect_v2_pid"
     "$main_pid"
@@ -405,4 +441,22 @@ MINIMAX_H3_HOST="$MINIMAX_H3_HOST" MINIMAX_H3_PORT="$MINIMAX_H3_PORT" \
   setsid uv run --no-sync --project "$MINIMAX_H3_PROJECT_DIR" \
   python "$MINIMAX_H3_PROJECT_DIR/main.py" &
 minimax_h3_pid=$!
-wait -n "$msst_pid" "$minimax_h3_pid" "$moss_music_pid" "$moss_soundeffect_v2_pid" "$main_pid" "$qwen3_tts_pid" "$indextts25_pid" "$qwen_voicedesign_pid" "$tiger_dnr_pid" "$confucius4_tts_pid" "$qwen3_asr_pid"
+# LongCat Avatar API 使用轻量 uv 环境；每个请求由 WanGP Python API 启动一次性 worker。
+LONGCAT_AVATAR_HOST="$LONGCAT_AVATAR_HOST" LONGCAT_AVATAR_PORT="$LONGCAT_AVATAR_PORT" \
+  LONGCAT_AVATAR_MODEL_DIR="$LONGCAT_AVATAR_MODEL_DIR" \
+  LONGCAT_AVATAR_BASE_MODEL_DIR="$LONGCAT_AVATAR_BASE_MODEL_DIR" \
+  LONGCAT_AVATAR_WANGP_DIR="$LONGCAT_AVATAR_WANGP_DIR" \
+  LONGCAT_AVATAR_WANGP_PYTHON="$LONGCAT_AVATAR_WANGP_PYTHON" \
+  LONGCAT_AVATAR_AUDIO_DIR="$LONGCAT_AVATAR_AUDIO_DIR" \
+  LONGCAT_AVATAR_IMAGE_DIR="$LONGCAT_AVATAR_IMAGE_DIR" \
+  LONGCAT_AVATAR_OUTPUT_DIR="$LONGCAT_AVATAR_OUTPUT_DIR" \
+  LONGCAT_AVATAR_WORKER_TMP_DIR="$LONGCAT_AVATAR_WORKER_TMP_DIR" \
+  LONGCAT_AVATAR_REQUEST_TIMEOUT="$LONGCAT_AVATAR_REQUEST_TIMEOUT" \
+  LONGCAT_AVATAR_CUDA_VISIBLE_DEVICES="$LONGCAT_AVATAR_CUDA_VISIBLE_DEVICES" \
+  LONGCAT_AVATAR_MEMORY_PROFILE="$LONGCAT_AVATAR_MEMORY_PROFILE" \
+  LONGCAT_AVATAR_MIN_FREE_VRAM_MIB="$LONGCAT_AVATAR_MIN_FREE_VRAM_MIB" \
+  HOST="$LONGCAT_AVATAR_HOST" PORT="$LONGCAT_AVATAR_PORT" \
+  setsid uv run --no-sync --project "$LONGCAT_AVATAR_PROJECT_DIR" \
+  python "$LONGCAT_AVATAR_PROJECT_DIR/main.py" &
+longcat_avatar_pid=$!
+wait -n "$msst_pid" "$minimax_h3_pid" "$longcat_avatar_pid" "$moss_music_pid" "$moss_soundeffect_v2_pid" "$main_pid" "$qwen3_tts_pid" "$indextts25_pid" "$qwen_voicedesign_pid" "$tiger_dnr_pid" "$confucius4_tts_pid" "$qwen3_asr_pid"

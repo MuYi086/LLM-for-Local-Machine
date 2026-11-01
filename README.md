@@ -4,7 +4,7 @@
 三路音源分离，以及 CPU 音频母带和 Steam Audio 对象级空间导出。
 模型推理均使用本地权重。
 
-仓库包含 **10 个模型服务 uv 项目，统一启动 11 个 HTTP 进程**，其中一个是轻量控制面。
+仓库包含 **11 个模型服务 uv 项目，统一启动 12 个 HTTP 进程**，其中一个是轻量控制面。
 HTTP 进程不加载重型模型，模型推理由对应目录
 中的一次性 worker 完成；共享运行时和无模型 QA 环境分别位于 `llm_local_runtime/`、`qa/`。
 接口、路径和默认值以当前 `main.py`、`worker.py`、`pyproject.toml` 与 `start.sh` 为准。
@@ -37,6 +37,7 @@ Base/VoiceDesign 的本地模型候选及一个 TIGER-DnR one-shot worker bridge
 | [Confucius4-TTS `model-audio/clone_confucius-4/`](model-audio/clone_confucius-4/) | 8361 | `POST /v1/confucius4TTS/generate` | 无需参考转写的零样本克隆与跨语言 TTS，支持 14 语种及参考音频的情感迁移（[官方](https://huggingface.co/netease-youdao/Confucius4-TTS)） | 语音波形 |
 | [Qwen3-ASR-1.7B `model-audio/transcribe_qwen3-asr-1.7b/`](model-audio/transcribe_qwen3-asr-1.7b/) | 8371 | `POST /v1/qwen3/asr` | 语种识别与语音转写，支持 30 种语言和 22 种中文方言（[官方](https://huggingface.co/Qwen/Qwen3-ASR-1.7B)） | 转写文本与语种 |
 | [MSST Mega 53 `model-audio/separate_msst-mega53/`](model-audio/separate_msst-mega53/) | 8380 | `POST /v1/msst/separate` | 按调用方选择音乐声部分离，保留 residual（[官方](https://github.com/ZFTurbo/Music-Source-Separation-Training/releases/tag/v1.0.21)） | 44.1 kHz 双声道 FLOAT WAV 与元数据 ZIP |
+| [LongCat-Video-Avatar-1.5 Quanto-Int8 `model-video/LongCat-Video-Avatar-1.5-Quanto-Int8/`](model-video/LongCat-Video-Avatar-1.5-Quanto-Int8/) | 8390 | `POST /v1/meituan/LongCat-Video-Avatar-1.5-Quanto-Int8` | 参考图、音频与文本驱动单人数字人视频，经 [WanGP](https://github.com/deepbeepmeep/WanGP) 官方 Python API 使用本地 Quanto 权重和内置 MMGP Profile 4（[模型卡](https://huggingface.co/meituan-longcat/LongCat-Video-Avatar-1.5)） | 含输入音频轨的 MP4 |
 | [MiniMax H3 16G HiFi `model-video/MiniMax-H3-16G-HiFi/`](model-video/MiniMax-H3-16G-HiFi/) | 8392 | `POST /v1/minimax/H3-16G-HiFi` | FL2VA 首尾帧或 Ref2VA 参考图生成视频，可选 H3 原生音轨（[模型卡](https://modelscope.cn/models/l1ngzi/MiniMax-H3-16G-HiFi)） | 默认无音轨；请求 `include_audio=true` 时输出带音轨 MP4 |
 
 Demo 调用对应端口并保存服务原始输出；
@@ -57,6 +58,7 @@ Demo 调用对应端口并保存服务原始输出；
 | MSST Mega 53（8380） | `application/zip`，选定声部、residual 与 manifest.json | 原子保存到 `storage/msst/`；输入与 worker 临时文件请求后清理 |
 | Qwen3-ASR | JSON 文本及上传摘要 | 请求结束后删除上传暂存和 worker 结果，不保留输入音频 |
 | TIGER-DnR | `application/zip`，含 `dialog.wav`、`effects.wav`、`music.wav` | 原子保存三路 Stem 与 ZIP 批次 |
+| LongCat Avatar（8390） | `video/mp4` | 原子保存到 `storage/video/longcat_avatar/`；请求工作区在返回前清理 |
 | 控制面音频导出 | WAV 或 MP3 | 响应完成后删除临时成品 |
 
 ## 接口兼容约束
@@ -85,7 +87,7 @@ model-audio/separate_tiger-dnr/                  TIGER-DnR 三 Stem 分离服务
 model-audio/transcribe_qwen3-asr-1.7b/           Qwen3-ASR-1.7B 语音识别服务和 worker
 model-text/                                      有声书纯文本润色训练实验
 model-image/                                     预留图像模型目录
-model-video/                                     MiniMax H3 视频生成服务
+model-video/                                     MiniMax H3 与 LongCat Avatar 视频生成服务
 tests/                                           根目录无模型回归测试
 qa/                                              锁定的轻量测试与 Ruff 环境，不安装模型依赖
 llm_local_runtime/                               共享流式上传、引用存储、GPU 队列与容量工具
@@ -108,7 +110,7 @@ storage/                                         上传素材、生成音视频�
 | `storage/msst/` | MSST 声部分离 ZIP；不受 WAV 自动保留策略清理 | `MSST_OUTPUT_DIR` |
 | `storage/clone/` | 普通参考音频与 TTS 克隆结果 | `CLONE_STORAGE_DIR`、各服务的 `*_OUTPUT_DIR` |
 | `storage/separation/` | TIGER-DnR 每次分离的 dialog、effects、music Stem 与 ZIP | `TIGER_DNR_OUTPUT_DIR` |
-| `storage/video/` | MiniMax H3 生成的 MP4 | `MINIMAX_H3_OUTPUT_DIR` |
+| `storage/video/` | MiniMax H3 与 LongCat Avatar 生成的 MP4 | `MINIMAX_H3_OUTPUT_DIR`、`LONGCAT_AVATAR_OUTPUT_DIR` |
 | `storage/training/` | 文本润色实验的数据集、adapter 和预测结果 | 训练脚本的 `--output-dir` 与训练配置 |
 | `storage/.cache/runtime/` | worker 临时文件、母带/Steam Audio 任务缓存、库缓存和共享 GPU 锁 | `RUNTIME_CACHE_DIR`、`SPATIAL_EXPORT_CACHE_DIR`、`STEAM_AUDIO_RENDER_CACHE_DIR`、`GPU_LOCK_FILE` |
 
@@ -145,7 +147,7 @@ cd LLM-for-Local-Machine
 先为需要的服务同步锁定依赖；部署全部服务时可以执行：
 
 ```bash
-for project in model-video/MiniMax-H3-16G-HiFi model-audio/analyse_moss-music-8b-Instruct model-audio/soundEffect-v2.0 \
+for project in model-video/LongCat-Video-Avatar-1.5-Quanto-Int8 model-video/MiniMax-H3-16G-HiFi model-audio/analyse_moss-music-8b-Instruct model-audio/soundEffect-v2.0 \
   model-audio/clone_qwen3-tts-1.7b-base model-audio/indexTTS-2.5 \
   model-audio/design_qwen3-tts-1.7b-voicedesign model-audio/clone_confucius-4 model-audio/transcribe_qwen3-asr-1.7b model-audio/separate_tiger-dnr model-audio/separate_msst-mega53; do
   uv sync --project "$project" --locked
@@ -166,8 +168,8 @@ Tokenizer 和上游源码就绪后启动全部服务：
 bash start.sh
 ```
 
-`start.sh` 会启动 8300、8301、8310、8321、8323、8351、8361、8362、8371、8380 和 8392，
-共 11 个进程；8300 使用 `model-audio/clone_qwen3-tts-1.7b-base` uv 项目中的轻量 HTTP 依赖，其余服务使用
+`start.sh` 会启动 8300、8301、8310、8321、8323、8351、8361、8362、8371、8380、8390 和 8392，
+共 12 个进程；8300 使用 `model-audio/clone_qwen3-tts-1.7b-base` uv 项目中的轻量 HTTP 依赖，其余服务使用
 各自的 uv 项目。启动命令统一使用 `uv run --no-sync`，不会在运行阶段联网解析依赖；
 本地 GPU 服务通过 `GPU_LOCK_FILE` 串行访问 GPU。默认最多排队 900 秒，超过时返回
 `503`；用正数 `GPU_LOCK_WAIT_TIMEOUT` 调整。共享锁实现仍兼容非正值无限等待，
@@ -287,7 +289,7 @@ LocalAI 请求持有共享 `GPU_LOCK_FILE`，完成后请求 `/backend/shutdown`
 
 ```bash
 curl -fsS http://127.0.0.1:8300/v1/control
-for port in 8300 8301 8310 8321 8323 8351 8361 8362 8371 8380 8392; do
+for port in 8300 8301 8310 8321 8323 8351 8361 8362 8371 8380 8390 8392; do
   curl -fsS "http://127.0.0.1:${port}/v1/health" >/dev/null && echo "${port}: ok"
 done
 ```
@@ -315,6 +317,7 @@ HOST=127.0.0.1 PORT=8321 \
 | MOSS-SoundEffect v2.0 | `$HF_MIRROR_DIR/OpenMOSS/MOSS-SoundEffect-v2.0` | `MOSS_SOUNDEFFECT_V2_MODEL_DIR`、`MOSS_SOUNDEFFECT_V2_CODE_PATH`、`MOSS_SOUNDEFFECT_V2_OUTPUT_DIR` |
 | TIGER-DnR | `$HF_MIRROR_DIR/JusperLee/TIGER-DnR` | `TIGER_DNR_MODEL_DIR`、`TIGER_DNR_SOURCE_DIR` |
 | MiniMax H3 16G HiFi | `$HF_MIRROR_DIR/minimax/MiniMax-H3-16G-HiFi` | `MINIMAX_H3_MODEL_DIR` |
+| LongCat Avatar 1.5 | `$HF_MIRROR_DIR/meituan/LongCat-Video-Avatar-1.5` | `LONGCAT_AVATAR_MODEL_DIR` |
 
 仓库外推理源码的默认位置如下，须在请求前准备；`start.sh` 不负责拉取源码：
 
@@ -325,6 +328,7 @@ HOST=127.0.0.1 PORT=8321 \
 | TIGER-DnR | `$HOME/.local/share/tiger-dnr/TIGER` | `TIGER_DNR_SOURCE_DIR` |
 | MOSS-SoundEffect v2.0 | `$HOME/LLM-depency/MOSS-TTS/moss_soundeffect_v2`（固定 revision `934d6826b084c46a0d033402174d5f8ac4ed2519`） | `MOSS_SOUNDEFFECT_V2_CODE_PATH` |
 | MiniMax H3 ComfyUI | `$HOME/LLM-depency/MiniMax-H3-ComfyUI`（ComfyUI `v0.37.0`） | `MINIMAX_H3_COMFYUI_CODE_PATH`、`MINIMAX_H3_COMFYUI_PYTHON` |
+| WanGP | `$HOME/LLM-depency/WanGP` | `LONGCAT_AVATAR_WANGP_DIR`、`LONGCAT_AVATAR_WANGP_PYTHON`；WanGP 自带 MMGP |
 
 通用配置包括 `HOST`、`PORT`、`STORAGE_DIR`、`PROMPTS_DIR`、`RUNTIME_CACHE_DIR`、
 `GPU_LOCK_FILE`、`LOCAL_FILES_ONLY` 和 `CUDA_RELEASE_DELAY`。48 kHz 导出可用
@@ -703,6 +707,16 @@ curl -fsS http://127.0.0.1:8310/v1/openMoss/moss-music \
 推理使用仓库外的 ComfyUI `v0.37.0` 与模型仓库提供的 `ComfyUI-sol-attn-main.zip`，其 Python/CUDA 依赖按服务说明单独安装。先执行 `uv sync --project model-video/MiniMax-H3-16G-HiFi --locked`，再按
 [MiniMax H3 服务说明](model-video/MiniMax-H3-16G-HiFi/README.md)准备 ComfyUI 和调用接口。`GET /v1/health` 检查权重、节点、依赖及 GPU 状态；完整准备不等于已完成真实生成验证。
 
+## LongCat-Video-Avatar-1.5 Quanto-Int8 音频驱动视频
+
+服务在 `8390` 提供 `POST /v1/meituan/LongCat-Video-Avatar-1.5-Quanto-Int8`。上传参考图、参考音频和文本生成人物说话视频；WanGP 的 LongCat Avatar 设置强制启用 `KI` 参考图模式，因此 `image_path` 必填。接口按音频时长自动选择 1–5 个 93 帧滑窗，最多覆盖约 16.52 秒，超出时返回 `422`，不会静默截短。成功返回含输入音轨的 MP4，并保存到 `LONGCAT_AVATAR_OUTPUT_DIR`（默认 `storage/video/longcat_avatar/`）。
+
+该服务使用 `$HOME/LLM-depency/WanGP` 中的 WanGP 推理实现，通过其推荐的 `shared.api.init()` / `session.submit_task()` Python API 调用 `longcat_avatar_v1_5`。WanGP 已在仓库内提供 MMGP；低显存 Profile 4 与 SDPA attention 用于单张 16 GiB 显卡。无需另行 clone 或 pip 安装 MMGP。8390 的 HTTP 环境保持轻量，实际模型依赖由 WanGP 自己的 `.venv` 提供。
+
+Quanto DiT/T5、UMT5 tokenizer、DMD LoRA 与 Whisper 文件默认位于 `$HF_MIRROR_DIR/meituan/LongCat-Video-Avatar-1.5`；VAE 默认位于 `$HF_MIRROR_DIR/meituan/LongCat-Video`。`bash start.sh` 会运行 `configure_wangp.py`，在 WanGP `ckpts/`、`loras/` 下为模型文件建立只读软链接，并设置 `wgp_config.json` 的检查点目录、Profile 4 和 SDPA。它不会复制或改写模型权重；缺少文件、WanGP 依赖或显存时，`GET /v1/health` 会报告对应状态。
+
+默认使用 GPU 0，空闲显存门槛为 10,000 MiB，可通过 `LONGCAT_AVATAR_CUDA_VISIBLE_DEVICES` 和 `LONGCAT_AVATAR_MIN_FREE_VRAM_MIB` 调整。该主机当前为 RTX 4070 Ti SUPER 16 GiB。通过 8390 的真实生成已返回有效 MP4，包含 H.264 视频和输入 AAC 音轨；具体调用方式见[LongCat Avatar 服务说明](model-video/LongCat-Video-Avatar-1.5-Quanto-Int8/README.md)。
+
 ## 文本润色训练实验
 
 `model-text/scripts/training/` 与 `model-text/training/configs/` 提供有声书“原始小说片段 → 纯净可朗读文本”的
@@ -771,7 +785,7 @@ bash -n start.sh
 bash scripts/quality_gate.sh
 ```
 
-统一质量门禁先执行 shell 语法和三个无 SDK 的 C++ 核心测试，再检查工作区中存在的服务、
+统一质量门禁先执行 shell 语法和三个无 SDK 的 C++ 核心测试，再检查所有当前维护服务、
 `localai_worker_bridge` 与 QA 锁文件、Ruff 和格式，最后执行根目录与 MiniMax H3 基准的两组无模型测试。
 所有当前维护的 uv 项目都必须存在并通过锁检查；缺失项目会使门禁失败。
 GitHub Actions 使用同一脚本；需要 `uv` 和 `g++`，不需要 CUDA 或 Steam Audio SDK。
