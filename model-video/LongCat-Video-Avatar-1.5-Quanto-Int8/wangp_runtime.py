@@ -8,7 +8,6 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-
 MODEL_WEIGHT_NAMES = (
     "longcat_avatar_v1_5_quanto_bf16_int8.safetensors",
     "models_t5_umt5-xxl-enc-quanto_int8.safetensors",
@@ -19,6 +18,19 @@ TOKENIZER_FILE_NAMES = (
     "tokenizer_config.json",
     "special_tokens_map.json",
 )
+DEFAULT_MEMORY_PROFILE = 0
+SUPPORTED_MEMORY_PROFILES = frozenset({0, 4})
+
+
+def validate_memory_profile(value: int | str) -> int:
+    """校验本服务支持的 WanGP 显存档位。"""
+    try:
+        profile = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("LongCat Avatar 8390 仅支持 MMGP Profile 0 或 Profile 4。") from exc
+    if profile not in SUPPORTED_MEMORY_PROFILES:
+        raise ValueError("LongCat Avatar 8390 仅支持 MMGP Profile 0 或 Profile 4。")
+    return profile
 
 
 def configured_paths(
@@ -35,10 +47,7 @@ def configured_paths(
     return {
         checkpoints / MODEL_WEIGHT_NAMES[0]: avatar / MODEL_WEIGHT_NAMES[0],
         checkpoints / "umt5-xxl" / MODEL_WEIGHT_NAMES[1]: avatar / MODEL_WEIGHT_NAMES[1],
-        **{
-            tokenizer_dir / name: avatar / "umt5-xxl" / name
-            for name in TOKENIZER_FILE_NAMES
-        },
+        **{tokenizer_dir / name: avatar / "umt5-xxl" / name for name in TOKENIZER_FILE_NAMES},
         checkpoints / "whisper-large-v3": avatar / "whisper-large-v3",
         checkpoints / "Wan2.1_VAE_bf16.safetensors": (
             base / "vae" / "diffusion_pytorch_model.safetensors"
@@ -59,10 +68,14 @@ def link_status(
     for destination, source in configured_paths(wangp_dir, model_dir, base_model_dir).items():
         try:
             status[str(destination.relative_to(Path(wangp_dir).expanduser().resolve()))] = (
-                source.is_file() and source.stat().st_size > 0
-                if source.is_file()
-                else source.is_dir()
-            ) and destination.exists() and destination.resolve() == source.resolve()
+                (
+                    source.is_file() and source.stat().st_size > 0
+                    if source.is_file()
+                    else source.is_dir()
+                )
+                and destination.exists()
+                and destination.resolve() == source.resolve()
+            )
         except (OSError, ValueError):
             status[str(destination)] = False
     return status
@@ -99,10 +112,11 @@ def ensure_links(
 def update_wangp_config(
     wangp_dir: str | Path,
     *,
-    memory_profile: int = 4,
+    memory_profile: int = DEFAULT_MEMORY_PROFILE,
     attention_mode: str = "sdpa",
 ) -> Path:
-    """更新 WanGP 配置中的检查点目录和低显存运行档。"""
+    """更新 WanGP 配置中的检查点目录和显存运行档。"""
+    memory_profile = validate_memory_profile(memory_profile)
     root = Path(wangp_dir).expanduser().resolve()
     config_path = root / "wgp_config.json"
     if not config_path.is_file():
@@ -124,9 +138,7 @@ def update_wangp_config(
             "attention_mode": attention_mode,
         }
     )
-    descriptor, temporary_name = tempfile.mkstemp(
-        dir=root, prefix=".wgp_config_", suffix=".tmp"
-    )
+    descriptor, temporary_name = tempfile.mkstemp(dir=root, prefix=".wgp_config_", suffix=".tmp")
     temporary = Path(temporary_name)
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8") as destination:

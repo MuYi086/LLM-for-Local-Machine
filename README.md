@@ -37,7 +37,7 @@ Base/VoiceDesign 的本地模型候选及一个 TIGER-DnR one-shot worker bridge
 | [Confucius4-TTS `model-audio/clone_confucius-4/`](model-audio/clone_confucius-4/) | 8361 | `POST /v1/confucius4TTS/generate` | 无需参考转写的零样本克隆与跨语言 TTS，支持 14 语种及参考音频的情感迁移（[官方](https://huggingface.co/netease-youdao/Confucius4-TTS)） | 语音波形 |
 | [Qwen3-ASR-1.7B `model-audio/transcribe_qwen3-asr-1.7b/`](model-audio/transcribe_qwen3-asr-1.7b/) | 8371 | `POST /v1/qwen3/asr` | 语种识别与语音转写，支持 30 种语言和 22 种中文方言（[官方](https://huggingface.co/Qwen/Qwen3-ASR-1.7B)） | 转写文本与语种 |
 | [MSST Mega 53 `model-audio/separate_msst-mega53/`](model-audio/separate_msst-mega53/) | 8380 | `POST /v1/msst/separate` | 按调用方选择音乐声部分离，保留 residual（[官方](https://github.com/ZFTurbo/Music-Source-Separation-Training/releases/tag/v1.0.21)） | 44.1 kHz 双声道 FLOAT WAV 与元数据 ZIP |
-| [LongCat-Video-Avatar-1.5 Quanto-Int8 `model-video/LongCat-Video-Avatar-1.5-Quanto-Int8/`](model-video/LongCat-Video-Avatar-1.5-Quanto-Int8/) | 8390 | `POST /v1/meituan/LongCat-Video-Avatar-1.5-Quanto-Int8` | 参考图、音频与文本驱动单人数字人视频，经 [WanGP](https://github.com/deepbeepmeep/WanGP) 官方 Python API 使用本地 Quanto 权重和内置 MMGP Profile 4（[模型卡](https://huggingface.co/meituan-longcat/LongCat-Video-Avatar-1.5)） | 含输入音频轨的 MP4 |
+| [LongCat-Video-Avatar-1.5 Quanto-Int8 `model-video/LongCat-Video-Avatar-1.5-Quanto-Int8/`](model-video/LongCat-Video-Avatar-1.5-Quanto-Int8/) | 8390 | `POST /v1/meituan/LongCat-Video-Avatar-1.5-Quanto-Int8` | 参考图、音频与文本驱动单人数字人视频，经 [WanGP](https://github.com/deepbeepmeep/WanGP) 官方 Python API 使用本地 Quanto 权重和内置 MMGP Profile 0（Profile 4 可回退；[模型卡](https://huggingface.co/meituan-longcat/LongCat-Video-Avatar-1.5)） | 含输入音频轨的 MP4 |
 | [MiniMax H3 16G HiFi `model-video/MiniMax-H3-16G-HiFi/`](model-video/MiniMax-H3-16G-HiFi/) | 8392 | `POST /v1/minimax/H3-16G-HiFi` | FL2VA 首尾帧或 Ref2VA 参考图生成视频，可选 H3 原生音轨（[模型卡](https://modelscope.cn/models/l1ngzi/MiniMax-H3-16G-HiFi)） | 默认无音轨；请求 `include_audio=true` 时输出带音轨 MP4 |
 
 Demo 调用对应端口并保存服务原始输出；
@@ -711,9 +711,9 @@ curl -fsS http://127.0.0.1:8310/v1/openMoss/moss-music \
 
 服务在 `8390` 提供 `POST /v1/meituan/LongCat-Video-Avatar-1.5-Quanto-Int8`。上传参考图、参考音频和文本生成人物说话视频；WanGP 的 LongCat Avatar 设置强制启用 `KI` 参考图模式，因此 `image_path` 必填。接口按音频时长自动选择 1–5 个 93 帧滑窗，最多覆盖约 16.52 秒，超出时返回 `422`，不会静默截短。成功返回含输入音轨的 MP4，并保存到 `LONGCAT_AVATAR_OUTPUT_DIR`（默认 `storage/video/longcat_avatar/`）。
 
-该服务使用 `$HOME/LLM-depency/WanGP` 中的 WanGP 推理实现，通过其推荐的 `shared.api.init()` / `session.submit_task()` Python API 调用 `longcat_avatar_v1_5`。WanGP 已在仓库内提供 MMGP；低显存 Profile 4 与 SDPA attention 用于单张 16 GiB 显卡。无需另行 clone 或 pip 安装 MMGP。8390 的 HTTP 环境保持轻量，实际模型依赖由 WanGP 自己的 `.venv` 提供。
+该服务使用 `$HOME/LLM-depency/WanGP` 中的 WanGP 推理实现，通过其推荐的 `shared.api.init()` / `session.submit_task()` Python API 调用 `longcat_avatar_v1_5`。WanGP 已在仓库内提供 MMGP；默认 Profile 0 与 SDPA attention 用于单张 16 GiB 显卡，并按运行工作负载动态预加载显存。设置 `LONGCAT_AVATAR_MEMORY_PROFILE=4` 可回退到 Profile 4。无需另行 clone 或 pip 安装 MMGP。8390 的 HTTP 环境保持轻量，实际模型依赖由 WanGP 自己的 `.venv` 提供。
 
-Quanto DiT/T5、UMT5 tokenizer、DMD LoRA 与 Whisper 文件默认位于 `$HF_MIRROR_DIR/meituan/LongCat-Video-Avatar-1.5`；VAE 默认位于 `$HF_MIRROR_DIR/meituan/LongCat-Video`。`bash start.sh` 会运行 `configure_wangp.py`，在 WanGP `ckpts/`、`loras/` 下为模型文件建立只读软链接，并设置 `wgp_config.json` 的检查点目录、Profile 4 和 SDPA。它不会复制或改写模型权重；缺少文件、WanGP 依赖或显存时，`GET /v1/health` 会报告对应状态。
+Quanto DiT/T5、UMT5 tokenizer、DMD LoRA 与 Whisper 文件默认位于 `$HF_MIRROR_DIR/meituan/LongCat-Video-Avatar-1.5`；VAE 默认位于 `$HF_MIRROR_DIR/meituan/LongCat-Video`。`bash start.sh` 会运行 `configure_wangp.py`，在 WanGP `ckpts/`、`loras/` 下为模型文件建立只读软链接，并设置 `wgp_config.json` 的检查点目录、当前 Profile 和 SDPA。默认 Profile 0，可用 `LONGCAT_AVATAR_MEMORY_PROFILE=4 bash start.sh` 启动回退档。它不会复制或改写模型权重；缺少文件、WanGP 依赖或显存时，`GET /v1/health` 会报告对应状态。
 
 默认使用 GPU 0，空闲显存门槛为 10,000 MiB，可通过 `LONGCAT_AVATAR_CUDA_VISIBLE_DEVICES` 和 `LONGCAT_AVATAR_MIN_FREE_VRAM_MIB` 调整。该主机当前为 RTX 4070 Ti SUPER 16 GiB。通过 8390 的真实生成已返回有效 MP4，包含 H.264 视频和输入 AAC 音轨；具体调用方式见[LongCat Avatar 服务说明](model-video/LongCat-Video-Avatar-1.5-Quanto-Int8/README.md)。
 

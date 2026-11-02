@@ -8,9 +8,11 @@
 
 推理使用仓库外的 [WanGP](https://github.com/deepbeepmeep/WanGP) 项目及其推荐的
 `shared.api.init()` / `session.submit_task()` 调用方式，模型类型为 `longcat_avatar_v1_5`。
-WanGP 仓库内已经包含 `mmgp/`，Profile 4 会通过 MMGP 分块调度模型权重，适合 16 GiB 显存；无需另行
+WanGP 仓库内已经包含 `mmgp/`，默认 Profile 0 会按工作负载动态预加载显存，并避免长期固定主模型权重到预留主存；无需另行
 clone `mmgp` 或在 8390 的 uv 环境安装它。服务将推理依赖放在 WanGP 自己的 Python 环境中，8390 环境只装
 FastAPI、Pillow 和共享运行包。
+
+可通过 `LONGCAT_AVATAR_MEMORY_PROFILE=4` 回退到 Profile 4；Profile 4 会将主 Transformer 长期保留在预留主存并逐块送入显存。Profile 0/4 均通过同一环境变量配置，其他档位会在启动时拒绝。
 
 WanGP 建议使用 Python 3.11 与匹配显卡的 CUDA PyTorch。当前主机使用 WanGP `.venv`、PyTorch 2.10.0
 CUDA 13.0、Triton 3.6；从 WanGP 目录可按项目要求准备环境：
@@ -38,7 +40,7 @@ uv pip install --python .venv/bin/python 'triton>=3.6,<3.7'
 
 WanGP 从自己的源码目录读取 Avatar scheduler、DiT/ VAE 配置和推理代码，不需要另装 LongCat 官方源码。
 `configure_wangp.py` 在 `WanGP/ckpts/` 与 `WanGP/loras/` 建立指向上表文件的软链接，并更新
-`wgp_config.json`，将检查点目录设为 `ckpts`、视频档设为 MMGP Profile 4、attention 设为 SDPA。
+`wgp_config.json`，将检查点目录设为 `ckpts`、视频档设为当前 MMGP Profile（默认 0）、attention 设为 SDPA。
 不会复制或覆盖模型文件；遇到同名的非目标文件时会停止并报出冲突。
 
 部署时先安装轻量 HTTP 环境，再启动服务：
@@ -59,9 +61,10 @@ uv run --project model-video/LongCat-Video-Avatar-1.5-Quanto-Int8 --locked \
 ```
 
 默认只暴露 GPU 0，要求至少有 `10,000 MiB` 空闲显存；可通过
-`LONGCAT_AVATAR_CUDA_VISIBLE_DEVICES` 和 `LONGCAT_AVATAR_MIN_FREE_VRAM_MIB` 调整。MMGP Profile 4 会在显存
-不足以容纳完整模型时分块卸载；速度会低于显存充足的多卡部署。共享 GPU 锁默认最多排队 900 秒。
+`LONGCAT_AVATAR_CUDA_VISIBLE_DEVICES` 和 `LONGCAT_AVATAR_MIN_FREE_VRAM_MIB` 调整。MMGP Profile 0 在分块运行时会按实测工作负载使用空闲显存，并让预留主存供正在运行的模型部分共享；Profile 4 则长期保留主 Transformer 权重在预留主存。两者都能运行大于显存的模型。共享 GPU 锁默认最多排队 900 秒。
 输入音频最多约 16.52 秒，WanGP 按 93 帧滑窗、13 帧重叠延续生成，服务最多接收 5 段覆盖范围内的音频。
+
+排查阶段耗时时可设置 `LONGCAT_AVATAR_TRACE_DIR` 为可写目录。每个 worker 会生成一个 JSONL，记录 worker 阶段计时和 WanGP 的进度/状态回调；不设置时不会写 trace，也不会改变推理参数。诊断文件写入失败不会中断推理。
 
 `GET /v1/health` 会检查权重、WanGP 源码/依赖、配置、软链接、FFmpeg 和显存；健康检查不会加载模型或执行
 生成。模型真实运行情况以完整推理请求为准。

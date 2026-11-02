@@ -97,7 +97,7 @@ localai_worker_bridge 是额外的非 HTTP uv 包，不计入服务数，也不�
   轻量 HTTP 层使用共享 GPU 锁和空闲显存门槛，每次请求由一次性 worker 启动 loopback ComfyUI，
   最多生成 960×544、5 秒视频；参考图只通过上传逻辑标识读取。
 - model-video/LongCat-Video-Avatar-1.5-Quanto-Int8/ 使用 `$HF_MIRROR_DIR/meituan/LongCat-Video-Avatar-1.5` 的 Quanto DiT/T5、DMD LoRA、Whisper，
-  以及 `$HF_MIRROR_DIR/meituan/LongCat-Video` 的基础 VAE；8390 通过 WanGP `shared.api.init()` 与 `submit_task()` 调用 `longcat_avatar_v1_5`，使用 WanGP 自带 MMGP Profile 4 和 SDPA attention。
+  以及 `$HF_MIRROR_DIR/meituan/LongCat-Video` 的基础 VAE；8390 通过 WanGP `shared.api.init()` 与 `submit_task()` 调用 `longcat_avatar_v1_5`，默认使用 WanGP 自带 MMGP Profile 0 和 SDPA attention；设置 `LONGCAT_AVATAR_MEMORY_PROFILE=4` 可回退到 Profile 4。
   `start.sh` 先运行 `configure_wangp.py`，只在 WanGP `ckpts/` 与 `loras/` 下建立指向已有权重的软链接，并维护 WanGP `wgp_config.json`；推理 worker 使用 WanGP 独立 Python 环境。
   WanGP 强制启用 `KI` 参考图模式，API 必须提供已上传图片的逻辑标识。HTTP 层共享 GPU 锁，默认单卡至少留有 10,000 MiB 显存；每个请求启动一次性 worker，最多覆盖约 16.52 秒音频，结果通过 ffprobe 确认含视频与音轨后原子保存。
 - 流行*模型功能简介.md、task*.md 和 `空间音频讨论/` 是调研/任务/方案资料，

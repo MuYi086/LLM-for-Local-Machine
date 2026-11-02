@@ -46,7 +46,7 @@ from longcat_runtime import (
     terminate_process_group,
     validate_video,
 )
-from wangp_runtime import link_status
+from wangp_runtime import DEFAULT_MEMORY_PROFILE, link_status, validate_memory_profile
 
 LOGGER = logging.getLogger(__name__)
 PROJECT_DIR = Path(__file__).resolve().parent
@@ -110,7 +110,9 @@ API_PORT = int(os.getenv("LONGCAT_AVATAR_PORT", os.getenv("PORT", "8390")))
 REQUEST_TIMEOUT = float(os.getenv("LONGCAT_AVATAR_REQUEST_TIMEOUT", "1800"))
 GPU_LOCK_WAIT_TIMEOUT = float(os.getenv("GPU_LOCK_WAIT_TIMEOUT", "900"))
 CUDA_VISIBLE_DEVICES = os.getenv("LONGCAT_AVATAR_CUDA_VISIBLE_DEVICES", "0").strip()
-MEMORY_PROFILE = int(os.getenv("LONGCAT_AVATAR_MEMORY_PROFILE", "4"))
+MEMORY_PROFILE = validate_memory_profile(
+    os.getenv("LONGCAT_AVATAR_MEMORY_PROFILE", str(DEFAULT_MEMORY_PROFILE))
+)
 MIN_FREE_VRAM_MIB = int(os.getenv("LONGCAT_AVATAR_MIN_FREE_VRAM_MIB", "10000"))
 MAX_UPLOAD_IMAGE_BYTES = int(os.getenv("LONGCAT_AVATAR_MAX_IMAGE_BYTES", str(20 * 1024 * 1024)))
 FFPROBE_BIN = os.getenv("FFPROBE_BIN", "ffprobe")
@@ -171,8 +173,6 @@ if CUDA_RELEASE_DELAY < 0:
     raise ValueError("CUDA_RELEASE_DELAY 不能为负数。")
 if not CUDA_VISIBLE_DEVICES or len(CUDA_VISIBLE_DEVICES.split(",")) != 1:
     raise ValueError("LongCat Avatar WanGP worker 固定使用一张可见 CUDA GPU。")
-if MEMORY_PROFILE != 4:
-    raise ValueError("LongCat Avatar WanGP worker 固定使用低显存 MMGP Profile 4。")
 if MIN_FREE_VRAM_MIB < 1 or MAX_UPLOAD_IMAGE_BYTES < 1:
     raise ValueError("LongCat Avatar 显存门槛和图片上传上限必须为正数。")
 
@@ -290,12 +290,12 @@ print(json.dumps(result))
 
 
 def wangp_config_status() -> dict[str, bool]:
-    """确认 WanGP 配置指向本地检查点和 Profile 4。"""
+    """确认 WanGP 配置指向本地检查点和当前服务显存档。"""
     checks = {
         "config_file": False,
         "checkpoints_paths": False,
         "loras_root": False,
-        "profile_4": False,
+        "profile_matches_runtime": False,
         "attention_sdpa": False,
     }
     try:
@@ -307,7 +307,7 @@ def wangp_config_status() -> dict[str, bool]:
                 "config_file": True,
                 "checkpoints_paths": config.get("checkpoints_paths") == ["ckpts"],
                 "loras_root": config.get("loras_root") == "loras",
-                "profile_4": (
+                "profile_matches_runtime": (
                     config.get("video_profile") == MEMORY_PROFILE
                     and config.get("profile") == MEMORY_PROFILE
                 ),
@@ -478,6 +478,7 @@ class LongCatAvatarWorkerManager:
             "resolution": "832x480" if request.resolution == "480p" else "1280x720",
             "duration_seconds": duration,
             "num_segments": segments,
+            "memory_profile": MEMORY_PROFILE,
             "cuda_visible_devices": CUDA_VISIBLE_DEVICES,
             "ffprobe_bin": ffprobe,
             "request_timeout": max(1.0, REQUEST_TIMEOUT - 30.0),

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""为 8390 配置 WanGP 的本地 LongCat 权重和低显存运行档。"""
+"""为 8390 配置 WanGP 的本地 LongCat 权重和显存运行档。"""
 
 from __future__ import annotations
 
@@ -7,7 +7,12 @@ import os
 import sys
 from pathlib import Path
 
-from wangp_runtime import ensure_links, update_wangp_config
+from wangp_runtime import (
+    DEFAULT_MEMORY_PROFILE,
+    ensure_links,
+    update_wangp_config,
+    validate_memory_profile,
+)
 
 
 def expand_path(value: str) -> Path:
@@ -17,9 +22,7 @@ def expand_path(value: str) -> Path:
 
 def main() -> int:
     """确保 WanGP 环境、配置文件和权重别名就绪。"""
-    wangp_dir = expand_path(
-        os.getenv("LONGCAT_AVATAR_WANGP_DIR", "~/LLM-depency/WanGP")
-    )
+    wangp_dir = expand_path(os.getenv("LONGCAT_AVATAR_WANGP_DIR", "~/LLM-depency/WanGP"))
     wangp_python = expand_path(
         os.getenv("LONGCAT_AVATAR_WANGP_PYTHON", str(wangp_dir / ".venv/bin/python"))
     )
@@ -32,9 +35,9 @@ def main() -> int:
     base_model_dir = expand_path(
         os.getenv("LONGCAT_AVATAR_BASE_MODEL_DIR", "~/hf-mirror/meituan/LongCat-Video")
     )
-    memory_profile = int(os.getenv("LONGCAT_AVATAR_MEMORY_PROFILE", "4"))
-    if memory_profile != 4:
-        raise ValueError("LongCat Avatar 8390 当前固定使用 WanGP 低显存 Profile 4。")
+    memory_profile = validate_memory_profile(
+        os.getenv("LONGCAT_AVATAR_MEMORY_PROFILE", str(DEFAULT_MEMORY_PROFILE))
+    )
     if not wangp_dir.is_dir() or not (wangp_dir / "shared/api.py").is_file():
         raise FileNotFoundError(f"WanGP 源码目录不可用：{wangp_dir}")
     if not wangp_python.is_file():
@@ -69,7 +72,7 @@ def main() -> int:
         attention_mode="sdpa",
     )
     print(f"WanGP 已配置：{wangp_dir}")
-    print(f"低显存运行档：MMGP Profile {memory_profile}，attention=sdpa")
+    print(f"显存运行档：MMGP Profile {memory_profile}，attention=sdpa")
     return 0
 
 
