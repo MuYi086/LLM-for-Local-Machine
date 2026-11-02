@@ -1,17 +1,20 @@
 # LongCat-Video-Avatar-1.5 量化搭配 WanGP 最佳实践
 
+> **历史记录：** LongCat-Video-Avatar-1.5 集成已退役，本文不再表示当前受支持的服务或运行建议。
+> 记录保留 2026-11-02 的本机配置和基准结果，源代码和本地模型文件未因此删除。
+
 本文记录本项目在单张 16 GiB RTX 4070 Ti SUPER 上，通过 WanGP 推理
 LongCat-Video-Avatar-1.5 Quanto 权重的已验证配置、配置变更和基准结果。
-当前选定 **MMGP Profile 0 + 手动 9216 MiB 视频预加载 + SDPA**。
+本次测试当时选择 **MMGP Profile 0 + 手动 9216 MiB 视频预加载 + SDPA**。
 
 服务 API、权重路径和请求方式见本目录的 [README.md](README.md)。8390 使用
 WanGP 推荐的 `shared.api.init()` / `session.submit_task()` API；WanGP 自带 MMGP，
 无需在 8390 的 uv 环境中另装 MMGP。
 
-## 推荐运行配置
+## 测试时运行配置（历史）
 
-WanGP 配置文件位于 `$HOME/LLM-depency/WanGP/wgp_config.json`。以下字段构成本次
-锁定的视频推理配置：
+测试时 WanGP 配置文件位于 `$HOME/LLM-depency/WanGP/wgp_config.json`。以下字段构成本次
+视频推理配置：
 
 | 字段 | 锁定值 | 用途 |
 | --- | --- | --- |
@@ -55,7 +58,7 @@ WanGP/MMGP 仍需为激活、VAE、缓存和运行时工作区留出显存；实
 video_preload_in_VRAM: 10240 → 9216
 ```
 
-五段测试完成后，已将 `9216` 保留为本机当前选定值。WanGP 配置由服务外部维护，
+五段测试完成后，当时将 `9216` 保留为本机选定值。WanGP 配置由服务外部维护，
 项目启动配置脚本保留该手动预加载字段；本次没有修改推理代码或服务 API。
 
 ## 基准测试方法
@@ -115,9 +118,9 @@ Profile 4 和 Profile 0 默认轮次的历史记录没有 PSS 数据。显存为
 - Profile 0 默认和 Profile 4 的轮次总耗时分别为 2036.0 秒和 1373.0 秒；手动
   9216 MiB 轮次为 1340.9 秒、GPU 均值 83.6%。每档目前只有一次完整轮次，且模型
   seed 会变化，因此结论是基于实测选档，不是对所有工作负载的普遍保证。
-- 当前推荐是固定 `video_preload_mode="manual"`、
-  `video_preload_in_VRAM=9216`、Profile 0 和 SDPA。若换显卡、改变分辨率、滑窗或
-  同时运行其他 GPU 任务，应重新验证峰值余量和时长。
+- 在该硬件和该工作流下，测试结论曾选择 `video_preload_mode="manual"`、
+  `video_preload_in_VRAM=9216`、Profile 0 和 SDPA。由于集成现已退役，此设置仅作历史
+  复现参考，不构成本项目当前运行配置。
 
 ## 记录索引
 

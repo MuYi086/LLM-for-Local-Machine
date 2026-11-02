@@ -7,7 +7,7 @@
 
 ## 可复现环境
 
-- 14 个模型服务项目固定使用 Python `3.12.13`。服务的 `.python-version` 与
+- 当前维护的模型服务项目固定使用 Python `3.12.13`。服务的 `.python-version` 与
   `requires-python` 必须保持一致；`qa` 和共享运行时也声明相同 Python 版本。
 - 各服务独立锁定 Torch、CUDA wheel 和上游运行时，不能合并到一个环境。
   核心依赖尽量使用精确版本；范围依赖、开发工具和 Git 依赖由对应 `uv.lock` 锁定。
@@ -38,7 +38,7 @@ bash scripts/quality_gate.sh
 ```
 
 统一入口先运行 `bash -n start.sh` 和不依赖 Steam Audio SDK 的三个 C++ 核心测试，
-再检查当前维护的模型服务项目、worker bridge 与 QA 的锁文件，使用轻量 QA 环境执行 Ruff、格式检查和两组单元测试。
+再检查当前维护的模型服务项目、worker bridge 与 QA 的锁文件，使用轻量 QA 环境执行 Ruff、格式检查和根目录单元测试。
 GitHub Actions 调用同一脚本，不需要模型环境或 CUDA；需要 `uv` 与 `g++`。
 锁检查仍可能访问 Git/wheel 元数据；已有完整缓存时可用 `UV_OFFLINE=1`，
 离线模式不能代替首次准备依赖元数据。
@@ -50,8 +50,8 @@ uv run --project qa --locked ruff check main llm_local_runtime tests/*.py
 uv run --project qa --locked ruff format --check main llm_local_runtime tests/*.py
 ```
 
-完整 Ruff 路径以 `scripts/quality_gate.sh` 为准；根目录回归只检查 `tests/*.py`，独立的
-`tests/i2v-benchmark/` 项目不属于 QA 质量门禁；当前也不包含 `model-text/scripts/training/`，
+完整 Ruff 路径以 `scripts/quality_gate.sh` 为准；根目录回归只检查 `tests/*.py`，已退役视频模型的
+`tests/i2v-benchmark/` 基准存档不属于 QA 质量门禁；当前也不包含 `model-text/scripts/training/`，
 修改这些独立项目时需显式加入对应文件路径检查。
 
 修复格式时使用 `ruff format .`；只使用 `ruff check --fix` 的安全修复，
@@ -75,12 +75,11 @@ uv run --project qa --locked ruff format --check main llm_local_runtime tests/*.
 ## 测试
 
 静态检查和单元测试必须不下载权重、不依赖 CUDA，也不调用真实外部模型服务。
-运行根目录与 MiniMax H3 基准的无模型测试：
+运行当前维护的根目录无模型测试：
 
 ```bash
 bash -n start.sh
 uv run --project qa --locked python -m unittest discover -s tests -v
-uv run --project qa --locked python -m unittest discover -s tests/i2v-benchmark/tests -v
 ```
 
 FastAPI TestClient 回归依赖 QA 的 `httpx2` 兼容组合；不得恢复已弃用的旧客户端版本。

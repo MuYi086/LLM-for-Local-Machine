@@ -9,8 +9,6 @@ bash -n start.sh
 bash scripts/test_steam_audio_renderer_core.sh
 
 service_projects=(
-    model-video/LongCat-Video-Avatar-1.5-Quanto-Int8
-    model-video/MiniMax-H3-16G-HiFi
     model-audio/analyse_moss-music-8b-Instruct
     model-audio/clone_qwen3-tts-1.7b-base
     model-audio/indexTTS-2.5
@@ -33,8 +31,6 @@ for project in "${lock_projects[@]}"; do
 done
 lint_paths+=(
     tests/*.py
-    tests/i2v-benchmark/minimax_h3/benchmark.py
-    tests/i2v-benchmark/tests/test_minimax_h3_benchmark.py
 )
 
 uv run --project qa --locked ruff check "${lint_paths[@]}"
@@ -42,4 +38,3 @@ uv run --project qa --locked ruff format --check "${lint_paths[@]}"
 
 uv run --project qa --locked python scripts/localai/validate_capabilities.py
 uv run --project qa --locked python -m unittest discover -s tests -v
-uv run --project qa --locked python -m unittest discover -s tests/i2v-benchmark/tests -v

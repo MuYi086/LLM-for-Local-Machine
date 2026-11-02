@@ -56,51 +56,21 @@ class StartupPortTests(unittest.TestCase):
         self.assertIn('setsid uv run --no-sync --project "$INDEXTTS25_PROJECT_DIR"', start_script)
         self.assertIn('"$indextts25_pid"', start_script)
 
-    def test_minimax_h3_is_registered_for_startup_and_port_preflight(self) -> None:
+    def test_retired_video_models_are_not_registered_for_unified_startup(self) -> None:
         start_script = (Path(__file__).resolve().parents[1] / "start.sh").read_text(
             encoding="utf-8"
         )
 
-        self.assertIn('MINIMAX_H3_PORT="${MINIMAX_H3_PORT:-8392}"', start_script)
-        self.assertIn(
-            '\'MiniMax-H3-16G-HiFi\' "$MINIMAX_H3_HOST" "$MINIMAX_H3_PORT"',
-            start_script,
-        )
-        self.assertIn("'/v1/minimax/H3-16G-HiFi'", start_script)
-        self.assertIn('setsid uv run --no-sync --project "$MINIMAX_H3_PROJECT_DIR"', start_script)
-        self.assertIn('"$minimax_h3_pid"', start_script)
-
-    def test_longcat_avatar_is_registered_for_startup_and_port_preflight(self) -> None:
-        start_script = (Path(__file__).resolve().parents[1] / "start.sh").read_text(
-            encoding="utf-8"
-        )
-
-        self.assertIn('LONGCAT_AVATAR_PORT="${LONGCAT_AVATAR_PORT:-8390}"', start_script)
-        self.assertIn(
-            '\'LongCat-Video-Avatar-1.5-Quanto-Int8\' "$LONGCAT_AVATAR_HOST" "$LONGCAT_AVATAR_PORT"',
-            start_script,
-        )
-        self.assertIn(
-            '\'MiniMax-H3-16G-HiFi\' "$MINIMAX_H3_HOST" "$MINIMAX_H3_PORT" \\\n'
-            "  'LongCat-Video-Avatar-1.5-Quanto-Int8'",
-            start_script,
-        )
-        self.assertIn(
-            'LONGCAT_AVATAR_MODEL_DIR="${LONGCAT_AVATAR_MODEL_DIR:-$HF_MIRROR_DIR/meituan/LongCat-Video-Avatar-1.5}"',
-            start_script,
-        )
-        self.assertLess(
-            start_script.index(
-                'export RUNTIME_CACHE_DIR="${RUNTIME_CACHE_DIR:-$STORAGE_DIR/.cache/runtime}"'
-            ),
-            start_script.index("export LONGCAT_AVATAR_WORKER_TMP_DIR="),
-        )
-        self.assertIn("'/v1/meituan/LongCat-Video-Avatar-1.5-Quanto-Int8'", start_script)
-        self.assertIn(
-            'setsid uv run --no-sync --project "$LONGCAT_AVATAR_PROJECT_DIR"', start_script
-        )
-        self.assertIn('"$longcat_avatar_pid"', start_script)
-        self.assertRegex(start_script, r'wait -n .*"\$longcat_avatar_pid"')
+        for retired_reference in (
+            "MINIMAX_H3_",
+            "LONGCAT_AVATAR_",
+            "MiniMax-H3-16G-HiFi",
+            "LongCat-Video-Avatar-1.5-Quanto-Int8",
+            "8390",
+            "8392",
+        ):
+            with self.subTest(reference=retired_reference):
+                self.assertNotIn(retired_reference, start_script)
 
     def test_available_ports_are_released_after_checking(self) -> None:
         listener = MagicMock()
