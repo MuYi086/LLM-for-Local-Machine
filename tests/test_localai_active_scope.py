@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import socket
 import subprocess
 import sys
 import tempfile
@@ -117,7 +118,13 @@ class LocalAIActiveScopeTests(unittest.TestCase):
                     recover_quarantine, "load_gateway_config", return_value=config
                 ) as load,
                 patch.object(recover_quarantine, "LocalAIClient") as client_factory,
-                patch.dict("os.environ", {"LLM_LOCALAI_MANAGED": "false"}),
+                patch.dict(
+                    "os.environ",
+                    {
+                        "GPU_LOCK_FILE": str(lock_path),
+                        "LLM_LOCALAI_MANAGED": "false",
+                    },
+                ),
             ):
                 client_factory.return_value.shutdown_model.return_value = None
 
@@ -134,6 +141,106 @@ class LocalAIActiveScopeTests(unittest.TestCase):
         )
         self.assertEqual(client_factory.call_args.args[0].model, config.model)
         self.assertFalse(marker_path.exists())
+
+    def test_quarantine_recovery_stops_qwen_group_on_secondary_loopback(self) -> None:
+        group_states = iter([True, False])
+        with tempfile.TemporaryDirectory() as temporary:
+            lock_path = Path(temporary) / "gpu-runtime.lock"
+            marker_path = Path(f"{lock_path}.quarantine")
+            marker_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "provider": "llama.cpp",
+                        "model": "Qwen3.6-35B-A3B-MTP",
+                        "host": "127.0.0.2",
+                        "port": 18400,
+                        "pid": 999991,
+                        "pgid": 999991,
+                        "pid_start_time": "12345",
+                        "executable": "/opt/llama.cpp/llama-server",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with (
+                patch.dict(
+                    "os.environ",
+                    {
+                        "GPU_LOCK_FILE": str(lock_path),
+                        "LLM_LOCALAI_CLEANUP_TIMEOUT": "1",
+                    },
+                ),
+                patch.object(recover_quarantine, "process_start_time", return_value="12345"),
+                patch.object(
+                    recover_quarantine,
+                    "_process_command_line",
+                    return_value=["/opt/llama.cpp/llama-server", "--port", "18400"],
+                ),
+                patch.object(
+                    recover_quarantine,
+                    "_process_group_exists",
+                    side_effect=lambda _pgid: next(group_states, False),
+                ),
+                patch.object(
+                    recover_quarantine, "_loopback_port_open", return_value=False
+                ) as port_open,
+                patch.object(recover_quarantine.os, "killpg") as killpg,
+                patch.object(recover_quarantine.time, "sleep"),
+            ):
+                result = recover_quarantine.main()
+
+            self.assertEqual(result, 0)
+            self.assertEqual(killpg.call_args.args, (999991, recover_quarantine.signal.SIGTERM))
+            self.assertTrue(port_open.called)
+            self.assertEqual(port_open.call_args.args, ("127.0.0.2", 18400))
+            self.assertFalse(marker_path.exists())
+
+    def test_ornith_recovery_keeps_marker_while_loopback_api_is_open(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            lock_path = Path(temporary) / "gpu-runtime.lock"
+            marker_path = Path(f"{lock_path}.quarantine")
+            marker_path.write_text(
+                json.dumps(
+                    {
+                        "provider": "llama.cpp",
+                        "model": "Qwen3.6-35B-A3B-MTP",
+                        "host": "127.0.0.2",
+                        "port": 18400,
+                        "pid": None,
+                        "pgid": None,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with (
+                patch.dict(
+                    "os.environ",
+                    {
+                        "GPU_LOCK_FILE": str(lock_path),
+                        "LLM_LOCALAI_CLEANUP_TIMEOUT": "0.1",
+                    },
+                ),
+                patch.object(recover_quarantine, "_loopback_port_open", return_value=True),
+                patch.object(recover_quarantine.time, "sleep"),
+            ):
+                result = recover_quarantine.main()
+
+            self.assertEqual(result, 1)
+            self.assertTrue(marker_path.exists())
+
+    def test_loopback_probe_detects_bound_secondary_loopback_port_without_connecting(self) -> None:
+        listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        listener.bind(("127.0.0.2", 0))
+        listener.listen()
+        port = listener.getsockname()[1]
+        try:
+            self.assertTrue(recover_quarantine._loopback_port_open("127.0.0.2", port))
+        finally:
+            listener.close()
+
+        self.assertFalse(recover_quarantine._loopback_port_open("127.0.0.2", port))
 
     def test_worker_bridge_sources_are_not_part_of_the_repository_runtime(self) -> None:
         bridge_sources = list((ROOT / "localai_worker_bridge/src").rglob("*.py"))

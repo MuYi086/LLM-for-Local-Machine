@@ -14,7 +14,14 @@ lock_projects=(
     model-audio/audio_cpp_runtime
     qa
 )
-lint_paths=(main llm_local_runtime inference_gateway scripts/localai)
+lint_paths=(
+    main
+    llm_local_runtime
+    inference_gateway
+    scripts/localai
+    model-text/ornith_1_5_35b_a3b
+    model-text/qwen3_6_35b_a3b
+)
 for project in "${lock_projects[@]}"; do
     if [[ ! -d "$project" ]]; then
         echo "缺少当前维护的 uv 项目：$project" >&2

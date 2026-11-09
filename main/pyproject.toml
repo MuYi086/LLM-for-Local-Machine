@@ -5,6 +5,7 @@ description = "轻量控制面、空间音频与 CPU 导出 API"
 requires-python = "==3.12.13"
 dependencies = [
     "fastapi==0.141.1",
+    "httpx==0.28.1",
     "llm-local-runtime",
     "python-multipart==0.0.32",
     "uvicorn==0.52.1",

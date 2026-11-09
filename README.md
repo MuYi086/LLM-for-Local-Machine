@@ -1,7 +1,7 @@
 # LLM Local Backend
 
-本仓库当前提供九个音频模型 HTTP API、一个轻量控制面和一个 CPU 空间音频 renderer。全部 GPU
-模型 API 共用同一个跨进程文件锁，接入约束、隔离和恢复步骤见[全局 GPU 锁说明](docs/global-gpu-lock.md)。
+本仓库当前提供九个音频模型 HTTP API、两个文本模型 API、一个轻量控制面和一个 CPU 空间音频 renderer。
+所有 GPU API 共用同一个跨进程文件锁，接入约束、隔离和恢复步骤见[全局 GPU 锁说明](docs/global-gpu-lock.md)。
 
 | 组件 | 端口 | 接口/职责 |
 | --- | ---: | --- |
@@ -15,16 +15,23 @@
 | [SeedVC](model-audio/vc_seed-vc/) | 8342 | `POST /v1/SeedVC/SeedVC-MLX-GGUF`，音色转换 |
 | [Stable Audio SFX](model-audio/gen_stable-audio-3-small-sfx/) | 8343 | `POST /v1/stabilityai/Stable-Audio-3-Small-SFX-GGUF`，音效生成 |
 | [VoxCPM2](model-audio/tts_voxcpm2/) | 8313 | `POST /v1/OpenBMB/VoxCPM2-GGUF`，TTS、音色设计与可选参考克隆 |
+| [Ornith-1.5-35B-A3B](model-text/ornith_1_5_35b_a3b/) | 8401 | `POST /v1/AtomicChat/Ornith-1.5-35B-A3B-AD-Q5`，CUDA 推理，前 20 层 MoE 专家放 CPU，mmproj 支持图片 |
+| [Qwen3.6-35B-A3B-MTP](model-text/qwen3_6_35b_a3b/) | 8402 | `POST /v1/qwen/Qwen3.6-35B-A3B-MTP`，CUDA + CPU MoE 混合推理，启用 MTP |
 | [Steam Audio renderer](model-audio/spatial_steam-audio/) | 无 HTTP 端口 | C++17 CPU renderer，由 8300 控制面调用 |
 
-共十个 HTTP 进程由 `start.sh` 管理。八个新增 audio.cpp API 共用轻量 Python 运行环境，不额外安装
-Torch；VoiceDesign 和控制面保留各自运行环境。`storage/` 中的用户运行数据不会由代码清理。
+共十四个 HTTP 进程由 `start.sh` 管理，包括两个仅绑定 loopback 的 llama-server 后端：Ornith 在 `127.0.0.1:8403`，
+Qwen 在 `127.0.0.2:8400`。LocalAI 保持在 `127.0.0.1:8400`，两者通过不同 loopback 地址并存。文本 API 适配器复用
+控制面 Python 项目；八个新增 audio.cpp API 共用轻量 Python 运行环境，不额外安装
+Torch。`storage/` 中的用户运行数据不会由代码清理。
 
 ## 安装与启动
 
-部署需要 Linux、Python `3.12.13`、`uv`、FFmpeg/ffprobe、`setsid`、CUDA/NVIDIA 驱动，以及仓库外准备的
-固定版本 LocalAI/audio.cpp。九个模型 GGUF 从 `$HF_MIRROR_DIR/audio.cpp-gguf/` 读取；固定文件名、
-family/task 和服务路由见[`localai/manifests/audio-cpp-models.json`](localai/manifests/audio-cpp-models.json)。
+部署需要 Linux、Python `3.12.13`、`uv`、FFmpeg/ffprobe、`setsid`、CUDA/NVIDIA 驱动、仓库外准备的
+固定版本 LocalAI/audio.cpp，以及带 CUDA、CUDA0、`--spec-type draft-mtp` 和 sleep-idle 支持的 llama.cpp `llama-server`。九个音频模型 GGUF 从
+`$HF_MIRROR_DIR/audio.cpp-gguf/` 读取；固定文件名、family/task 和服务路由见
+[`localai/manifests/audio-cpp-models.json`](localai/manifests/audio-cpp-models.json)。Ornith 的 GGUF 与 mmproj
+从 `$HF_MIRROR_DIR/AtomicChat/Ornith-1.5-35B-A3B/` 读取，Qwen GGUF 从
+`$HF_MIRROR_DIR/unsloth/Qwen3.6-35B-A3B-MTP/` 读取，不复制进仓库。
 版本和宿主制品指纹见[`localai/manifests/versions.json`](localai/manifests/versions.json)。
 运行与恢复步骤见[LocalAI/audio.cpp 运维说明](docs/localai-audiocpp-upgrade.md)。
 
@@ -50,8 +57,10 @@ bash scripts/build_steam_audio_renderer.sh
 bash start.sh
 ```
 
-脚本先检查全部十个 HTTP 端口，注册九个 GGUF 候选，启动受管 LocalAI/audio.cpp 并执行 readiness 检查，
-再启动控制面、VoiceDesign 和八个共享运行环境的模型服务。任一 HTTP 进程退出时会清理其他进程组并停止受管 LocalAI。按 `Ctrl+C`
+脚本先检查全部十四个监听端口、CUDA 构建的 llama.cpp、两个文本模型文件和必需参数，注册九个 GGUF 候选，
+启动受管 LocalAI/audio.cpp 并执行 readiness 检查；随后使用共享 GPU 锁依次预热 Ornith 和 Qwen，并确认模型进入 sleep-idle，
+再启动控制面与所有 API。两个文本 API 每次请求结束后持锁等待对应模型卸载，再释放 GPU 给其他 provider。
+任一服务进程退出时会清理其他进程组和 llama-server，再停止受管 LocalAI。按 `Ctrl+C`
 正常等待退出；遇到进程异常时，检查 `scripts/localai/manager.py status` 和 GPU quarantine 标记。
 
 默认模型文件路径：
@@ -68,6 +77,25 @@ bash start.sh
 | `QWEN_VOICEDESIGN_HOST` / `QWEN_VOICEDESIGN_PORT` | 继承 `HOST` / `8301` | VoiceDesign 监听地址与端口 |
 | `AUDIO_CPP_*_PORT` | 各服务默认端口 | 八个 audio.cpp 服务端口，可分别覆盖 |
 | `AUDIO_CPP_*_MODEL_FILE` | `$HF_MIRROR_DIR/audio.cpp-gguf/<候选目录>/<固定文件名>` | 各服务 GGUF 路径，完整变量名见模型清单 |
+| `LLAMA_SERVER_BIN` | PATH 中的 `llama-server`，否则尝试 `$HOME/.local/src/llama.cpp/build-cuda/bin/llama-server` | llama.cpp HTTP server 可执行文件；也可显式设置路径 |
+| `ORNITH_MODEL_FILE` | `$HF_MIRROR_DIR/AtomicChat/Ornith-1.5-35B-A3B/Ornith-1.5-35B-A3B-AD-Q5_K-Q4_K.gguf` | Ornith 主模型，只读加载 |
+| `ORNITH_MMPROJ_FILE` | `$HF_MIRROR_DIR/AtomicChat/Ornith-1.5-35B-A3B/mmproj-Ornith-1.5-35B-A3B-F16.gguf` | 多模态 projector，只读加载 |
+| `ORNITH_HOST` / `ORNITH_PORT` | 继承 `HOST` / `8401` | Ornith 对外 API 监听地址 |
+| `LLAMA_CPP_PORT` | `8403` | Ornith llama-server loopback 端口，不绑定外部网卡 |
+| `ORNITH_CONTEXT_SIZE` | `32768` | llama.cpp 上下文长度，最大 `32768` |
+| `ORNITH_BATCH_SIZE` | `512` | llama.cpp logical batch size |
+| `ORNITH_THREADS` | 在线 CPU 数量 | llama.cpp CPU 推理线程数 |
+| `ORNITH_N_GPU_LAYERS` | `99` | 尝试将可用模型层卸载到 CUDA0 |
+| `ORNITH_N_CPU_MOE` | `20` | 前 20 个 MoE 层的专家权重放在 CPU |
+| `ORNITH_SLEEP_IDLE_SECONDS` | `1` | llama.cpp 空闲后卸载模型和 KV cache 的秒数 |
+| `ORNITH_STARTUP_TIMEOUT` | `1800` 秒 | 等待首次加载并确认 sleep-idle 的最长时间 |
+| `ORNITH_SLEEP_TIMEOUT` | `300` 秒 | 单个请求结束后等待模型卸载的最长时间 |
+| `QWEN36_MODEL_FILE` | `$HF_MIRROR_DIR/unsloth/Qwen3.6-35B-A3B-MTP/Qwen3.6-35B-A3B-UD-Q5_K_M.gguf` | Qwen GGUF，只读加载 |
+| `QWEN36_HOST` / `QWEN36_PORT` | 继承 `HOST` / `8402` | Qwen 对外 API 监听地址 |
+| `QWEN36_BACKEND_HOST` / `QWEN36_LLAMA_CPP_PORT` | `127.0.0.2` / `8400` | Qwen llama-server loopback 地址，与 LocalAI 的 `127.0.0.1:8400` 并存 |
+| `QWEN36_CONTEXT_SIZE` / `QWEN36_BATCH_SIZE` | `32768` / `512` | Qwen llama.cpp 上下文和 batch 大小 |
+| `QWEN36_N_GPU_LAYERS` / `QWEN36_N_CPU_MOE` | `99` / `25` | CUDA0 层卸载与 CPU MoE 层数，默认混合推理配置 |
+| `QWEN36_SLEEP_IDLE_SECONDS` | `1` | llama.cpp 空闲后卸载模型和 KV cache 的秒数 |
 | `HF_MIRROR_DIR` | `~/hf-mirror` | 本地模型镜像根目录 |
 | `QWEN_VOICEDESIGN_MODEL_FILE` | 上述 GGUF 路径 | VoiceDesign 模型文件 |
 | `LLM_LOCALAI_DATA_DIR` | `$STORAGE_DIR/.cache/localai` | LocalAI binary、models、backend 和状态数据根目录 |
@@ -82,6 +110,18 @@ bash start.sh
 
 各模型的完整默认权重路径、变量名、端口和路由见模型清单；上传上限、超时及空间 renderer 的其他设置
 可从 `start.sh` 和对应服务模块读取。`GET /v1/health` 不触发推理，会检查 LocalAI 与固定模型注册状态。
+
+Ornith API 使用 CUDA 计算，并将配置的前 20 个 MoE 专家层放在 CPU；空闲后 llama.cpp 通过 sleep-idle 卸载模型，
+API 请求共享 `GPU_LOCK_FILE`，直到确认卸载才归还 GPU。混合推理接口和示例：
+
+```bash
+curl -X POST http://127.0.0.1:8401/v1/AtomicChat/Ornith-1.5-35B-A3B-AD-Q5 \
+  -H 'Content-Type: application/json' \
+  -d '{"messages":[{"role":"user","content":"你好，请用简洁的中文介绍一下自己。"}],"max_tokens":128}'
+uv run --project qa --locked python tests/ornith_1_5_35b_a3b/generate_example.py
+```
+
+样例默认保存在 `storage/llm_tests/ornith_1_5_35b_a3b/`，也可通过 `ORNITH_TEST_OUTPUT_DIR` 指定目录。
 
 ## API
 
@@ -122,6 +162,33 @@ curl -X POST http://127.0.0.1:8300/v1/audio/spatial/render \
 [Steam Audio renderer 文档](model-audio/spatial_steam-audio/README.md)和[通用空间轨迹](docs/spatial-trajectories.md)。
 
 当前不支持 `diffuse`、非 `none` 遮挡和几何反射；服务会拒绝这些字段，不会静默降级。
+
+### Ornith-1.5-35B-A3B 聊天补全
+
+API 适配器将 OpenAI Chat Completions 格式转发给本机 llama-server；模型由 URL 路由固定：
+
+```bash
+curl -X POST http://127.0.0.1:8401/v1/AtomicChat/Ornith-1.5-35B-A3B-AD-Q5 \
+  -H 'Content-Type: application/json' \
+  -d '{"messages":[{"role":"user","content":"用中文解释什么是混合量化。"}],"max_tokens":256}'
+```
+
+真实模型样例生成入口见[`tests/ornith_1_5_35b_a3b/README.md`](tests/ornith_1_5_35b_a3b/README.md)。
+
+### Qwen3.6-35B-A3B-MTP 聊天补全
+
+Qwen 使用本机 `Qwen3.6-35B-A3B-UD-Q5_K_M.gguf`，固定 alias 为 `Qwen3.6-35B-A3B-MTP`。默认启用 CUDA0、
+25 个 CPU MoE 层和 `draft-mtp`；backend 绑定 `127.0.0.2:8400`，可与 `127.0.0.1:8400` 的 LocalAI 并存。
+对外接口为 `POST /v1/qwen/Qwen3.6-35B-A3B-MTP`：
+
+```bash
+curl -X POST http://127.0.0.1:8402/v1/qwen/Qwen3.6-35B-A3B-MTP \
+  -H 'Content-Type: application/json' \
+  -d '{"messages":[{"role":"user","content":"用中文简要解释 MTP。"}],"max_tokens":128}'
+uv run --project qa --locked python tests/qwen3_6_35b_a3b/generate_example.py
+```
+
+真实生成的非空文本默认写入 `storage/llm_tests/qwen3_6_35b_a3b/`。样例请求关闭 thinking，普通 API 请求保留客户端参数。
 
 ### Qwen3-TTS VoiceDesign
 
@@ -177,7 +244,7 @@ Qwen3-ASR 接受 multipart `audio`，可选 `language` 与 `prompt`。SeedVC 接
 
 - VoiceDesign 生成 WAV 默认保存在 `storage/timbre/`。
 - renderer 上传及导出临时文件位于 `$RUNTIME_CACHE_DIR` 下，请求完成后清理。
-- GPU 锁、LocalAI 临时产物和空间任务缓存位于 `$RUNTIME_CACHE_DIR`。
+- GPU 锁、LocalAI 临时产物和空间任务缓存位于 `$RUNTIME_CACHE_DIR`；文本模型样例保存在 `storage/llm_tests/`。
 - 保留策略默认关闭。设置 `STORAGE_RETENTION_HOURS` 或 `STORAGE_RETENTION_MAX_BYTES` 后，可先预览：
 
   ```bash
@@ -202,7 +269,7 @@ bash -n start.sh
 bash scripts/quality_gate.sh
 ```
 
-门禁检查控制面、VoiceDesign、共享 audio.cpp 运行环境和 QA 的锁文件，运行 Steam Audio 无 SDK 核心测试、Ruff、能力清单校验和
+门禁检查控制面、VoiceDesign、Ornith 适配器、共享 audio.cpp 运行环境和 QA 的锁文件，运行 Steam Audio 无 SDK 核心测试、Ruff、能力清单校验和
 无模型 unittest。单独运行测试：
 
 ```bash

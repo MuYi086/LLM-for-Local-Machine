@@ -7,6 +7,9 @@ MAIN_PROJECT_DIR="$MAIN_DIR"
 VOICEDESIGN_PROJECT_DIR="$PROJECT_DIR/model-audio/design_qwen3-tts-1.7b-voicedesign"
 AUDIO_CPP_RUNTIME_PROJECT_DIR="$PROJECT_DIR/model-audio/audio_cpp_runtime"
 AUDIO_CPP_RUNTIME_SRC="$AUDIO_CPP_RUNTIME_PROJECT_DIR/src"
+MODEL_TEXT_DIR="$PROJECT_DIR/model-text"
+ORNITH_SERVICE_DIR="$MODEL_TEXT_DIR/ornith_1_5_35b_a3b"
+QWEN36_SERVICE_DIR="$MODEL_TEXT_DIR/qwen3_6_35b_a3b"
 LLM_LOCAL_RUNTIME_SRC="$PROJECT_DIR/llm_local_runtime/src"
 INFERENCE_GATEWAY_SRC="$PROJECT_DIR/inference_gateway/src"
 
@@ -27,7 +30,7 @@ if [[ ! -f "$AUDIO_CPP_RUNTIME_SRC/audio_cpp_runtime/__init__.py" ]]; then
   exit 1
 fi
 
-export PYTHONPATH="$AUDIO_CPP_RUNTIME_SRC:$LLM_LOCAL_RUNTIME_SRC:$INFERENCE_GATEWAY_SRC${PYTHONPATH:+:$PYTHONPATH}"
+export PYTHONPATH="$MODEL_TEXT_DIR:$AUDIO_CPP_RUNTIME_SRC:$LLM_LOCAL_RUNTIME_SRC:$INFERENCE_GATEWAY_SRC${PYTHONPATH:+:$PYTHONPATH}"
 export STORAGE_DIR="${STORAGE_DIR:-$PROJECT_DIR/storage}"
 export RUNTIME_CACHE_DIR="${RUNTIME_CACHE_DIR:-$STORAGE_DIR/.cache/runtime}"
 export HF_MIRROR_DIR="${HF_MIRROR_DIR:-$HOME/hf-mirror}"
@@ -40,7 +43,23 @@ export AUDIO_CPP_QWEN3_TTS_BASE_MODEL_FILE="${AUDIO_CPP_QWEN3_TTS_BASE_MODEL_FIL
 export AUDIO_CPP_SEED_VC_MODEL_FILE="${AUDIO_CPP_SEED_VC_MODEL_FILE:-$HF_MIRROR_DIR/audio.cpp-gguf/SeedVC-MLX-GGUF/seed-vc-mlx-f16.gguf}"
 export AUDIO_CPP_STABLE_AUDIO_SFX_MODEL_FILE="${AUDIO_CPP_STABLE_AUDIO_SFX_MODEL_FILE:-$HF_MIRROR_DIR/audio.cpp-gguf/Stable-Audio-3-Small-SFX-GGUF/stable-audio-3-small-sfx-f16.gguf}"
 export AUDIO_CPP_VOXCPM2_MODEL_FILE="${AUDIO_CPP_VOXCPM2_MODEL_FILE:-$HF_MIRROR_DIR/audio.cpp-gguf/VoxCPM2-GGUF/voxcpm2-q8_0.gguf}"
+export ORNITH_MODEL_FILE="${ORNITH_MODEL_FILE:-$HF_MIRROR_DIR/AtomicChat/Ornith-1.5-35B-A3B/Ornith-1.5-35B-A3B-AD-Q5_K-Q4_K.gguf}"
+export ORNITH_MMPROJ_FILE="${ORNITH_MMPROJ_FILE:-$HF_MIRROR_DIR/AtomicChat/Ornith-1.5-35B-A3B/mmproj-Ornith-1.5-35B-A3B-F16.gguf}"
+export QWEN36_MODEL_FILE="${QWEN36_MODEL_FILE:-$HF_MIRROR_DIR/unsloth/Qwen3.6-35B-A3B-MTP/Qwen3.6-35B-A3B-UD-Q5_K_M.gguf}"
 export TIMBRE_STORAGE_DIR="${TIMBRE_STORAGE_DIR:-$STORAGE_DIR/timbre}"
+
+if [[ -z "${LLAMA_SERVER_BIN:-}" ]]; then
+  LLAMA_SERVER_BIN="$(command -v llama-server || true)"
+  if [[ -z "$LLAMA_SERVER_BIN" ]]; then
+    local_cuda_llama_server="$HOME/.local/src/llama.cpp/build-cuda/bin/llama-server"
+    if [[ -x "$local_cuda_llama_server" ]]; then
+      LLAMA_SERVER_BIN="$local_cuda_llama_server"
+    fi
+  fi
+elif [[ "$LLAMA_SERVER_BIN" != */* ]]; then
+  LLAMA_SERVER_BIN="$(command -v "$LLAMA_SERVER_BIN" || true)"
+fi
+export LLAMA_SERVER_BIN
 
 export LLM_LOCALAI_ENABLED="${LLM_LOCALAI_ENABLED:-true}"
 export LLM_LOCALAI_MANAGED="${LLM_LOCALAI_MANAGED:-true}"
@@ -79,6 +98,35 @@ export HOST="${HOST:-0.0.0.0}"
 export PORT="${PORT:-8300}"
 export QWEN_VOICEDESIGN_HOST="${QWEN_VOICEDESIGN_HOST:-$HOST}"
 export QWEN_VOICEDESIGN_PORT="${QWEN_VOICEDESIGN_PORT:-8301}"
+export ORNITH_HOST="${ORNITH_HOST:-$HOST}"
+export ORNITH_PORT="${ORNITH_PORT:-8401}"
+export LLAMA_CPP_PORT="${LLAMA_CPP_PORT:-8403}"
+export ORNITH_LLAMA_BASE_URL="${ORNITH_LLAMA_BASE_URL:-http://127.0.0.1:$LLAMA_CPP_PORT}"
+export ORNITH_CONTEXT_SIZE="${ORNITH_CONTEXT_SIZE:-32768}"
+export ORNITH_BATCH_SIZE="${ORNITH_BATCH_SIZE:-512}"
+export ORNITH_THREADS="${ORNITH_THREADS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || printf '8')}"
+export ORNITH_N_GPU_LAYERS="${ORNITH_N_GPU_LAYERS:-99}"
+export ORNITH_N_CPU_MOE="${ORNITH_N_CPU_MOE:-20}"
+export ORNITH_SLEEP_IDLE_SECONDS="${ORNITH_SLEEP_IDLE_SECONDS:-1}"
+export ORNITH_STARTUP_TIMEOUT="${ORNITH_STARTUP_TIMEOUT:-1800}"
+export ORNITH_SLEEP_TIMEOUT="${ORNITH_SLEEP_TIMEOUT:-300}"
+export ORNITH_SLEEP_POLL_INTERVAL="${ORNITH_SLEEP_POLL_INTERVAL:-0.25}"
+export ORNITH_BACKEND_PID_FILE="${ORNITH_BACKEND_PID_FILE:-$RUNTIME_CACHE_DIR/ornith-llama-server.pid}"
+export QWEN36_HOST="${QWEN36_HOST:-$HOST}"
+export QWEN36_PORT="${QWEN36_PORT:-8402}"
+export QWEN36_BACKEND_HOST="${QWEN36_BACKEND_HOST:-127.0.0.2}"
+export QWEN36_LLAMA_CPP_PORT="${QWEN36_LLAMA_CPP_PORT:-8400}"
+export QWEN36_LLAMA_BASE_URL="${QWEN36_LLAMA_BASE_URL:-http://$QWEN36_BACKEND_HOST:$QWEN36_LLAMA_CPP_PORT}"
+export QWEN36_CONTEXT_SIZE="${QWEN36_CONTEXT_SIZE:-32768}"
+export QWEN36_BATCH_SIZE="${QWEN36_BATCH_SIZE:-512}"
+export QWEN36_THREADS="${QWEN36_THREADS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || printf '8')}"
+export QWEN36_N_GPU_LAYERS="${QWEN36_N_GPU_LAYERS:-99}"
+export QWEN36_N_CPU_MOE="${QWEN36_N_CPU_MOE:-25}"
+export QWEN36_SLEEP_IDLE_SECONDS="${QWEN36_SLEEP_IDLE_SECONDS:-1}"
+export QWEN36_STARTUP_TIMEOUT="${QWEN36_STARTUP_TIMEOUT:-1800}"
+export QWEN36_SLEEP_TIMEOUT="${QWEN36_SLEEP_TIMEOUT:-300}"
+export QWEN36_SLEEP_POLL_INTERVAL="${QWEN36_SLEEP_POLL_INTERVAL:-0.25}"
+export QWEN36_BACKEND_PID_FILE="${QWEN36_BACKEND_PID_FILE:-$RUNTIME_CACHE_DIR/qwen3-6-llama-server.pid}"
 
 AUDIO_CPP_SERVICE_KEYS=(
   confucius4_tts index_tts25 midashenglm_gen qwen3_asr
@@ -135,6 +183,10 @@ mkdir -p \
 PORT_CHECK_ARGS=(
   'Control-plane' "$HOST" "$PORT"
   'Qwen3-TTS VoiceDesign' "$QWEN_VOICEDESIGN_HOST" "$QWEN_VOICEDESIGN_PORT"
+  'Ornith API' "$ORNITH_HOST" "$ORNITH_PORT"
+  'Ornith llama.cpp backend' '127.0.0.1' "$LLAMA_CPP_PORT"
+  'Qwen3.6 API' "$QWEN36_HOST" "$QWEN36_PORT"
+  'Qwen3.6 llama.cpp backend' "$QWEN36_BACKEND_HOST" "$QWEN36_LLAMA_CPP_PORT"
 )
 for index in "${!AUDIO_CPP_SERVICE_KEYS[@]}"; do
   PORT_CHECK_ARGS+=(
@@ -145,6 +197,106 @@ for index in "${!AUDIO_CPP_SERVICE_KEYS[@]}"; do
 done
 uv run --no-sync --project "$MAIN_PROJECT_DIR" python "$MAIN_DIR/check_ports.py" \
   "${PORT_CHECK_ARGS[@]}"
+
+if [[ "$ORNITH_LLAMA_BASE_URL" != "http://127.0.0.1:$LLAMA_CPP_PORT" ]]; then
+  echo "ORNITH_LLAMA_BASE_URL 必须与 Ornith backend 的 127.0.0.1:$LLAMA_CPP_PORT 一致。" >&2
+  exit 1
+fi
+case "$QWEN36_BACKEND_HOST" in
+  127.*|localhost) ;;
+  *)
+    echo "QWEN36_BACKEND_HOST 必须是 loopback 地址。" >&2
+    exit 1
+    ;;
+esac
+if [[ "$QWEN36_LLAMA_BASE_URL" != "http://$QWEN36_BACKEND_HOST:$QWEN36_LLAMA_CPP_PORT" ]]; then
+  echo "QWEN36_LLAMA_BASE_URL 必须与 Qwen3.6 backend host 和 port 一致。" >&2
+  exit 1
+fi
+
+if [[ -z "$LLAMA_SERVER_BIN" || ! -x "$LLAMA_SERVER_BIN" ]]; then
+  echo "找不到可执行的 llama-server；请安装 llama.cpp 或设置 LLAMA_SERVER_BIN。" >&2
+  exit 1
+fi
+if [[ ! -s "$ORNITH_MODEL_FILE" ]]; then
+  echo "Ornith GGUF 缺失或为空：$ORNITH_MODEL_FILE" >&2
+  exit 1
+fi
+if [[ ! -s "$ORNITH_MMPROJ_FILE" ]]; then
+  echo "Ornith mmproj 缺失或为空：$ORNITH_MMPROJ_FILE" >&2
+  exit 1
+fi
+if [[ ! -s "$QWEN36_MODEL_FILE" ]]; then
+  echo "Qwen3.6 GGUF 缺失或为空：$QWEN36_MODEL_FILE" >&2
+  exit 1
+fi
+for value_name in \
+  ORNITH_CONTEXT_SIZE ORNITH_BATCH_SIZE ORNITH_THREADS \
+  ORNITH_N_GPU_LAYERS ORNITH_N_CPU_MOE ORNITH_SLEEP_IDLE_SECONDS ORNITH_STARTUP_TIMEOUT; do
+  value="${!value_name}"
+  if [[ ! "$value" =~ ^[1-9][0-9]*$ ]]; then
+    echo "$value_name 必须是正整数。" >&2
+    exit 1
+  fi
+done
+for value_name in \
+  QWEN36_CONTEXT_SIZE QWEN36_BATCH_SIZE QWEN36_THREADS \
+  QWEN36_N_GPU_LAYERS QWEN36_N_CPU_MOE QWEN36_SLEEP_IDLE_SECONDS QWEN36_STARTUP_TIMEOUT; do
+  value="${!value_name}"
+  if [[ ! "$value" =~ ^[1-9][0-9]*$ ]]; then
+    echo "$value_name 必须是正整数。" >&2
+    exit 1
+  fi
+done
+if (( QWEN36_CONTEXT_SIZE > 32768 )); then
+  echo "QWEN36_CONTEXT_SIZE 不得超过 32768。" >&2
+  exit 1
+fi
+if (( ORNITH_CONTEXT_SIZE > 32768 )); then
+  echo "ORNITH_CONTEXT_SIZE 不得超过 32768。" >&2
+  exit 1
+fi
+if ! [[ "$ORNITH_SLEEP_TIMEOUT" =~ ^[0-9]+([.][0-9]+)?$ ]] || (( $(awk "BEGIN { print ($ORNITH_SLEEP_TIMEOUT > 0) ? 1 : 0 }") == 0 )); then
+  echo "ORNITH_SLEEP_TIMEOUT 必须是正数。" >&2
+  exit 1
+fi
+if ! [[ "$ORNITH_SLEEP_POLL_INTERVAL" =~ ^[0-9]+([.][0-9]+)?$ ]] || (( $(awk "BEGIN { print ($ORNITH_SLEEP_POLL_INTERVAL > 0) ? 1 : 0 }") == 0 )); then
+  echo "ORNITH_SLEEP_POLL_INTERVAL 必须是正数。" >&2
+  exit 1
+fi
+if ! [[ "$QWEN36_SLEEP_TIMEOUT" =~ ^[0-9]+([.][0-9]+)?$ ]] || (( $(awk "BEGIN { print ($QWEN36_SLEEP_TIMEOUT > 0) ? 1 : 0 }") == 0 )); then
+  echo "QWEN36_SLEEP_TIMEOUT 必须是正数。" >&2
+  exit 1
+fi
+if ! [[ "$QWEN36_SLEEP_POLL_INTERVAL" =~ ^[0-9]+([.][0-9]+)?$ ]] || (( $(awk "BEGIN { print ($QWEN36_SLEEP_POLL_INTERVAL > 0) ? 1 : 0 }") == 0 )); then
+  echo "QWEN36_SLEEP_POLL_INTERVAL 必须是正数。" >&2
+  exit 1
+fi
+if ! [[ "$CUDA_RELEASE_DELAY" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
+  echo "CUDA_RELEASE_DELAY 必须是非负数。" >&2
+  exit 1
+fi
+if ! [[ "$GPU_LOCK_WAIT_TIMEOUT" =~ ^[0-9]+([.][0-9]+)?$ ]] || (( $(awk "BEGIN { print ($GPU_LOCK_WAIT_TIMEOUT > 0) ? 1 : 0 }") == 0 )); then
+  echo "GPU_LOCK_WAIT_TIMEOUT 必须是正数。" >&2
+  exit 1
+fi
+DEVICE_LIST="$($LLAMA_SERVER_BIN --list-devices 2>&1 || true)"
+if ! grep -q 'CUDA0' <<<"$DEVICE_LIST"; then
+  echo "llama-server 未提供 CUDA0 设备；请安装 CUDA 构建的 llama.cpp。" >&2
+  printf '%s\n' "$DEVICE_LIST" >&2
+  exit 1
+fi
+LLAMA_HELP="$($LLAMA_SERVER_BIN --help 2>&1 || true)"
+for required_flag in --n-cpu-moe --sleep-idle-seconds --mmproj-offload --spec-type; do
+  if ! grep -q -- "$required_flag" <<<"$LLAMA_HELP"; then
+    echo "llama-server 缺少所需参数：$required_flag。" >&2
+    exit 1
+  fi
+done
+if [[ -e "$GPU_LOCK_FILE.quarantine" ]]; then
+  echo "GPU quarantine 标记存在：$GPU_LOCK_FILE.quarantine；请先运行 scripts/localai/recover_quarantine.py。" >&2
+  exit 1
+fi
 
 if [[ ! -x "$STEAM_AUDIO_RENDERER_BIN" ]]; then
   echo "警告：Steam Audio renderer 不存在或不可执行：$STEAM_AUDIO_RENDERER_BIN" >&2
@@ -161,6 +313,13 @@ echo "Spatial render:        http://$HOST:$PORT/v1/audio/spatial/render"
 echo "VoiceDesign project:   $VOICEDESIGN_PROJECT_DIR"
 echo "audio.cpp runtime:     $AUDIO_CPP_RUNTIME_PROJECT_DIR"
 echo "VoiceDesign GGUF:      $QWEN_VOICEDESIGN_MODEL_FILE"
+echo "Ornith GGUF:           $ORNITH_MODEL_FILE"
+echo "Ornith mmproj:         $ORNITH_MMPROJ_FILE"
+echo "Ornith llama-server:   $LLAMA_SERVER_BIN (CUDA0, CPU MoE=$ORNITH_N_CPU_MOE, 127.0.0.1:$LLAMA_CPP_PORT)"
+echo "Ornith API:            http://$ORNITH_HOST:$ORNITH_PORT/v1/AtomicChat/Ornith-1.5-35B-A3B-AD-Q5"
+echo "Qwen3.6 GGUF:          $QWEN36_MODEL_FILE"
+echo "Qwen3.6 llama-server:  $LLAMA_SERVER_BIN (CUDA0, CPU MoE=$QWEN36_N_CPU_MOE, MTP, $QWEN36_BACKEND_HOST:$QWEN36_LLAMA_CPP_PORT)"
+echo "Qwen3.6 API:           http://$QWEN36_HOST:$QWEN36_PORT/v1/qwen/Qwen3.6-35B-A3B-MTP"
 echo "VoiceDesign API:       http://$QWEN_VOICEDESIGN_HOST:$QWEN_VOICEDESIGN_PORT/v1/qwen/Qwen3-TTS-1.7B-VoiceDesign"
 for index in "${!AUDIO_CPP_SERVICE_KEYS[@]}"; do
   echo "${AUDIO_CPP_SERVICE_KEYS[$index]} API: http://${AUDIO_CPP_SERVICE_HOSTS[$index]}:${AUDIO_CPP_SERVICE_PORTS[$index]}${AUDIO_CPP_SERVICE_ROUTES[$index]}"
@@ -182,26 +341,34 @@ cd "$PROJECT_DIR"
 
 main_pid=""
 voicedesign_pid=""
+ornith_pid=""
+qwen36_pid=""
+llama_server_pid=""
+qwen36_llama_server_pid=""
+llama_watch_pid=""
+qwen36_llama_watch_pid=""
+ornith_backend_start_attempted=0
+qwen36_backend_start_attempted=0
 audio_cpp_pids=()
 localai_managed_started=0
 
 cleanup() {
   local status=$?
-  local pids=("$main_pid" "$voicedesign_pid" "${audio_cpp_pids[@]}")
+  local service_pids=("$main_pid" "$voicedesign_pid" "$ornith_pid" "$qwen36_pid" "$llama_watch_pid" "$qwen36_llama_watch_pid" "${audio_cpp_pids[@]}")
   trap - INT TERM EXIT
 
-  for pid in "${pids[@]}"; do
+  for pid in "${service_pids[@]}"; do
     if [[ -n "$pid" ]] && kill -0 -- "-$pid" 2>/dev/null; then
       kill -TERM -- "-$pid" 2>/dev/null || true
     fi
   done
   sleep 1
-  for pid in "${pids[@]}"; do
+  for pid in "${service_pids[@]}"; do
     if [[ -n "$pid" ]] && kill -0 -- "-$pid" 2>/dev/null; then
       kill -KILL -- "-$pid" 2>/dev/null || true
     fi
   done
-  for pid in "${pids[@]}"; do
+  for pid in "${service_pids[@]}"; do
     wait "$pid" 2>/dev/null || true
   done
 
@@ -211,6 +378,46 @@ cleanup() {
       [[ "$status" != "0" ]] || status=1
     fi
   fi
+
+  if [[ -e "$GPU_LOCK_FILE.quarantine" ]]; then
+    if ! LLM_LOCALAI_ENABLED="$LLM_LOCALAI_ENABLED" \
+      python3 "$PROJECT_DIR/scripts/localai/recover_quarantine.py"; then
+      echo "GPU quarantine 恢复未确认，保留标记：$GPU_LOCK_FILE.quarantine" >&2
+      [[ "$status" != "0" ]] || status=1
+    fi
+  fi
+  local backend_models=(Ornith-1.5-35B-A3B-AD-Q5 Qwen3.6-35B-A3B-MTP)
+  local backend_hosts=(127.0.0.1 "$QWEN36_BACKEND_HOST")
+  local backend_ports=("$LLAMA_CPP_PORT" "$QWEN36_LLAMA_CPP_PORT")
+  local backend_pid_files=("$ORNITH_BACKEND_PID_FILE" "$QWEN36_BACKEND_PID_FILE")
+  local backend_attempted=("$ornith_backend_start_attempted" "$qwen36_backend_start_attempted")
+  local backend_pids=("$llama_server_pid" "$qwen36_llama_server_pid")
+  local backend_count="${#backend_models[@]}"
+  local backend_index
+  for ((backend_index = 0; backend_index < backend_count; backend_index++)); do
+    local backend_pid="${backend_pids[$backend_index]}"
+    if [[ -z "$backend_pid" && "${backend_attempted[$backend_index]}" == "1" && -s "${backend_pid_files[$backend_index]}" ]]; then
+      read -r backend_pid < "${backend_pid_files[$backend_index]}" || true
+    fi
+    if [[ -n "$backend_pid" && "$backend_pid" =~ ^[1-9][0-9]*$ && ! -e "$GPU_LOCK_FILE.quarantine" ]]; then
+      if python3 -m ornith_1_5_35b_a3b.runtime shutdown \
+        --lock-file "$GPU_LOCK_FILE" \
+        --model "${backend_models[$backend_index]}" \
+        --host "${backend_hosts[$backend_index]}" \
+        --port "${backend_ports[$backend_index]}" \
+        --pid "$backend_pid" \
+        --pgid "$backend_pid" \
+        --executable "$LLAMA_SERVER_BIN" \
+        --lock-timeout "$GPU_LOCK_WAIT_TIMEOUT" \
+        --cleanup-timeout "${LLM_LOCALAI_CLEANUP_TIMEOUT:-30}" \
+        --cuda-release-delay "$CUDA_RELEASE_DELAY"; then
+        rm -f -- "${backend_pid_files[$backend_index]}"
+      else
+        echo "${backend_models[$backend_index]} llama.cpp backend 未确认停止，保留 GPU quarantine 标记。" >&2
+        [[ "$status" != "0" ]] || status=1
+      fi
+    fi
+  done
   exit "$status"
 }
 
@@ -233,6 +440,81 @@ fi
 uv run --no-sync --project "$MAIN_PROJECT_DIR" \
   python "$PROJECT_DIR/scripts/localai/preflight.py"
 
+rm -f -- "$ORNITH_BACKEND_PID_FILE"
+ornith_backend_start_attempted=1
+python3 -m ornith_1_5_35b_a3b.runtime startup \
+  --lock-file "$GPU_LOCK_FILE" \
+  --pid-file "$ORNITH_BACKEND_PID_FILE" \
+  --host 127.0.0.1 \
+  --port "$LLAMA_CPP_PORT" \
+  --model Ornith-1.5-35B-A3B-AD-Q5 \
+  --base-url "$ORNITH_LLAMA_BASE_URL" \
+  --executable "$LLAMA_SERVER_BIN" \
+  --lock-timeout "$GPU_LOCK_WAIT_TIMEOUT" \
+  --timeout "$ORNITH_STARTUP_TIMEOUT" \
+  --interval "$ORNITH_SLEEP_POLL_INTERVAL" \
+  --cuda-release-delay "$CUDA_RELEASE_DELAY" \
+  -- \
+  --model "$ORNITH_MODEL_FILE" \
+  --mmproj "$ORNITH_MMPROJ_FILE" \
+  --host 127.0.0.1 \
+  --port "$LLAMA_CPP_PORT" \
+  --alias Ornith-1.5-35B-A3B-AD-Q5 \
+  --device CUDA0 \
+  --gpu-layers "$ORNITH_N_GPU_LAYERS" \
+  --n-cpu-moe "$ORNITH_N_CPU_MOE" \
+  --mmproj-offload \
+  --flash-attn on \
+  --jinja \
+  --ctx-size "$ORNITH_CONTEXT_SIZE" \
+  --batch-size "$ORNITH_BATCH_SIZE" \
+  --threads "$ORNITH_THREADS" \
+  --threads-batch "$ORNITH_THREADS" \
+  --parallel 1 \
+  --sleep-idle-seconds "$ORNITH_SLEEP_IDLE_SECONDS"
+read -r llama_server_pid < "$ORNITH_BACKEND_PID_FILE"
+if [[ ! "$llama_server_pid" =~ ^[1-9][0-9]*$ ]]; then
+  echo "Ornith startup helper 未返回有效 backend PID。" >&2
+  exit 1
+fi
+
+rm -f -- "$QWEN36_BACKEND_PID_FILE"
+qwen36_backend_start_attempted=1
+python3 -m ornith_1_5_35b_a3b.runtime startup \
+  --lock-file "$GPU_LOCK_FILE" \
+  --pid-file "$QWEN36_BACKEND_PID_FILE" \
+  --host "$QWEN36_BACKEND_HOST" \
+  --port "$QWEN36_LLAMA_CPP_PORT" \
+  --model Qwen3.6-35B-A3B-MTP \
+  --base-url "$QWEN36_LLAMA_BASE_URL" \
+  --executable "$LLAMA_SERVER_BIN" \
+  --lock-timeout "$GPU_LOCK_WAIT_TIMEOUT" \
+  --timeout "$QWEN36_STARTUP_TIMEOUT" \
+  --interval "$QWEN36_SLEEP_POLL_INTERVAL" \
+  --cuda-release-delay "$CUDA_RELEASE_DELAY" \
+  -- \
+  --model "$QWEN36_MODEL_FILE" \
+  --host "$QWEN36_BACKEND_HOST" \
+  --port "$QWEN36_LLAMA_CPP_PORT" \
+  --alias Qwen3.6-35B-A3B-MTP \
+  --device CUDA0 \
+  --gpu-layers "$QWEN36_N_GPU_LAYERS" \
+  --n-cpu-moe "$QWEN36_N_CPU_MOE" \
+  --spec-type draft-mtp \
+  --flash-attn on \
+  --jinja \
+  --ctx-size "$QWEN36_CONTEXT_SIZE" \
+  --batch-size "$QWEN36_BATCH_SIZE" \
+  --threads "$QWEN36_THREADS" \
+  --threads-batch "$QWEN36_THREADS" \
+  --parallel 1 \
+  --sleep-idle-seconds "$QWEN36_SLEEP_IDLE_SECONDS"
+read -r qwen36_llama_server_pid < "$QWEN36_BACKEND_PID_FILE"
+if [[ ! "$qwen36_llama_server_pid" =~ ^[1-9][0-9]*$ ]]; then
+  echo "Qwen3.6 startup helper 未返回有效 backend PID。" >&2
+  exit 1
+fi
+
 setsid uv run --no-sync --project "$MAIN_PROJECT_DIR" python "$MAIN_DIR/main.py" &
 main_pid=$!
 QWEN_VOICEDESIGN_HOST="$QWEN_VOICEDESIGN_HOST" \
@@ -250,4 +532,40 @@ for index in "${!AUDIO_CPP_SERVICE_KEYS[@]}"; do
   audio_cpp_pids+=("$!")
 done
 
-wait -n "$main_pid" "$voicedesign_pid" "${audio_cpp_pids[@]}"
+ORNITH_HOST="$ORNITH_HOST" \
+  ORNITH_PORT="$ORNITH_PORT" \
+  ORNITH_LLAMA_BASE_URL="$ORNITH_LLAMA_BASE_URL" \
+  ORNITH_BACKEND_HOST=127.0.0.1 \
+  ORNITH_BACKEND_PID="$llama_server_pid" \
+  ORNITH_BACKEND_PGID="$llama_server_pid" \
+  LLAMA_CPP_PORT="$LLAMA_CPP_PORT" \
+  setsid uv run --no-sync --project "$MAIN_PROJECT_DIR" \
+  python "$ORNITH_SERVICE_DIR/main.py" &
+ornith_pid=$!
+
+QWEN36_HOST="$QWEN36_HOST" \
+  QWEN36_PORT="$QWEN36_PORT" \
+  QWEN36_LLAMA_BASE_URL="$QWEN36_LLAMA_BASE_URL" \
+  QWEN36_BACKEND_HOST="$QWEN36_BACKEND_HOST" \
+  QWEN36_LLAMA_CPP_PORT="$QWEN36_LLAMA_CPP_PORT" \
+  QWEN36_BACKEND_PID="$qwen36_llama_server_pid" \
+  QWEN36_BACKEND_PGID="$qwen36_llama_server_pid" \
+  setsid uv run --no-sync --project "$MAIN_PROJECT_DIR" \
+  python "$QWEN36_SERVICE_DIR/main.py" &
+qwen36_pid=$!
+
+setsid bash -c '
+  backend_pid="$1"
+  while kill -0 "$backend_pid" 2>/dev/null; do sleep 1; done
+  exit 1
+' _ "$llama_server_pid" &
+llama_watch_pid=$!
+
+setsid bash -c '
+  backend_pid="$1"
+  while kill -0 "$backend_pid" 2>/dev/null; do sleep 1; done
+  exit 1
+' _ "$qwen36_llama_server_pid" &
+qwen36_llama_watch_pid=$!
+
+wait -n "$main_pid" "$voicedesign_pid" "$ornith_pid" "$qwen36_pid" "$llama_watch_pid" "$qwen36_llama_watch_pid" "${audio_cpp_pids[@]}"
