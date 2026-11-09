@@ -45,6 +45,7 @@ export AUDIO_CPP_STABLE_AUDIO_SFX_MODEL_FILE="${AUDIO_CPP_STABLE_AUDIO_SFX_MODEL
 export AUDIO_CPP_VOXCPM2_MODEL_FILE="${AUDIO_CPP_VOXCPM2_MODEL_FILE:-$HF_MIRROR_DIR/audio.cpp-gguf/VoxCPM2-GGUF/voxcpm2-q8_0.gguf}"
 export ORNITH_MODEL_FILE="${ORNITH_MODEL_FILE:-$HF_MIRROR_DIR/AtomicChat/Ornith-1.5-35B-A3B/Ornith-1.5-35B-A3B-AD-Q5_K-Q4_K.gguf}"
 export ORNITH_MMPROJ_FILE="${ORNITH_MMPROJ_FILE:-$HF_MIRROR_DIR/AtomicChat/Ornith-1.5-35B-A3B/mmproj-Ornith-1.5-35B-A3B-F16.gguf}"
+export ORNITH_MTP_FILE="${ORNITH_MTP_FILE:-$HF_MIRROR_DIR/AtomicChat/Ornith-1.5-35B-A3B/mtp-Ornith-1.5-35B-A3B-Q8_0.gguf}"
 export QWEN36_MODEL_FILE="${QWEN36_MODEL_FILE:-$HF_MIRROR_DIR/unsloth/Qwen3.6-35B-A3B-MTP/Qwen3.6-35B-A3B-UD-Q5_K_M.gguf}"
 export TIMBRE_STORAGE_DIR="${TIMBRE_STORAGE_DIR:-$STORAGE_DIR/timbre}"
 
@@ -102,11 +103,21 @@ export ORNITH_HOST="${ORNITH_HOST:-$HOST}"
 export ORNITH_PORT="${ORNITH_PORT:-8401}"
 export LLAMA_CPP_PORT="${LLAMA_CPP_PORT:-8403}"
 export ORNITH_LLAMA_BASE_URL="${ORNITH_LLAMA_BASE_URL:-http://127.0.0.1:$LLAMA_CPP_PORT}"
+# 默认采用同权重、32K 上下文下的实测配置，记录见 tests/model_web_comparison/README.md。
 export ORNITH_CONTEXT_SIZE="${ORNITH_CONTEXT_SIZE:-32768}"
 export ORNITH_BATCH_SIZE="${ORNITH_BATCH_SIZE:-512}"
-export ORNITH_THREADS="${ORNITH_THREADS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || printf '8')}"
+export ORNITH_THREADS="${ORNITH_THREADS:-6}"
+export ORNITH_THREADS_BATCH="${ORNITH_THREADS_BATCH:-8}"
+export ORNITH_CACHE_TYPE_K="${ORNITH_CACHE_TYPE_K:-q8_0}"
+export ORNITH_CACHE_TYPE_V="${ORNITH_CACHE_TYPE_V:-q8_0}"
+export ORNITH_LOAD_MODE="${ORNITH_LOAD_MODE:-none}"
+export ORNITH_SPEC_TYPE="${ORNITH_SPEC_TYPE:-draft-mtp}"
+export ORNITH_SPEC_DRAFT_N_MAX="${ORNITH_SPEC_DRAFT_N_MAX:-4}"
+export ORNITH_SPEC_DRAFT_CACHE_TYPE_K="${ORNITH_SPEC_DRAFT_CACHE_TYPE_K:-f16}"
+export ORNITH_SPEC_DRAFT_CACHE_TYPE_V="${ORNITH_SPEC_DRAFT_CACHE_TYPE_V:-f16}"
 export ORNITH_N_GPU_LAYERS="${ORNITH_N_GPU_LAYERS:-99}"
-export ORNITH_N_CPU_MOE="${ORNITH_N_CPU_MOE:-20}"
+# 独立 MTP 占用额外显存；23 层 CPU 专家搭配 Q8 主 KV 是本机串行复测选定的配置。
+export ORNITH_N_CPU_MOE="${ORNITH_N_CPU_MOE:-23}"
 export ORNITH_SLEEP_IDLE_SECONDS="${ORNITH_SLEEP_IDLE_SECONDS:-1}"
 export ORNITH_STARTUP_TIMEOUT="${ORNITH_STARTUP_TIMEOUT:-1800}"
 export ORNITH_SLEEP_TIMEOUT="${ORNITH_SLEEP_TIMEOUT:-300}"
@@ -119,9 +130,16 @@ export QWEN36_LLAMA_CPP_PORT="${QWEN36_LLAMA_CPP_PORT:-8400}"
 export QWEN36_LLAMA_BASE_URL="${QWEN36_LLAMA_BASE_URL:-http://$QWEN36_BACKEND_HOST:$QWEN36_LLAMA_CPP_PORT}"
 export QWEN36_CONTEXT_SIZE="${QWEN36_CONTEXT_SIZE:-32768}"
 export QWEN36_BATCH_SIZE="${QWEN36_BATCH_SIZE:-512}"
-export QWEN36_THREADS="${QWEN36_THREADS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || printf '8')}"
+export QWEN36_THREADS="${QWEN36_THREADS:-8}"
+export QWEN36_THREADS_BATCH="${QWEN36_THREADS_BATCH:-8}"
+export QWEN36_CACHE_TYPE_K="${QWEN36_CACHE_TYPE_K:-q8_0}"
+export QWEN36_CACHE_TYPE_V="${QWEN36_CACHE_TYPE_V:-q8_0}"
+export QWEN36_LOAD_MODE="${QWEN36_LOAD_MODE:-none}"
+export QWEN36_SPEC_DRAFT_N_MAX="${QWEN36_SPEC_DRAFT_N_MAX:-4}"
+export QWEN36_SPEC_DRAFT_CACHE_TYPE_K="${QWEN36_SPEC_DRAFT_CACHE_TYPE_K:-f16}"
+export QWEN36_SPEC_DRAFT_CACHE_TYPE_V="${QWEN36_SPEC_DRAFT_CACHE_TYPE_V:-f16}"
 export QWEN36_N_GPU_LAYERS="${QWEN36_N_GPU_LAYERS:-99}"
-export QWEN36_N_CPU_MOE="${QWEN36_N_CPU_MOE:-25}"
+export QWEN36_N_CPU_MOE="${QWEN36_N_CPU_MOE:-23}"
 export QWEN36_SLEEP_IDLE_SECONDS="${QWEN36_SLEEP_IDLE_SECONDS:-1}"
 export QWEN36_STARTUP_TIMEOUT="${QWEN36_STARTUP_TIMEOUT:-1800}"
 export QWEN36_SLEEP_TIMEOUT="${QWEN36_SLEEP_TIMEOUT:-300}"
@@ -226,12 +244,32 @@ if [[ ! -s "$ORNITH_MMPROJ_FILE" ]]; then
   echo "Ornith mmproj 缺失或为空：$ORNITH_MMPROJ_FILE" >&2
   exit 1
 fi
+case "$ORNITH_SPEC_TYPE" in
+  none|draft-mtp) ;;
+  *)
+    echo "ORNITH_SPEC_TYPE 必须是 none 或 draft-mtp。" >&2
+    exit 1
+    ;;
+esac
+ORNITH_SPEC_ARGS=(--spec-type "$ORNITH_SPEC_TYPE")
+if [[ "$ORNITH_SPEC_TYPE" == draft-mtp ]]; then
+  if [[ ! -s "$ORNITH_MTP_FILE" ]]; then
+    echo "Ornith MTP 缺失或为空：$ORNITH_MTP_FILE" >&2
+    exit 1
+  fi
+  ORNITH_SPEC_ARGS+=(
+    --spec-draft-model "$ORNITH_MTP_FILE"
+    --spec-draft-n-max "$ORNITH_SPEC_DRAFT_N_MAX"
+    --spec-draft-type-k "$ORNITH_SPEC_DRAFT_CACHE_TYPE_K"
+    --spec-draft-type-v "$ORNITH_SPEC_DRAFT_CACHE_TYPE_V"
+  )
+fi
 if [[ ! -s "$QWEN36_MODEL_FILE" ]]; then
   echo "Qwen3.6 GGUF 缺失或为空：$QWEN36_MODEL_FILE" >&2
   exit 1
 fi
 for model_prefix in ORNITH QWEN36; do
-  for setting in CONTEXT_SIZE BATCH_SIZE THREADS N_GPU_LAYERS N_CPU_MOE SLEEP_IDLE_SECONDS STARTUP_TIMEOUT; do
+  for setting in CONTEXT_SIZE BATCH_SIZE THREADS THREADS_BATCH N_GPU_LAYERS N_CPU_MOE SLEEP_IDLE_SECONDS STARTUP_TIMEOUT; do
     value_name="${model_prefix}_${setting}"
     if [[ ! "${!value_name}" =~ ^[1-9][0-9]*$ ]]; then
       echo "$value_name 必须是正整数。" >&2
@@ -243,6 +281,26 @@ for model_prefix in ORNITH QWEN36; do
     echo "$value_name 不得超过 32768。" >&2
     exit 1
   fi
+done
+for model_prefix in ORNITH QWEN36; do
+  if [[ "$model_prefix" == ORNITH && "$ORNITH_SPEC_TYPE" == none ]]; then
+    continue
+  fi
+  value_name="${model_prefix}_SPEC_DRAFT_N_MAX"
+  if [[ ! "${!value_name}" =~ ^[0-9]+$ ]]; then
+    echo "$value_name 必须是非负整数。" >&2
+    exit 1
+  fi
+  for setting in SPEC_DRAFT_CACHE_TYPE_K SPEC_DRAFT_CACHE_TYPE_V; do
+    value_name="${model_prefix}_${setting}"
+    case "${!value_name}" in
+      f32|f16|bf16|q8_0|q4_0|q4_1|iq4_nl|q5_0|q5_1) ;;
+      *)
+        echo "$value_name 不是支持的 KV 缓存类型。" >&2
+        exit 1
+        ;;
+    esac
+  done
 done
 for value_name in ORNITH_SLEEP_TIMEOUT ORNITH_SLEEP_POLL_INTERVAL \
   QWEN36_SLEEP_TIMEOUT QWEN36_SLEEP_POLL_INTERVAL GPU_LOCK_WAIT_TIMEOUT; do
@@ -263,7 +321,11 @@ if ! grep -q 'CUDA0' <<<"$DEVICE_LIST"; then
   exit 1
 fi
 LLAMA_HELP="$("$LLAMA_SERVER_BIN" --help 2>&1 || true)"
-for required_flag in --n-cpu-moe --sleep-idle-seconds --mmproj-offload --spec-type; do
+REQUIRED_LLAMA_FLAGS=(--n-cpu-moe --sleep-idle-seconds --mmproj-offload --spec-type)
+if [[ "$ORNITH_SPEC_TYPE" == draft-mtp ]]; then
+  REQUIRED_LLAMA_FLAGS+=(--spec-draft-model)
+fi
+for required_flag in "${REQUIRED_LLAMA_FLAGS[@]}"; do
   if ! grep -q -- "$required_flag" <<<"$LLAMA_HELP"; then
     echo "llama-server 缺少所需参数：$required_flag。" >&2
     exit 1
@@ -291,6 +353,10 @@ echo "audio.cpp runtime:     $AUDIO_CPP_RUNTIME_PROJECT_DIR"
 echo "VoiceDesign GGUF:      $QWEN_VOICEDESIGN_MODEL_FILE"
 echo "Ornith GGUF:           $ORNITH_MODEL_FILE"
 echo "Ornith mmproj:         $ORNITH_MMPROJ_FILE"
+echo "Ornith speculative:    $ORNITH_SPEC_TYPE"
+if [[ "$ORNITH_SPEC_TYPE" == draft-mtp ]]; then
+  echo "Ornith MTP:            $ORNITH_MTP_FILE"
+fi
 echo "Ornith llama-server:   $LLAMA_SERVER_BIN (CUDA0, CPU MoE=$ORNITH_N_CPU_MOE, 127.0.0.1:$LLAMA_CPP_PORT)"
 echo "Ornith API:            http://$ORNITH_HOST:$ORNITH_PORT/v1/AtomicChat/Ornith-1.5-35B-A3B-AD-Q5"
 echo "Qwen3.6 GGUF:          $QWEN36_MODEL_FILE"
@@ -433,6 +499,7 @@ python3 -m ornith_1_5_35b_a3b.runtime startup \
   -- \
   --model "$ORNITH_MODEL_FILE" \
   --mmproj "$ORNITH_MMPROJ_FILE" \
+  "${ORNITH_SPEC_ARGS[@]}" \
   --host 127.0.0.1 \
   --port "$LLAMA_CPP_PORT" \
   --alias Ornith-1.5-35B-A3B-AD-Q5 \
@@ -445,7 +512,10 @@ python3 -m ornith_1_5_35b_a3b.runtime startup \
   --ctx-size "$ORNITH_CONTEXT_SIZE" \
   --batch-size "$ORNITH_BATCH_SIZE" \
   --threads "$ORNITH_THREADS" \
-  --threads-batch "$ORNITH_THREADS" \
+  --threads-batch "$ORNITH_THREADS_BATCH" \
+  --cache-type-k "$ORNITH_CACHE_TYPE_K" \
+  --cache-type-v "$ORNITH_CACHE_TYPE_V" \
+  --load-mode "$ORNITH_LOAD_MODE" \
   --parallel 1 \
   --sleep-idle-seconds "$ORNITH_SLEEP_IDLE_SECONDS"
 read -r llama_server_pid < "$ORNITH_BACKEND_PID_FILE"
@@ -477,12 +547,18 @@ python3 -m ornith_1_5_35b_a3b.runtime startup \
   --gpu-layers "$QWEN36_N_GPU_LAYERS" \
   --n-cpu-moe "$QWEN36_N_CPU_MOE" \
   --spec-type draft-mtp \
+  --spec-draft-n-max "$QWEN36_SPEC_DRAFT_N_MAX" \
+  --spec-draft-type-k "$QWEN36_SPEC_DRAFT_CACHE_TYPE_K" \
+  --spec-draft-type-v "$QWEN36_SPEC_DRAFT_CACHE_TYPE_V" \
   --flash-attn on \
   --jinja \
   --ctx-size "$QWEN36_CONTEXT_SIZE" \
   --batch-size "$QWEN36_BATCH_SIZE" \
   --threads "$QWEN36_THREADS" \
-  --threads-batch "$QWEN36_THREADS" \
+  --threads-batch "$QWEN36_THREADS_BATCH" \
+  --cache-type-k "$QWEN36_CACHE_TYPE_K" \
+  --cache-type-v "$QWEN36_CACHE_TYPE_V" \
+  --load-mode "$QWEN36_LOAD_MODE" \
   --parallel 1 \
   --sleep-idle-seconds "$QWEN36_SLEEP_IDLE_SECONDS"
 read -r qwen36_llama_server_pid < "$QWEN36_BACKEND_PID_FILE"

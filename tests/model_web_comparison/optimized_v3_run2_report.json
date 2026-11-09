@@ -1,0 +1,83 @@
+{
+  "started_at": "2026-11-09T14:36:15+00:00",
+  "run_id": "20261109T143615Z",
+  "prompt_file": "task_prompt.txt",
+  "prompt_sha256": "67ed0ec8d791e654a821cc9b210fd63c6dfbbe9d997e23a8a50017e446ec896c",
+  "generation": {
+    "temperature": 0.0,
+    "top_p": 1.0,
+    "max_tokens": 8192,
+    "thinking_enabled": false,
+    "stream": true
+  },
+  "results": [
+    {
+      "model": "Ornith-1.5-35B-A3B-AD-Q5",
+      "key": "ornith_1_5_35b_a3b",
+      "html_file": "tests/ornith_1_5_35b_a3b/outputs/20261109T143615Z.html",
+      "preview_file": "tests/ornith_1_5_35b_a3b/outputs/20261109T143615Z.html",
+      "quality_notes": [],
+      "metrics": {
+        "elapsed_seconds": 108.748,
+        "time_to_first_token_seconds": 14.186,
+        "generation_interval_seconds": 90.281,
+        "completion_tokens": 6898,
+        "tokens_per_second": 76.41,
+        "finish_reasons": [
+          "stop"
+        ],
+        "html_characters": 20449,
+        "html_sha256": "dbb5e9d27244aaec6093365a4bf6b4e36db8f9865d459cc49ef4c9e671188aa3",
+        "sample_count": 376,
+        "sample_interval_seconds": 0.25,
+        "gpu_device_index": 0,
+        "gpu_memory_baseline_mib": 1879,
+        "gpu_memory_peak_mib": 15577,
+        "gpu_memory_peak_delta_mib": 13698,
+        "llama_server_pid": 51618,
+        "llama_server_rss_baseline_mib": 644.234375,
+        "llama_server_rss_peak_sampled_mib": 12484.8046875,
+        "llama_server_rss_peak_delta_mib": 11840.5703125,
+        "llama_server_rss_high_water_mib_at_end": 12485.00390625,
+        "system_available_memory_baseline_mib": 32590.9140625,
+        "system_available_memory_min_mib": 20761.4453125,
+        "system_memory_used_peak_delta_mib": 11829.46875
+      }
+    },
+    {
+      "model": "Qwen3.6-35B-A3B-MTP",
+      "key": "qwen3_6_35b_a3b",
+      "html_file": "tests/qwen3_6_35b_a3b/outputs/20261109T143615Z.html",
+      "preview_file": "tests/qwen3_6_35b_a3b/outputs/20261109T143615Z.html",
+      "quality_notes": [
+        "没有实现任务要求的目的地输入框。"
+      ],
+      "metrics": {
+        "elapsed_seconds": 87.406,
+        "time_to_first_token_seconds": 13.81,
+        "generation_interval_seconds": 69.265,
+        "completion_tokens": 5040,
+        "tokens_per_second": 72.76,
+        "finish_reasons": [
+          "stop"
+        ],
+        "html_characters": 17828,
+        "html_sha256": "3ee4f925c23a03d55c5fd00fa78da2bfe933640bad7f8de6be6e626e6db4701b",
+        "sample_count": 303,
+        "sample_interval_seconds": 0.25,
+        "gpu_device_index": 0,
+        "gpu_memory_baseline_mib": 1879,
+        "gpu_memory_peak_mib": 15606,
+        "gpu_memory_peak_delta_mib": 13727,
+        "llama_server_pid": 51912,
+        "llama_server_rss_baseline_mib": 733.8984375,
+        "llama_server_rss_peak_sampled_mib": 14321.859375,
+        "llama_server_rss_peak_delta_mib": 13587.9609375,
+        "llama_server_rss_high_water_mib_at_end": 14321.01953125,
+        "system_available_memory_baseline_mib": 32596.05859375,
+        "system_available_memory_min_mib": 18957.5859375,
+        "system_memory_used_peak_delta_mib": 13638.47265625
+      }
+    }
+  ]
+}

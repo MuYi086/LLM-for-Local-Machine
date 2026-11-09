@@ -1,0 +1,1497 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ornith 与 Qwen 网页任务对比</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, sans-serif; }
+    body { margin: 0; background: #f3f5f8; color: #172033; }
+    header { padding: 1rem 1.5rem; background: #fff; border-bottom: 1px solid #dfe4ec; }
+    h1 { margin: 0; font-size: 1.2rem; }
+    main { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; padding: 1rem; }
+    section { min-width: 0; }
+    h2 { margin: 0 0 .5rem; font-size: 1rem; }
+    .note { margin: 0 0 .5rem; color: #9a3412; font-size: .85rem; }
+    iframe { display: block; width: 100%; height: calc(100vh - 6rem); border: 1px solid #d7dce5; border-radius: .5rem; background: white; }
+    @media (max-width: 800px) { main { grid-template-columns: 1fr; } iframe { height: 75vh; } }
+  </style>
+</head>
+<body>
+  <header><h1>同一网页任务：模型输出并排预览</h1></header>
+  <p style="margin:1rem;color:#9a3412">浏览器实测：Ornith 删除行程无效；Qwen 缺少目的地输入框，行李原生勾选状态未保留。以下保留模型原始输出。</p>
+  <main><section><h2>Ornith-1.5-35B-A3B-AD-Q5</h2><iframe sandbox="allow-scripts allow-modals" title="Ornith-1.5-35B-A3B-AD-Q5 生成网页" srcdoc="&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;zh-CN&quot;&gt;
+&lt;head&gt;
+&lt;meta charset=&quot;UTF-8&quot;&gt;
+&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;&gt;
+&lt;title&gt;周末城市微旅行规划器&lt;/title&gt;
+&lt;style&gt;
+  :root {
+    --primary: #2e86ab;
+    --primary-dark: #21618c;
+    --accent: #f6a623;
+    --bg: #f4f7f9;
+    --card-bg: #ffffff;
+    --text: #2c3e50;
+    --text-light: #6b7d8d;
+    --border: #e1e8ed;
+    --success: #27ae60;
+    --danger: #e74c3c;
+    --radius: 14px;
+    --shadow: 0 4px 16px rgba(44, 62, 80, 0.08);
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: -apple-system, &quot;PingFang SC&quot;, &quot;Microsoft YaHei&quot;, &quot;Hiragino Sans GB&quot;, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  a:focus,
+  button:focus,
+  input:focus,
+  [tabindex]:focus {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  .container {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 0 20px 60px;
+  }
+
+  /* Header */
+  header {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: #fff;
+    padding: 40px 20px 48px;
+    text-align: center;
+  }
+
+  header h1 {
+    font-size: 2rem;
+    margin-bottom: 10px;
+    letter-spacing: 2px;
+  }
+
+  header p {
+    font-size: 1rem;
+    opacity: 0.92;
+    max-width: 520px;
+    margin: 0 auto 20px;
+  }
+
+  .date-badge {
+    display: inline-block;
+    background: var(--accent);
+    color: #fff;
+    font-size: 1.05rem;
+    font-weight: 700;
+    padding: 10px 26px;
+    border-radius: 50px;
+    box-shadow: 0 4px 14px rgba(246, 166, 35, 0.45);
+    letter-spacing: 1px;
+  }
+
+  /* Section */
+  section {
+    margin-top: 32px;
+  }
+
+  .section-title {
+    font-size: 1.3rem;
+    margin-bottom: 16px;
+    padding-left: 12px;
+    border-left: 5px solid var(--primary);
+    color: var(--text);
+  }
+
+  /* Budget Card */
+  .budget-card {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    padding: 24px;
+    box-shadow: var(--shadow);
+  }
+
+  .budget-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: flex-end;
+  }
+
+  .input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .input-group label {
+    font-size: 0.85rem;
+    color: var(--text-light);
+    font-weight: 600;
+  }
+
+  .input-group input {
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 1rem;
+    width: 200px;
+    transition: border-color 0.2s;
+  }
+
+  .input-group input:focus {
+    border-color: var(--primary);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: none;
+    border-radius: 10px;
+    padding: 11px 22px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.2s, background 0.2s;
+    color: #fff;
+  }
+
+  .btn:active {
+    transform: scale(0.96);
+  }
+
+  .btn-primary {
+    background: var(--primary);
+  }
+
+  .btn-primary:hover {
+    background: var(--primary-dark);
+  }
+
+  .btn-accent {
+    background: var(--accent);
+  }
+
+  .btn-accent:hover {
+    background: #e09510;
+  }
+
+  .btn-danger {
+    background: var(--danger);
+    padding: 7px 14px;
+    font-size: 0.85rem;
+  }
+
+  .btn-danger:hover {
+    background: #c0392b;
+  }
+
+  .btn-outline {
+    background: transparent;
+    border: 2px dashed var(--primary);
+    color: var(--primary);
+  }
+
+  .btn-outline:hover {
+    background: var(--primary);
+    color: #fff;
+  }
+
+  .btn-add {
+    width: 100%;
+    justify-content: center;
+    margin-top: 14px;
+  }
+
+  /* Budget Progress */
+  .budget-summary {
+    margin-top: 24px;
+  }
+
+  .budget-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    margin-bottom: 14px;
+  }
+
+  .stat {
+    flex: 1;
+    min-width: 140px;
+    text-align: center;
+    padding: 14px;
+    border-radius: 10px;
+    background: var(--bg);
+  }
+
+  .stat .label {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .stat .value {
+    font-size: 1.4rem;
+    font-weight: 700;
+  }
+
+  .stat-spent .value { color: var(--primary); }
+  .stat-remaining .value { color: var(--success); }
+  .stat-over .value { color: var(--danger); }
+
+  .progress-track {
+    width: 100%;
+    height: 22px;
+    background: #e8eef2;
+    border-radius: 50px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary), var(--accent));
+    border-radius: 50px;
+    transition: width 0.4s ease;
+    min-width: 0;
+  }
+
+  .progress-fill.over {
+    background: linear-gradient(90deg, var(--danger), #f39c12);
+  }
+
+  .progress-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--text);
+    white-space: nowrap;
+  }
+
+  /* Itinerary */
+  .itinerary-list {
+    display: grid;
+    gap: 16px;
+  }
+
+  .trip-card {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    display: flex;
+    transition: opacity 0.3s, transform 0.2s;
+    position: relative;
+  }
+
+  .trip-card.done {
+    opacity: 0.6;
+  }
+
+  .trip-card .time-col {
+    background: var(--primary);
+    color: #fff;
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 96px;
+    text-align: center;
+  }
+
+  .trip-card .time-col .time {
+    font-size: 1.1rem;
+    font-weight: 700;
+  }
+
+  .trip-card .time-col .period {
+    font-size: 0.75rem;
+    opacity: 0.85;
+    margin-top: 4px;
+  }
+
+  .trip-card .body {
+    flex: 1;
+    padding: 16px 20px;
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+  }
+
+  .trip-checkbox {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    margin-top: 2px;
+    accent-color: var(--success);
+    cursor: pointer;
+  }
+
+  .trip-info {
+    flex: 1;
+  }
+
+  .trip-info h3 {
+    font-size: 1.05rem;
+    margin-bottom: 4px;
+  }
+
+  .trip-info .place {
+    font-size: 0.85rem;
+    color: var(--text-light);
+    margin-bottom: 6px;
+  }
+
+  .trip-info .desc {
+    font-size: 0.9rem;
+    color: var(--text);
+  }
+
+  .trip-cost {
+    flex-shrink: 0;
+    text-align: right;
+    font-weight: 700;
+    color: var(--accent);
+    font-size: 1.05rem;
+    align-self: center;
+    white-space: nowrap;
+  }
+
+  .trip-card .delete-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: transparent;
+    border: none;
+    color: #c0cdd6;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: color 0.2s, background 0.2s;
+    line-height: 1;
+  }
+
+  .trip-card .delete-btn:hover {
+    color: var(--danger);
+    background: rgba(231, 76, 60, 0.1);
+  }
+
+  .trip-card.done .trip-info h3 {
+    text-decoration: line-through;
+    text-decoration-color: var(--text-light);
+  }
+
+  .empty-note {
+    text-align: center;
+    color: var(--text-light);
+    padding: 30px;
+    font-size: 0.95rem;
+  }
+
+  /* Packing */
+  .packing-card {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 24px;
+  }
+
+  .packing-progress {
+    margin-bottom: 18px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .packing-progress .track {
+    flex: 1;
+    height: 12px;
+    background: #e8eef2;
+    border-radius: 50px;
+    overflow: hidden;
+  }
+
+  .packing-progress .fill {
+    height: 100%;
+    background: var(--success);
+    border-radius: 50px;
+    transition: width 0.3s ease;
+  }
+
+  .packing-progress .pct {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-light);
+    white-space: nowrap;
+  }
+
+  .packing-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+  }
+
+  .packing-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    user-select: none;
+  }
+
+  .packing-item:hover {
+    border-color: var(--primary);
+  }
+
+  .packing-item input {
+    width: 20px;
+    height: 20px;
+    accent-color: var(--success);
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .packing-item .icon {
+    font-size: 1.3rem;
+    flex-shrink: 0;
+  }
+
+  .packing-item .name {
+    font-size: 0.95rem;
+  }
+
+  .packing-item.checked {
+    background: #eaf7ef;
+    border-color: var(--success);
+  }
+
+  .packing-item.checked .name {
+    color: var(--text-light);
+    text-decoration: line-through;
+  }
+
+  /* Footer */
+  footer {
+    text-align: center;
+    padding: 30px 20px;
+    color: var(--text-light);
+    font-size: 0.85rem;
+  }
+
+  /* Responsive */
+  @media (max-width: 600px) {
+    header {
+      padding: 30px 16px 40px;
+    }
+    header h1 {
+      font-size: 1.5rem;
+    }
+    .trip-card {
+      flex-direction: column;
+    }
+    .trip-card .time-col {
+      flex-direction: row;
+      gap: 8px;
+      min-width: 0;
+      padding: 10px 14px;
+    }
+    .trip-card .time-col .period {
+      display: none;
+    }
+    .trip-card .body {
+      flex-direction: column;
+      gap: 8px;
+    }
+    .trip-cost {
+      align-self: flex-start;
+    }
+    .trip-card .delete-btn {
+      top: 6px;
+      right: 6px;
+    }
+    .budget-form {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .input-group input {
+      width: 100%;
+    }
+    .stat {
+      min-width: 100px;
+    }
+  }
+&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;header&gt;
+    &lt;div class=&quot;container&quot; style=&quot;padding-top:0;padding-bottom:0;&quot;&gt;
+      &lt;h1&gt;🌆 周末城市微旅行规划器&lt;/h1&gt;
+      &lt;p&gt;为轻松的周末短途旅行，规划目的地、行程、预算与行李。勾选已完成的项目，享受一段惬意的城市微旅行。&lt;/p&gt;
+      &lt;div class=&quot;date-badge&quot; id=&quot;dateBadge&quot;&gt;本周末加载中…&lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/header&gt;
+
+  &lt;main class=&quot;container&quot;&gt;
+
+    &lt;!-- 预算 --&gt;
+    &lt;section aria-labelledby=&quot;budget-title&quot;&gt;
+      &lt;h2 class=&quot;section-title&quot; id=&quot;budget-title&quot;&gt;💰 预算规划&lt;/h2&gt;
+      &lt;div class=&quot;budget-card&quot;&gt;
+        &lt;div class=&quot;budget-form&quot;&gt;
+          &lt;div class=&quot;input-group&quot;&gt;
+            &lt;label for=&quot;destination&quot;&gt;目的地&lt;/label&gt;
+            &lt;input type=&quot;text&quot; id=&quot;destination&quot; value=&quot;苏州古城&quot; placeholder=&quot;请输入目的地&quot;&gt;
+          &lt;/div&gt;
+          &lt;div class=&quot;input-group&quot;&gt;
+            &lt;label for=&quot;budget&quot;&gt;人均预算（元）&lt;/label&gt;
+            &lt;input type=&quot;number&quot; id=&quot;budget&quot; min=&quot;0&quot; step=&quot;50&quot; value=&quot;500&quot;&gt;
+          &lt;/div&gt;
+          &lt;button class=&quot;btn btn-primary&quot; id=&quot;budgetBtn&quot; type=&quot;button&quot;&gt;更新预算&lt;/button&gt;
+        &lt;/div&gt;
+        &lt;div class=&quot;budget-summary&quot;&gt;
+          &lt;div class=&quot;budget-stats&quot;&gt;
+            &lt;div class=&quot;stat stat-spent&quot;&gt;
+              &lt;span class=&quot;label&quot;&gt;已规划支出&lt;/span&gt;
+              &lt;span class=&quot;value&quot; id=&quot;spentAmount&quot;&gt;¥0&lt;/span&gt;
+            &lt;/div&gt;
+            &lt;div class=&quot;stat stat-remaining&quot;&gt;
+              &lt;span class=&quot;label&quot;&gt;剩余预算&lt;/span&gt;
+              &lt;span class=&quot;value&quot; id=&quot;remainingAmount&quot;&gt;¥0&lt;/span&gt;
+            &lt;/div&gt;
+            &lt;div class=&quot;stat stat-over&quot;&gt;
+              &lt;span class=&quot;label&quot;&gt;目的地&lt;/span&gt;
+              &lt;span class=&quot;value&quot; id=&quot;destStat&quot; style=&quot;font-size:1.1rem;&quot;&gt;—&lt;/span&gt;
+            &lt;/div&gt;
+          &lt;/div&gt;
+          &lt;div class=&quot;progress-track&quot;&gt;
+            &lt;div class=&quot;progress-fill&quot; id=&quot;progressFill&quot; style=&quot;width:0%&quot;&gt;&lt;/div&gt;
+            &lt;span class=&quot;progress-text&quot; id=&quot;progressText&quot;&gt;已使用 0%&lt;/span&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/section&gt;
+
+    &lt;!-- 行程 --&gt;
+    &lt;section aria-labelledby=&quot;itinerary-title&quot;&gt;
+      &lt;h2 class=&quot;section-title&quot; id=&quot;itinerary-title&quot;&gt;🗺️ 周末行程&lt;/h2&gt;
+      &lt;div class=&quot;itinerary-list&quot; id=&quot;itineraryList&quot;&gt;&lt;/div&gt;
+      &lt;button class=&quot;btn btn-outline btn-add&quot; id=&quot;addTripBtn&quot; type=&quot;button&quot;&gt;＋ 添加新行程&lt;/button&gt;
+    &lt;/section&gt;
+
+    &lt;!-- 行李 --&gt;
+    &lt;section aria-labelledby=&quot;packing-title&quot;&gt;
+      &lt;h2 class=&quot;section-title&quot; id=&quot;packing-title&quot;&gt;🎒 行李清单&lt;/h2&gt;
+      &lt;div class=&quot;packing-card&quot;&gt;
+        &lt;div class=&quot;packing-progress&quot;&gt;
+          &lt;span class=&quot;pct&quot; id=&quot;packingPct&quot;&gt;0 / 0&lt;/span&gt;
+          &lt;div class=&quot;track&quot;&gt;
+            &lt;div class=&quot;fill&quot; id=&quot;packingFill&quot; style=&quot;width:0%&quot;&gt;&lt;/div&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+        &lt;div class=&quot;packing-grid&quot; id=&quot;packingGrid&quot;&gt;&lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/section&gt;
+
+  &lt;/main&gt;
+
+  &lt;footer&gt;
+    &lt;p&gt;周末城市微旅行规划器 · 祝你旅途愉快 🚂&lt;/p&gt;
+  &lt;/footer&gt;
+
+&lt;script&gt;
+(function () {
+  &quot;use strict&quot;;
+
+  /* ---------- 计算本周末日期 ---------- */
+  function getWeekendRange() {
+    var now = new Date();
+    var day = now.getDay(); // 0=周日, 6=周六
+    var saturday = new Date(now);
+    saturday.setDate(now.getDate() + ((6 - day + 7) % 7));
+    var sunday = new Date(saturday);
+    sunday.setDate(saturday.getDate() + 1);
+    function fmt(d) {
+      return d.getFullYear() + &quot;年&quot; + (d.getMonth() + 1) + &quot;月&quot; + d.getDate() + &quot;日&quot;;
+    }
+    return { start: fmt(saturday), end: fmt(sunday), saturday: saturday };
+  }
+
+  var weekend = getWeekendRange();
+  document.getElementById(&quot;dateBadge&quot;).textContent =
+    &quot;本周末：&quot; + weekend.start + &quot; 至 &quot; + weekend.end;
+
+  /* ---------- 行程数据 ---------- */
+  var trips = [
+    {
+      time: &quot;08:30&quot;,
+      place: &quot;高铁站 · 出发&quot;,
+      title: &quot;乘坐高铁前往目的地&quot;,
+      desc: &quot;提前到达车站，享用早餐，欣赏沿途风景，轻松抵达。&quot;,
+      cost: 160,
+      done: false
+    },
+    {
+      time: &quot;10:30&quot;,
+      place: &quot;古城老街&quot;,
+      title: &quot;漫步老街 · 品尝地道小吃&quot;,
+      desc: &quot;逛青石板老街，尝当地特色早点与甜点，感受慢节奏生活。&quot;,
+      cost: 60,
+      done: false
+    },
+    {
+      time: &quot;12:30&quot;,
+      place: &quot;湖畔餐厅&quot;,
+      title: &quot;午餐 · 湖景休憩&quot;,
+      desc: &quot;在湖景餐厅享用当地特色午餐，稍作休息，放松身心。&quot;,
+      cost: 80,
+      done: false
+    },
+    {
+      time: &quot;14:30&quot;,
+      place: &quot;城市公园 / 博物馆&quot;,
+      title: &quot;游览公园或参观博物馆&quot;,
+      desc: &quot;午后游览城市公园，或参观本地博物馆，感受人文气息。&quot;,
+      cost: 40,
+      done: false
+    },
+    {
+      time: &quot;17:30&quot;,
+      place: &quot;特色咖啡馆&quot;,
+      title: &quot;下午茶 · 拍照留念&quot;,
+      desc: &quot;找一家有格调的咖啡馆，喝杯下午茶，整理照片与心情。&quot;,
+      cost: 50,
+      done: false
+    },
+    {
+      time: &quot;19:00&quot;,
+      place: &quot;高铁站 · 返程&quot;,
+      title: &quot;晚餐后返程&quot;,
+      desc: &quot;在车站附近享用晚餐，乘坐高铁返回，结束愉快的周末之旅。&quot;,
+      cost: 160,
+      done: false
+    }
+  ];
+
+  /* ---------- 行李数据 ---------- */
+  var packing = [
+    { name: &quot;相机&quot;, icon: &quot;📷&quot;, checked: false },
+    { name: &quot;充电器&quot;, icon: &quot;🔌&quot;, checked: false },
+    { name: &quot;雨伞&quot;, icon: &quot;☂️&quot;, checked: false },
+    { name: &quot;换洗衣物&quot;, icon: &quot;👕&quot;, checked: false },
+    { name: &quot;洗漱用品&quot;, icon: &quot;🪥&quot;, checked: false },
+    { name: &quot;充电宝&quot;, icon: &quot;🔋&quot;, checked: false },
+    { name: &quot;身份证&quot;, icon: &quot;🪪&quot;, checked: false },
+    { name: &quot;舒适步行鞋&quot;, icon: &quot;👟&quot;, checked: false }
+  ];
+
+  /* ---------- 预算相关 ---------- */
+  var budgetInput = document.getElementById(&quot;budget&quot;);
+  var destinationInput = document.getElementById(&quot;destination&quot;);
+  var spentAmount = document.getElementById(&quot;spentAmount&quot;);
+  var remainingAmount = document.getElementById(&quot;remainingAmount&quot;);
+  var destStat = document.getElementById(&quot;destStat&quot;);
+  var progressFill = document.getElementById(&quot;progressFill&quot;);
+  var progressText = document.getElementById(&quot;progressText&quot;);
+
+  function getBudget() {
+    var v = parseInt(budgetInput.value, 10);
+    return isNaN(v) || v &lt; 0 ? 0 : v;
+  }
+
+  function getSpent() {
+    var total = 0;
+    for (var i = 0; i &lt; trips.length; i++) {
+      total += trips[i].cost;
+    }
+    return total;
+  }
+
+  function updateBudget() {
+    var budget = getBudget();
+    var spent = getSpent();
+    var remaining = budget - spent;
+    var pct = budget &gt; 0 ? Math.round((spent / budget) * 100) : 0;
+
+    spentAmount.textContent = &quot;¥&quot; + spent;
+    destStat.textContent = destinationInput.value || &quot;—&quot;;
+
+    if (remaining &gt;= 0) {
+      remainingAmount.textContent = &quot;¥&quot; + remaining;
+      remainingAmount.parentElement.className = &quot;stat stat-remaining&quot;;
+    } else {
+      remainingAmount.textContent = &quot;-¥&quot; + Math.abs(remaining);
+      remainingAmount.parentElement.className = &quot;stat stat-over&quot;;
+    }
+
+    var clamped = Math.min(pct, 100);
+    progressFill.style.width = clamped + &quot;%&quot;;
+    progressFill.className = &quot;progress-fill&quot; + (pct &gt; 100 ? &quot; over&quot; : &quot;&quot;);
+    progressText.textContent = &quot;已使用 &quot; + pct + &quot;%&quot;;
+  }
+
+  budgetInput.addEventListener(&quot;input&quot;, updateBudget);
+  destinationInput.addEventListener(&quot;input&quot;, updateBudget);
+  document.getElementById(&quot;budgetBtn&quot;).addEventListener(&quot;click&quot;, function () {
+    updateBudget();
+  });
+
+  /* ---------- 行程渲染 ---------- */
+  var itineraryList = document.getElementById(&quot;itineraryList&quot;);
+
+  function renderTrips() {
+    itineraryList.innerHTML = &quot;&quot;;
+    if (trips.length === 0) {
+      var note = document.createElement(&quot;p&quot;);
+      note.className = &quot;empty-note&quot;;
+      note.textContent = &quot;暂无行程，点击下方按钮添加你的第一个行程吧！&quot;;
+      itineraryList.appendChild(note);
+      updateBudget();
+      return;
+    }
+    for (var i = 0; i &lt; trips.length; i++) {
+      (function (trip) {
+        var card = document.createElement(&quot;article&quot;);
+        card.className = &quot;trip-card&quot; + (trip.done ? &quot; done&quot; : &quot;&quot;);
+
+        var timeCol = document.createElement(&quot;div&quot;);
+        timeCol.className = &quot;time-col&quot;;
+        timeCol.innerHTML =
+          '&lt;span class=&quot;time&quot;&gt;' + trip.time + '&lt;/span&gt;' +
+          '&lt;span class=&quot;period&quot;&gt;行程&lt;/span&gt;';
+
+        var body = document.createElement(&quot;div&quot;);
+        body.className = &quot;body&quot;;
+
+        var checkbox = document.createElement(&quot;input&quot;);
+        checkbox.type = &quot;checkbox&quot;;
+        checkbox.className = &quot;trip-checkbox&quot;;
+        checkbox.checked = trip.done;
+        checkbox.setAttribute(&quot;aria-label&quot;, &quot;标记「&quot; + trip.title + &quot;」为已完成&quot;);
+        checkbox.addEventListener(&quot;change&quot;, function () {
+          trip.done = checkbox.checked;
+          renderTrips();
+        });
+
+        var info = document.createElement(&quot;div&quot;);
+        info.className = &quot;trip-info&quot;;
+        info.innerHTML =
+          '&lt;h3&gt;' + trip.title + '&lt;/h3&gt;' +
+          '&lt;div class=&quot;place&quot;&gt;📍 ' + trip.place + '&lt;/div&gt;' +
+          '&lt;div class=&quot;desc&quot;&gt;' + trip.desc + '&lt;/div&gt;';
+
+        var cost = document.createElement(&quot;div&quot;);
+        cost.className = &quot;trip-cost&quot;;
+        cost.textContent = &quot;¥&quot; + trip.cost;
+
+        body.appendChild(checkbox);
+        body.appendChild(info);
+        body.appendChild(cost);
+
+        var delBtn = document.createElement(&quot;button&quot;);
+        delBtn.type = &quot;button&quot;;
+        delBtn.className = &quot;delete-btn&quot;;
+        delBtn.textContent = &quot;✕&quot;;
+        delBtn.setAttribute(&quot;aria-label&quot;, &quot;删除行程「&quot; + trip.title + &quot;」&quot;);
+        delBtn.addEventListener(&quot;click&quot;, function () {
+          trips.splice(i, 1);
+          renderTrips();
+        });
+
+        card.appendChild(timeCol);
+        card.appendChild(body);
+        card.appendChild(delBtn);
+        itineraryList.appendChild(card);
+      })(trips[i]);
+    }
+    updateBudget();
+  }
+
+  document.getElementById(&quot;addTripBtn&quot;).addEventListener(&quot;click&quot;, function () {
+    var newTrip = {
+      time: &quot;12:00&quot;,
+      place: &quot;待定地点&quot;,
+      title: &quot;新增行程&quot;,
+      desc: &quot;点击编辑，添加你的活动说明与费用。&quot;,
+      cost: 0,
+      done: false
+    };
+    trips.push(newTrip);
+    renderTrips();
+    window.scrollTo({ top: document.getElementById(&quot;itinerary-title&quot;).offsetTop - 20, behavior: &quot;smooth&quot; });
+  });
+
+  /* ---------- 行李渲染 ---------- */
+  var packingGrid = document.getElementById(&quot;packingGrid&quot;);
+  var packingPct = document.getElementById(&quot;packingPct&quot;);
+  var packingFill = document.getElementById(&quot;packingFill&quot;);
+
+  function renderPacking() {
+    packingGrid.innerHTML = &quot;&quot;;
+    var total = packing.length;
+    var checkedCount = 0;
+    for (var i = 0; i &lt; packing.length; i++) {
+      (function (item) {
+        if (item.checked) checkedCount++;
+        var label = document.createElement(&quot;label&quot;);
+        label.className = &quot;packing-item&quot; + (item.checked ? &quot; checked&quot; : &quot;&quot;);
+
+        var checkbox = document.createElement(&quot;input&quot;);
+        checkbox.type = &quot;checkbox&quot;;
+        checkbox.checked = item.checked;
+        checkbox.setAttribute(&quot;aria-label&quot;, &quot;勾选「&quot; + item.name + &quot;」&quot;);
+        checkbox.addEventListener(&quot;change&quot;, function () {
+          item.checked = checkbox.checked;
+          renderPacking();
+        });
+
+        var icon = document.createElement(&quot;span&quot;);
+        icon.className = &quot;icon&quot;;
+        icon.textContent = item.icon;
+
+        var name = document.createElement(&quot;span&quot;);
+        name.className = &quot;name&quot;;
+        name.textContent = item.name;
+
+        label.appendChild(checkbox);
+        label.appendChild(icon);
+        label.appendChild(name);
+        packingGrid.appendChild(label);
+      })(packing[i]);
+    }
+    packingPct.textContent = checkedCount + &quot; / &quot; + total;
+    packingFill.style.width = (total ? Math.round((checkedCount / total) * 100) : 0) + &quot;%&quot;;
+  }
+
+  /* ---------- 初始化 ---------- */
+  updateBudget();
+  renderTrips();
+  renderPacking();
+})();
+&lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;"></iframe></section>
+<section><h2>Qwen3.6-35B-A3B-MTP</h2><p class="note">没有实现任务要求的目的地输入框。</p><iframe sandbox="allow-scripts allow-modals" title="Qwen3.6-35B-A3B-MTP 生成网页" srcdoc="&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;zh-CN&quot;&gt;
+&lt;head&gt;
+    &lt;meta charset=&quot;UTF-8&quot;&gt;
+    &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;&gt;
+    &lt;title&gt;周末城市微旅行规划器&lt;/title&gt;
+    &lt;style&gt;
+        :root {
+            --primary-color: #4a90e2;
+            --primary-hover: #357abd;
+            --bg-color: #f5f7fa;
+            --card-bg: #ffffff;
+            --text-main: #333333;
+            --text-secondary: #666666;
+            --border-color: #e1e4e8;
+            --success-color: #2ecc71;
+            --danger-color: #e74c3c;
+            --shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            --radius: 12px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, &quot;Helvetica Neue&quot;, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        /* 布局容器 */
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        /* 头部样式 */
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px 0;
+        }
+
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            color: var(--text-main);
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            margin-bottom: 15px;
+        }
+
+        .date-badge {
+            display: inline-block;
+            background-color: var(--primary-color);
+            color: white;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            box-shadow: 0 2px 4px rgba(74, 144, 226, 0.3);
+        }
+
+        /* 卡片通用样式 */
+        .card {
+            background: var(--card-bg);
+            border-radius: var(--radius);
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border-color);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #f0f0f0;
+            padding-bottom: 10px;
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        /* 预算部分 */
+        .budget-input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        input[type=&quot;number&quot;], input[type=&quot;text&quot;] {
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 1rem;
+            width: 100%;
+            transition: border-color 0.2s;
+        }
+
+        input[type=&quot;number&quot;]:focus, input[type=&quot;text&quot;]:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        .budget-stats {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .progress-bar-bg {
+            height: 10px;
+            background-color: #e9ecef;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background-color: var(--success-color);
+            width: 0%;
+            transition: width 0.3s ease, background-color 0.3s ease;
+        }
+
+        .progress-bar-fill.warning {
+            background-color: #f1c40f;
+        }
+
+        .progress-bar-fill.danger {
+            background-color: var(--danger-color);
+        }
+
+        /* 行程列表 */
+        .trip-list {
+            list-style: none;
+        }
+
+        .trip-item {
+            display: flex;
+            align-items: flex-start;
+            padding: 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 10px;
+            transition: all 0.2s;
+            background-color: #fff;
+        }
+
+        .trip-item.completed {
+            background-color: #f8f9fa;
+            opacity: 0.7;
+        }
+
+        .trip-item.completed .trip-content h3 {
+            text-decoration: line-through;
+            color: #999;
+        }
+
+        .trip-checkbox {
+            margin-top: 4px;
+            margin-right: 15px;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            accent-color: var(--success-color);
+        }
+
+        .trip-content {
+            flex: 1;
+        }
+
+        .trip-content h3 {
+            font-size: 1.1rem;
+            margin-bottom: 4px;
+        }
+
+        .trip-meta {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            display: flex;
+            gap: 15px;
+            margin-bottom: 5px;
+        }
+
+        .trip-desc {
+            font-size: 0.95rem;
+            color: #555;
+        }
+
+        .trip-cost {
+            font-weight: bold;
+            color: var(--primary-color);
+            margin-left: auto;
+            padding-left: 15px;
+            white-space: nowrap;
+        }
+
+        .btn-delete {
+            background: none;
+            border: none;
+            color: #ccc;
+            cursor: pointer;
+            font-size: 1.2rem;
+            margin-left: 10px;
+            padding: 0 5px;
+        }
+
+        .btn-delete:hover {
+            color: var(--danger-color);
+        }
+
+        .add-trip-form {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .btn-outline {
+            background-color: transparent;
+            border: 1px solid var(--primary-color);
+            color: var(--primary-color);
+        }
+
+        .btn-outline:hover {
+            background-color: #f0f7ff;
+        }
+
+        /* 行李清单 */
+        .packing-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+        }
+
+        .packing-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .packing-item:hover {
+            background-color: #e9ecef;
+        }
+
+        .packing-item input {
+            margin-right: 10px;
+            width: 18px;
+            height: 18px;
+            accent-color: var(--primary-color);
+        }
+
+        .packing-item.checked {
+            text-decoration: line-through;
+            color: #999;
+            background-color: #f0f0f0;
+        }
+
+        /* 响应式调整 */
+        @media (max-width: 600px) {
+            .trip-item {
+                flex-direction: column;
+            }
+            .trip-cost {
+                margin-left: 35px;
+                margin-top: 10px;
+            }
+            .add-trip-form {
+                flex-direction: column;
+            }
+            .btn {
+                width: 100%;
+            }
+        }
+
+        /* 焦点样式 */
+        button:focus-visible, input:focus-visible {
+            outline: 2px solid var(--primary-color);
+            outline-offset: 2px;
+        }
+    &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+
+&lt;div class=&quot;container&quot;&gt;
+    &lt;header&gt;
+        &lt;h1&gt;周末城市微旅行规划器&lt;/h1&gt;
+        &lt;p class=&quot;subtitle&quot;&gt;逃离日常，用 48 小时探索身边的风景。轻松、预算可控、说走就走。&lt;/p&gt;
+        &lt;div class=&quot;date-badge&quot; id=&quot;currentDate&quot;&gt;加载中...&lt;/div&gt;
+    &lt;/header&gt;
+
+    &lt;!-- 预算控制区 --&gt;
+    &lt;section class=&quot;card&quot;&gt;
+        &lt;div class=&quot;card-header&quot;&gt;
+            &lt;span class=&quot;card-title&quot;&gt;💰 预算规划&lt;/span&gt;
+        &lt;/div&gt;
+        &lt;div class=&quot;budget-input-group&quot;&gt;
+            &lt;label for=&quot;budgetInput&quot; style=&quot;display:none&quot;&gt;设置总预算&lt;/label&gt;
+            &lt;input type=&quot;number&quot; id=&quot;budgetInput&quot; placeholder=&quot;输入人均总预算 (元)&quot; value=&quot;1000&quot;&gt;
+        &lt;/div&gt;
+        &lt;div class=&quot;budget-stats&quot;&gt;
+            &lt;span&gt;已花费: &lt;strong id=&quot;spentAmount&quot;&gt;0&lt;/strong&gt; 元&lt;/span&gt;
+            &lt;span&gt;剩余: &lt;strong id=&quot;remainingAmount&quot;&gt;1000&lt;/strong&gt; 元&lt;/span&gt;
+        &lt;/div&gt;
+        &lt;div class=&quot;progress-bar-bg&quot;&gt;
+            &lt;div class=&quot;progress-bar-fill&quot; id=&quot;budgetProgress&quot;&gt;&lt;/div&gt;
+        &lt;/div&gt;
+    &lt;/section&gt;
+
+    &lt;!-- 行程规划区 --&gt;
+    &lt;section class=&quot;card&quot;&gt;
+        &lt;div class=&quot;card-header&quot;&gt;
+            &lt;span class=&quot;card-title&quot;&gt;🗺️ 周末行程&lt;/span&gt;
+            &lt;button class=&quot;btn btn-outline&quot; onclick=&quot;resetTrips()&quot;&gt;重置默认行程&lt;/button&gt;
+        &lt;/div&gt;
+        &lt;ul class=&quot;trip-list&quot; id=&quot;tripList&quot;&gt;
+            &lt;!-- 行程卡片将通过 JS 渲染 --&gt;
+        &lt;/ul&gt;
+        
+        &lt;div style=&quot;margin-top: 20px; border-top: 1px dashed #ddd; padding-top: 15px;&quot;&gt;
+            &lt;h4 style=&quot;margin-bottom: 10px; color: var(--text-secondary);&quot;&gt;添加新行程&lt;/h4&gt;
+            &lt;form class=&quot;add-trip-form&quot; id=&quot;addTripForm&quot;&gt;
+                &lt;input type=&quot;text&quot; id=&quot;newTime&quot; placeholder=&quot;时间 (如: 周六 10:00)&quot; style=&quot;flex: 1;&quot; required&gt;
+                &lt;input type=&quot;text&quot; id=&quot;newPlace&quot; placeholder=&quot;地点&quot; style=&quot;flex: 2;&quot; required&gt;
+                &lt;input type=&quot;number&quot; id=&quot;newCost&quot; placeholder=&quot;费用 (元)&quot; style=&quot;flex: 1;&quot; min=&quot;0&quot; required&gt;
+                &lt;button type=&quot;submit&quot; class=&quot;btn btn-primary&quot;&gt;添加行程&lt;/button&gt;
+            &lt;/form&gt;
+        &lt;/div&gt;
+    &lt;/section&gt;
+
+    &lt;!-- 行李清单区 --&gt;
+    &lt;section class=&quot;card&quot;&gt;
+        &lt;div class=&quot;card-header&quot;&gt;
+            &lt;span class=&quot;card-title&quot;&gt;🎒 行李清单&lt;/span&gt;
+            &lt;span style=&quot;font-size: 0.9rem; color: var(--text-secondary);&quot; id=&quot;packingStatus&quot;&gt;准备中...&lt;/span&gt;
+        &lt;/div&gt;
+        &lt;div class=&quot;packing-list&quot; id=&quot;packingList&quot;&gt;
+            &lt;!-- 行李项将通过 JS 渲染 --&gt;
+        &lt;/div&gt;
+    &lt;/section&gt;
+&lt;/div&gt;
+
+&lt;script&gt;
+    // --- 数据与状态 ---
+    
+    // 获取本周末日期
+    function getWeekendDate() {
+        const now = new Date();
+        const day = now.getDay();
+        let nextSaturday = now.getDate() + (6 - day);
+        let nextSunday = now.getDate() + (7 - day);
+        
+        // 如果今天是周日，简单处理为下周（或者保持本周，这里简化逻辑）
+        // 为了演示效果，我们直接显示“本周末”
+        const options = { month: 'long', day: 'numeric' };
+        return `本周末: ${now.toLocaleDateString('zh-CN', options)}`;
+    }
+
+    // 初始行程数据
+    const defaultTrips = [
+        { id: 1, time: '周六 09:00', place: '城市植物园', desc: '漫步林荫道，呼吸新鲜空气，拍摄秋日/春日景色。', cost: 0, completed: false },
+        { id: 2, time: '周六 12:30', place: '老街美食街', desc: '品尝当地特色小吃：臭豆腐、糖油粑粑、奶茶。', cost: 150, completed: false },
+        { id: 3, time: '周六 15:00', place: '独立书店 &amp; 咖啡馆', desc: '挑选一本好书，点一杯手冲，享受慵懒午后。', cost: 60, completed: false },
+        { id: 4, time: '周六 19:00', place: '江景餐厅', desc: '晚餐享用精致料理，欣赏城市夜景。', cost: 300, completed: false },
+        { id: 5, time: '周日 10:00', place: '创意艺术园区', desc: '参观画廊，逛逛手作市集，购买伴手礼。', cost: 200, completed: false },
+        { id: 6, time: '周日 16:00', place: '返程', desc: '乘坐高铁/驾车回家，整理照片。', cost: 100, completed: false }
+    ];
+
+    // 初始行李数据
+    const defaultPacking = [
+        { id: 1, name: '相机/手机', checked: false },
+        { id: 2, name: '充电器/充电宝', checked: false },
+        { id: 3, name: '雨伞', checked: false },
+        { id: 4, name: '舒适的鞋子', checked: false },
+        { id: 5, name: '身份证/学生证', checked: false },
+        { id: 6, name: '防晒霜', checked: false },
+        { id: 7, name: '换洗衣物', checked: false },
+        { id: 8, name: '个人洗漱用品', checked: false }
+    ];
+
+    // 状态变量
+    let trips = JSON.parse(JSON.stringify(defaultTrips));
+    let packing = JSON.parse(JSON.stringify(defaultPacking));
+    let totalBudget = 1000;
+
+    // --- DOM 元素 ---
+    const budgetInput = document.getElementById('budgetInput');
+    const spentAmountEl = document.getElementById('spentAmount');
+    const remainingAmountEl = document.getElementById('remainingAmount');
+    const budgetProgress = document.getElementById('budgetProgress');
+    const tripListEl = document.getElementById('tripList');
+    const addTripForm = document.getElementById('addTripForm');
+    const packingListEl = document.getElementById('packingList');
+    const packingStatusEl = document.getElementById('packingStatus');
+    const currentDateEl = document.getElementById('currentDate');
+
+    // --- 初始化 ---
+    function init() {
+        currentDateEl.textContent = getWeekendDate();
+        renderTrips();
+        renderPacking();
+        updateBudgetUI();
+    }
+
+    // --- 预算逻辑 ---
+    function calculateSpent() {
+        return trips.reduce((sum, trip) =&gt; sum + (trip.cost || 0), 0);
+    }
+
+    function updateBudgetUI() {
+        const spent = calculateSpent();
+        const budget = parseFloat(budgetInput.value) || 0;
+        const remaining = budget - spent;
+        
+        spentAmountEl.textContent = spent;
+        remainingAmountEl.textContent = remaining;
+
+        // 进度条逻辑
+        let percentage = 0;
+        if (budget &gt; 0) {
+            percentage = (spent / budget) * 100;
+        }
+        
+        // 限制最大宽度为100%
+        const displayPercentage = Math.min(percentage, 100);
+        budgetProgress.style.width = `${displayPercentage}%`;
+
+        // 颜色变化
+        budgetProgress.className = 'progress-bar-fill';
+        if (percentage &gt; 100) {
+            budgetProgress.classList.add('danger');
+            remainingAmountEl.style.color = 'var(--danger-color)';
+        } else if (percentage &gt; 80) {
+            budgetProgress.classList.add('warning');
+            remainingAmountEl.style.color = '#f39c12';
+        } else {
+            remainingAmountEl.style.color = 'var(--text-main)';
+        }
+    }
+
+    budgetInput.addEventListener('input', updateBudgetUI);
+
+    // --- 行程逻辑 ---
+    function renderTrips() {
+        tripListEl.innerHTML = '';
+        trips.forEach(trip =&gt; {
+            const li = document.createElement('li');
+            li.className = `trip-item ${trip.completed ? 'completed' : ''}`;
+            li.innerHTML = `
+                &lt;input type=&quot;checkbox&quot; class=&quot;trip-checkbox&quot; 
+                    ${trip.completed ? 'checked' : ''} 
+                    onchange=&quot;toggleTrip(${trip.id})&quot; 
+                    aria-label=&quot;标记 ${trip.place} 完成&quot;&gt;
+                &lt;div class=&quot;trip-content&quot;&gt;
+                    &lt;h3&gt;${trip.place}&lt;/h3&gt;
+                    &lt;div class=&quot;trip-meta&quot;&gt;
+                        &lt;span&gt;🕒 ${trip.time}&lt;/span&gt;
+                    &lt;/div&gt;
+                    &lt;div class=&quot;trip-desc&quot;&gt;${trip.desc}&lt;/div&gt;
+                &lt;/div&gt;
+                &lt;div class=&quot;trip-cost&quot;&gt;¥${trip.cost}&lt;/div&gt;
+                &lt;button class=&quot;btn-delete&quot; onclick=&quot;deleteTrip(${trip.id})&quot; aria-label=&quot;删除行程&quot; title=&quot;删除&quot;&gt;✕&lt;/button&gt;
+            `;
+            tripListEl.appendChild(li);
+        });
+        updateBudgetUI();
+    }
+
+    window.toggleTrip = function(id) {
+        const trip = trips.find(t =&gt; t.id === id);
+        if (trip) {
+            trip.completed = !trip.completed;
+            renderTrips();
+        }
+    };
+
+    window.deleteTrip = function(id) {
+        if(confirm('确定要删除这个行程吗？')) {
+            trips = trips.filter(t =&gt; t.id !== id);
+            renderTrips();
+        }
+    };
+
+    window.resetTrips = function() {
+        if(confirm('确定要重置为默认行程吗？当前修改将丢失。')) {
+            trips = JSON.parse(JSON.stringify(defaultTrips));
+            renderTrips();
+        }
+    };
+
+    addTripForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const time = document.getElementById('newTime').value;
+        const place = document.getElementById('newPlace').value;
+        const cost = parseFloat(document.getElementById('newCost').value);
+
+        if (time &amp;&amp; place &amp;&amp; !isNaN(cost)) {
+            const newTrip = {
+                id: Date.now(), // 简单ID生成
+                time: time,
+                place: place,
+                desc: '自定义行程',
+                cost: cost,
+                completed: false
+            };
+            trips.push(newTrip);
+            renderTrips();
+            addTripForm.reset();
+        }
+    });
+
+    // --- 行李清单逻辑 ---
+    function renderPacking() {
+        packingListEl.innerHTML = '';
+        let checkedCount = 0;
+        
+        packing.forEach(item =&gt; {
+            if (item.checked) checkedCount++;
+            
+            const label = document.createElement('label');
+            label.className = `packing-item ${item.checked ? 'checked' : ''}`;
+            label.innerHTML = `
+                &lt;input type=&quot;checkbox&quot; onchange=&quot;togglePacking(${item.id})&quot;&gt;
+                &lt;span&gt;${item.name}&lt;/span&gt;
+            `;
+            // 让点击整个标签也能触发checkbox
+            label.addEventListener('click', function(e) {
+                if (e.target.tagName !== 'INPUT') {
+                    const checkbox = this.querySelector('input');
+                    checkbox.checked = !checkbox.checked;
+                    togglePacking(item.id);
+                }
+            });
+            
+            packingListEl.appendChild(label);
+        });
+
+        // 更新状态文字
+        if (checkedCount === packing.length) {
+            packingStatusEl.textContent = '✅ 准备就绪！';
+            packingStatusEl.style.color = 'var(--success-color)';
+        } else {
+            packingStatusEl.textContent = `已准备 ${checkedCount}/${packing.length}`;
+            packingStatusEl.style.color = 'var(--text-secondary)';
+        }
+    }
+
+    window.togglePacking = function(id) {
+        const item = packing.find(p =&gt; p.id === id);
+        if (item) {
+            item.checked = !item.checked;
+            renderPacking();
+        }
+    };
+
+    // 启动应用
+    init();
+
+&lt;/script&gt;
+
+&lt;/body&gt;
+&lt;/html&gt;"></iframe></section></main>
+</body>
+</html>

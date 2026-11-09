@@ -1,0 +1,362 @@
+{
+  "syntax": [
+    {
+      "run": 1,
+      "model": "ornith_1_5_35b_a3b",
+      "script_count": 1,
+      "all_scripts_parse": true,
+      "errors": []
+    },
+    {
+      "run": 1,
+      "model": "qwen3_6_35b_a3b",
+      "script_count": 1,
+      "all_scripts_parse": true,
+      "errors": []
+    },
+    {
+      "run": 2,
+      "model": "ornith_1_5_35b_a3b",
+      "script_count": 1,
+      "all_scripts_parse": true,
+      "errors": []
+    },
+    {
+      "run": 2,
+      "model": "qwen3_6_35b_a3b",
+      "script_count": 1,
+      "all_scripts_parse": true,
+      "errors": []
+    },
+    {
+      "run": 3,
+      "model": "ornith_1_5_35b_a3b",
+      "script_count": 1,
+      "all_scripts_parse": true,
+      "errors": []
+    },
+    {
+      "run": 3,
+      "model": "qwen3_6_35b_a3b",
+      "script_count": 1,
+      "all_scripts_parse": true,
+      "errors": []
+    }
+  ],
+  "browser": [
+    {
+      "model": "ornith_1_5_35b_a3b",
+      "html_file": "tests/ornith_1_5_35b_a3b/outputs/20261109T143932Z.html",
+      "all_scripts_parse": true,
+      "scripts": [
+        {
+          "passed": true,
+          "error": ""
+        }
+      ],
+      "browser": {
+        "title": "周末城市微旅行规划器",
+        "ready": "complete",
+        "inputs": [
+          {
+            "id": "destination",
+            "type": "text",
+            "placeholder": "请输入目的地"
+          },
+          {
+            "id": "budget",
+            "type": "number",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          }
+        ],
+        "buttons": [
+          {
+            "id": "budgetBtn",
+            "text": "更新预算",
+            "aria": null
+          },
+          {
+            "id": "",
+            "text": "✕",
+            "aria": "删除行程「乘坐高铁前往目的地」"
+          },
+          {
+            "id": "",
+            "text": "✕",
+            "aria": "删除行程「漫步老街 · 品尝地道小吃」"
+          },
+          {
+            "id": "",
+            "text": "✕",
+            "aria": "删除行程「午餐 · 湖景休憩」"
+          },
+          {
+            "id": "",
+            "text": "✕",
+            "aria": "删除行程「游览公园或参观博物馆」"
+          },
+          {
+            "id": "",
+            "text": "✕",
+            "aria": "删除行程「下午茶 · 拍照留念」"
+          },
+          {
+            "id": "",
+            "text": "✕",
+            "aria": "删除行程「晚餐后返程」"
+          },
+          {
+            "id": "addTripBtn",
+            "text": "＋ 添加新行程",
+            "aria": null
+          }
+        ]
+      },
+      "checks": {
+        "itinerary_after_delete": 7,
+        "delete_decreases_count": false,
+        "packing_toggle": true,
+        "destination_input": true,
+        "budget_immediate_update": true,
+        "checkbox_toggle": true,
+        "itinerary_initial": 6,
+        "itinerary_after_add": 7,
+        "add_increases_count": true
+      },
+      "runtime_errors": [],
+      "external_requests": []
+    },
+    {
+      "model": "qwen3_6_35b_a3b",
+      "html_file": "tests/qwen3_6_35b_a3b/outputs/20261109T143932Z.html",
+      "all_scripts_parse": true,
+      "scripts": [
+        {
+          "passed": true,
+          "error": ""
+        }
+      ],
+      "browser": {
+        "title": "周末城市微旅行规划器",
+        "ready": "complete",
+        "inputs": [
+          {
+            "id": "budgetInput",
+            "type": "number",
+            "placeholder": "输入人均总预算 (元)"
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "newTime",
+            "type": "text",
+            "placeholder": "时间 (如: 周六 10:00)"
+          },
+          {
+            "id": "newPlace",
+            "type": "text",
+            "placeholder": "地点"
+          },
+          {
+            "id": "newCost",
+            "type": "number",
+            "placeholder": "费用 (元)"
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          }
+        ],
+        "buttons": [
+          {
+            "id": "",
+            "text": "重置默认行程",
+            "aria": null
+          },
+          {
+            "id": "",
+            "text": "✕",
+            "aria": "删除行程"
+          },
+          {
+            "id": "",
+            "text": "✕",
+            "aria": "删除行程"
+          },
+          {
+            "id": "",
+            "text": "✕",
+            "aria": "删除行程"
+          },
+          {
+            "id": "",
+            "text": "✕",
+            "aria": "删除行程"
+          },
+          {
+            "id": "",
+            "text": "✕",
+            "aria": "删除行程"
+          },
+          {
+            "id": "",
+            "text": "✕",
+            "aria": "删除行程"
+          },
+          {
+            "id": "",
+            "text": "添加行程",
+            "aria": null
+          }
+        ]
+      },
+      "checks": {
+        "itinerary_after_delete": 6,
+        "delete_decreases_count": true,
+        "packing_toggle": false,
+        "destination_input": false,
+        "budget_immediate_update": true,
+        "checkbox_toggle": true,
+        "itinerary_initial": 6,
+        "itinerary_after_add": 7,
+        "add_increases_count": true
+      },
+      "runtime_errors": [],
+      "external_requests": []
+    }
+  ]
+}

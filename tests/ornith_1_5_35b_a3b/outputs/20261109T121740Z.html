@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>周末城市微旅行规划器</title>
+<style>
+  :root {
+    --primary: #2e7d6f;
+    --primary-dark: #1f5a50;
+    --primary-light: #e8f4f0;
+    --accent: #e08a3c;
+    --danger: #c0392b;
+    --danger-light: #fdecea;
+    --text: #2c3e3a;
+    --text-light: #6b7d78;
+    --bg: #f4f7f6;
+    --card: #ffffff;
+    --border: #dce6e3;
+    --shadow: 0 4px 16px rgba(46, 125, 111, 0.10);
+    --radius: 14px;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", "Noto Sans SC", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  a:focus,
+  button:focus,
+  input:focus,
+  [tabindex]:focus {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  .container {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 0 16px 60px;
+  }
+
+  /* Header */
+  header {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: #fff;
+    padding: 32px 16px 28px;
+    text-align: center;
+  }
+
+  header h1 {
+    font-size: clamp(1.5rem, 4vw, 2.1rem);
+    margin-bottom: 8px;
+    letter-spacing: 1px;
+  }
+
+  header p {
+    font-size: 0.95rem;
+    opacity: 0.92;
+    max-width: 520px;
+    margin: 0 auto 16px;
+  }
+
+  .date-badge {
+    display: inline-block;
+    background: var(--accent);
+    color: #fff;
+    padding: 10px 22px;
+    border-radius: 40px;
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    box-shadow: 0 4px 14px rgba(224, 138, 60, 0.4);
+  }
+
+  .date-badge .icon {
+    margin-right: 6px;
+  }
+
+  /* Section */
+  section {
+    margin-top: 28px;
+  }
+
+  .section-title {
+    font-size: 1.2rem;
+    color: var(--primary-dark);
+    margin-bottom: 14px;
+    padding-left: 12px;
+    border-left: 4px solid var(--accent);
+  }
+
+  .card {
+    background: var(--card);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 20px;
+  }
+
+  /* Budget Input */
+  .budget-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: flex-end;
+  }
+
+  .field {
+    flex: 1 1 200px;
+  }
+
+  .field label {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--text-light);
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+
+  .field input {
+    width: 100%;
+    padding: 11px 14px;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    font-size: 1rem;
+    color: var(--text);
+    background: #fff;
+    transition: border-color 0.2s;
+  }
+
+  .field input:focus {
+    border-color: var(--primary);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 11px 20px;
+    border: none;
+    border-radius: 10px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.1s, background 0.2s, box-shadow 0.2s;
+    white-space: nowrap;
+  }
+
+  .btn:active {
+    transform: scale(0.96);
+  }
+
+  .btn-primary {
+    background: var(--primary);
+    color: #fff;
+  }
+
+  .btn-primary:hover {
+    background: var(--primary-dark);
+  }
+
+  .btn-accent {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .btn-accent:hover {
+    background: #c97a2f;
+  }
+
+  .btn-danger {
+    background: transparent;
+    color: var(--danger);
+    padding: 6px 12px;
+    font-size: 0.85rem;
+  }
+
+  .btn-danger:hover {
+    background: var(--danger-light);
+  }
+
+  .btn-ghost {
+    background: var(--primary-light);
+    color: var(--primary-dark);
+  }
+
+  .btn-ghost:hover {
+    background: #d5ecE6;
+  }
+
+  /* Budget Progress */
+  .budget-summary {
+    margin-top: 18px;
+  }
+
+  .budget-stats {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+  }
+
+  .budget-stats span {
+    font-weight: 600;
+  }
+
+  .stat-total { color: var(--text-light); }
+  .stat-used { color: var(--primary-dark); }
+  .stat-remain { color: var(--accent); }
+
+  .progress-track {
+    width: 100%;
+    height: 22px;
+    background: var(--primary-light);
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary), var(--accent));
+    border-radius: 12px;
+    transition: width 0.4s ease;
+    min-width: 0;
+  }
+
+  .progress-fill.over {
+    background: var(--danger);
+  }
+
+  .progress-label {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--text);
+    text-shadow: 0 0 4px rgba(255,255,255,0.8);
+  }
+
+  /* Itinerary */
+  .itinerary-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .trip-card {
+    background: var(--card);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 18px 20px;
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    border-left: 5px solid var(--primary);
+    transition: opacity 0.3s, transform 0.2s;
+  }
+
+  .trip-card.done {
+    border-left-color: #b0b8b5;
+    opacity: 0.65;
+  }
+
+  .trip-card.done .trip-activity {
+    text-decoration: line-through;
+    color: var(--text-light);
+  }
+
+  .trip-check {
+    flex-shrink: 0;
+    width: 26px;
+    height: 26px;
+    margin-top: 2px;
+    cursor: pointer;
+    accent-color: var(--primary);
+  }
+
+  .trip-body {
+    flex: 1;
+  }
+
+  .trip-time {
+    display: inline-block;
+    background: var(--primary-light);
+    color: var(--primary-dark);
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 20px;
+    margin-bottom: 8px;
+  }
+
+  .trip-activity {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .trip-location {
+    font-size: 0.88rem;
+    color: var(--text-light);
+  }
+
+  .trip-location::before {
+    content: "📍 ";
+  }
+
+  .trip-cost {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--accent);
+    margin-top: 8px;
+  }
+
+  .trip-actions {
+    flex-shrink: 0;
+  }
+
+  .add-trip-form {
+    margin-top: 14px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: flex-end;
+    background: var(--primary-light);
+    border-radius: 12px;
+    padding: 16px;
+  }
+
+  .add-trip-form .field {
+    flex: 1 1 140px;
+  }
+
+  .add-trip-form .field.wide {
+    flex: 2 1 200px;
+  }
+
+  /* Packing */
+  .packing-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
+  }
+
+  .packing-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--card);
+    border-radius: 12px;
+    padding: 14px 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+    user-select: none;
+  }
+
+  .packing-item:hover {
+    transform: translateY(-2px);
+  }
+
+  .packing-item.checked {
+    background: var(--primary-light);
+  }
+
+  .packing-item .emoji {
+    font-size: 1.4rem;
+  }
+
+  .packing-item .p-label {
+    font-size: 0.95rem;
+    font-weight: 500;
+  }
+
+  .packing-item.checked .p-label {
+    text-decoration: line-through;
+    color: var(--text-light);
+  }
+
+  .packing-check {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    accent-color: var(--primary);
+  }
+
+  /* Footer */
+  footer {
+    text-align: center;
+    padding: 24px 16px;
+    color: var(--text-light);
+    font-size: 0.82rem;
+  }
+
+  /* Modal */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+
+  .modal-overlay.show {
+    display: flex;
+  }
+
+  .modal {
+    background: #fff;
+    border-radius: var(--radius);
+    padding: 24px;
+    max-width: 380px;
+    width: 100%;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+    text-align: center;
+  }
+
+  .modal h3 {
+    margin-bottom: 10px;
+    color: var(--danger);
+  }
+
+  .modal p {
+    color: var(--text-light);
+    margin-bottom: 20px;
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+  }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: var(--primary-dark);
+    color: #fff;
+    padding: 12px 24px;
+    border-radius: 40px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+    z-index: 200;
+    transition: transform 0.35s ease;
+    max-width: 90vw;
+  }
+
+  .toast.show {
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* Responsive */
+  @media (max-width: 600px) {
+    header {
+      padding: 24px 14px 22px;
+    }
+    .container {
+      padding: 0 12px 40px;
+    }
+    .card {
+      padding: 16px;
+    }
+    .trip-card {
+      flex-wrap: wrap;
+    }
+    .trip-actions {
+      width: 100%;
+      margin-top: 8px;
+      padding-left: 42px;
+    }
+    .packing-grid {
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="container" style="padding-top:0;padding-bottom:0;">
+    <h1>🌆 周末城市微旅行规划器</h1>
+    <p>放下忙碌，给自己一个轻松的短途之旅。规划目的地、预算和行程，打包行李，说走就走。</p>
+    <div class="date-badge">
+      <span class="icon">📅</span>
+      <span id="weekendLabel">本周末加载中…</span>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+
+  <!-- 目的地与预算 -->
+  <section aria-labelledby="dest-title">
+    <h2 class="section-title" id="dest-title">📍 目的地与预算</h2>
+    <div class="card">
+      <div class="budget-form">
+        <div class="field">
+          <label for="destInput">目的地</label>
+          <input type="text" id="destInput" placeholder="例如：杭州、苏州、古镇…" value="杭州">
+        </div>
+        <div class="field">
+          <label for="budgetInput">人均预算（元）</label>
+          <input type="number" id="budgetInput" min="0" step="50" value="800">
+        </div>
+        <button class="btn btn-primary" id="updateBudgetBtn" type="button">更新预算</button>
+      </div>
+      <div class="budget-summary">
+        <div class="budget-stats">
+          <span class="stat-total">总预算：<span id="totalBudget">800</span> 元</span>
+          <span class="stat-used">已安排：<span id="usedBudget">0</span> 元</span>
+          <span class="stat-remain">剩余：<span id="remainBudget">800</span> 元</span>
+        </div>
+        <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progressTrack">
+          <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
+          <div class="progress-label" id="progressLabel">0%</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 周末行程 -->
+  <section aria-labelledby="trip-title">
+    <h2 class="section-title" id="trip-title">🗺️ 周末行程</h2>
+    <div class="itinerary-list" id="itineraryList"></div>
+
+    <div class="add-trip-form" id="addTripForm">
+      <div class="field wide">
+        <label for="tripActivity">活动</label>
+        <input type="text" id="tripActivity" placeholder="例如：逛西湖">
+      </div>
+      <div class="field">
+        <label for="tripTime">时间</label>
+        <input type="text" id="tripTime" placeholder="例如：上午 9:00">
+      </div>
+      <div class="field">
+        <label for="tripLocation">地点</label>
+        <input type="text" id="tripLocation" placeholder="例如：西湖断桥">
+      </div>
+      <div class="field">
+        <label for="tripCost">费用（元）</label>
+        <input type="number" id="tripCost" min="0" step="10" placeholder="0">
+      </div>
+      <button class="btn btn-accent" id="addTripBtn" type="button">＋ 添加行程</button>
+    </div>
+  </section>
+
+  <!-- 行李清单 -->
+  <section aria-labelledby="packing-title">
+    <h2 class="section-title" id="packing-title">🎒 行李清单</h2>
+    <div class="card">
+      <div class="packing-grid" id="packingGrid"></div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <p>周末城市微旅行规划器 · 愿你有一个愉快的短途之旅 🚂</p>
+</footer>
+
+<!-- 确认弹窗 -->
+<div class="modal-overlay" id="deleteModal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <h3 id="modalTitle">确认删除</h3>
+    <p id="modalMessage">确定要删除这个行程吗？</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="cancelDeleteBtn" type="button">取消</button>
+      <button class="btn btn-danger" id="confirmDeleteBtn" type="button" style="background:var(--danger);color:#fff;">删除</button>
+    </div>
+  </div>
+</div>
+
+<!-- 提示 -->
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ===== 计算本周末日期 =====
+  function getWeekendDates() {
+    var now = new Date();
+    var day = now.getDay(); // 0=周日, 6=周六
+    var saturday = new Date(now);
+    saturday.setDate(now.getDate() + (6 - day + 7) % 7);
+    var sunday = new Date(saturday);
+    sunday.setDate(saturday.getDate() + 1);
+    function fmt(d) {
+      return d.getFullYear() + "年" + (d.getMonth() + 1) + "月" + d.getDate() + "日";
+    }
+    return { saturday: fmt(saturday), sunday: fmt(sunday), saturdayObj: saturday };
+  }
+
+  var weekend = getWeekendDates();
+  document.getElementById("weekendLabel").textContent =
+    weekend.saturday + "（周六）— " + weekend.sunday + "（周日）";
+
+  // ===== 初始行程数据 =====
+  var trips = [
+    { id: 1, time: "上午 8:30", location: "高铁东站", activity: "乘坐高铁前往目的地", cost: 150, done: false },
+    { id: 2, time: "上午 10:00", location: "西湖景区", activity: "漫步西湖断桥，赏湖光山色", cost: 0, done: false },
+    { id: 3, time: "中午 12:00", location: "河坊街", activity: "品尝当地特色午餐与小吃", cost: 80, done: false },
+    { id: 4, time: "下午 14:30", location: "龙井茶园", activity: "品茶休闲，感受山间宁静", cost: 60, done: false },
+    { id: 5, time: "傍晚 17:00", location: "雷峰塔", activity: "登塔俯瞰西湖全景", cost: 40, done: false },
+    { id: 6, time: "晚上 18:30", location: "湖滨银泰", activity: "享用晚餐，夜游湖滨", cost: 120, done: false },
+    { id: 7, time: "晚上 20:00", location: "高铁东站", activity: "乘坐高铁返程", cost: 150, done: false }
+  ];
+
+  // ===== 初始行李清单 =====
+  var packingItems = [
+    { id: 1, emoji: "📷", label: "相机", checked: false },
+    { id: 2, emoji: "🔌", label: "充电器", checked: false },
+    { id: 3, emoji: "☂️", label: "雨伞", checked: false },
+    { id: 4, emoji: "🪥", label: "洗漱用品", checked: false },
+    { id: 5, emoji: "👕", label: "换洗衣物", checked: false },
+    { id: 6, emoji: "🪪", label: "身份证", checked: false },
+    { id: 7, emoji: "📱", label: "手机及充电宝", checked: false },
+    { id: 8, emoji: "💊", label: "常用药品", checked: false }
+  ];
+
+  var nextTripId = 8;
+
+  // ===== DOM 引用 =====
+  var budgetInput = document.getElementById("budgetInput");
+  var totalBudgetEl = document.getElementById("totalBudget");
+  var usedBudgetEl = document.getElementById("usedBudget");
+  var remainBudgetEl = document.getElementById("remainBudget");
+  var progressFill = document.getElementById("progressFill");
+  var progressLabel = document.getElementById("progressLabel");
+  var progressTrack = document.getElementById("progressTrack");
+  var itineraryList = document.getElementById("itineraryList");
+  var packingGrid = document.getElementById("packingGrid");
+
+  // ===== 工具函数 =====
+  function formatNum(n) {
+    return n.toLocaleString("zh-CN");
+  }
+
+  function showToast(msg) {
+    var toast = document.getElementById("toast");
+    toast.textContent = msg;
+    toast.classList.add("show");
+    setTimeout(function () {
+      toast.classList.remove("show");
+    }, 2200);
+  }
+
+  // ===== 预算更新 =====
+  function getBudget() {
+    var v = parseInt(budgetInput.value, 10);
+    return isNaN(v) || v < 0 ? 0 : v;
+  }
+
+  function getUsedTotal() {
+    var total = 0;
+    for (var i = 0; i < trips.length; i++) {
+      total += trips[i].cost || 0;
+    }
+    return total;
+  }
+
+  function updateBudgetDisplay() {
+    var total = getBudget();
+    var used = getUsedTotal();
+    var remain = total - used;
+    var pct = total > 0 ? Math.round((used / total) * 100) : 0;
+
+    totalBudgetEl.textContent = formatNum(total);
+    usedBudgetEl.textContent = formatNum(used);
+    remainBudgetEl.textContent = formatNum(remain);
+
+    var clampedPct = Math.min(pct, 100);
+    progressFill.style.width = clampedPct + "%";
+    progressLabel.textContent = pct + "%";
+    progressTrack.setAttribute("aria-valuenow", pct);
+
+    if (used > total) {
+      progressFill.classList.add("over");
+      remainBudgetEl.style.color = "var(--danger)";
+    } else {
+      progressFill.classList.remove("over");
+      remainBudgetEl.style.color = "var(--accent)";
+    }
+  }
+
+  // ===== 渲染行程 =====
+  function renderTrips() {
+    itineraryList.innerHTML = "";
+    for (var i = 0; i < trips.length; i++) {
+      var t = trips[i];
+      var card = document.createElement("article");
+      card.className = "trip-card" + (t.done ? " done" : "");
+      card.setAttribute("data-id", t.id);
+
+      var check = document.createElement("input");
+      check.type = "checkbox";
+      check.className = "trip-check";
+      check.checked = t.done;
+      check.setAttribute("aria-label", "标记「" + t.activity + "」为已完成");
+      check.addEventListener("change", function (e) {
+        var id = parseInt(this.getAttribute("aria-data-id") || this.closest(".trip-card").getAttribute("data-id"), 10);
+        for (var j = 0; j < trips.length; j++) {
+          if (trips[j].id === id) { trips[j].done = this.checked; break; }
+        }
+        card.classList.toggle("done", this.checked);
+        showToast(this.checked ? "✅ 已完成：" + t.activity : "↩️ 已恢复：" + t.activity);
+      });
+      // 存储 id 到 checkbox
+      (function (id) {
+        check.setAttribute("aria-data-id", id);
+      })(t.id);
+
+      var body = document.createElement("div");
+      body.className = "trip-body";
+
+      var time = document.createElement("span");
+      time.className = "trip-time";
+      time.textContent = t.time;
+
+      var activity = document.createElement("div");
+      activity.className = "trip-activity";
+      activity.textContent = t.activity;
+
+      var location = document.createElement("div");
+      location.className = "trip-location";
+      location.textContent = t.location;
+
+      var cost = document.createElement("div");
+      cost.className = "trip-cost";
+      cost.textContent = "费用：" + formatNum(t.cost) + " 元";
+
+      body.appendChild(time);
+      body.appendChild(activity);
+      body.appendChild(location);
+      body.appendChild(cost);
+
+      var actions = document.createElement("div");
+      actions.className = "trip-actions";
+
+      var delBtn = document.createElement("button");
+      delBtn.className = "btn btn-danger";
+      delBtn.type = "button";
+      delBtn.textContent = "🗑 删除";
+      delBtn.addEventListener("click", function () {
+        var id = parseInt(this.closest(".trip-card").getAttribute("data-id"), 10);
+        openDeleteModal(id);
+      });
+
+      actions.appendChild(delBtn);
+
+      card.appendChild(check);
+      card.appendChild(body);
+      card.appendChild(actions);
+      itineraryList.appendChild(card);
+    }
+    updateBudgetDisplay();
+  }
+
+  // ===== 添加行程 =====
+  function addTrip() {
+    var activityEl = document.getElementById("tripActivity");
+    var timeEl = document.getElementById("tripTime");
+    var locationEl = document.getElementById("tripLocation");
+    var costEl = document.getElementById("tripCost");
+
+    var activity = activityEl.value.trim();
+    var time = timeEl.value.trim();
+    var location = locationEl.value.trim();
+    var cost = parseInt(costEl.value, 10);
+
+    if (!activity) {
+      showToast("请输入活动名称");
+      activityEl.focus();
+      return;
+    }
+    if (!time) {
+      showToast("请输入时间");
+      timeEl.focus();
+      return;
+    }
+
+    trips.push({
+      id: nextTripId++,
+      time: time,
+      location: location || "待定",
+      activity: activity,
+      cost: isNaN(cost) || cost < 0 ? 0 : cost,
+      done: false
+    });
+
+    activityEl.value = "";
+    timeEl.value = "";
+    locationEl.value = "";
+    costEl.value = "";
+    activityEl.focus();
+
+    renderTrips();
+    showToast("✅ 已添加行程：" + activity);
+  }
+
+  document.getElementById("addTripBtn").addEventListener("click", addTrip);
+  document.getElementById("tripActivity").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); addTrip(); }
+  });
+  document.getElementById("tripCost").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); addTrip(); }
+  });
+
+  // ===== 删除行程（弹窗确认）=====
+  var deleteModal = document.getElementById("deleteModal");
+  var deleteId = null;
+
+  function openDeleteModal(id) {
+    deleteId = id;
+    for (var i = 0; i < trips.length; i++) {
+      if (trips[i].id === id) {
+        document.getElementById("modalMessage").textContent =
+          "确定要删除「" + trips[i].activity + "」这个行程吗？";
+        break;
+      }
+    }
+    deleteModal.classList.add("show");
+    document.getElementById("cancelDeleteBtn").focus();
+  }
+
+  function closeDeleteModal() {
+    deleteModal.classList.remove("show");
+    deleteId = null;
+  }
+
+  document.getElementById("cancelDeleteBtn").addEventListener("click", closeDeleteModal);
+  document.getElementById("confirmDeleteBtn").addEventListener("click", function () {
+    if (deleteId !== null) {
+      var removed = null;
+      for (var i = 0; i < trips.length; i++) {
+        if (trips[i].id === deleteId) { removed = trips[i]; trips.splice(i, 1); break; }
+      }
+      closeDeleteModal();
+      renderTrips();
+      if (removed) showToast("🗑 已删除：" + removed.activity);
+    }
+  });
+  deleteModal.addEventListener("click", function (e) {
+    if (e.target === deleteModal) closeDeleteModal();
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && deleteModal.classList.contains("show")) closeDeleteModal();
+  });
+
+  // ===== 行李清单渲染 =====
+  function renderPacking() {
+    packingGrid.innerHTML = "";
+    for (var i = 0; i < packingItems.length; i++) {
+      var item = packingItems[i];
+      var el = document.createElement("label");
+      el.className = "packing-item" + (item.checked ? " checked" : "");
+      el.setAttribute("data-id", item.id);
+
+      var check = document.createElement("input");
+      check.type = "checkbox";
+      check.className = "packing-check";
+      check.checked = item.checked;
+      check.setAttribute("aria-label", "勾选「" + item.label + "」");
+
+      var emoji = document.createElement("span");
+      emoji.className = "emoji";
+      emoji.textContent = item.emoji;
+
+      var label = document.createElement("span");
+      label.className = "p-label";
+      label.textContent = item.label;
+
+      el.appendChild(check);
+      el.appendChild(emoji);
+      el.appendChild(label);
+
+      el.addEventListener("change", function () {
+        var id = parseInt(this.getAttribute("data-id"), 10);
+        for (var j = 0; j < packingItems.length; j++) {
+          if (packingItems[j].id === id) {
+            packingItems[j].checked = check.checked;
+            break;
+          }
+        }
+        this.classList.toggle("checked", check.checked);
+        showToast(check.checked ? "✅ " + item.label + " 已打包" : "↩️ " + item.label + " 取消");
+      });
+
+      packingGrid.appendChild(el);
+    }
+  }
+
+  // ===== 预算按钮 =====
+  document.getElementById("updateBudgetBtn").addEventListener("click", function () {
+    updateBudgetDisplay();
+    var total = getBudget();
+    var used = getUsedTotal();
+    if (used > total) {
+      showToast("⚠️ 预算已超支，请留意开支");
+    } else {
+      showToast("✅ 预算已更新：" + formatNum(total) + " 元");
+    }
+  });
+  budgetInput.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); updateBudgetDisplay(); }
+  });
+  budgetInput.addEventListener("input", function () {
+    updateBudgetDisplay();
+  });
+
+  // ===== 初始化 =====
+  renderTrips();
+  renderPacking();
+  updateBudgetDisplay();
+
+})();
+</script>
+
+</body>
+</html>

@@ -30,9 +30,9 @@ def _write_fake_llama_server(executable: Path) -> None:
         "    print('Available devices: CUDA0')\n"
         "    raise SystemExit(0)\n"
         "if '--help' in sys.argv:\n"
-        "    print('--n-cpu-moe --sleep-idle-seconds --mmproj-offload --spec-type')\n"
+        "    print('--n-cpu-moe --sleep-idle-seconds --mmproj-offload --spec-type --spec-draft-model')\n"
         "    raise SystemExit(0)\n"
-        "if '--spec-type' in sys.argv and os.getenv('FAKE_QWEN_FAIL') == 'true':\n"
+        "if 'Qwen3.6-35B-A3B-MTP' in sys.argv and os.getenv('FAKE_QWEN_FAIL') == 'true':\n"
         "    raise SystemExit(9)\n"
         "with open(os.environ['TRACE'], 'a', encoding='utf-8') as trace:\n"
         "    trace.write('llama-server ' + ' '.join(sys.argv[1:]) + '\\n')\n"
@@ -71,9 +71,11 @@ def _preflight_environment(root: Path) -> tuple[dict[str, str], Path]:
     _write_fake_llama_server(llama_server)
     model_file = root / "Ornith.gguf"
     mmproj_file = root / "mmproj.gguf"
+    mtp_file = root / "mtp.gguf"
     qwen_model_file = root / "Qwen3.6-35B-A3B-UD-Q5_K_M.gguf"
     model_file.write_bytes(b"GGUF-test-model")
     mmproj_file.write_bytes(b"GGUF-test-mmproj")
+    mtp_file.write_bytes(b"GGUF-test-mtp")
     qwen_model_file.write_bytes(b"GGUF-test-qwen-model")
     environment = {
         **os.environ,
@@ -97,6 +99,7 @@ def _preflight_environment(root: Path) -> tuple[dict[str, str], Path]:
         "QWEN36_SLEEP_POLL_INTERVAL": "0.01",
         "LLAMA_SERVER_BIN": str(llama_server),
         "ORNITH_MODEL_FILE": str(model_file),
+        "ORNITH_MTP_FILE": str(mtp_file),
         "ORNITH_MMPROJ_FILE": str(mmproj_file),
         "ORNITH_STARTUP_TIMEOUT": "5",
         "ORNITH_SLEEP_TIMEOUT": "1",
@@ -136,6 +139,66 @@ class StartServicesTests(unittest.TestCase):
                     self.assertIn(f"{variable} 必须是正数", completed.stderr)
                     self.assertNotIn("manager.py", trace_path.read_text())
 
+    def test_default_text_settings_match_measured_profile(self) -> None:
+        expected = {
+            "ORNITH": {"threads": "6", "threads-batch": "8"},
+            "QWEN36": {"threads": "8", "threads-batch": "8"},
+        }
+        common = {
+            "n-cpu-moe": "23",
+            "ctx-size": "32768",
+            "batch-size": "512",
+            "cache-type-k": "q8_0",
+            "cache-type-v": "q8_0",
+            "load-mode": "none",
+            "spec-type": "draft-mtp",
+            "spec-draft-n-max": "4",
+            "spec-draft-type-k": "f16",
+            "spec-draft-type-v": "f16",
+            "parallel": "1",
+            "sleep-idle-seconds": "1",
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            environment, trace_path = _preflight_environment(Path(temporary))
+            for prefix in expected:
+                for setting in (
+                    "THREADS",
+                    "THREADS_BATCH",
+                    "N_CPU_MOE",
+                    "CONTEXT_SIZE",
+                    "BATCH_SIZE",
+                    "CACHE_TYPE_K",
+                    "CACHE_TYPE_V",
+                    "LOAD_MODE",
+                    "SPEC_TYPE",
+                    "SPEC_DRAFT_N_MAX",
+                    "SPEC_DRAFT_CACHE_TYPE_K",
+                    "SPEC_DRAFT_CACHE_TYPE_V",
+                    "SLEEP_IDLE_SECONDS",
+                ):
+                    environment.pop(f"{prefix}_{setting}", None)
+            completed = subprocess.run(
+                ["bash", str(ROOT / "start.sh")],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=environment,
+                timeout=30,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            starts = [
+                line
+                for line in trace_path.read_text().splitlines()
+                if line.startswith("llama-server ")
+            ]
+            self.assertEqual(len(starts), 2)
+            for command, (prefix, settings) in zip(starts, expected.items(), strict=True):
+                arguments = command.split()
+                for flag, value in (common | settings).items():
+                    with self.subTest(model=prefix, flag=flag):
+                        self.assertIn(f"--{flag}", arguments)
+                        self.assertEqual(arguments[arguments.index(f"--{flag}") + 1], value)
+
     def test_start_invokes_managed_services_and_both_llama_backends(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -155,9 +218,11 @@ class StartServicesTests(unittest.TestCase):
             _write_fake_llama_server(llama_server)
             model_file = root / "Ornith.gguf"
             mmproj_file = root / "mmproj.gguf"
+            mtp_file = root / "mtp.gguf"
             qwen_model_file = root / "Qwen3.6-35B-A3B-UD-Q5_K_M.gguf"
             model_file.write_bytes(b"GGUF-test-model")
             mmproj_file.write_bytes(b"GGUF-test-mmproj")
+            mtp_file.write_bytes(b"GGUF-test-mtp")
             qwen_model_file.write_bytes(b"GGUF-test-qwen-model")
 
             environment = {
@@ -179,7 +244,17 @@ class StartServicesTests(unittest.TestCase):
                 "LLAMA_SERVER_BIN": str(llama_server),
                 "ORNITH_MODEL_FILE": str(model_file),
                 "ORNITH_MMPROJ_FILE": str(mmproj_file),
+                "ORNITH_MTP_FILE": str(mtp_file),
                 "QWEN36_MODEL_FILE": str(qwen_model_file),
+                "QWEN36_THREADS_BATCH": "12",
+                "ORNITH_N_CPU_MOE": "24",
+                "QWEN36_N_CPU_MOE": "25",
+                "QWEN36_SPEC_DRAFT_N_MAX": "4",
+                "ORNITH_SPEC_DRAFT_N_MAX": "5",
+                "ORNITH_SPEC_DRAFT_CACHE_TYPE_K": "q8_0",
+                "ORNITH_SPEC_DRAFT_CACHE_TYPE_V": "q8_0",
+                "QWEN36_SPEC_DRAFT_CACHE_TYPE_K": "q8_0",
+                "QWEN36_SPEC_DRAFT_CACHE_TYPE_V": "q8_0",
                 "ORNITH_STARTUP_TIMEOUT": "5",
                 "ORNITH_SLEEP_TIMEOUT": "1",
                 "ORNITH_SLEEP_POLL_INTERVAL": "0.01",
@@ -268,12 +343,17 @@ class StartServicesTests(unittest.TestCase):
             ornith_start, qwen_start = llama_starts
             self.assertIn(f"--model {model_file}", ornith_start)
             self.assertIn(f"--mmproj {mmproj_file}", ornith_start)
+            self.assertIn(f"--spec-draft-model {mtp_file}", ornith_start)
+            self.assertIn("--spec-type draft-mtp", ornith_start)
+            self.assertIn("--spec-draft-n-max 5", ornith_start)
+            self.assertIn("--spec-draft-type-k q8_0", ornith_start)
+            self.assertIn("--spec-draft-type-v q8_0", ornith_start)
             self.assertIn("--host 127.0.0.1", ornith_start)
             self.assertIn("--port 18403", ornith_start)
             self.assertIn("--alias Ornith-1.5-35B-A3B-AD-Q5", ornith_start)
             self.assertIn("--device CUDA0", ornith_start)
             self.assertIn("--gpu-layers 99", ornith_start)
-            self.assertIn("--n-cpu-moe 20", ornith_start)
+            self.assertIn("--n-cpu-moe 24", ornith_start)
             self.assertIn("--mmproj-offload", ornith_start)
             self.assertIn("--flash-attn on", ornith_start)
             self.assertIn("--jinja", ornith_start)
@@ -287,6 +367,10 @@ class StartServicesTests(unittest.TestCase):
             self.assertIn("--gpu-layers 99", qwen_start)
             self.assertIn("--n-cpu-moe 25", qwen_start)
             self.assertIn("--spec-type draft-mtp", qwen_start)
+            self.assertIn("--threads-batch 12", qwen_start)
+            self.assertIn("--spec-draft-n-max 4", qwen_start)
+            self.assertIn("--spec-draft-type-k q8_0", qwen_start)
+            self.assertIn("--spec-draft-type-v q8_0", qwen_start)
             self.assertIn("--flash-attn on", qwen_start)
             self.assertIn("--jinja", qwen_start)
             self.assertIn("--ctx-size 32768", qwen_start)
@@ -332,6 +416,31 @@ class StartServicesTests(unittest.TestCase):
                     )
                 )
             )
+
+    def test_invalid_draft_settings_fail_before_localai_starts(self) -> None:
+        for variable, value in (
+            ("ORNITH_SPEC_TYPE", "draft-simple"),
+            ("ORNITH_SPEC_DRAFT_N_MAX", "-1"),
+            ("ORNITH_SPEC_DRAFT_CACHE_TYPE_K", "invalid"),
+            ("ORNITH_SPEC_DRAFT_CACHE_TYPE_V", "invalid"),
+            ("QWEN36_SPEC_DRAFT_N_MAX", "-1"),
+            ("QWEN36_SPEC_DRAFT_CACHE_TYPE_K", "invalid"),
+            ("QWEN36_SPEC_DRAFT_CACHE_TYPE_V", "invalid"),
+        ):
+            with self.subTest(variable=variable), tempfile.TemporaryDirectory() as temporary:
+                environment, trace_path = _preflight_environment(Path(temporary))
+                environment[variable] = value
+                completed = subprocess.run(
+                    ["bash", str(ROOT / "start.sh")],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                    env=environment,
+                    timeout=15,
+                )
+                self.assertNotEqual(completed.returncode, 0)
+                self.assertIn(variable, completed.stderr)
+                self.assertNotIn("manager.py", trace_path.read_text())
 
     def test_missing_llama_server_fails_before_localai_starts(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -379,6 +488,45 @@ class StartServicesTests(unittest.TestCase):
             self.assertNotEqual(completed.returncode, 0)
             self.assertIn("Ornith GGUF 缺失或为空", completed.stderr)
             self.assertNotIn("找不到可执行的 llama-server", completed.stderr)
+            calls = trace_path.read_text(encoding="utf-8").splitlines()
+            self.assertFalse(any("manager.py" in call for call in calls))
+
+    def test_ornith_without_mtp_preserves_legacy_startup(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            environment, trace_path = _preflight_environment(root)
+            environment["ORNITH_SPEC_TYPE"] = "none"
+            environment["ORNITH_MTP_FILE"] = str(root / "missing-mtp.gguf")
+            environment["ORNITH_SPEC_DRAFT_N_MAX"] = "unused"
+            completed = subprocess.run(
+                ["bash", str(ROOT / "start.sh")],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=environment,
+                timeout=30,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            calls = trace_path.read_text(encoding="utf-8").splitlines()
+            ornith_start = next(call for call in calls if call.startswith("llama-server "))
+            self.assertIn("--spec-type none", ornith_start)
+            self.assertNotIn("--spec-draft-", ornith_start)
+
+    def test_missing_ornith_mtp_fails_before_localai_starts(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            environment, trace_path = _preflight_environment(root)
+            environment["ORNITH_MTP_FILE"] = str(root / "missing-mtp.gguf")
+            completed = subprocess.run(
+                ["bash", str(ROOT / "start.sh")],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=environment,
+                timeout=15,
+            )
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertIn("Ornith MTP 缺失或为空", completed.stderr)
             calls = trace_path.read_text(encoding="utf-8").splitlines()
             self.assertFalse(any("manager.py" in call for call in calls))
 

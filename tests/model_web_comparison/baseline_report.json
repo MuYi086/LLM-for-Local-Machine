@@ -1,0 +1,85 @@
+{
+  "started_at": "2026-11-09T09:11:18+00:00",
+  "run_id": "20261109T091118Z",
+  "prompt_file": "task_prompt.txt",
+  "prompt_sha256": "67ed0ec8d791e654a821cc9b210fd63c6dfbbe9d997e23a8a50017e446ec896c",
+  "generation": {
+    "temperature": 0.0,
+    "top_p": 1.0,
+    "max_tokens": 8192,
+    "thinking_enabled": false,
+    "stream": true
+  },
+  "results": [
+    {
+      "model": "Ornith-1.5-35B-A3B-AD-Q5",
+      "key": "ornith_1_5_35b_a3b",
+      "html_file": "tests/ornith_1_5_35b_a3b/outputs/20261109T091118Z.html",
+      "metrics": {
+        "elapsed_seconds": 234.884,
+        "time_to_first_token_seconds": 5.359,
+        "generation_interval_seconds": 226.3,
+        "completion_tokens": 6861,
+        "tokens_per_second": 30.32,
+        "finish_reasons": [
+          "stop"
+        ],
+        "html_characters": 19991,
+        "html_sha256": "2da6003778e96806e766c59a9df00be388727e268314be9fc02e46523730c94a",
+        "sample_count": 786,
+        "sample_interval_seconds": 0.25,
+        "gpu_device_index": 0,
+        "gpu_memory_baseline_mib": 1444,
+        "gpu_memory_peak_mib": 15044,
+        "gpu_memory_peak_delta_mib": 13600,
+        "llama_server_pid": 984006,
+        "llama_server_rss_baseline_mib": 632.203125,
+        "llama_server_rss_peak_sampled_mib": 21795.4453125,
+        "llama_server_rss_peak_delta_mib": 21163.2421875,
+        "llama_server_rss_high_water_mib_at_end": 21793.52734375,
+        "system_available_memory_baseline_mib": 32693.8671875,
+        "system_available_memory_min_mib": 32338.26171875,
+        "system_memory_used_peak_delta_mib": 355.60546875
+      },
+      "quality_notes": [
+        "aria-label 字符串拼接有 3 处引号错误，原始页的内联 JavaScript 无法解析；并排预览副本只补齐这些引号，原始页保持不变。"
+      ],
+      "preview_file": "tests/ornith_1_5_35b_a3b/outputs/20261109T091118Z.preview.html"
+    },
+    {
+      "model": "Qwen3.6-35B-A3B-MTP",
+      "key": "qwen3_6_35b_a3b",
+      "html_file": "tests/qwen3_6_35b_a3b/outputs/20261109T091118Z.html",
+      "metrics": {
+        "elapsed_seconds": 169.515,
+        "time_to_first_token_seconds": 20.409,
+        "generation_interval_seconds": 145.665,
+        "completion_tokens": 4897,
+        "tokens_per_second": 33.62,
+        "finish_reasons": [
+          "stop"
+        ],
+        "html_characters": 17796,
+        "html_sha256": "e72250cefdc1ce600b94768ff6291744c3bddfb11e0ebb15e027f754bc341408",
+        "sample_count": 569,
+        "sample_interval_seconds": 0.25,
+        "gpu_device_index": 0,
+        "gpu_memory_baseline_mib": 1453,
+        "gpu_memory_peak_mib": 14296,
+        "gpu_memory_peak_delta_mib": 12843,
+        "llama_server_pid": 984216,
+        "llama_server_rss_baseline_mib": 433.25390625,
+        "llama_server_rss_peak_sampled_mib": 15358.30078125,
+        "llama_server_rss_peak_delta_mib": 14925.046875,
+        "llama_server_rss_high_water_mib_at_end": 15355.84375,
+        "system_available_memory_baseline_mib": 32543.28515625,
+        "system_available_memory_min_mib": 32483.52734375,
+        "system_memory_used_peak_delta_mib": 59.7578125
+      },
+      "quality_notes": [
+        "没有实现任务要求的目的地输入框。"
+      ],
+      "preview_file": "tests/qwen3_6_35b_a3b/outputs/20261109T091118Z.html"
+    }
+  ]
+}

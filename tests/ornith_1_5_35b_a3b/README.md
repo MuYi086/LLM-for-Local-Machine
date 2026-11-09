@@ -26,4 +26,6 @@ curl -N http://127.0.0.1:8401/v1/AtomicChat/Ornith-1.5-35B-A3B-AD-Q5 \
   -d '{"messages":[{"role":"user","content":"请用中文介绍一下你自己。"}],"max_tokens":128,"stream":true}'
 ```
 
-主 GGUF 和 F16 mmproj 从 `$HF_MIRROR_DIR/AtomicChat/Ornith-1.5-35B-A3B/` 读取。llama-server 必须是 CUDA 构建且报告 `CUDA0`，默认用 CUDA 承载模型层、将前 20 层 MoE 专家放到 CPU，并在空闲后卸载模型。每个请求使用公共 GPU 锁；如果 backend 未确认休眠，服务会返回 503 并保留 quarantine 标记。
+主 GGUF、F16 mmproj 和独立 `mtp-Ornith-1.5-35B-A3B-Q8_0.gguf` 从 `$HF_MIRROR_DIR/AtomicChat/Ornith-1.5-35B-A3B/` 读取。llama-server 必须是 CUDA 构建且报告 `CUDA0`，默认用 CUDA 承载模型层、将前 23 层 MoE 专家放到 CPU，并在空闲后卸载模型。每个请求使用公共 GPU 锁；如果 backend 未确认休眠，服务会返回 503 并保留 quarantine 标记。
+
+`start.sh` 默认使用线程 6/8、主模型 Q8 KV、F16 草稿 KV、MTP 草稿长度 4 和 load-mode none；复测步骤与完整结论见 [网页任务对比](../model_web_comparison/README.md)。

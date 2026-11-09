@@ -1,0 +1,87 @@
+{
+  "started_at": "2026-11-09T14:39:32+00:00",
+  "run_id": "20261109T143932Z",
+  "prompt_file": "task_prompt.txt",
+  "prompt_sha256": "67ed0ec8d791e654a821cc9b210fd63c6dfbbe9d997e23a8a50017e446ec896c",
+  "generation": {
+    "temperature": 0.0,
+    "top_p": 1.0,
+    "max_tokens": 8192,
+    "thinking_enabled": false,
+    "stream": true
+  },
+  "results": [
+    {
+      "model": "Ornith-1.5-35B-A3B-AD-Q5",
+      "key": "ornith_1_5_35b_a3b",
+      "html_file": "tests/ornith_1_5_35b_a3b/outputs/20261109T143932Z.html",
+      "preview_file": "tests/ornith_1_5_35b_a3b/outputs/20261109T143932Z.html",
+      "quality_notes": [
+        "浏览器实测删除行程无效：点击后数量未减少。"
+      ],
+      "metrics": {
+        "elapsed_seconds": 106.713,
+        "time_to_first_token_seconds": 13.124,
+        "generation_interval_seconds": 89.365,
+        "completion_tokens": 6898,
+        "tokens_per_second": 77.19,
+        "finish_reasons": [
+          "stop"
+        ],
+        "html_characters": 20449,
+        "html_sha256": "dbb5e9d27244aaec6093365a4bf6b4e36db8f9865d459cc49ef4c9e671188aa3",
+        "sample_count": 369,
+        "sample_interval_seconds": 0.25,
+        "gpu_device_index": 0,
+        "gpu_memory_baseline_mib": 1893,
+        "gpu_memory_peak_mib": 15591,
+        "gpu_memory_peak_delta_mib": 13698,
+        "llama_server_pid": 51618,
+        "llama_server_rss_baseline_mib": 665.890625,
+        "llama_server_rss_peak_sampled_mib": 12477.4765625,
+        "llama_server_rss_peak_delta_mib": 11811.5859375,
+        "llama_server_rss_high_water_mib_at_end": 12485.00390625,
+        "system_available_memory_baseline_mib": 32557.8984375,
+        "system_available_memory_min_mib": 20690.4375,
+        "system_memory_used_peak_delta_mib": 11867.4609375
+      }
+    },
+    {
+      "model": "Qwen3.6-35B-A3B-MTP",
+      "key": "qwen3_6_35b_a3b",
+      "html_file": "tests/qwen3_6_35b_a3b/outputs/20261109T143932Z.html",
+      "preview_file": "tests/qwen3_6_35b_a3b/outputs/20261109T143932Z.html",
+      "quality_notes": [
+        "没有实现任务要求的目的地输入框。",
+        "浏览器实测行李 checkbox 的原生勾选状态在重绘后未保留。"
+      ],
+      "metrics": {
+        "elapsed_seconds": 89.648,
+        "time_to_first_token_seconds": 14.106,
+        "generation_interval_seconds": 71.26,
+        "completion_tokens": 5040,
+        "tokens_per_second": 70.73,
+        "finish_reasons": [
+          "stop"
+        ],
+        "html_characters": 17828,
+        "html_sha256": "3ee4f925c23a03d55c5fd00fa78da2bfe933640bad7f8de6be6e626e6db4701b",
+        "sample_count": 310,
+        "sample_interval_seconds": 0.25,
+        "gpu_device_index": 0,
+        "gpu_memory_baseline_mib": 1893,
+        "gpu_memory_peak_mib": 15605,
+        "gpu_memory_peak_delta_mib": 13712,
+        "llama_server_pid": 51912,
+        "llama_server_rss_baseline_mib": 773.78515625,
+        "llama_server_rss_peak_sampled_mib": 14338.375,
+        "llama_server_rss_peak_delta_mib": 13564.58984375,
+        "llama_server_rss_high_water_mib_at_end": 14337.6953125,
+        "system_available_memory_baseline_mib": 32531.94921875,
+        "system_available_memory_min_mib": 18961.51953125,
+        "system_memory_used_peak_delta_mib": 13570.4296875
+      }
+    }
+  ],
+  "browser_checks_file": "quality_checks_v3.json"
+}

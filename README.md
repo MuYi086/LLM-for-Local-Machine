@@ -15,7 +15,7 @@
 | [SeedVC](model-audio/vc_seed-vc/) | 8342 | `POST /v1/SeedVC/SeedVC-MLX-GGUF`，音色转换 |
 | [Stable Audio SFX](model-audio/gen_stable-audio-3-small-sfx/) | 8343 | `POST /v1/stabilityai/Stable-Audio-3-Small-SFX-GGUF`，音效生成 |
 | [VoxCPM2](model-audio/tts_voxcpm2/) | 8313 | `POST /v1/OpenBMB/VoxCPM2-GGUF`，TTS、音色设计与可选参考克隆 |
-| [Ornith-1.5-35B-A3B](model-text/ornith_1_5_35b_a3b/) | 8401 | `POST /v1/AtomicChat/Ornith-1.5-35B-A3B-AD-Q5`，CUDA 推理，前 20 层 MoE 专家放 CPU，mmproj 支持图片 |
+| [Ornith-1.5-35B-A3B](model-text/ornith_1_5_35b_a3b/) | 8401 | `POST /v1/AtomicChat/Ornith-1.5-35B-A3B-AD-Q5`，CUDA 推理，前 23 层 MoE 专家放 CPU，mmproj 支持图片 |
 | [Qwen3.6-35B-A3B-MTP](model-text/qwen3_6_35b_a3b/) | 8402 | `POST /v1/qwen/Qwen3.6-35B-A3B-MTP`，CUDA + CPU MoE 混合推理，启用 MTP |
 | [Steam Audio renderer](model-audio/spatial_steam-audio/) | 无 HTTP 端口 | C++17 CPU renderer，由 8300 控制面调用 |
 
@@ -69,6 +69,9 @@ bash start.sh
 ~/hf-mirror/audio.cpp-gguf/Qwen3-TTS-12Hz-1.7B-VoiceDesign-GGUF/qwen3-tts-12hz-1.7b-voicedesign-bf16.gguf
 ```
 
+`start.sh` 的 Ornith 与 Qwen 默认参数已采用本机三次完整实测选定的配置；复测步骤、性能及资源结论见
+[文本模型对比测试](tests/model_web_comparison/README.md)。所有参数仍可通过环境变量覆盖。
+
 主要环境变量：
 
 | 变量 | 默认值 | 用途 |
@@ -80,13 +83,20 @@ bash start.sh
 | `LLAMA_SERVER_BIN` | PATH 中的 `llama-server`，否则尝试 `$HOME/.local/src/llama.cpp/build-cuda/bin/llama-server` | llama.cpp HTTP server 可执行文件；也可显式设置路径 |
 | `ORNITH_MODEL_FILE` | `$HF_MIRROR_DIR/AtomicChat/Ornith-1.5-35B-A3B/Ornith-1.5-35B-A3B-AD-Q5_K-Q4_K.gguf` | Ornith 主模型，只读加载 |
 | `ORNITH_MMPROJ_FILE` | `$HF_MIRROR_DIR/AtomicChat/Ornith-1.5-35B-A3B/mmproj-Ornith-1.5-35B-A3B-F16.gguf` | 多模态 projector，只读加载 |
+| `ORNITH_MTP_FILE` | `$HF_MIRROR_DIR/AtomicChat/Ornith-1.5-35B-A3B/mtp-Ornith-1.5-35B-A3B-Q8_0.gguf` | 独立 MTP draft 模型，通过 `--spec-type draft-mtp --spec-draft-model` 只读加载 |
+| `ORNITH_SPEC_TYPE` | `draft-mtp` | Ornith 推测解码类型：`draft-mtp` 或 `none`；`none` 不要求或加载独立 MTP 文件 |
+| `ORNITH_SPEC_DRAFT_N_MAX` | `4` | 最大草稿长度，非负整数 |
+| `ORNITH_SPEC_DRAFT_CACHE_TYPE_K` / `ORNITH_SPEC_DRAFT_CACHE_TYPE_V` | `f16` / `f16` | 独立 MTP 的 K/V 缓存类型 |
 | `ORNITH_HOST` / `ORNITH_PORT` | 继承 `HOST` / `8401` | Ornith 对外 API 监听地址 |
 | `LLAMA_CPP_PORT` | `8403` | Ornith llama-server loopback 端口，不绑定外部网卡 |
 | `ORNITH_CONTEXT_SIZE` | `32768` | llama.cpp 上下文长度，最大 `32768` |
 | `ORNITH_BATCH_SIZE` | `512` | llama.cpp logical batch size |
-| `ORNITH_THREADS` | 在线 CPU 数量 | llama.cpp CPU 推理线程数 |
+| `ORNITH_THREADS` | `6` | llama.cpp CPU 推理线程数 |
+| `ORNITH_THREADS_BATCH` | `8` | 提示处理及 MTP 验证的 CPU 批量线程数 |
+| `ORNITH_CACHE_TYPE_K` / `ORNITH_CACHE_TYPE_V` | `q8_0` / `q8_0` | 主模型 K/V 缓存 |
+| `ORNITH_LOAD_MODE` | `none` | llama.cpp 加载方式，采用本机实测配置 |
 | `ORNITH_N_GPU_LAYERS` | `99` | 尝试将可用模型层卸载到 CUDA0 |
-| `ORNITH_N_CPU_MOE` | `20` | 前 20 个 MoE 层的专家权重放在 CPU |
+| `ORNITH_N_CPU_MOE` | `23` | 前 23 个 MoE 层的专家权重放在 CPU |
 | `ORNITH_SLEEP_IDLE_SECONDS` | `1` | llama.cpp 空闲后卸载模型和 KV cache 的秒数 |
 | `ORNITH_STARTUP_TIMEOUT` | `1800` 秒 | 等待首次加载并确认 sleep-idle 的最长时间 |
 | `ORNITH_SLEEP_TIMEOUT` | `300` 秒 | 单个请求结束后等待模型卸载的最长时间 |
@@ -94,7 +104,12 @@ bash start.sh
 | `QWEN36_HOST` / `QWEN36_PORT` | 继承 `HOST` / `8402` | Qwen 对外 API 监听地址 |
 | `QWEN36_BACKEND_HOST` / `QWEN36_LLAMA_CPP_PORT` | `127.0.0.2` / `8400` | Qwen llama-server loopback 地址，与 LocalAI 的 `127.0.0.1:8400` 并存 |
 | `QWEN36_CONTEXT_SIZE` / `QWEN36_BATCH_SIZE` | `32768` / `512` | Qwen llama.cpp 上下文和 batch 大小 |
-| `QWEN36_N_GPU_LAYERS` / `QWEN36_N_CPU_MOE` | `99` / `25` | CUDA0 层卸载与 CPU MoE 层数，默认混合推理配置 |
+| `QWEN36_THREADS` / `QWEN36_THREADS_BATCH` | `8` / `8` | 生成及 CPU 批量线程数 |
+| `QWEN36_CACHE_TYPE_K` / `QWEN36_CACHE_TYPE_V` | `q8_0` / `q8_0` | 主模型 K/V 缓存 |
+| `QWEN36_LOAD_MODE` | `none` | llama.cpp 加载方式 |
+| `QWEN36_SPEC_DRAFT_N_MAX` | `4` | 最大 MTP 草稿长度 |
+| `QWEN36_SPEC_DRAFT_CACHE_TYPE_K` / `QWEN36_SPEC_DRAFT_CACHE_TYPE_V` | `f16` / `f16` | MTP 草稿 K/V 缓存 |
+| `QWEN36_N_GPU_LAYERS` / `QWEN36_N_CPU_MOE` | `99` / `23` | CUDA0 层卸载与 CPU MoE 层数，默认混合推理配置 |
 | `QWEN36_SLEEP_IDLE_SECONDS` | `1` | llama.cpp 空闲后卸载模型和 KV cache 的秒数 |
 | `HF_MIRROR_DIR` | `~/hf-mirror` | 本地模型镜像根目录 |
 | `QWEN_VOICEDESIGN_MODEL_FILE` | 上述 GGUF 路径 | VoiceDesign 模型文件 |
@@ -111,7 +126,7 @@ bash start.sh
 各模型的完整默认权重路径、变量名、端口和路由见模型清单；上传上限、超时及空间 renderer 的其他设置
 可从 `start.sh` 和对应服务模块读取。`GET /v1/health` 不触发推理，会检查 LocalAI 与固定模型注册状态。
 
-Ornith API 使用 CUDA 计算，并将配置的前 20 个 MoE 专家层放在 CPU；空闲后 llama.cpp 通过 sleep-idle 卸载模型，
+Ornith API 使用 CUDA 计算，并将配置的前 23 个 MoE 专家层放在 CPU；空闲后 llama.cpp 通过 sleep-idle 卸载模型，
 API 请求共享 `GPU_LOCK_FILE`，直到确认卸载才归还 GPU。混合推理接口和示例：
 
 ```bash

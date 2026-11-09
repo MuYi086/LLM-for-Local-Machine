@@ -1,0 +1,728 @@
+{
+  "prompt_sha256": "67ed0ec8d791e654a821cc9b210fd63c6dfbbe9d997e23a8a50017e446ec896c",
+  "generation": {
+    "temperature": 0.0,
+    "top_p": 1.0,
+    "max_tokens": 8192,
+    "thinking_enabled": false,
+    "stream": true
+  },
+  "selection": {
+    "ornith": {
+      "cpu_moe": 23,
+      "threads": 6,
+      "threads_batch": 8,
+      "draft_max": 4,
+      "draft_kv": "f16"
+    },
+    "qwen": {
+      "cpu_moe": 23,
+      "threads": 8,
+      "threads_batch": 8,
+      "draft_max": 4,
+      "draft_kv": "f16"
+    },
+    "main_kv": "q8_0",
+    "load_mode": "none",
+    "context": 32768,
+    "batch": 512,
+    "probes": [
+      {
+        "label": "mtp_base_retry",
+        "model": "ornith",
+        "samples": [
+          80.697,
+          80.142
+        ],
+        "median_tokens_per_second": 80.4195
+      },
+      {
+        "label": "mtp_base_retry",
+        "model": "qwen",
+        "samples": [
+          80.554,
+          80.845
+        ],
+        "median_tokens_per_second": 80.6995
+      },
+      {
+        "label": "mtp_batch4",
+        "model": "ornith",
+        "samples": [
+          70.15,
+          70.512
+        ],
+        "median_tokens_per_second": 70.331
+      },
+      {
+        "label": "mtp_batch4",
+        "model": "qwen",
+        "samples": [
+          70.147,
+          69.613
+        ],
+        "median_tokens_per_second": 69.88
+      },
+      {
+        "label": "mtp_batch6",
+        "model": "ornith",
+        "samples": [
+          81.361,
+          79.707
+        ],
+        "median_tokens_per_second": 80.53399999999999
+      },
+      {
+        "label": "mtp_batch6",
+        "model": "qwen",
+        "samples": [
+          80.963,
+          80.917
+        ],
+        "median_tokens_per_second": 80.94
+      },
+      {
+        "label": "mtp_draft5",
+        "model": "ornith",
+        "samples": [
+          77.201,
+          77.443
+        ],
+        "median_tokens_per_second": 77.322
+      },
+      {
+        "label": "mtp_draft5",
+        "model": "qwen",
+        "samples": [
+          80.769,
+          78.195
+        ],
+        "median_tokens_per_second": 79.482
+      },
+      {
+        "label": "mtp_draft6",
+        "model": "ornith",
+        "samples": [
+          76.511,
+          75.534
+        ],
+        "median_tokens_per_second": 76.02250000000001
+      },
+      {
+        "label": "mtp_draft6",
+        "model": "qwen",
+        "samples": [
+          81.801,
+          81.686
+        ],
+        "median_tokens_per_second": 81.74350000000001
+      },
+      {
+        "label": "mtp_ornith_draft3",
+        "model": "ornith",
+        "samples": [
+          78.339,
+          77.746
+        ],
+        "median_tokens_per_second": 78.04249999999999
+      }
+    ],
+    "selection_note": "批量6与8差异不足0.4 token/s；Qwen draft6仅比draft4快约1.3%，保留v2参数。Ornith draft4最快。"
+  },
+  "models": [
+    {
+      "model": "Ornith-1.5-35B-A3B-AD-Q5",
+      "key": "ornith_1_5_35b_a3b",
+      "metrics": {
+        "tokens_per_second": {
+          "samples": [
+            76.71,
+            76.41,
+            77.19
+          ],
+          "median": 76.71,
+          "min": 76.41,
+          "max": 77.19
+        },
+        "elapsed_seconds": {
+          "samples": [
+            107.415,
+            108.748,
+            106.713
+          ],
+          "median": 107.415,
+          "min": 106.713,
+          "max": 108.748
+        },
+        "time_to_first_token_seconds": {
+          "samples": [
+            13.22,
+            14.186,
+            13.124
+          ],
+          "median": 13.22,
+          "min": 13.124,
+          "max": 14.186
+        },
+        "completion_tokens": {
+          "samples": [
+            6898,
+            6898,
+            6898
+          ],
+          "median": 6898,
+          "min": 6898,
+          "max": 6898
+        },
+        "llama_server_rss_peak_sampled_mib": {
+          "samples": [
+            12486.1953125,
+            12484.8046875,
+            12477.4765625
+          ],
+          "median": 12484.8046875,
+          "min": 12477.4765625,
+          "max": 12486.1953125
+        },
+        "gpu_memory_peak_mib": {
+          "samples": [
+            15551,
+            15577,
+            15591
+          ],
+          "median": 15577,
+          "min": 15551,
+          "max": 15591
+        },
+        "gpu_memory_peak_delta_mib": {
+          "samples": [
+            13708,
+            13698,
+            13698
+          ],
+          "median": 13698,
+          "min": 13698,
+          "max": 13708
+        },
+        "system_memory_used_peak_delta_mib": {
+          "samples": [
+            11984.9609375,
+            11829.46875,
+            11867.4609375
+          ],
+          "median": 11867.4609375,
+          "min": 11829.46875,
+          "max": 11984.9609375
+        },
+        "gpu_memory_baseline_mib": {
+          "samples": [
+            1843,
+            1879,
+            1893
+          ],
+          "median": 1879,
+          "min": 1843,
+          "max": 1893
+        }
+      },
+      "html_files": [
+        "tests/ornith_1_5_35b_a3b/outputs/20261109T143300Z.html",
+        "tests/ornith_1_5_35b_a3b/outputs/20261109T143615Z.html",
+        "tests/ornith_1_5_35b_a3b/outputs/20261109T143932Z.html"
+      ],
+      "html_sha256": [
+        "dbb5e9d27244aaec6093365a4bf6b4e36db8f9865d459cc49ef4c9e671188aa3",
+        "dbb5e9d27244aaec6093365a4bf6b4e36db8f9865d459cc49ef4c9e671188aa3",
+        "dbb5e9d27244aaec6093365a4bf6b4e36db8f9865d459cc49ef4c9e671188aa3"
+      ],
+      "finish_reasons": [
+        [
+          "stop"
+        ],
+        [
+          "stop"
+        ],
+        [
+          "stop"
+        ]
+      ]
+    },
+    {
+      "model": "Qwen3.6-35B-A3B-MTP",
+      "key": "qwen3_6_35b_a3b",
+      "metrics": {
+        "tokens_per_second": {
+          "samples": [
+            73.51,
+            72.76,
+            70.73
+          ],
+          "median": 72.76,
+          "min": 70.73,
+          "max": 73.51
+        },
+        "elapsed_seconds": {
+          "samples": [
+            88.141,
+            87.406,
+            89.648
+          ],
+          "median": 88.141,
+          "min": 87.406,
+          "max": 89.648
+        },
+        "time_to_first_token_seconds": {
+          "samples": [
+            15.265,
+            13.81,
+            14.106
+          ],
+          "median": 14.106,
+          "min": 13.81,
+          "max": 15.265
+        },
+        "completion_tokens": {
+          "samples": [
+            5040,
+            5040,
+            5040
+          ],
+          "median": 5040,
+          "min": 5040,
+          "max": 5040
+        },
+        "llama_server_rss_peak_sampled_mib": {
+          "samples": [
+            14286.96484375,
+            14321.859375,
+            14338.375
+          ],
+          "median": 14321.859375,
+          "min": 14286.96484375,
+          "max": 14338.375
+        },
+        "gpu_memory_peak_mib": {
+          "samples": [
+            15593,
+            15606,
+            15605
+          ],
+          "median": 15605,
+          "min": 15593,
+          "max": 15606
+        },
+        "gpu_memory_peak_delta_mib": {
+          "samples": [
+            13732,
+            13727,
+            13712
+          ],
+          "median": 13727,
+          "min": 13712,
+          "max": 13732
+        },
+        "system_memory_used_peak_delta_mib": {
+          "samples": [
+            13868.34765625,
+            13638.47265625,
+            13570.4296875
+          ],
+          "median": 13638.47265625,
+          "min": 13570.4296875,
+          "max": 13868.34765625
+        },
+        "gpu_memory_baseline_mib": {
+          "samples": [
+            1861,
+            1879,
+            1893
+          ],
+          "median": 1879,
+          "min": 1861,
+          "max": 1893
+        }
+      },
+      "html_files": [
+        "tests/qwen3_6_35b_a3b/outputs/20261109T143300Z.html",
+        "tests/qwen3_6_35b_a3b/outputs/20261109T143615Z.html",
+        "tests/qwen3_6_35b_a3b/outputs/20261109T143932Z.html"
+      ],
+      "html_sha256": [
+        "3ee4f925c23a03d55c5fd00fa78da2bfe933640bad7f8de6be6e626e6db4701b",
+        "3ee4f925c23a03d55c5fd00fa78da2bfe933640bad7f8de6be6e626e6db4701b",
+        "3ee4f925c23a03d55c5fd00fa78da2bfe933640bad7f8de6be6e626e6db4701b"
+      ],
+      "finish_reasons": [
+        [
+          "stop"
+        ],
+        [
+          "stop"
+        ],
+        [
+          "stop"
+        ]
+      ]
+    }
+  ],
+  "syntax": [
+    {
+      "run": 1,
+      "model": "ornith_1_5_35b_a3b",
+      "script_count": 1,
+      "all_scripts_parse": true,
+      "errors": []
+    },
+    {
+      "run": 1,
+      "model": "qwen3_6_35b_a3b",
+      "script_count": 1,
+      "all_scripts_parse": true,
+      "errors": []
+    },
+    {
+      "run": 2,
+      "model": "ornith_1_5_35b_a3b",
+      "script_count": 1,
+      "all_scripts_parse": true,
+      "errors": []
+    },
+    {
+      "run": 2,
+      "model": "qwen3_6_35b_a3b",
+      "script_count": 1,
+      "all_scripts_parse": true,
+      "errors": []
+    },
+    {
+      "run": 3,
+      "model": "ornith_1_5_35b_a3b",
+      "script_count": 1,
+      "all_scripts_parse": true,
+      "errors": []
+    },
+    {
+      "run": 3,
+      "model": "qwen3_6_35b_a3b",
+      "script_count": 1,
+      "all_scripts_parse": true,
+      "errors": []
+    }
+  ],
+  "browser": [
+    {
+      "model": "ornith_1_5_35b_a3b",
+      "html_file": "tests/ornith_1_5_35b_a3b/outputs/20261109T143932Z.html",
+      "all_scripts_parse": true,
+      "scripts": [
+        {
+          "passed": true,
+          "error": ""
+        }
+      ],
+      "browser": {
+        "title": "周末城市微旅行规划器",
+        "ready": "complete",
+        "inputs": [
+          {
+            "id": "destination",
+            "type": "text",
+            "placeholder": "请输入目的地"
+          },
+          {
+            "id": "budget",
+            "type": "number",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          }
+        ],
+        "buttons": [
+          {
+            "id": "budgetBtn",
+            "text": "更新预算",
+            "aria": null
+          },
+          {
+            "id": "",
+            "text": "✕",
+            "aria": "删除行程「乘坐高铁前往目的地」"
+          },
+          {
+            "id": "",
+            "text": "✕",
+            "aria": "删除行程「漫步老街 · 品尝地道小吃」"
+          },
+          {
+            "id": "",
+            "text": "✕",
+            "aria": "删除行程「午餐 · 湖景休憩」"
+          },
+          {
+            "id": "",
+            "text": "✕",
+            "aria": "删除行程「游览公园或参观博物馆」"
+          },
+          {
+            "id": "",
+            "text": "✕",
+            "aria": "删除行程「下午茶 · 拍照留念」"
+          },
+          {
+            "id": "",
+            "text": "✕",
+            "aria": "删除行程「晚餐后返程」"
+          },
+          {
+            "id": "addTripBtn",
+            "text": "＋ 添加新行程",
+            "aria": null
+          }
+        ]
+      },
+      "checks": {
+        "itinerary_after_delete": 7,
+        "delete_decreases_count": false,
+        "packing_toggle": true,
+        "destination_input": true,
+        "budget_immediate_update": true,
+        "checkbox_toggle": true,
+        "itinerary_initial": 6,
+        "itinerary_after_add": 7,
+        "add_increases_count": true
+      },
+      "runtime_errors": [],
+      "external_requests": []
+    },
+    {
+      "model": "qwen3_6_35b_a3b",
+      "html_file": "tests/qwen3_6_35b_a3b/outputs/20261109T143932Z.html",
+      "all_scripts_parse": true,
+      "scripts": [
+        {
+          "passed": true,
+          "error": ""
+        }
+      ],
+      "browser": {
+        "title": "周末城市微旅行规划器",
+        "ready": "complete",
+        "inputs": [
+          {
+            "id": "budgetInput",
+            "type": "number",
+            "placeholder": "输入人均总预算 (元)"
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "newTime",
+            "type": "text",
+            "placeholder": "时间 (如: 周六 10:00)"
+          },
+          {
+            "id": "newPlace",
+            "type": "text",
+            "placeholder": "地点"
+          },
+          {
+            "id": "newCost",
+            "type": "number",
+            "placeholder": "费用 (元)"
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          },
+          {
+            "id": "",
+            "type": "checkbox",
+            "placeholder": ""
+          }
+        ],
+        "buttons": [
+          {
+            "id": "",
+            "text": "重置默认行程",
+            "aria": null
+          },
+          {
+            "id": "",
+            "text": "✕",
+            "aria": "删除行程"
+          },
+          {
+            "id": "",
+            "text": "✕",
+            "aria": "删除行程"
+          },
+          {
+            "id": "",
+            "text": "✕",
+            "aria": "删除行程"
+          },
+          {
+            "id": "",
+            "text": "✕",
+            "aria": "删除行程"
+          },
+          {
+            "id": "",
+            "text": "✕",
+            "aria": "删除行程"
+          },
+          {
+            "id": "",
+            "text": "✕",
+            "aria": "删除行程"
+          },
+          {
+            "id": "",
+            "text": "添加行程",
+            "aria": null
+          }
+        ]
+      },
+      "checks": {
+        "itinerary_after_delete": 6,
+        "delete_decreases_count": true,
+        "packing_toggle": false,
+        "destination_input": false,
+        "budget_immediate_update": true,
+        "checkbox_toggle": true,
+        "itinerary_initial": 6,
+        "itinerary_after_add": 7,
+        "add_increases_count": true
+      },
+      "runtime_errors": [],
+      "external_requests": []
+    }
+  ]
+}
