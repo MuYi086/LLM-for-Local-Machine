@@ -37,7 +37,7 @@ python3 scripts/localai/manager.py register-qwen3-tts-candidate
 
 ## 无模型验证
 
-历史验证记录：本轮服务退役前的质量门禁通过；当时的项目与测试计数已过期。当前收尾质量门禁结果见 [升级记录](../../docs/localai-audiocpp-upgrade.md)。VoiceDesign 的 gateway/manager/provider 路由均由 mock 覆盖；这不证明固定 audio.cpp RPC、模型载入、WAV 质量、shutdown 后显存释放或并发真实表现。
+历史验证记录：本轮服务退役前的质量门禁通过；当时的项目与测试计数已过期。当前收尾质量门禁结果见[历史升级归档](audiocpp-upgrade-history-2026-10-22.md)。Base 克隆的 gateway/provider 路由由 mock 覆盖；下方另记录 VoiceDesign GGUF 的真实请求与 WAV 输出校验。
 
 ## 待完成验收
 
@@ -48,33 +48,30 @@ python3 scripts/localai/manager.py register-qwen3-tts-candidate
 
 ---
 
-## 同阶段：Qwen3 VoiceDesign 代码试点
+## Qwen3 VoiceDesign GGUF 接入
 
 - 状态：`single_sample_verified_quality_unverified`
-- 服务：`qwen3_voiceDesign` / 8301，`POST /v1/qwen/timbre`
-- 默认 provider：`native`
-- LocalAI 候选：`llm-local.qwen3-tts.1p7b-voicedesign`，audio.cpp `family:qwen3_tts`、`task:vdes`
-- 模型制品：官方 `Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign` safetensors；权重由用户手动准备，snapshot revision 与全量非缓存文件 hash 已按本地制品登记于 versions.json
-- 证据：mock 覆盖接口字段和切段存储；2026-10-22 通过一次真实中文短句、24 kHz WAV 及 shutdown；完整 E2/E3 未验收
+- 日期：2026-11-08
+- 服务：`qwen3_voiceDesign` / 8301，`POST /v1/qwen/Qwen3-TTS-1.7B-VoiceDesign`
+- provider：固定 `localai/audio.cpp`；start.sh 默认注册候选、启动受管 LocalAI 并预检
+- 模型 ID：`llm-local.qwen3-tts.1p7b-voicedesign`，固定 `family:qwen3_tts`、`task:vdes` 与 CUDA
+- 模型文件：`$HF_MIRROR_DIR/audio.cpp-gguf/Qwen3-TTS-12Hz-1.7B-VoiceDesign-GGUF/qwen3-tts-12hz-1.7b-voicedesign-bf16.gguf`
+- SHA-256：`f12c79e8c492f006b04f5ba823bebe512c9d46e13a7837081f1d34803b4bac0e`
+- 本机推理证据：最终代码 API 返回 24 kHz、单声道、3.36 秒、161324 字节 PCM WAV；共享 GPU 记录峰值 5522 MiB；`/backend/shutdown` 与 LocalAI 受管进程组停止均已确认
+- 生成文件：`storage/timbre/qwen3-tts-voicedesign-56e80fd15f7e42f6abd865819d4ed83c.wav`
+- 验收边界：单次短中文请求和 WAV 结构已验证；听感、长文本、音色描述效果及故障恢复演练未验收
 
-### 字段映射和限制
+### 字段映射
 
-| LLM Local Backend 字段 | LocalAI/audio.cpp 处理 | 状态与限制 |
+| VoiceDesign 请求字段 | LocalAI/audio.cpp 字段或处理 | 说明 |
 | --- | --- | --- |
-| `voice_description` | `/v1/audio/speech` 的 `instructions` | 固定 `task:vdes`，不附加 Base 克隆参考音频 |
-| `text`、`language` | `input`、`language` | 保留现有文本和语言值 |
-| `max_new_tokens`、`top_p`、`temperature` | `params.max_tokens`、同名采样参数 | 值映射 mock 已覆盖，真实生成待验收 |
-| `max_chars_per_chunk` | 使用与 native worker 相同的标点/长度切段 | 在一次共享 GPU 租约内顺序合成；单次最多 32 段，超过时返回 422 |
-| `pause_ms` | CPU 解码 WAV 后插入静音并重编码 | 复用 native worker 的分段停顿语义；采样率不一致或 WAV 无效时拒绝 |
-| `device_map`、`dtype`、`attn_implementation` | LocalAI YAML 固定 CUDA 设备；拒绝非服务默认值 | 显式非默认配置返回 422；逐请求 PyTorch 覆盖不静默忽略 |
-| 输出 | WAV 合并后保存至 `storage/timbre/` 并注册为可复用音色 | 一个短句输出 24 kHz WAV 且 shutdown 成功；音质及异常生命周期待扩展验证 |
+| `voice_description` | `/v1/audio/speech` 的 `instructions` | 固定使用 `task:vdes`，不加入 Base 克隆参考音频 |
+| `text`、`language` | `input`、`language` | 语言为空时省略 |
+| `max_new_tokens`、`top_p`、`temperature` | `params.max_tokens` 与同名采样字段 | 可选采样值为空时省略 |
+| `max_chars_per_chunk` | CPU 按 Unicode 字符数切段 | 单次最多 32 段，超出返回 422 |
+| `pause_ms` | CPU 合并 PCM WAV 时插入静音 | 分段采样参数必须一致 |
+| 输出 | 验证 WAV 后写入 `storage/timbre/` 并登记 `AudioReferenceStore` | HTTP 输出与存储文件经逐字节比较一致 |
 
-VoiceDesign 注册命令只检查运维已准备的目录并写入独立 YAML：
+管理器只接受任务指定文件名的非空 GGUF；在 LocalAI models 目录建立受控相对 `.gguf` 链接，并拒绝覆盖未知 YAML。旧 safetensors YAML 仅在内容与已知旧配置完全相同时备份后迁移。真实请求经共享 GPU 锁排队并在响应后确认 backend 停止；无法确认时继续遵循 gateway quarantine 规则。
 
-```bash
-python3 scripts/localai/manager.py register-qwen3-voicedesign-candidate
-```
-
-无模型测试覆盖候选缺文件、`task:vdes` 固定与配置篡改拒绝，以及设计指令、分段、静音合并入口和音色目录写入。WAV 解码/拼接依赖 VoiceDesign 服务的 NumPy/SoundFile，本次 QA 路由用 mock 替代；真实 backend 的一次短句、模型本地 revision/hash 与 shutdown 已验证；完整资源基准和质量对照仍待完成。
-
-2026-10-22 修复候选绝对模型路径和 Base session 选项前缀；两条真实调用的样本大小、显存和验收边界见 [当前升级记录](../../docs/localai-audiocpp-upgrade.md#7-2026-10-22-复核修复与当前验证)。
+无模型回归覆盖 API 校验、WAV 存储与分段、候选注册、旧配置迁移和 start.sh 配置顺序。执行 `uv run --project qa --locked python tests/qwen3_tts_voicedesign/generate_example.py` 可在具备完整部署的主机重新生成并验证短句示例。2026-10-22 safetensors 快照 hash 保留于[历史版本快照](versions-history-2026-10-22.json)，不是当前候选；当前 GGUF 与推理结果登记于 [`versions.json`](../../localai/manifests/versions.json)。

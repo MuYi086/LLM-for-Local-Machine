@@ -1,6 +1,7 @@
 name: llm-local.qwen3-tts.1p7b-voicedesign
 backend: audio-cpp
 parameters:
+  # manager.py 注册此处所需的受控相对 GGUF 文件引用。
   model: __QWEN3_VOICEDESIGN_MODEL_PATH__
 options:
   - family:qwen3_tts

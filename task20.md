@@ -1,0 +1,2 @@
+
+你先阅读`/home/muyi086/hf-mirror/AtomicChat/Ornith-1.5-35B-A3B`然后通过start.sh调用的方式，使用llama.cpp在当前项目中中实现Ornith-1.5-35B-A3B-AD-Q5_K-Q4_K模型的调用，并暴露在`start.sh`中以端口8401对外暴露服务，路由地址设置为`/v1/AtomicChat/Ornith-1.5-35B-A3B-AD-Q5`,然后再tests目录生成对应模型的测试目录，测试生成一个例子

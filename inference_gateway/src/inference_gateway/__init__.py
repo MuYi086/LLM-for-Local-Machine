@@ -7,11 +7,6 @@ from .errors import (
     LocalAIUnavailableError,
     UnsupportedCapabilityError,
 )
-from .execution import (
-    execute_localai_worker,
-    execute_localai_worker_file,
-    execute_localai_worker_file_reference,
-)
 from .localai_client import LocalAIClient
 
 __all__ = [
@@ -23,7 +18,4 @@ __all__ = [
     "LocalAIUnavailableError",
     "UnsupportedCapabilityError",
     "load_gateway_config",
-    "execute_localai_worker",
-    "execute_localai_worker_file",
-    "execute_localai_worker_file_reference",
 ]

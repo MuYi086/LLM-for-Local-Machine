@@ -35,7 +35,7 @@ python3 scripts/localai/manager.py verify-worker-bridge-candidates
 
 仓库无模型测试覆盖协议、worker allowlist、路由、输出类型和文件清理。它不验证模型加载、真实输出质量、
 峰值 GPU 显存、最长输入、backend 停止后的显存回落或故障恢复。上述 E2/E3 验收须等用户准备权重后逐项执行。
-完整质量门禁的本次结果记录于 [`localai-audiocpp-upgrade.md`](../../docs/localai-audiocpp-upgrade.md)。
+当时完整质量门禁的结果见[历史升级归档](audiocpp-upgrade-history-2026-10-22.md)。
 
 provider 设为 `native` 即回到原服务 worker；LocalAI 候选 YAML 不影响 native 路径。
 
@@ -43,5 +43,5 @@ provider 设为 `native` 即回到原服务 worker；LocalAI 候选 YAML 不影�
 
 TIGER-DnR 文件成品合同使用最大 4 GiB 的共享 file_ref，避免固定 LocalAI 50 MiB gRPC 接收限制。
 41 MiB 与 129 MiB 静音 WAV 已经真实 LocalAI HTTP/Go gRPC/无模型 worker 链路验证，内容与消费清理通过。
-进程组统一收尾、Free 失败隔离、目录迁移和恢复流程均已补回归；详见 [升级记录](../../docs/localai-audiocpp-upgrade.md#7-2026-10-22-复核修复与当前验证)。
+进程组统一收尾、Free 失败隔离、目录迁移和恢复流程均已补回归；详见[历史升级归档](audiocpp-upgrade-history-2026-10-22.md#7-2026-10-22-复核修复与当前验证)。
 此记录不代表TIGER-DnR worker 的真实权重推理或输出质量验收完成。

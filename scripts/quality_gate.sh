@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 只使用 qa 轻量环境执行无模型质量门禁，不解析任一 CUDA/模型项目依赖。
+# 只使用 qa 轻量环境执行无模型质量门禁，不解析模型项目依赖。
 set -euo pipefail
 
 repository_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -8,29 +8,33 @@ cd "$repository_dir"
 bash -n start.sh
 bash scripts/test_steam_audio_renderer_core.sh
 
-service_projects=(
-    model-audio/analyse_moss-music-8b-Instruct
-    model-audio/clone_qwen3-tts-1.7b-base
-    model-audio/indexTTS-2.5
-    model-audio/design_qwen3-tts-1.7b-voicedesign model-audio/clone_confucius-4 model-audio/transcribe_qwen3-asr-1.7b
-    model-audio/separate_tiger-dnr model-audio/separate_msst-mega53 model-audio/soundEffect-v2.0
+lock_projects=(
+    main
+    model-audio/design_qwen3-tts-1.7b-voicedesign
+    model-audio/audio_cpp_runtime
+    qa
 )
-
-lock_projects=("${service_projects[@]}" localai_worker_bridge qa)
 lint_paths=(main llm_local_runtime inference_gateway scripts/localai)
 for project in "${lock_projects[@]}"; do
-    if [[ -d "$project" ]]; then
-        uv lock --project "$project" --check
-        if [[ "$project" != qa ]]; then
-            lint_paths+=("$project")
-        fi
-    else
+    if [[ ! -d "$project" ]]; then
         echo "缺少当前维护的 uv 项目：$project" >&2
         exit 1
     fi
+    uv lock --project "$project" --check
+    if [[ "$project" != qa ]]; then
+        lint_paths+=("$project")
+    fi
 done
+lint_paths+=(tests)
 lint_paths+=(
-    tests/*.py
+    model-audio/tts_confucius4-tts
+    model-audio/tts_indextts2.5
+    model-audio/gen_midashenglm
+    model-audio/asr_qwen3-1.7b
+    model-audio/tts_qwen3-1.7b-base
+    model-audio/vc_seed-vc
+    model-audio/gen_stable-audio-3-small-sfx
+    model-audio/tts_voxcpm2
 )
 
 uv run --project qa --locked ruff check "${lint_paths[@]}"

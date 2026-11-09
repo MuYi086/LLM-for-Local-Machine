@@ -27,7 +27,6 @@ def main() -> int:
     args = parse_args()
     storage_dir = expand_path(os.getenv("STORAGE_DIR", "storage"))
     timbre_dir = expand_path(os.getenv("TIMBRE_STORAGE_DIR", str(storage_dir / "timbre")))
-    clone_dir = expand_path(os.getenv("CLONE_STORAGE_DIR", str(storage_dir / "clone")))
     status = storage_disk_status(storage_dir)
     print(status)
     if not status["retention_enabled"]:
@@ -39,12 +38,10 @@ def main() -> int:
     planned = prune_generated_outputs(
         {
             timbre_dir: ("qwen_voicedesign_",),
-            clone_dir: ("qwen3_tts_", "indexTTS25_"),
         },
         retention_hours=float(status["retention_hours"]),
         retention_max_bytes=int(status["retention_max_bytes"]),
         apply=args.apply,
-        timbre_dir=timbre_dir,
     )
     action = "已删除" if args.apply else "将删除（预览）"
     for path in planned:

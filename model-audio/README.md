@@ -1,26 +1,24 @@
 # 音频模型与处理
 
-此目录集中维护当前启用的音频模型服务，以及 CPU 空间音频 renderer。权重仍由
-`$HF_MIRROR_DIR` 指向的仓库外目录提供；LocalAI 管理与分发代码保留在根目录 `localai/`。
+当前音频运行面维护九个 GPU 模型 API 和一个 CPU 空间音频 renderer。八个新接入的 audio.cpp 服务共享
+`audio_cpp_runtime` uv 项目，不安装 Torch；VoiceDesign 保持独立环境。所有 GPU 服务共用同一
+`GPU_LOCK_FILE`，按跨进程队列串行推理。
 
-当前 9 个模型服务包括 MOSS-Music-8B-Instruct、MOSS-SoundEffect v2.0、Qwen3-TTS Base/VoiceDesign、IndexTTS-2.5、
-MSST Mega 53、TIGER-DnR、Confucius4-TTS 和 Qwen3-ASR。Qwen3-ASR 按输入模态归入
-音频模型。`model-audio/spatial_steam-audio/` 是 CPU 空间音频处理程序，不加载 AI 模型。
+| 目录 | 模型职责 | 默认端口 | 业务接口 |
+| --- | --- | ---: | --- |
+| `design_qwen3-tts-1.7b-voicedesign/` | Qwen3-TTS 文本音色设计 | 8301 | `POST /v1/qwen/Qwen3-TTS-1.7B-VoiceDesign` |
+| `tts_confucius4-tts/` | Confucius4 多语参考音频克隆 | 8331 | `POST /v1/netease/Confucius4-TTS-GGUF` |
+| `tts_indextts2.5/` | IndexTTS2.5 参考音频克隆 | 8312 | `POST /v1/indexTeam/IndexTTS2.5-GGUF` |
+| `gen_midashenglm/` | MiDashengLM 文本提示音频生成 | 8341 | `POST /v1/mi/MiDashengLM-Gen-GGUF` |
+| `asr_qwen3-1.7b/` | Qwen3-ASR 语音转写 | 8321 | `POST /v1/qwen/Qwen3-ASR-1.7B-GGUF` |
+| `tts_qwen3-1.7b-base/` | Qwen3-TTS Base 参考音频克隆 | 8311 | `POST /v1/qwen/Qwen3-TTS-12Hz-1.7B-Base-GGUF` |
+| `vc_seed-vc/` | SeedVC 参考音色转换 | 8342 | `POST /v1/SeedVC/SeedVC-MLX-GGUF` |
+| `gen_stable-audio-3-small-sfx/` | Stable Audio 3 Small 音效生成 | 8343 | `POST /v1/stabilityai/Stable-Audio-3-Small-SFX-GGUF` |
+| `tts_voxcpm2/` | VoxCPM2 TTS、音色设计与可选参考克隆 | 8313 | `POST /v1/OpenBMB/VoxCPM2-GGUF` |
+| `spatial_steam-audio/` | Steam Audio C++17 双耳空间 renderer | 无 HTTP 端口 | 由 8300 控制面调用，纯 CPU |
 
-## 目录命名与功能速查
+八个共享运行时服务各自有薄型 `main.py` 入口；模型 ID、GGUF 文件名、LocalAI family/task、路由和端口
+集中在 `localai/manifests/audio-cpp-models.json`。健康检查统一为 `GET /v1/health`，不会触发推理。
 
-目录统一使用 `功能词_模型名-版本`，功能词是一个英文单词，模型部分使用连字符，优先使用小写；MOSS 目录按既有任务约定保留 `Instruct` 大小写。
-保留可辨认的模型名、版本、规模及变体；模型包名、API 路径、环境变量和仓库外权重目录独立命名。
-
-| 目录 | 功能词含义 | 主要用途 |
-| --- | --- | --- |
-| `analyse_moss-music-8b-Instruct/` | analyse：音乐理解 | 上传音乐并生成分析或问答文本 |
-| `soundEffect-v2.0/` | generate：音效生成 | 根据文字提示词生成最长 30 秒环境音效 |
-| `clone_confucius-4/` | clone：语音克隆 | 跨语言零样本 TTS |
-| `clone_qwen3-tts-1.7b-base/` | clone：语音克隆 | 参考音频驱动的多语言 TTS |
-| `indexTTS-2.5/` | clone：语音克隆 | 参考音频驱动的五语言 TTS 与情感控制 |
-| `design_qwen3-tts-1.7b-voicedesign/` | design：音色设计 | 用文字描述音色并生成语音 |
-| `separate_msst-mega53/` | separate：音源分离 | 按请求选择音乐声部并保留 residual |
-| `separate_tiger-dnr/` | separate：音源分离 | 分离对白、音效和音乐 |
-| `spatial_steam-audio/` | spatial：空间渲染 | CPU 空间音频处理程序 |
-| `transcribe_qwen3-asr-1.7b/` | transcribe：语音转写 | 语种识别及语音转文字 |
+各服务请求格式、端口、部署步骤和全局 GPU 锁说明见根目录 [README](../README.md)。
+真实模型串行生成示例见 [audio.cpp 冒烟生成说明](../tests/audio_cpp/README.md)。

@@ -1,36 +1,42 @@
-# 固定 audio.cpp 模型族筛选
+# audio.cpp 模型族与本地候选筛选
 
-- 日期：2026-10-21
+- 日期：2026-11-09
 - 上游 revision：9a02e61326aaaf9d462b584ca5e0daba22c0abfc
-- 证据等级：E1（固定 README 中的 family/task/variant 声明）
-- 部署总范围：10 个模型服务与 8300 控制面，共 11 个 HTTP 入口
-- 能力清单范围：8 个服务入口，含 7 个模型 uv 项目与 8300 控制面；此清单不覆盖全部部署服务
-- 源码校验：localai/manifests/capabilities.json
+- 证据等级：E1（固定上游 README 的 family/task/variant 声明）
+- 当前范围：九个 LocalAI/audio.cpp GGUF 模型服务、8300 控制面与 Steam Audio CPU renderer
+- 活跃 API 快照：localai/manifests/capabilities.json
+- 本地候选清单：localai/manifests/audio-cpp-models.json
 
-本文只记录固定 audio.cpp README 的上游声明。family 匹配不证明当前存在模型制品、
-provider 代码、请求字段映射、推理兼容性或质量验收。
+family/task 与本地 GGUF 文件存在性不证明模型请求已成功、输出质量已验收或峰值资源适合生产。
+下表记录本机候选制品已做只读存在性检查；真实推理结果由逐模型生成记录补充。
 
-## 仍有上游 family 对应关系的服务
+## 当前候选
 
-| 服务 | 固定上游 family | 当前状态 |
-| --- | --- | --- |
-| qwen3_tts | qwen3_tts | Base 克隆 provider 保留；本机 HF 模型目录存在 |
-| qwen3_voiceDesign | qwen3_tts | VoiceDesign provider 保留；本机 HF 模型目录存在 |
+| 模型服务 | LocalAI family/task | 本机 GGUF | 服务端口 |
+| --- | --- | --- | ---: |
+| Qwen3-TTS VoiceDesign | qwen3_tts / vdes | qwen3-tts-12hz-1.7b-voicedesign-bf16.gguf | 8301 |
+| Confucius4-TTS | confucius4_tts / clon | confucius4-tts-orig.gguf | 8331 |
+| IndexTTS2.5 | index_tts2 / clon | index-tts2_5-f16.gguf | 8312 |
+| MiDashengLM-Gen | midashenglm_gen / gen | midashenglm-gen-q8_0.gguf | 8341 |
+| Qwen3-ASR | qwen3_asr / asr | qwen3-asr-1.7b-f16.gguf | 8321 |
+| Qwen3-TTS Base | qwen3_tts / tts | qwen3-tts-12hz-1.7b-base-q8_0_v2.gguf | 8311 |
+| SeedVC | seed_vc / vc | seed-vc-mlx-f16.gguf | 8342 |
+| Stable Audio 3 Small SFX | stable_audio / gen | stable-audio-3-small-sfx-f16.gguf | 8343 |
+| VoxCPM2 | voxcpm2 / tts | voxcpm2-q8_0.gguf | 8313 |
 
-只有 Qwen3-TTS Base 与 VoiceDesign 当前保留直接 LocalAI audio.cpp provider。
+上述候选共用固定 LocalAI/audio.cpp 宿主和轻量 Python HTTP runtime。所有模型推理共用 GPU_LOCK_FILE，
+并在每次请求结束时确认 LocalAI backend shutdown 后释放显存租约。
 
-## 当前没有保留直接候选的服务
+## 筛选范围以外
 
-| 服务 | 筛选结果 |
-| --- | --- |
-| Qwen3-ASR | audio.cpp 声明 qwen3_asr，但 GGUF 不在 hf-mirror；直接 provider 已移除，原生服务保留 |
-| Confucius4-TTS | 上游声明 confucius4_tts，但 GGUF 不在 hf-mirror；直接 provider 已移除，原生服务保留 |
+当前没有为 MOSS-Music、TIGER-DnR、MSST-Mega53 或退役视频模型保留 LocalAI/audio.cpp 服务入口。
+Steam Audio 是纯 CPU renderer。不要从已退役报告、旧候选文件或上游 family 列表推断这些模型已实现。
 
-## 无精确模型族
+## 验收边界
 
-| 服务 | 结论 |
-| --- | --- |
-| TIGER-DnR | 无同名三 Stem 分离模型；当前通过 worker bridge 保留原生 ZIP 合同 |
+- 此筛选报告确认固定上游对照和本机候选文件名；不代表 LocalAI 服务已经启动。
+- API 合同、候选注册和 readiness 校验由代码与无模型质量门禁覆盖。
+- 真实模型生成逐个顺序运行，输出记录在运行目录 storage/audio_cpp_tests/，不纳入 Git。
+- 新接入模型仍需检查实际 HTTP 响应、WAV/JSON 合同、backend shutdown 与 CUDA 释放；短样例不等于听感或性能验收。
 
-固定上游目录中的任务和模型变体仍按 E1 维护；能力清单用 excluded 标记未在镜像中准备模型制品的直接候选。
-不应将 family 标签写成已实现 provider，也不应据此宣称 E2/E3。
+真实生成命令与输入文件要求见 [audio.cpp 冒烟生成说明](../../tests/audio_cpp/README.md)。

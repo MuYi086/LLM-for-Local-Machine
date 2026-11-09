@@ -5,15 +5,13 @@ description = "LLM Local Backend 无模型回归与静态检查环境"
 requires-python = "==3.12.13"
 dependencies = [
     "fastapi==0.141.1",
-    "grpcio>=1.70,<2",
     "httpx==0.28.1",
     "httpx2>=0.28",
+    "llm-local-inference-gateway",
     "pydantic==2.13.4",
-    "protobuf>=5,<7",
     "python-multipart==0.0.32",
     "pyyaml==6.0.3",
     "starlette==1.6.0",
-    "localai-worker-bridge",
     "llm-local-runtime",
     "uvicorn==0.52.1",
 ]
@@ -27,5 +25,5 @@ dev = [
 package = false
 
 [tool.uv.sources]
-localai-worker-bridge = { path = "../localai_worker_bridge", editable = true }
+llm-local-inference-gateway = { path = "../inference_gateway", editable = true }
 llm-local-runtime = { path = "../llm_local_runtime", editable = true }

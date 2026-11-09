@@ -1,0 +1,157 @@
+{
+  "schema_version": 1,
+  "models": [
+    {
+      "key": "qwen3_tts_voicedesign",
+      "model_id": "llm-local.qwen3-tts.1p7b-voicedesign",
+      "source_directory": "Qwen3-TTS-12Hz-1.7B-VoiceDesign-GGUF",
+      "required_file": "qwen3-tts-12hz-1.7b-voicedesign-bf16.gguf",
+      "model_file_env": "QWEN_VOICEDESIGN_MODEL_FILE",
+      "family": "qwen3_tts",
+      "task": "vdes",
+      "service": {
+        "runtime": "voicedesign",
+        "directory": "model-audio/design_qwen3-tts-1.7b-voicedesign",
+        "port": 8301,
+        "route": "/v1/qwen/Qwen3-TTS-1.7B-VoiceDesign",
+        "kind": "voice_design"
+      }
+    },
+    {
+      "key": "confucius4_tts",
+      "model_id": "llm-local.confucius4-tts.audio-cpp",
+      "source_directory": "Confucius4-TTS-GGUF",
+      "required_file": "confucius4-tts-orig.gguf",
+      "model_file_env": "AUDIO_CPP_CONFUCIUS4_TTS_MODEL_FILE",
+      "family": "confucius4_tts",
+      "task": "clon",
+      "service": {
+        "runtime": "audio_cpp_runtime",
+        "directory": "model-audio/tts_confucius4-tts",
+        "port": 8331,
+        "route": "/v1/netease/Confucius4-TTS-GGUF",
+        "kind": "tts_clone",
+        "description": "Confucius4-TTS 多语言参考音频克隆"
+      }
+    },
+    {
+      "key": "index_tts25",
+      "model_id": "llm-local.index-tts2.5.audio-cpp",
+      "source_directory": "IndexTTS2.5-GGUF",
+      "required_file": "index-tts2_5-f16.gguf",
+      "model_file_env": "AUDIO_CPP_INDEX_TTS25_MODEL_FILE",
+      "family": "index_tts2",
+      "task": "clon",
+      "service": {
+        "runtime": "audio_cpp_runtime",
+        "directory": "model-audio/tts_indextts2.5",
+        "port": 8312,
+        "route": "/v1/indexTeam/IndexTTS2.5-GGUF",
+        "kind": "tts_clone",
+        "description": "IndexTTS 2.5 多语言参考音频克隆"
+      }
+    },
+    {
+      "key": "midashenglm_gen",
+      "model_id": "llm-local.midashenglm-gen.audio-cpp",
+      "source_directory": "MiDashengLM-Gen-GGUF",
+      "required_file": "midashenglm-gen-q8_0.gguf",
+      "model_file_env": "AUDIO_CPP_MIDASHENGLM_GEN_MODEL_FILE",
+      "family": "midashenglm_gen",
+      "task": "gen",
+      "service": {
+        "runtime": "audio_cpp_runtime",
+        "directory": "model-audio/gen_midashenglm",
+        "port": 8341,
+        "route": "/v1/mi/MiDashengLM-Gen-GGUF",
+        "kind": "sound_generation",
+        "description": "MiDashengLM-Gen 结构化提示音频生成"
+      }
+    },
+    {
+      "key": "qwen3_asr",
+      "model_id": "llm-local.qwen3-asr.1p7b.audio-cpp",
+      "source_directory": "Qwen3-ASR-1.7B-GGUF",
+      "required_file": "qwen3-asr-1.7b-f16.gguf",
+      "model_file_env": "AUDIO_CPP_QWEN3_ASR_MODEL_FILE",
+      "family": "qwen3_asr",
+      "task": "asr",
+      "service": {
+        "runtime": "audio_cpp_runtime",
+        "directory": "model-audio/asr_qwen3-1.7b",
+        "port": 8321,
+        "route": "/v1/qwen/Qwen3-ASR-1.7B-GGUF",
+        "kind": "asr",
+        "description": "Qwen3-ASR 1.7B 多语种语音转写"
+      }
+    },
+    {
+      "key": "qwen3_tts_base",
+      "model_id": "llm-local.qwen3-tts.1p7b-base.audio-cpp",
+      "source_directory": "Qwen3-TTS-12Hz-1.7B-Base-GGUF",
+      "required_file": "qwen3-tts-12hz-1.7b-base-q8_0_v2.gguf",
+      "model_file_env": "AUDIO_CPP_QWEN3_TTS_BASE_MODEL_FILE",
+      "family": "qwen3_tts",
+      "task": "tts",
+      "service": {
+        "runtime": "audio_cpp_runtime",
+        "directory": "model-audio/tts_qwen3-1.7b-base",
+        "port": 8311,
+        "route": "/v1/qwen/Qwen3-TTS-12Hz-1.7B-Base-GGUF",
+        "kind": "tts_clone",
+        "description": "Qwen3-TTS 12Hz 1.7B Base 参考音频克隆"
+      }
+    },
+    {
+      "key": "seed_vc",
+      "model_id": "llm-local.seed-vc.audio-cpp",
+      "source_directory": "SeedVC-MLX-GGUF",
+      "required_file": "seed-vc-mlx-f16.gguf",
+      "model_file_env": "AUDIO_CPP_SEED_VC_MODEL_FILE",
+      "family": "seed_vc",
+      "task": "vc",
+      "service": {
+        "runtime": "audio_cpp_runtime",
+        "directory": "model-audio/vc_seed-vc",
+        "port": 8342,
+        "route": "/v1/SeedVC/SeedVC-MLX-GGUF",
+        "kind": "voice_conversion",
+        "description": "SeedVC 语音音色转换"
+      }
+    },
+    {
+      "key": "stable_audio_sfx",
+      "model_id": "llm-local.stable-audio-3-small-sfx.audio-cpp",
+      "source_directory": "Stable-Audio-3-Small-SFX-GGUF",
+      "required_file": "stable-audio-3-small-sfx-f16.gguf",
+      "model_file_env": "AUDIO_CPP_STABLE_AUDIO_SFX_MODEL_FILE",
+      "family": "stable_audio",
+      "task": "gen",
+      "service": {
+        "runtime": "audio_cpp_runtime",
+        "directory": "model-audio/gen_stable-audio-3-small-sfx",
+        "port": 8343,
+        "route": "/v1/stabilityai/Stable-Audio-3-Small-SFX-GGUF",
+        "kind": "sound_generation",
+        "description": "Stable Audio 3 Small SFX 音效生成"
+      }
+    },
+    {
+      "key": "voxcpm2",
+      "model_id": "llm-local.voxcpm2.audio-cpp",
+      "source_directory": "VoxCPM2-GGUF",
+      "required_file": "voxcpm2-q8_0.gguf",
+      "model_file_env": "AUDIO_CPP_VOXCPM2_MODEL_FILE",
+      "family": "voxcpm2",
+      "task": "tts",
+      "service": {
+        "runtime": "audio_cpp_runtime",
+        "directory": "model-audio/tts_voxcpm2",
+        "port": 8313,
+        "route": "/v1/OpenBMB/VoxCPM2-GGUF",
+        "kind": "tts_optional_reference",
+        "description": "VoxCPM2 多语 TTS、音色设计与参考音频克隆"
+      }
+    }
+  ]
+}

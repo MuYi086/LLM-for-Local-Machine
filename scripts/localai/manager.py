@@ -23,24 +23,8 @@ from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST_PATH = ROOT / "localai/manifests/versions.json"
-QWEN3_TTS_MODEL_NAME = "llm-local.qwen3-tts.1p7b-base"
-QWEN3_TTS_CONFIG_PATH = ROOT / "localai/manifests/qwen3-tts-base-candidate.yaml"
-QWEN3_TTS_MODEL_FILES = (
-    "config.json",
-    "generation_config.json",
-    "model.safetensors",
-    "speech_tokenizer/config.json",
-    "speech_tokenizer/model.safetensors",
-    "tokenizer_config.json",
-    "vocab.json",
-    "merges.txt",
-)
+MODEL_CANDIDATES_PATH = ROOT / "localai/manifests/audio-cpp-models.json"
 QWEN3_VOICEDESIGN_MODEL_NAME = "llm-local.qwen3-tts.1p7b-voicedesign"
-QWEN3_VOICEDESIGN_CONFIG_PATH = ROOT / "localai/manifests/qwen3-tts-voicedesign-candidate.yaml"
-WORKER_BRIDGE_CANDIDATES = {
-    "llm-local.tiger-dnr.worker.v1": ROOT / "localai/manifests/tiger-dnr-worker-candidate.yaml",
-}
-WORKER_BRIDGE_MANIFEST_PATH = ROOT / "localai/manifests/worker-bridge.json"
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 _COMMAND_TIMEOUT_SECONDS = 15
@@ -133,212 +117,194 @@ class LocalAIManager:
         self._write_install_stamp()
         print("已校验宿主机 LocalAI/audio.cpp 文件；该检查不代表模型推理验收。")
 
-    def register_worker_bridge_candidates(self) -> None:
-        """将已固定的一次性 worker bridge 模型 YAML 注册到 LocalAI。"""
-        self._verify_worker_bridge_manifest()
-        self._ensure_directories()
-        for model_name, template_path in WORKER_BRIDGE_CANDIDATES.items():
-            rendered = template_path.read_text(encoding="utf-8")
-            self._register_model_config(model_name, rendered)
-        print("已注册 E0 one-shot worker bridge 候选；不代表真实模型推理已验收。")
+    def _audio_cpp_candidates(self) -> list[dict[str, object]]:
+        """读取所有被固定 audio.cpp revision 筛选并登记的模型候选。"""
+        try:
+            manifest = json.loads(MODEL_CANDIDATES_PATH.read_text(encoding="utf-8"))
+            candidates = manifest["models"]
+        except (OSError, KeyError, TypeError, json.JSONDecodeError) as exc:
+            raise LocalAIManagerError("audio.cpp 模型候选清单缺失或格式无效。") from exc
+        if (
+            manifest.get("schema_version") != 1
+            or not isinstance(candidates, list)
+            or not candidates
+        ):
+            raise LocalAIManagerError("audio.cpp 模型候选清单版本或 models 格式无效。")
+        return candidates
 
-    def verify_worker_bridge_candidates(self) -> None:
-        """检查 worker registry 路径和 LocalAI 固定 YAML 是否完整。"""
-        self._verify_worker_bridge_manifest()
-        for model_name, template_path in WORKER_BRIDGE_CANDIDATES.items():
-            try:
-                expected = template_path.read_bytes()
-                installed = (self.models_dir / f"{model_name}.yaml").read_bytes()
-            except OSError as exc:
-                raise LocalAIManagerError(
-                    f"LocalAI worker bridge 模型 {model_name} 尚未注册；先运行 "
-                    "manager.py register-worker-bridge-candidates。"
-                ) from exc
-            if expected != installed:
-                raise LocalAIManagerError(f"LocalAI worker bridge YAML 不匹配：{model_name}")
+    def _verify_candidate_model_file(self, candidate: Mapping[str, object]) -> Path:
+        """检查清单中指定的本地 GGUF 文件，不下载模型。"""
+        filename = candidate.get("required_file")
+        source_directory = candidate.get("source_directory")
+        model_file_env = candidate.get("model_file_env")
+        if not all(
+            isinstance(value, str) and value
+            for value in (filename, source_directory, model_file_env)
+        ):
+            raise LocalAIManagerError("audio.cpp 候选缺少模型文件名、目录或环境变量。")
+        model_file_value = self.environ.get(str(model_file_env))
+        if model_file_value:
+            model_file = Path(os.path.expandvars(model_file_value)).expanduser().resolve()
+        else:
+            hf_mirror = Path(self.environ.get("HF_MIRROR_DIR", "~/hf-mirror")).expanduser()
+            model_file = (
+                hf_mirror / "audio.cpp-gguf" / str(source_directory) / str(filename)
+            ).resolve()
+        if model_file.name != filename:
+            raise LocalAIManagerError(f"{model_file_env} 文件名必须为 {filename}。")
+        if not model_file.is_file() or model_file.stat().st_size == 0:
+            raise LocalAIManagerError(f"audio.cpp 模型 GGUF 缺失或为空：{model_file}。")
+        return model_file
 
     @staticmethod
-    def _verify_worker_bridge_manifest() -> set[Path]:
-        """验证版本化 registry，并返回回收时使用的同一组 worker 入口。"""
-        try:
-            manifest = json.loads(WORKER_BRIDGE_MANIFEST_PATH.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
-            raise LocalAIManagerError(
-                "LocalAI worker bridge manifest 不可读或 JSON 无效。"
-            ) from exc
-        workers = manifest.get("workers") if isinstance(manifest, dict) else None
-        if not isinstance(manifest, dict) or manifest.get("schema_version") != 1:
-            raise LocalAIManagerError("LocalAI worker bridge manifest schema_version 必须为 1。")
-        if not isinstance(workers, dict) or set(workers) != set(WORKER_BRIDGE_CANDIDATES):
-            raise LocalAIManagerError("LocalAI worker bridge registry 与固定候选模型集合不一致。")
-        scripts: set[Path] = set()
-        for model_name, entry in workers.items():
-            if not isinstance(entry, dict):
-                raise LocalAIManagerError(
-                    f"LocalAI worker bridge registry entry 无效：{model_name}"
-                )
-            project_value = entry.get("project")
-            script_value = entry.get("script")
-            if (
-                not isinstance(project_value, str)
-                or Path(project_value).is_absolute()
-                or ".." in Path(project_value).parts
-                or not isinstance(script_value, str)
-                or Path(script_value).is_absolute()
-                or ".." in Path(script_value).parts
-            ):
-                raise LocalAIManagerError(f"LocalAI worker bridge 路径无效：{model_name}")
-            project = (ROOT / project_value).resolve()
-            script = (project / script_value).resolve()
-            if not project.is_relative_to(ROOT) or not script.is_relative_to(project):
-                raise LocalAIManagerError(f"LocalAI worker bridge 路径越界：{model_name}")
-            if not project.is_dir() or not script.is_file():
-                raise LocalAIManagerError(f"LocalAI worker bridge worker 不存在：{model_name}")
-            scripts.add(script)
-        return scripts
-
-    def register_qwen3_tts_candidate(self) -> None:
-        """校验用户准备的 Base safetensors 快照并注册本地模型 YAML。"""
-        model_dir = self._verify_qwen3_tts_model_files()
-        try:
-            template = QWEN3_TTS_CONFIG_PATH.read_text(encoding="utf-8")
-        except OSError as exc:
-            raise LocalAIManagerError("Qwen3-TTS Base 候选 YAML 模板不可读。") from exc
-        if template.count("__QWEN3_TTS_MODEL_PATH__") != 1:
-            raise LocalAIManagerError("Qwen3-TTS Base YAML 模板必须且只能有一个模型路径占位符。")
-        model_reference = self._register_model_directory(QWEN3_TTS_MODEL_NAME, model_dir)
-        self._register_model_config(
-            QWEN3_TTS_MODEL_NAME,
-            template.replace("__QWEN3_TTS_MODEL_PATH__", json.dumps(model_reference)),
+    def _render_candidate_config(candidate: Mapping[str, object], model_reference: str) -> str:
+        """生成固定 family/task、CUDA 设备与模型引用的 LocalAI YAML。"""
+        model_id = candidate.get("model_id")
+        family = candidate.get("family")
+        task = candidate.get("task")
+        if not all(isinstance(value, str) and value for value in (model_id, family, task)):
+            raise LocalAIManagerError("audio.cpp 候选缺少 model_id、family 或 task。")
+        return (
+            f"name: {model_id}\n"
+            "backend: audio-cpp\n"
+            "parameters:\n"
+            f'  model: "{model_reference}"\n'
+            "options:\n"
+            f"  - family:{family}\n"
+            f"  - task:{task}\n"
+            "  - backend:cuda\n"
+            "  - device:0\n"
         )
 
-    def verify_qwen3_tts_candidate(self) -> None:
-        """校验 Qwen3-TTS Base 所需权重文件及已注册模型配置。"""
-        model_dir = self._verify_qwen3_tts_model_files()
-        try:
-            template = QWEN3_TTS_CONFIG_PATH.read_text(encoding="utf-8")
-            installed_yaml = (self.models_dir / f"{QWEN3_TTS_MODEL_NAME}.yaml").read_bytes()
-        except OSError as exc:
-            raise LocalAIManagerError(
-                "Qwen3-TTS Base 模型或固定 YAML 尚未就绪；先下载模型并运行 "
-                "manager.py register-qwen3-tts-candidate。"
-            ) from exc
-        model_reference = self._verify_model_directory(QWEN3_TTS_MODEL_NAME, model_dir)
-        candidate_yaml = template.replace(
-            "__QWEN3_TTS_MODEL_PATH__", json.dumps(model_reference)
-        ).encode()
-        if installed_yaml != candidate_yaml:
-            raise LocalAIManagerError(
-                "LocalAI models 目录中的 Qwen3-TTS Base YAML 与固定模板不一致。"
+    def register_audio_cpp_candidates(self) -> None:
+        """先预检全部本地 GGUF 与配置冲突，再注册所有 audio.cpp 候选。"""
+        prepared: list[tuple[dict[str, object], Path, str, set[str]]] = []
+        candidates = self._audio_cpp_candidates()
+        for candidate_value in candidates:
+            if not isinstance(candidate_value, dict):
+                raise LocalAIManagerError("audio.cpp 候选条目格式无效。")
+            candidate = candidate_value
+            model_id = candidate.get("model_id")
+            if not isinstance(model_id, str) or not model_id:
+                raise LocalAIManagerError("audio.cpp 候选缺少 model_id。")
+            model_file = self._verify_candidate_model_file(candidate)
+            reference = f"{model_id}.gguf"
+            link = self.models_dir / reference
+            if link.exists() or link.is_symlink():
+                self._verify_model_file(model_id, model_file)
+            config_path = self.models_dir / f"{model_id}.yaml"
+            rendered = self._render_candidate_config(candidate, reference)
+            allowed_previous_contents: set[str] = set()
+            if model_id == QWEN3_VOICEDESIGN_MODEL_NAME:
+                allowed_previous_contents.add(
+                    f"name: {model_id}\n"
+                    "backend: audio-cpp\n"
+                    "parameters:\n"
+                    f'  model: "{model_id}.hf"\n'
+                    "options:\n"
+                    "  - family:qwen3_tts\n"
+                    "  - task:vdes\n"
+                    "  - backend:cuda\n"
+                    "  - device:0\n"
+                )
+                allowed_previous_contents.add(
+                    f"name: {model_id}\n"
+                    "backend: audio-cpp\n"
+                    "parameters:\n"
+                    "  # manager.py 注册此处所需的受控相对 GGUF 文件引用。\n"
+                    f'  model: "{model_id}.gguf"\n'
+                    "options:\n"
+                    "  - family:qwen3_tts\n"
+                    "  - task:vdes\n"
+                    "  - backend:cuda\n"
+                    "  - device:0\n"
+                )
+            if config_path.exists():
+                existing = config_path.read_text(encoding="utf-8")
+                if existing != rendered and existing not in allowed_previous_contents:
+                    raise LocalAIManagerError(f"拒绝覆盖不同的 LocalAI 模型配置：{config_path}")
+            prepared.append((candidate, model_file, rendered, allowed_previous_contents))
+
+        for candidate, model_file, rendered, allowed_previous_contents in prepared:
+            model_id = str(candidate["model_id"])
+            self._register_model_file(model_id, model_file)
+            self._register_model_config(
+                model_id,
+                rendered,
+                allowed_previous_contents=allowed_previous_contents,
             )
 
-    def _verify_qwen3_tts_model_files(self) -> Path:
-        """检查官方 Base safetensors 布局，不下载或导入模型运行时。"""
-        model_dir_value = self.environ.get("QWEN3_TTS_MODEL_DIR")
-        if not model_dir_value:
-            hf_mirror = Path(self.environ.get("HF_MIRROR_DIR", "~/hf-mirror")).expanduser()
-            model_dir_value = str(hf_mirror / "Qwen/Qwen3-TTS-12Hz-1.7B-Base")
-        model_dir = Path(os.path.expandvars(model_dir_value)).expanduser().resolve()
-        missing_files = [
-            relative_path
-            for relative_path in QWEN3_TTS_MODEL_FILES
-            if not (model_dir / relative_path).is_file()
-            or (model_dir / relative_path).stat().st_size == 0
-        ]
-        if missing_files:
-            missing = ", ".join(missing_files)
-            raise LocalAIManagerError(
-                f"Qwen3-TTS Base 模型文件缺失或为空：{model_dir}（{missing}）；"
-                "该候选需要官方 Qwen3-TTS-12Hz-1.7B-Base safetensors 快照。"
-            )
-        return model_dir
+    def verify_audio_cpp_candidates(self) -> None:
+        """检查所有固定 audio.cpp GGUF 引用和候选 YAML。"""
+        for candidate_value in self._audio_cpp_candidates():
+            if not isinstance(candidate_value, dict):
+                raise LocalAIManagerError("audio.cpp 候选条目格式无效。")
+            candidate = candidate_value
+            model_id = candidate.get("model_id")
+            if not isinstance(model_id, str) or not model_id:
+                raise LocalAIManagerError("audio.cpp 候选缺少 model_id。")
+            model_file = self._verify_candidate_model_file(candidate)
+            try:
+                model_reference = self._verify_model_file(model_id, model_file)
+                installed_yaml = (self.models_dir / f"{model_id}.yaml").read_text(encoding="utf-8")
+            except OSError as exc:
+                raise LocalAIManagerError(
+                    "audio.cpp 候选尚未注册；先准备模型并运行 "
+                    "manager.py register-audio-cpp-candidates。"
+                ) from exc
+            expected_yaml = self._render_candidate_config(candidate, model_reference)
+            if installed_yaml != expected_yaml:
+                raise LocalAIManagerError(f"LocalAI 模型 YAML 与固定候选不一致：{model_id}")
 
-    def register_qwen3_voicedesign_candidate(self) -> None:
-        """校验手动准备的 VoiceDesign 文件并注册固定 task:vdes YAML。"""
-        model_dir = self._verify_qwen3_voicedesign_model_files()
-        template = QWEN3_VOICEDESIGN_CONFIG_PATH.read_text(encoding="utf-8")
-        if template.count("__QWEN3_VOICEDESIGN_MODEL_PATH__") != 1:
-            raise LocalAIManagerError("Qwen3 VoiceDesign 候选 YAML 模板占位符无效。")
-        model_reference = self._register_model_directory(QWEN3_VOICEDESIGN_MODEL_NAME, model_dir)
-        rendered = template.replace("__QWEN3_VOICEDESIGN_MODEL_PATH__", json.dumps(model_reference))
-        self._register_model_config(QWEN3_VOICEDESIGN_MODEL_NAME, rendered)
-
-    def verify_qwen3_voicedesign_candidate(self) -> None:
-        """检查 VoiceDesign 模型文件与已注册 task:vdes YAML。"""
-        model_dir = self._verify_qwen3_voicedesign_model_files()
-        try:
-            template = QWEN3_VOICEDESIGN_CONFIG_PATH.read_text(encoding="utf-8")
-            installed_yaml = (self.models_dir / f"{QWEN3_VOICEDESIGN_MODEL_NAME}.yaml").read_bytes()
-        except OSError as exc:
-            raise LocalAIManagerError(
-                "Qwen3 VoiceDesign 模型或固定 YAML 尚未就绪；先手动准备模型并运行 "
-                "manager.py register-qwen3-voicedesign-candidate。"
-            ) from exc
-        model_reference = self._verify_model_directory(QWEN3_VOICEDESIGN_MODEL_NAME, model_dir)
-        candidate_yaml = template.replace(
-            "__QWEN3_VOICEDESIGN_MODEL_PATH__", json.dumps(model_reference)
-        ).encode()
-        if installed_yaml != candidate_yaml:
-            raise LocalAIManagerError(
-                "LocalAI models 目录中的 Qwen3 VoiceDesign YAML 与固定 task:vdes 模板不一致。"
-            )
-
-    def _verify_qwen3_voicedesign_model_files(self) -> Path:
-        """检查官方 VoiceDesign safetensors 布局，不下载或导入模型运行时。"""
-        model_dir_value = self.environ.get("QWEN_VOICEDESIGN_MODEL_DIR")
-        if not model_dir_value:
-            hf_mirror = Path(self.environ.get("HF_MIRROR_DIR", "~/hf-mirror")).expanduser()
-            model_dir_value = str(hf_mirror / "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign")
-        model_dir = Path(os.path.expandvars(model_dir_value)).expanduser().resolve()
-        missing_files = [
-            relative_path
-            for relative_path in QWEN3_TTS_MODEL_FILES
-            if not (model_dir / relative_path).is_file()
-            or (model_dir / relative_path).stat().st_size == 0
-        ]
-        if missing_files:
-            missing = ", ".join(missing_files)
-            raise LocalAIManagerError(
-                f"Qwen3 VoiceDesign 模型文件缺失或为空：{model_dir}（{missing}）；"
-                "该候选需要官方 Qwen3-TTS-12Hz-1.7B-VoiceDesign safetensors 快照。"
-            )
-        return model_dir
-
-    def _register_model_directory(self, model_name: str, model_dir: Path) -> str:
-        """在 models 内建立受控引用，满足 LocalAI 禁止绝对 parameters.model 的合同。"""
+    def _register_model_file(self, model_name: str, model_file: Path) -> str:
+        """在 LocalAI models 内建立受控相对 GGUF 文件引用。"""
         self.models_dir.mkdir(parents=True, exist_ok=True)
-        reference = f"{model_name}.hf"
+        reference = f"{model_name}.gguf"
         destination = self.models_dir / reference
         if destination.exists() or destination.is_symlink():
-            return self._verify_model_directory(model_name, model_dir)
+            return self._verify_model_file(model_name, model_file)
         temporary = self.models_dir / f".{reference}.{uuid.uuid4().hex}.tmp"
         try:
-            temporary.symlink_to(model_dir, target_is_directory=True)
+            temporary.symlink_to(model_file)
             os.replace(temporary, destination)
             self._fsync_directory(self.models_dir)
         finally:
             temporary.unlink(missing_ok=True)
         return reference
 
-    def _verify_model_directory(self, model_name: str, model_dir: Path) -> str:
-        """确认相对引用仍指向显式配置且已检查完整的本地快照。"""
-        reference = f"{model_name}.hf"
+    def _verify_model_file(self, model_name: str, model_file: Path) -> str:
+        """确认 LocalAI 文件引用指向经过校验的 GGUF。"""
+        reference = f"{model_name}.gguf"
         link = self.models_dir / reference
-        if not link.is_symlink() or link.resolve() != model_dir.resolve():
-            raise LocalAIManagerError(f"LocalAI 模型目录引用缺失或目标不一致：{link}")
+        if not link.is_symlink() or link.resolve() != model_file.resolve():
+            raise LocalAIManagerError(f"LocalAI GGUF 文件引用缺失或目标不一致：{link}")
         return reference
 
-    def _register_model_config(self, model_name: str, rendered: str) -> None:
+    def _register_model_config(
+        self,
+        model_name: str,
+        rendered: str,
+        *,
+        allowed_previous_contents: set[str] | None = None,
+    ) -> None:
         """原子注册模型 YAML，拒绝覆盖内容不同的既有配置。"""
         destination = self.models_dir / f"{model_name}.yaml"
         self.models_dir.mkdir(parents=True, exist_ok=True)
         if destination.exists():
-            if destination.read_text(encoding="utf-8") != rendered:
+            existing = destination.read_text(encoding="utf-8")
+            if existing == rendered:
+                print(f"模型配置已匹配：{destination}")
+                return
+            if existing not in (allowed_previous_contents or set()):
                 raise LocalAIManagerError(
                     f"拒绝覆盖不同的 LocalAI 模型配置：{destination}；请先人工检查并移除旧配置。"
                 )
-            print(f"模型配置已匹配：{destination}")
-            return
+            backup_dir = self.data_dir / "config-backups" / time.strftime("%Y-%m-%d")
+            backup_dir.mkdir(parents=True, exist_ok=True)
+            backup_path = backup_dir / f"{destination.stem}.{uuid.uuid4().hex}.yaml"
+            shutil.copy2(destination, backup_path)
+            with backup_path.open("rb") as backup_file:
+                os.fsync(backup_file.fileno())
         descriptor, temporary_name = tempfile.mkstemp(
             prefix=f".{model_name}-", suffix=".yaml.tmp", dir=self.models_dir
         )
@@ -407,34 +373,7 @@ class LocalAIManager:
         localai_environment.setdefault(
             "LLM_LOCALAI_ARTIFACT_DIR", str(runtime_cache / "localai_artifacts")
         )
-        worker_bridge_enabled = self._worker_bridge_enabled()
         command = [str(self.binary_path), "run"]
-        if worker_bridge_enabled:
-            bridge_address, bridge_port = self._bridge_address_and_port()
-            self._ensure_port_available(bridge_port)
-            localai_environment["LLM_LOCALAI_WORKER_BRIDGE_ENABLED"] = "true"
-            localai_environment["LLM_LOCALAI_BRIDGE_ADDRESS"] = bridge_address
-            worker_manifest = Path(
-                self.environ.get(
-                    "LLM_LOCALAI_BRIDGE_WORKERS",
-                    str(ROOT / "localai/manifests/worker-bridge.json"),
-                )
-            ).expanduser()
-            if not worker_manifest.is_file():
-                raise LocalAIManagerError(
-                    f"LocalAI bridge worker manifest 不存在：{worker_manifest}"
-                )
-            localai_environment["LLM_LOCALAI_BRIDGE_WORKERS"] = str(worker_manifest.resolve())
-            backend_entries = [
-                entry
-                for entry in localai_environment.get("LOCALAI_EXTERNAL_GRPC_BACKENDS", "").split(
-                    ","
-                )
-                if entry and entry.split(":", 1)[0] != "llm-local-worker"
-            ]
-            backend_entries.append(f"llm-local-worker:{bridge_address}")
-            localai_environment["LOCALAI_EXTERNAL_GRPC_BACKENDS"] = ",".join(backend_entries)
-            command = [sys.executable, str(ROOT / "scripts/localai/host.py"), str(self.binary_path)]
         if api_key := self.environ.get("LLM_LOCALAI_API_KEY"):
             localai_environment["LOCALAI_API_KEY"] = api_key
         try:
@@ -457,11 +396,6 @@ class LocalAIManager:
             "run_id": run_id,
             "base_url": base_url,
             "command": command,
-            "bridge_address": (
-                localai_environment.get("LLM_LOCALAI_BRIDGE_ADDRESS")
-                if worker_bridge_enabled
-                else None
-            ),
             "started_at": time.time(),
         }
         try:
@@ -479,16 +413,11 @@ class LocalAIManager:
         """终止受管进程组并确认所有组成员退出且 API 端口关闭。"""
         state = self._read_state(required=False)
         if state is None:
-            self._reap_worker_bridge_processes()
             self._ensure_no_managed_processes()
             self._ensure_port_closed()
-            if self._worker_bridge_enabled():
-                address, _port = self._bridge_address_and_port()
-                self._ensure_bridge_port_closed(address)
             print("受管 LocalAI 未运行。")
             return
         self._terminate_process_group(state)
-        self._ensure_bridge_port_closed(state.get("bridge_address"))
         self.state_path.unlink(missing_ok=True)
         self._fsync_directory(self.state_dir)
         print("LocalAI 进程组已停止并确认回收。")
@@ -513,57 +442,17 @@ class LocalAIManager:
             raise LocalAIManagerError("受管 LocalAI 状态仍存在；先运行 manager.py stop。")
         self._ensure_no_managed_processes()
         self._ensure_port_closed()
-        if self._worker_bridge_enabled():
-            address, _port = self._bridge_address_and_port()
-            self._ensure_bridge_port_closed(address)
 
     @staticmethod
     def _ensure_port_available(port: int) -> None:
         """在启动前检测目标 loopback 端口是否已占用。"""
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+            # 与 Uvicorn 的端口合同一致，允许已关闭连接的 TIME_WAIT 状态下立即重启。
+            probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             try:
                 probe.bind(("127.0.0.1", port))
             except OSError as exc:
                 raise LocalAIManagerError(f"LocalAI loopback 端口 {port} 已被占用。") from exc
-
-    def _worker_bridge_enabled(self) -> bool:
-        """读取是否将固定的一次性 worker bridge 纳入受管 LocalAI 进程组。"""
-        return self.environ.get("LLM_LOCALAI_WORKER_BRIDGE_ENABLED", "false").strip().lower() in {
-            "1",
-            "true",
-            "yes",
-            "on",
-        }
-
-    def _bridge_address_and_port(self) -> tuple[str, int]:
-        """读取并限制 bridge gRPC 监听在本机回环。"""
-        address = self.environ.get("LLM_LOCALAI_BRIDGE_ADDRESS", "127.0.0.1:50052")
-        host, separator, raw_port = address.rpartition(":")
-        if not separator or host != "127.0.0.1":
-            raise LocalAIManagerError("LLM_LOCALAI_BRIDGE_ADDRESS 必须是 127.0.0.1 回环地址。")
-        try:
-            port = int(raw_port)
-        except ValueError as exc:
-            raise LocalAIManagerError("LocalAI bridge gRPC 端口无效。") from exc
-        if not 1 <= port <= 65535:
-            raise LocalAIManagerError("LocalAI bridge gRPC 端口超出有效范围。")
-        return address, port
-
-    @staticmethod
-    def _ensure_bridge_port_closed(address: object) -> None:
-        """当实例启用了外部 backend 时，确认它的 gRPC 监听也已关闭。"""
-        if not isinstance(address, str):
-            return
-        host, separator, raw_port = address.rpartition(":")
-        if not separator or host != "127.0.0.1":
-            raise LocalAIManagerError("状态文件中的 LocalAI bridge 地址无效。")
-        try:
-            port = int(raw_port)
-            connection = socket.create_connection((host, port), timeout=0.5)
-        except OSError:
-            return
-        connection.close()
-        raise LocalAIManagerError(f"LocalAI worker bridge 端口仍可连接：{address}")
 
     def _spawn_detached(
         self,
@@ -773,8 +662,6 @@ class LocalAIManager:
         markers = (
             str(self.binary_path.resolve()).encode(),
             str(self.backends_dir.resolve()).encode(),
-            str((ROOT / "scripts/localai/host.py").resolve()).encode(),
-            b"localai_worker_bridge.server",
         )
         process_ids: list[int] = []
         for process_path in Path("/proc").glob("[0-9]*"):
@@ -867,77 +754,9 @@ class LocalAIManager:
                 self._wait_for_process_group(pgid, self.stop_timeout)
         if self._process_group_alive(pgid):
             raise LocalAIManagerError("LocalAI 进程组在 SIGKILL 后仍有活动进程。")
-        if state.get("bridge_address") is not None:
-            self._reap_worker_bridge_processes()
         # 进程组消失与内核关闭监听之间存在短暂间隔，限时复核后再报告失败。
         self._ensure_port_closed(timeout=min(self.stop_timeout, 2.0))
-        self._ensure_bridge_port_closed(state.get("bridge_address"))
         self._reap_spawned_child(pid)
-
-    def _reap_worker_bridge_processes(self) -> None:
-        """回收 bridge 被强制终止后脱离宿主机进程组的一次性模型 worker。"""
-        expected_scripts = {str(script) for script in self._verify_worker_bridge_manifest()}
-        groups: dict[int, dict[int, str]] = {}
-        for process_path in Path("/proc").glob("[0-9]*"):
-            try:
-                process_id = int(process_path.name)
-                arguments = process_path.joinpath("cmdline").read_bytes().split(b"\0")
-                decoded_arguments = [
-                    argument.decode("utf-8", errors="replace") for argument in arguments
-                ]
-                process_environment = process_path.joinpath("environ").read_bytes().split(b"\0")
-                inherited_script = next(
-                    (
-                        entry.split(b"=", 1)[1].decode("utf-8", errors="replace")
-                        for entry in process_environment
-                        if entry.startswith(b"LLM_LOCALAI_WORKER_SCRIPT=")
-                    ),
-                    None,
-                )
-                stat = self._read_process_stat(process_id)
-                process_group = os.getpgid(process_id)
-            except (OSError, ProcessLookupError, ValueError):
-                continue
-            if (
-                stat is None
-                or stat[0] in {"Z", "X"}
-                or not (
-                    (
-                        "--input-json" in decoded_arguments
-                        and expected_scripts.intersection(decoded_arguments)
-                    )
-                    or inherited_script in expected_scripts
-                )
-                or not any(
-                    entry.startswith(b"LLM_LOCALAI_REQUEST_ID=") for entry in process_environment
-                )
-                or process_group <= 1
-                or process_group == os.getpgrp()
-            ):
-                continue
-            groups.setdefault(process_group, {})[process_id] = stat[2]
-
-        for process_group, process_starts in groups.items():
-            if not any(
-                self._process_start_time(process_id) == start_time
-                for process_id, start_time in process_starts.items()
-            ):
-                continue
-            try:
-                os.killpg(process_group, signal.SIGTERM)
-            except ProcessLookupError:
-                continue
-            self._wait_for_process_group(process_group, min(self.stop_timeout, 3.0))
-            if self._process_group_alive(process_group):
-                try:
-                    os.killpg(process_group, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-                self._wait_for_process_group(process_group, min(self.stop_timeout, 3.0))
-            if self._process_group_alive(process_group):
-                raise LocalAIManagerError(
-                    f"LocalAI worker bridge 子进程组 {process_group} 未能确认退出；保留运行状态。"
-                )
 
     def _wait_for_process_group(self, pgid: int, timeout: float) -> None:
         deadline = time.monotonic() + timeout
@@ -1187,12 +1006,8 @@ def main() -> int:
         "command",
         choices=(
             "verify-install",
-            "register-qwen3-tts-candidate",
-            "verify-qwen3-tts-candidate",
-            "register-qwen3-voicedesign-candidate",
-            "register-worker-bridge-candidates",
-            "verify-worker-bridge-candidates",
-            "verify-qwen3-voicedesign-candidate",
+            "register-audio-cpp-candidates",
+            "verify-audio-cpp-candidates",
             "start",
             "stop",
             "status",
@@ -1212,18 +1027,10 @@ def main() -> int:
                 int(arguments.watch_args[2]),
                 arguments.watch_args[3],
             )
-        elif arguments.command == "register-qwen3-tts-candidate":
-            manager.register_qwen3_tts_candidate()
-        elif arguments.command == "verify-qwen3-tts-candidate":
-            manager.verify_qwen3_tts_candidate()
-        elif arguments.command == "register-qwen3-voicedesign-candidate":
-            manager.register_qwen3_voicedesign_candidate()
-        elif arguments.command == "register-worker-bridge-candidates":
-            manager.register_worker_bridge_candidates()
-        elif arguments.command == "verify-worker-bridge-candidates":
-            manager.verify_worker_bridge_candidates()
-        elif arguments.command == "verify-qwen3-voicedesign-candidate":
-            manager.verify_qwen3_voicedesign_candidate()
+        elif arguments.command == "register-audio-cpp-candidates":
+            manager.register_audio_cpp_candidates()
+        elif arguments.command == "verify-audio-cpp-candidates":
+            manager.verify_audio_cpp_candidates()
         elif arguments.command == "verify-install":
             manager.verify_install()
         else:

@@ -8,7 +8,6 @@ from .gpu import (
     gpu_runtime_lock,
 )
 from .storage import (
-    AudioReferenceStore,
     AudioUploadError,
     StagedUpload,
     UploadPolicy,
@@ -19,7 +18,6 @@ from .storage import (
 )
 
 __all__ = [
-    "AudioReferenceStore",
     "AudioUploadError",
     "commit_plain_upload",
     "GpuLockTimeoutError",

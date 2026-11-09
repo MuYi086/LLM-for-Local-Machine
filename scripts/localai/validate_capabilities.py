@@ -13,6 +13,15 @@ ROOT = Path(__file__).resolve().parents[2]
 MANIFEST_PATH = ROOT / "localai/manifests/capabilities.json"
 _ROUTE_METHODS = {"get", "post", "put", "patch", "delete", "options", "head", "api_route"}
 _AUDIO_CPP_SOURCE_REVISION = "9a02e61326aaaf9d462b584ca5e0daba22c0abfc"
+_AUDIO_CPP_MODELS_PATH = ROOT / "localai/manifests/audio-cpp-models.json"
+_AUDIO_CPP_RUNTIME_SOURCE = "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py"
+_AUDIO_CPP_ROUTE_FUNCTIONS = {
+    "tts_clone": "clone_tts",
+    "tts_optional_reference": "tts_optional_reference",
+    "sound_generation": "sound_generation",
+    "asr": "asr",
+    "voice_conversion": "voice_conversion",
+}
 _AUDIO_CPP_FAMILY_SCREEN_STATUSES = {
     "family_candidate",
     "partial_family_candidate",
@@ -141,6 +150,95 @@ def _route_declarations(
             if isinstance(path, ast.Constant) and isinstance(path.value, str):
                 declarations[(method, path.value, decorator.lineno)] = _route_parameter_facts(node)
     return declarations
+
+
+def _audio_cpp_route_declarations(
+    source_path: Path,
+    *,
+    kind: str,
+    route: str,
+) -> dict[tuple[str, str, int], list[dict[str, Any]]]:
+    """解析共享 audio.cpp router 的固定 health 路由和模型路由。"""
+    try:
+        source_tree = ast.parse(source_path.read_text(encoding="utf-8"), filename=str(source_path))
+    except (OSError, SyntaxError) as exc:
+        raise CapabilityManifestError(f"无法解析 audio.cpp router：{source_path}") from exc
+
+    function_name = _AUDIO_CPP_ROUTE_FUNCTIONS.get(kind)
+    if function_name is None:
+        raise CapabilityManifestError(f"未知 audio.cpp 服务类型：{kind!r}")
+
+    declarations: dict[tuple[str, str, int], list[dict[str, Any]]] = {}
+    for node in ast.walk(source_tree):
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        for decorator in node.decorator_list:
+            if not isinstance(decorator, ast.Call) or not isinstance(decorator.func, ast.Attribute):
+                continue
+            method = decorator.func.attr.upper()
+            if method == "GET" and node.name == "health" and decorator.args:
+                path = decorator.args[0]
+                if isinstance(path, ast.Constant) and path.value == "/v1/health":
+                    declarations[(method, path.value, decorator.lineno)] = _route_parameter_facts(
+                        node
+                    )
+            elif method == "POST" and node.name == function_name:
+                if decorator.args and _call_name(decorator.args[0]) == "route":
+                    declarations[(method, route, decorator.lineno)] = _route_parameter_facts(node)
+    return declarations
+
+
+def _audio_cpp_candidate_for_service(service: dict[str, Any]) -> dict[str, Any]:
+    """确认动态服务入口与固定 audio.cpp 模型候选一一对应。"""
+    model_key = service.get("dynamic_model_key")
+    if not isinstance(model_key, str) or not model_key:
+        raise CapabilityManifestError("动态 audio.cpp 服务缺少 dynamic_model_key。")
+    try:
+        manifest = json.loads(_AUDIO_CPP_MODELS_PATH.read_text(encoding="utf-8"))
+        candidates = manifest["models"]
+    except (OSError, KeyError, TypeError, json.JSONDecodeError) as exc:
+        raise CapabilityManifestError("无法读取 audio.cpp 模型候选清单。") from exc
+    matches = [
+        entry for entry in candidates if isinstance(entry, dict) and entry.get("key") == model_key
+    ]
+    if len(matches) != 1:
+        raise CapabilityManifestError(f"audio.cpp 候选 key 不存在或重复：{model_key}")
+    candidate = matches[0]
+    candidate_service = candidate.get("service")
+    if not isinstance(candidate_service, dict):
+        raise CapabilityManifestError(f"audio.cpp 候选缺少服务信息：{model_key}")
+    expected = {
+        "directory": service.get("directory"),
+        "route": service.get("dynamic_route"),
+        "port": service.get("ports", [None])[0],
+        "kind": service.get("dynamic_kind"),
+    }
+    actual = {
+        "directory": candidate_service.get("directory"),
+        "route": candidate_service.get("route"),
+        "port": candidate_service.get("port"),
+        "kind": candidate_service.get("kind"),
+    }
+    if expected != actual or candidate_service.get("runtime") != "audio_cpp_runtime":
+        raise CapabilityManifestError(f"{model_key} 能力快照与 audio.cpp 候选清单不一致。")
+
+    project_dir = ROOT / str(service["directory"])
+    try:
+        tree = ast.parse((project_dir / "main.py").read_text(encoding="utf-8"))
+    except (OSError, SyntaxError) as exc:
+        raise CapabilityManifestError(f"无法解析动态服务入口：{project_dir / 'main.py'}") from exc
+    calls = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and _call_name(node.func) == "run_service"
+        and node.args
+        and isinstance(node.args[0], ast.Constant)
+        and node.args[0].value == model_key
+    ]
+    if len(calls) != 1:
+        raise CapabilityManifestError(f"{project_dir / 'main.py'} 未固定启动候选 {model_key}。")
+    return candidate
 
 
 def _pydantic_field_facts(node: ast.AnnAssign, source: str, project: str) -> dict[str, Any]:
@@ -323,7 +421,7 @@ def validate_capabilities_manifest(
     schema_names: set[tuple[str, str]] = set()
     route_count = 0
     field_count = 0
-    uv_project_count = 0
+    uv_project_directories: set[str] = set()
     problems: list[str] = []
 
     for service_value in services:
@@ -344,16 +442,48 @@ def validate_capabilities_manifest(
         source_available = source_path.is_file()
         if not source_available:
             raise CapabilityManifestError(f"能力清单引用的服务源码不存在：{source_path}")
-        if (project_path / "pyproject.toml").is_file():
-            uv_project_count += 1
+        uv_project_directory = service.get("uv_project_directory", directory)
+        if not isinstance(uv_project_directory, str) or not uv_project_directory:
+            raise CapabilityManifestError(f"{project}.uv_project_directory 必须是非空相对路径。")
+        uv_project_path = (repository_root / uv_project_directory).resolve()
+        if not uv_project_path.is_relative_to(repository_root.resolve()):
+            raise CapabilityManifestError(f"uv 项目路径越出仓库根目录：{uv_project_directory}")
+        if (uv_project_path / "pyproject.toml").is_file():
+            uv_project_directories.add(uv_project_directory)
+
+        dynamic_key = service.get("dynamic_model_key")
+        dynamic_candidate = (
+            _audio_cpp_candidate_for_service(service) if dynamic_key is not None else None
+        )
+        route_source_relative_path = (
+            _AUDIO_CPP_RUNTIME_SOURCE if dynamic_candidate is not None else source_relative_path
+        )
+        route_source_path = (repository_root / route_source_relative_path).resolve()
+        if (
+            not route_source_path.is_relative_to(repository_root.resolve())
+            or not route_source_path.is_file()
+        ):
+            raise CapabilityManifestError(
+                f"{project} 引用的路由源码不存在或越出仓库：{route_source_relative_path}"
+            )
+        schema_source_relative_path = service.get("schema_source", source_relative_path)
+        if not isinstance(schema_source_relative_path, str) or not schema_source_relative_path:
+            raise CapabilityManifestError(f"{project}.schema_source 必须是非空相对路径。")
+        schema_source_path = (repository_root / schema_source_relative_path).resolve()
+        if not schema_source_path.is_relative_to(repository_root.resolve()):
+            raise CapabilityManifestError(f"{project} schema 源路径越出仓库根目录。")
 
         request_schemas = service.get("request_schemas", {})
         if not isinstance(request_schemas, dict):
             raise CapabilityManifestError(f"{project}.request_schemas 必须是 object。")
         schema_names.update((project, name) for name in request_schemas)
         source_schemas = (
-            _pydantic_schema_facts(source_path, project, source_relative_path)
-            if source_available
+            _pydantic_schema_facts(
+                schema_source_path,
+                project,
+                schema_source_relative_path,
+            )
+            if schema_source_path.is_file()
             else {}
         )
         schema_field_names: dict[str, set[str]] = {}
@@ -372,7 +502,7 @@ def validate_capabilities_manifest(
                 source_available
                 and source_schema is not None
                 and (
-                    schema.get("source") != source_relative_path
+                    schema.get("source") != schema_source_relative_path
                     or schema.get("line") != source_schema["line"]
                     or schema.get("inherits") != source_schema["inherits"]
                 )
@@ -400,7 +530,15 @@ def validate_capabilities_manifest(
             )
 
         expected_signatures: set[tuple[str, str, str, int]] = set()
-        source_route_declarations = _route_declarations(source_path) if source_available else {}
+        source_route_declarations = (
+            _audio_cpp_route_declarations(
+                route_source_path,
+                kind=str(service.get("dynamic_kind")),
+                route=str(service.get("dynamic_route")),
+            )
+            if dynamic_candidate is not None
+            else _route_declarations(route_source_path)
+        )
         for route_value in routes:
             route = _require_object(route_value, f"{project}.route")
             method, path, source, line = (
@@ -412,7 +550,7 @@ def validate_capabilities_manifest(
             if (
                 not isinstance(method, str)
                 or not isinstance(path, str)
-                or source != source_relative_path
+                or source != route_source_relative_path
                 or not isinstance(line, int)
             ):
                 raise CapabilityManifestError(f"{project} 含有无效路由记录：{route!r}")
@@ -505,20 +643,27 @@ def validate_capabilities_manifest(
                     f"多余={sorted(mapped_fields - schema_fields)}"
                 )
 
-        if source_available:
-            actual_routes = {
-                (method, path, source_relative_path, line)
-                for method, path, line in _decorated_routes(source_path)
-            }
-            if expected_signatures != actual_routes:
-                problems.append(
-                    f"{project} 源码路由与快照不一致："
-                    f"新增/变更={sorted(actual_routes - expected_signatures)}，"
-                    f"已删除/过期={sorted(expected_signatures - actual_routes)}"
-                )
+        actual_routes = {
+            (method, path, route_source_relative_path, line)
+            for method, path, line in (
+                source_route_declarations
+                if dynamic_candidate is not None
+                else {
+                    (method, path, line): []
+                    for method, path, line in _decorated_routes(route_source_path)
+                }
+            )
+        }
+        if expected_signatures != actual_routes:
+            problems.append(
+                f"{project} 源码路由与快照不一致："
+                f"新增/变更={sorted(actual_routes - expected_signatures)}，"
+                f"已删除/过期={sorted(expected_signatures - actual_routes)}"
+            )
         route_count += len(routes)
 
     declared_uv_projects = manifest.get("service_count_with_uv_projects")
+    uv_project_count = len(uv_project_directories)
     if declared_uv_projects != uv_project_count:
         problems.append(
             "service_count_with_uv_projects 与项目目录不一致："

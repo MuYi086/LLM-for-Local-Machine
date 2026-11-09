@@ -1,4 +1,0 @@
-name: llm-local.tiger-dnr.worker.v1
-backend: llm-local-worker
-parameters:
-  model: llm-local.tiger-dnr.worker.v1

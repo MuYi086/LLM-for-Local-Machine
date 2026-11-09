@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""校验已显式启用的 LocalAI provider 和模型注册状态。"""
+"""校验固定 LocalAI/audio.cpp 安装、九个 GGUF 候选和服务 readiness。"""
 
 from __future__ import annotations
 
-import ipaddress
+import json
 import os
-import socket
 import sys
 from pathlib import Path
 
@@ -22,105 +21,71 @@ from inference_gateway import (  # noqa: E402
 )
 from scripts.localai.manager import LocalAIManager, LocalAIManagerError  # noqa: E402
 
+MODEL_MANIFEST_PATH = ROOT / "localai/manifests/audio-cpp-models.json"
+
 
 def main() -> int:
-    """检查显式选择 LocalAI 的候选模型，不启动或加载模型。"""
-    providers = (
-        (
-            "LLM_LOCAL_QWEN3_TTS_PROVIDER",
-            "llm-local.qwen3-tts.1p7b-base",
-            float(os.getenv("QWEN3_TTS_REQUEST_TIMEOUT", "600")),
-            "tts-base",
-        ),
-        (
-            "LLM_LOCAL_QWEN3_VOICEDESIGN_PROVIDER",
-            "llm-local.qwen3-tts.1p7b-voicedesign",
-            float(os.getenv("QWEN_VOICEDESIGN_REQUEST_TIMEOUT", "900")),
-            "voice-design",
-        ),
-        (
-            "LLM_LOCAL_TIGER_DNR_PROVIDER",
-            "llm-local.tiger-dnr.worker.v1",
-            float(os.getenv("TIGER_DNR_REQUEST_TIMEOUT", "900")),
-            "tiger-dnr-worker",
-        ),
-    )
-    selected = [
-        entry for entry in providers if os.getenv(entry[0], "native").strip().lower() == "localai"
-    ]
-    if not selected:
-        print("LocalAI provider 未启用，保持 native 启动路径。")
+    """确认受管 LocalAI 与全部清单模型已就绪，不加载任何模型。"""
+    if os.getenv("LLM_LOCALAI_ENABLED", "false").strip().lower() not in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }:
+        print("LocalAI 未启用，跳过 audio.cpp 候选预检。")
         return 0
-    manager = LocalAIManager()
-    worker_tasks = {
-        "tiger-dnr-worker",
-    }
-    if any(task in worker_tasks for _, _, _, task in selected):
-        try:
-            manager.verify_worker_bridge_candidates()
-            verify_worker_bridge_listener(
-                os.getenv("LLM_LOCALAI_BRIDGE_ADDRESS", "127.0.0.1:50052")
+    if os.getenv("LLM_LOCAL_AUDIO_CPP_PROVIDER", "native").strip().lower() != "localai":
+        print("audio.cpp 服务固定使用 LocalAI provider。", file=sys.stderr)
+        return 1
+
+    try:
+        manifest = json.loads(MODEL_MANIFEST_PATH.read_text(encoding="utf-8"))
+        candidates = [
+            candidate
+            for candidate in manifest["models"]
+            if candidate["service"]["runtime"] in {"voicedesign", "audio_cpp_runtime"}
+        ]
+        if len(candidates) != 9:
+            raise LocalAIManagerError(
+                f"期望九个 audio.cpp GGUF 候选，清单含 {len(candidates)} 个。"
             )
-        except LocalAIManagerError as exc:
-            print(f"LocalAI worker bridge 预检失败：{exc}", file=sys.stderr)
-            return 1
-    for service_env, default_model, timeout, task in selected:
-        try:
-            if task == "tts-base":
-                manager.verify_qwen3_tts_candidate()
-            elif task in worker_tasks:
-                if (
-                    os.getenv(service_env.removesuffix("_PROVIDER") + "_MODEL", default_model)
-                    != default_model
-                ):
-                    raise LocalAIManagerError(
-                        f"{task} 只能使用 manifest 固定模型 ID {default_model}。"
-                    )
-            else:
-                manager.verify_qwen3_voicedesign_candidate()
+
+        manager = LocalAIManager()
+        manager.verify_audio_cpp_candidates()
+        environment = dict(os.environ)
+        environment.pop("LLM_LOCAL_AUDIO_CPP_MODEL", None)
+        timeout = float(os.getenv("AUDIO_CPP_REQUEST_TIMEOUT", "900"))
+        for index, candidate in enumerate(candidates):
+            model_id = candidate["model_id"]
             config = load_gateway_config(
-                service_provider_env=service_env,
-                default_model=default_model,
+                service_provider_env="LLM_LOCAL_AUDIO_CPP_PROVIDER",
+                default_model=model_id,
                 request_timeout=timeout,
+                environ=environment,
             )
+            if config.model != model_id:
+                raise LocalAIManagerError(f"LocalAI model ID 与候选清单不一致：{model_id}")
             client = LocalAIClient(config)
-            if not client.health():
-                raise LocalAIManagerError(
-                    f"LocalAI 未就绪；拒绝启动显式选择 LocalAI 的 {task.upper()} 服务。"
-                )
+            if index == 0 and not client.health():
+                raise LocalAIManagerError("LocalAI 未就绪；拒绝启动 audio.cpp 服务。")
             if not client.model_ready():
-                raise LocalAIManagerError(f"LocalAI 未注册模型 {config.model}。")
-        except (
-            GatewayConfigurationError,
-            LocalAIManagerError,
-            LocalAIRequestError,
-            LocalAIUnavailableError,
-        ) as exc:
-            print(f"LocalAI {task} 候选模型预检失败：{exc}", file=sys.stderr)
-            return 1
-        print(f"LocalAI 已就绪，{task} 模型已注册：{config.model}")
+                raise LocalAIManagerError(f"LocalAI 未注册模型 {model_id}。")
+    except (
+        GatewayConfigurationError,
+        LocalAIManagerError,
+        LocalAIRequestError,
+        LocalAIUnavailableError,
+        KeyError,
+        OSError,
+        TypeError,
+        ValueError,
+        json.JSONDecodeError,
+    ) as exc:
+        print(f"LocalAI/audio.cpp 候选预检失败：{exc}", file=sys.stderr)
+        return 1
+
+    print("LocalAI 已就绪，九个 audio.cpp 模型均已注册。")
     return 0
-
-
-def verify_worker_bridge_listener(address: str) -> None:
-    """确认 worker bridge 在本机回环地址监听，避免暴露远程 GPU worker。"""
-    host, separator, port_text = address.rpartition(":")
-    if host.startswith("[") and host.endswith("]"):
-        host = host[1:-1]
-    try:
-        port = int(port_text)
-        is_loopback = host.lower() == "localhost" or ipaddress.ip_address(host).is_loopback
-    except ValueError as exc:
-        raise LocalAIManagerError("LLM_LOCALAI_BRIDGE_ADDRESS 必须是有效回环地址。") from exc
-    if not separator or not is_loopback or not 1 <= port <= 65535:
-        raise LocalAIManagerError("LLM_LOCALAI_BRIDGE_ADDRESS 必须是有效回环地址。")
-    try:
-        with socket.create_connection((host, port), timeout=2):
-            return
-    except OSError as exc:
-        raise LocalAIManagerError(
-            f"LocalAI worker bridge 未在 {host}:{port} 监听；检查 managed bridge 或外部 gRPC backend。"
-        ) from exc
 
 
 if __name__ == "__main__":

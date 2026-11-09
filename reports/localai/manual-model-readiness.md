@@ -14,7 +14,7 @@
 | 服务 | 镜像相对路径 | 目录检查 |
 | --- | --- | --- |
 | Qwen3-TTS Base | Qwen/Qwen3-TTS-12Hz-1.7B-Base | 存在 |
-| Qwen3 VoiceDesign | Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign | 存在 |
+| Qwen3 VoiceDesign | audio.cpp-gguf/Qwen3-TTS-12Hz-1.7B-VoiceDesign-GGUF | BF16 GGUF 存在；SHA-256 已登记；一次短句推理及 WAV 校验通过，质量待评估 |
 | Qwen3-ASR | Qwen/Qwen3-ASR-1.7B | 存在 |
 | Confucius4-TTS | netease-youdao/Confucius4-TTS | 存在 |
 | TIGER-DnR | JusperLee/TIGER-DnR | 存在 |
@@ -36,7 +36,7 @@
 
 ## 当前保留的 LocalAI 路径
 
-Qwen3-TTS Base 与 VoiceDesign 的官方 Hugging Face 模型目录存在，直接候选 YAML 与只读文件预检保留。
+Qwen3-TTS Base 的官方 Hugging Face 模型目录存在；VoiceDesign 使用本地 audio.cpp BF16 GGUF 文件。两个直接候选均只读检查源模型制品，VoiceDesign 的真实短句与 WAV 输出校验已完成。
 one-shot worker bridge 保留 TIGER-DnR 一个模型 ID。
 该 bridge 是本地模型服务的执行后端，不额外要求 audio.cpp GGUF。
 

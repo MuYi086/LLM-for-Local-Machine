@@ -4,19 +4,17 @@ from __future__ import annotations
 
 import http.client
 import json
+import mimetypes
 import time
-import uuid
 from collections.abc import Iterable
 from pathlib import Path
 from urllib.parse import urlsplit
 
 from .config import GatewayConfig
 from .errors import LocalAIRequestError, LocalAIUnavailableError
-from .worker_protocol import WorkerProtocolError, decode_worker_response, encode_worker_request
 
 _MAX_JSON_BYTES = 16 * 1024 * 1024
 _MAX_AUDIO_BYTES = 512 * 1024 * 1024
-_MAX_WORKER_RESPONSE_BYTES = 180 * 1024 * 1024
 
 
 class LocalAIClient:
@@ -31,95 +29,6 @@ class LocalAIClient:
         self._headers = {"Accept": "application/json"}
         if config.api_key:
             self._headers["Authorization"] = f"Bearer {config.api_key}"
-
-    def run_worker(
-        self,
-        *,
-        operation: str,
-        payload: dict[str, object],
-    ) -> tuple[dict[str, object], float]:
-        """经 LocalAI completion RPC 调用版本化的一次性 LLM Local Backend worker。"""
-        request_id = uuid.uuid4().hex
-        try:
-            prompt = encode_worker_request(
-                model=self._config.model,
-                operation=operation,
-                request_id=request_id,
-                payload=payload,
-            )
-        except WorkerProtocolError as exc:
-            raise LocalAIRequestError(str(exc)) from exc
-        request_body = json.dumps(
-            {
-                "model": self._config.model,
-                "prompt": prompt,
-                "temperature": 0,
-                "max_tokens": 1,
-                "stream": False,
-            },
-            ensure_ascii=False,
-            separators=(",", ":"),
-        ).encode("utf-8")
-        started = time.perf_counter()
-        response = self._request(
-            "POST",
-            "/v1/completions",
-            body=request_body,
-            headers={**self._headers, "Content-Type": "application/json"},
-            timeout=self._config.request_timeout,
-            response_limit=_MAX_WORKER_RESPONSE_BYTES,
-        )
-        elapsed = time.perf_counter() - started
-        if not isinstance(response, dict):
-            raise LocalAIRequestError("LocalAI worker completion 响应必须是 JSON 对象。")
-        choices = response.get("choices")
-        if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
-            raise LocalAIRequestError("LocalAI worker completion 响应缺少 choices。")
-        try:
-            result = decode_worker_response(
-                choices[0].get("text"),
-                model=self._config.model,
-                operation=operation,
-                request_id=request_id,
-            )
-        except WorkerProtocolError as exc:
-            raise LocalAIRequestError(str(exc)) from exc
-        return result, elapsed
-
-    def synthesize_speech(
-        self,
-        *,
-        text: str,
-        voice_path: Path,
-        language: str | None,
-        reference_text: str | None,
-        x_vector_only: bool,
-        max_new_tokens: int,
-        top_p: float | None,
-        temperature: float | None,
-    ) -> tuple[bytes, float]:
-        """调用 LocalAI TTS 并将参考音频及 Qwen3 克隆参数传入后端。"""
-        params = {
-            "max_tokens": str(max_new_tokens),
-            "x_vector_only_mode": str(x_vector_only).lower(),
-        }
-        if reference_text:
-            params["reference_text"] = reference_text
-        if top_p is not None:
-            params["top_p"] = str(top_p)
-        if temperature is not None:
-            params["temperature"] = str(temperature)
-        request_body: dict[str, object] = {
-            "model": self._config.model,
-            "input": text,
-            "voice": str(voice_path),
-            "response_format": "wav",
-            "params": params,
-        }
-        if language:
-            request_body["language"] = language
-
-        return self._post_speech(request_body)
 
     def design_voice(
         self,
@@ -173,6 +82,144 @@ class LocalAIClient:
         if normalized_type not in {"audio/wav", "audio/x-wav", "application/octet-stream"}:
             raise LocalAIRequestError("LocalAI TTS 响应 Content-Type 不是 WAV。")
         return audio_bytes, elapsed
+
+    def synthesize_speech(self, request_body: dict[str, object]) -> bytes:
+        """通过 LocalAI speech API 合成并返回 WAV。"""
+        audio_bytes, _ = self._post_speech(request_body)
+        return audio_bytes
+
+    def transcribe(
+        self,
+        *,
+        filename: str,
+        audio_path: Path,
+        language: str | None,
+        prompt: str | None,
+    ) -> dict[str, object]:
+        """将有界上传文件流式转交 LocalAI transcription API。"""
+        fields = {"model": self._config.model, "response_format": "json"}
+        if language:
+            fields["language"] = language
+        if prompt:
+            fields["prompt"] = prompt
+        result = self._post_multipart(
+            "/v1/audio/transcriptions",
+            fields=fields,
+            files={
+                "file": (
+                    filename,
+                    audio_path,
+                    mimetypes.guess_type(filename)[0] or "application/octet-stream",
+                )
+            },
+            expect_json=True,
+        )
+        if not isinstance(result, dict):
+            raise LocalAIRequestError("LocalAI transcription 响应必须是 JSON object。")
+        return result
+
+    def generate_sound(self, request_body: dict[str, object]) -> bytes:
+        """通过 LocalAI sound-generation API 生成 WAV。"""
+        body = json.dumps(request_body, ensure_ascii=False, separators=(",", ":")).encode()
+        response = self._request(
+            "POST",
+            "/v1/sound-generation",
+            body=body,
+            headers={**self._headers, "Content-Type": "application/json"},
+            timeout=self._config.request_timeout,
+            response_limit=_MAX_AUDIO_BYTES,
+            expect_json=False,
+        )
+        if not isinstance(response, tuple) or not isinstance(response[0], bytes):
+            raise LocalAIRequestError("LocalAI sound-generation 响应格式无效。")
+        audio_bytes = response[0]
+        if len(audio_bytes) < 12 or audio_bytes[:4] != b"RIFF" or audio_bytes[8:12] != b"WAVE":
+            raise LocalAIRequestError("LocalAI sound-generation 未返回 RIFF/WAVE 音频。")
+        return audio_bytes
+
+    def transform_audio(
+        self,
+        *,
+        fields: dict[str, str],
+        files: dict[str, tuple[str, Path, str]],
+    ) -> bytes:
+        """流式提交源音频和参考音频，调用 LocalAI audio-transform API。"""
+        response = self._post_multipart(
+            "/audio/transform",
+            fields=fields,
+            files=files,
+            expect_json=False,
+        )
+        if not isinstance(response, tuple) or not isinstance(response[0], bytes):
+            raise LocalAIRequestError("LocalAI audio-transform 响应格式无效。")
+        audio_bytes = response[0]
+        if len(audio_bytes) < 12 or audio_bytes[:4] != b"RIFF" or audio_bytes[8:12] != b"WAVE":
+            raise LocalAIRequestError("LocalAI audio-transform 未返回 RIFF/WAVE 音频。")
+        return audio_bytes
+
+    def _post_multipart(
+        self,
+        path: str,
+        *,
+        fields: dict[str, str],
+        files: dict[str, tuple[str, Path, str]],
+        expect_json: bool,
+    ) -> object:
+        """以固定 Content-Length 分块发送 multipart，避免复制整段输入音频。"""
+        boundary = f"llm-local-{time.time_ns():x}"
+        body_parts: list[bytes | Path] = []
+        for name, value in fields.items():
+            body_parts.extend(
+                (
+                    f"--{boundary}\r\n".encode(),
+                    f'Content-Disposition: form-data; name="{name}"\r\n\r\n'.encode(),
+                    value.encode("utf-8"),
+                    b"\r\n",
+                )
+            )
+        for name, (filename, file_path, content_type) in files.items():
+            safe_filename = Path(filename).name.replace('"', "")
+            if any(character in name + safe_filename for character in "\r\n"):
+                raise LocalAIRequestError("multipart 字段名或文件名含有无效换行。")
+            body_parts.extend(
+                (
+                    f"--{boundary}\r\n".encode(),
+                    (
+                        f'Content-Disposition: form-data; name="{name}"; '
+                        f'filename="{safe_filename}"\r\n'
+                    ).encode(),
+                    f"Content-Type: {content_type}\r\n\r\n".encode(),
+                    file_path,
+                    b"\r\n",
+                )
+            )
+        body_parts.append(f"--{boundary}--\r\n".encode())
+        content_length = sum(
+            part.stat().st_size if isinstance(part, Path) else len(part) for part in body_parts
+        )
+
+        def iter_body() -> Iterable[bytes]:
+            for part in body_parts:
+                if isinstance(part, bytes):
+                    yield part
+                    continue
+                with part.open("rb") as audio_file:
+                    while chunk := audio_file.read(64 * 1024):
+                        yield chunk
+
+        return self._request(
+            "POST",
+            path,
+            body=iter_body(),
+            headers={
+                **self._headers,
+                "Content-Type": f"multipart/form-data; boundary={boundary}",
+                "Content-Length": str(content_length),
+            },
+            timeout=self._config.request_timeout,
+            response_limit=_MAX_JSON_BYTES if expect_json else _MAX_AUDIO_BYTES,
+            expect_json=expect_json,
+        )
 
     def shutdown_model(self) -> None:
         """调用 LocalAI backend/shutdown 并要求得到停止确认。"""

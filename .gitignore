@@ -8,6 +8,7 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.hypothesis/
 .uv-cache/
 .tox/
 .nox/
@@ -43,6 +44,24 @@ pretrained_models/
 *.onnx
 *.bin
 
+# Local model downloads and generated training/inference artifacts
+/hf-mirror/
+/downloads/
+/models/
+/model-cache/
+/outputs/
+/artifacts/
+/runs/
+/datasets/
+model-text/training/data/
+model-text/training/datasets/
+model-text/training/outputs/
+model-text/training/adapters/
+model-text/training/runs/
+wandb/
+mlruns/
+lightning_logs/
+
 # Local audio/video samples, uploads and generated output
 *.wav
 *.mp3
@@ -67,6 +86,7 @@ model-audio/spatial_steam-audio/sdk/
 # Third-party source clones and side-loaded Python packages
 vendor/
 LLM-depency/
+node_modules/
 
 # Local/cloud workspace config not needed for GitHub local runtime
 .cnb/
@@ -76,9 +96,37 @@ LLM-depency/
 *.log
 .env
 .env.*
+!.env.example
+!.env.*.example
+
+# Local test reports, process files, and editor swap/backup files
+.coverage
+.coverage.*
+/coverage.xml
+/htmlcov/
+*.pid
+*.sock
+core
+core.*
+*.tmp
+*.swp
+*.swo
+*~
+*.bak
+*.orig
+*.rej
+
+# Credentials and private certificates
+/secrets/
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
 
 # Editor/OS noise
 .DS_Store
+Thumbs.db
 .idea/
 .vscode/
 

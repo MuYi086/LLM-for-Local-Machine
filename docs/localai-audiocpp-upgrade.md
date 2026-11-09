@@ -1,144 +1,91 @@
-# LocalAI 与 audio.cpp 升级及镜像清理记录
+# LocalAI/audio.cpp 模型服务运维
 
-> 状态：宿主机构建与当前维护范围已完成；2026-10-22 修复升级复核中的五项问题及真实 Qwen 调用发现的候选配置遗漏。完整无模型门禁、真实 LocalAI 大文件传输和两个 Qwen 短句推理通过。完整模型部署与音质验收仍需单独进行。本轮不使用 Docker，不下载模型，不安装 Python 项目依赖。更新日期：2026-10-22。
+本文描述当前九个 LocalAI/audio.cpp GGUF 候选、统一启动和故障恢复。模型文件名、环境变量、family/task、
+model ID、端口与 API 路由以 [audio-cpp-models.json](../localai/manifests/audio-cpp-models.json) 为准；
+所有模型制品都由部署者预先放入本地镜像，manager 不下载权重。
 
-## 1. 目标与完成标准
+## 固定运行合同
 
-LocalAI 以宿主机进程承载固定 audio.cpp CUDA backend；服务保留 HTTP 参数校验、逻辑文件引用、
-GPU 锁、原子保存和原有响应格式。自定义 gRPC bridge 只负责将版本化 RPC 分发到各服务环境的一次性 worker。
+- LocalAI 是宿主机 loopback 服务，默认地址为 http://127.0.0.1:8400，使用固定 LocalAI v4.11.0 和相应
+  audio.cpp CUDA backend。版本与制品指纹见 [versions.json](../localai/manifests/versions.json)。
+- 当前候选包括 Qwen3-TTS VoiceDesign、Confucius4-TTS、IndexTTS2.5、MiDashengLM-Gen、Qwen3-ASR、
+  Qwen3-TTS Base、SeedVC、Stable Audio SFX 和 VoxCPM2。
+- GGUF 默认从 $HF_MIRROR_DIR/audio.cpp-gguf/ 下的候选目录读取，环境变量可覆盖路径；候选文件名必须固定。
+- 8300 控制面、8301 VoiceDesign 与八个新增模型 API 共十个 HTTP 进程。八个新 API 共用
+  model-audio/audio_cpp_runtime 的轻量 uv 环境，不安装 Torch。
+- 所有 GPU API 必须共用 GPU_LOCK_FILE。Steam Audio renderer 是 CPU 路径，不获取 GPU 锁。
+- 当前 LocalAI provider 固定启用。start.sh 管理 LocalAI 进程组，按模型请求加载任务，推理完成后请求 backend
+  shutdown，并等待 CUDA_RELEASE_DELAY 后释放 GPU 锁。
 
-升级交付包括固定版本、可复核的宿主机构建、进程管理、provider/bridge 路由、测试、能力清单和运维文档。
-镜像清理依据是用户指定的 ~/hf-mirror：不存在的主模型或服务必需辅助模型视为退役，不留下等待下载的服务代码。
+## 安装与启动
 
-## 2. 架构与边界
+先准备 LocalAI binary、audio-cpp backend 和 manifest 中列出的九个 GGUF 文件，然后同步锁定依赖：
 
-LocalAI 与 worker bridge 使用 loopback；provider 显式启用，默认仍为 native。调用服务持有共享 GPU 锁，
-直到 backend shutdown 或 worker 进程组退出及 CUDA 回收等待结束。shutdown 无法确认时保留 quarantine 标记，
-阻止后续 GPU 请求。
-
-bridge 只允许 localai/manifests/worker-bridge.json 登记的模型 ID、uv 项目、worker.py、输出类型、
-超时与环境白名单。输入和大文件通过流式 staging、逻辑标识或随机 artifact ID 传递，不信任任意路径。
-
-Steam Audio renderer 是独立 CPU 路径；其 SDK 不属于 LocalAI/audio.cpp backend，也不由 LocalAI 管理。
-
-## 3. 软件构建与版本
-
-固定 LocalAI v4.11.0，audio.cpp revision 为 9a02e61326aaaf9d462b584ca5e0daba22c0abfc。
-使用用户提供的本地源码包和 Ubuntu 24.04 amd64 deb，在私有前缀构建 CUDA 12 sm_89 gRPC backend，
-再按固定上游 package 脚本打包。没有使用 Docker，没有用 apt/dpkg 修改系统安装状态。
-LocalAI binary、backend 包和安装指纹位于忽略的本地运行目录；版本和 hash 见 localai/manifests/versions.json。
-
-manager.py verify-install 校验 LocalAI 版本、backend 入口和文件树 hash。manager start/stop 管理
-loopback 宿主机进程组、owner watcher、readiness、TERM/KILL、进程身份和端口回收。
-候选登记只创建或验证本地 YAML，不下载模型。
-
-## 4. 镜像筛选与维护范围
-
-当前维护 10 个模型 uv 项目与 1 个控制面，共 11 个 HTTP 进程。
-本地目录、依赖与真实推理状态需分别核验；历史镜像检查不代表当前权重就绪。
-
-### 保留的 LocalAI 路径
-
-- Qwen3-TTS Base 克隆与 Qwen3 VoiceDesign 使用本地官方 Hugging Face 目录，保留直接候选 YAML、结构预检和显式 provider。
-- TIGER-DnR 使用固定 one-shot worker bridge ID。
-- MOSS-Music-8B-Instruct 使用本地完整 GGUF 与 HOT-Step-CPP 原版 `ace-caption`；通过独立原生 worker 提供 8310 的音乐理解 API，没有 LocalAI provider，也不加入 LocalAI worker bridge。
-- 其余原生服务保持各自原生 worker；原生 provider 仍为默认值。
-
-### 已清理的服务与候选
-
-- Stable Audio 3 Medium 的主模型目录缺失，完整服务代码和全部启动/维护/测试引用已移除。
-- Seed-VC 主目录虽存在，但必需 Whisper-small 不存在；其 44 kHz BigVGAN/RMVPE 也缺失。VC/SVC 服务和候选已移除。
-- Qwen3-ASR、Confucius4-TTS 的相应直接 GGUF 不在 hf-mirror，因此仅移除 LocalAI provider、GGUF 候选、注册/预检和专属测试，原生 API 保留。
-- Index 相关代码此前已按用户要求退役；task10 中列出的服务也不属于当前部署范围。
-
-维护清单见 reports/localai/manual-model-readiness.md。固定 audio.cpp 上游 family 清单只作为 E1 研究证据，
-不能推断模型文件存在或 LocalAI provider 已接入。
-
-## 5. Worker bridge
-
-当前仅登记 TIGER-DnR worker ID：
-
-| 服务 | 固定 model ID | 输出合同 |
-| --- | --- | --- |
-| TIGER-DnR | llm-local.tiger-dnr.worker.v1 | 三 Stem ZIP 文件引用 |
-
-注册和检查：
-
-~~~
-python3 scripts/localai/manager.py register-worker-bridge-candidates
-python3 scripts/localai/manager.py verify-worker-bridge-candidates
-~~~
-
-无模型测试覆盖 RPC envelope、allowlist、服务路由、文件合同、大小限制和清理；
-TIGER-DnR bridge 的真实模型加载、资源和输出质量仍需模型运行时单独验证。
-当前 TIGER-DnR worker 文件成品使用最大 4 GiB 的共享 `file_ref`，不将 WAV/NPZ/ZIP 放进 gRPC Reply；
-服务与 bridge 必须使用相同的 `LLM_LOCALAI_ARTIFACT_DIR`。取回时流式复制并删除共享原文件。
-
-## 6. 验证与当前限制
-
-离线可运行的检查：
-
-~~~
+~~~bash
+uv sync --project main --locked
+uv sync --project model-audio/design_qwen3-tts-1.7b-voicedesign --locked
+uv sync --project model-audio/audio_cpp_runtime --locked
+uv sync --project qa --locked
 python3 scripts/localai/manager.py verify-install
-python3 scripts/localai/manager.py verify-worker-bridge-candidates
-UV_OFFLINE=1 bash scripts/quality_gate.sh
 ~~~
 
-能力清单校验当前服务入口、模型 uv 项目、路由、请求 schema 与字段；计数由当前源码生成。
-quality gate 还包含 shell 语法、Steam Audio renderer 的无 SDK 核心测试、锁检查、Ruff、格式检查与两组无模型回归。
-2026-10-21 的历史 `UV_OFFLINE=1 bash scripts/quality_gate.sh` 记录为通过：13 个 uv 项目锁检查、Ruff 和 104 个 Python 文件格式检查通过；
-能力清单通过；根目录 198 项无模型测试全部通过。`bash -n start.sh` 和 Steam Audio renderer
-无 SDK 核心测试也包含在门禁中。
+verify-install 检查宿主 LocalAI 固定版本与 audio.cpp backend 文件指纹，记录安装状态，不下载文件。
+启动整组服务：
 
-LocalAI `verify-install`、两个 Qwen3-TTS 候选和TIGER-DnR worker bridge 候选核验通过。对 11 个服务 uv 项目、
-`localai_worker_bridge/` 和 `qa/` 执行 `uv sync --locked --offline --dry-run` 均显示 `Would make no changes`；
-该只读检查没有安装依赖。13 份维护文档的相对文件链接检查通过。
+~~~bash
+bash start.sh
+~~~
 
-本机 Steam Audio SDK 4.8.1 已放置于 `$HOME/.local/share/steam-audio/4.8.1`，空间 renderer
-可执行文件已存在于 `model-audio/spatial_steam-audio/build/`；`ldd` 可解析 `libphonon.so`。
-Linux 启动与构建脚本均默认使用该 SDK 路径，无需每次额外设置环境变量。SDK 保持在仓库外，
-不会提交。该 SDK 状态记录不代表模型镜像当前完整；各服务须以实际健康响应核验。
-缺失 GGUF 对应的直接 provider 不在维护范围。
-模型权重及真实测试样本仍由用户管理。下节记录当前目录布局修复后的新验证结果；
-历史门禁结果不能代替当前提交验证。
+start.sh 会依次检查所有十个 HTTP 端口、注册九个候选、启动受管 LocalAI、执行候选 readiness 检查，
+再启动控制面、VoiceDesign 和八个 audio.cpp API。任一 HTTP 服务退出时，脚本会清理其他服务进程组并停止
+受管 LocalAI。启动期间不会加载 GGUF 模型；模型只在请求到达后加载。
 
-## 7. 2026-10-22 复核修复与当前验证
+候选注册命令会在 LocalAI models 目录建立指向本地 GGUF 的受控符号链接，并原子写入 YAML，不复制权重。
+常用检查：
 
-复核基线为 `1bd58ae`（目录优化），下列记录保留当时的修复与验证边界。
+~~~bash
+python3 scripts/localai/manager.py verify-audio-cpp-candidates
+python3 scripts/localai/manager.py status
+curl -fsS http://127.0.0.1:8300/v1/control
+curl -fsS http://127.0.0.1:8301/v1/health
+curl -fsS http://127.0.0.1:8311/v1/health
+~~~
 
-- manager 从已验证的 worker manifest 获取回收入口，覆盖登记项目；
-  子进程继承入口标记，父 worker 提前退出后仍可识别并回收遗留组。
-- bridge 对成功、非零退出、取消和超时统一执行整个进程组的 TERM/KILL 收尾；
-  Free 重试尚未确认的组，失败时保留隔离。固定 LocalAI 可能吞掉 Free 错误，
-  gateway 因此另行检测被 bridge 更新的隔离标记，恢复脚本要求宿主机退出证据。
-- bridge 文件产物使用共享引用，泛用内联产物上限降为 32 MiB，
-  为固定 LocalAI 的 50 MiB gRPC 接收限制预留 base64 和 envelope 空间。
-- 修复服务路由测试、uv 配置测试、启动断言及文本训练测试的目录迁移遗漏，
-  修正训练推理脚本的包内/直接执行导入，完成 Ruff 安全修复并同步能力清单行号。
-- 真实 Qwen 调用发现绝对 `parameters.model` 被 LocalAI 拒绝，以及 Base session 选项缺少
-  `session.` 前缀。候选现通过 models 内 `<model-id>.hf` 符号链接引用本地快照，
-  verify 命令同时检查链接目标；不复制权重。旧本机 YAML 已备份后重新登记。
-- LocalAI 可变数据设置到 `$LLM_LOCALAI_DATA_DIR/data`，避免污染仓库根目录。
-  本机残留的两份退役 worker YAML 已备份移出 models；备份不在 LocalAI 扫描目录。
+新增模型服务的健康检查验证 LocalAI readiness 和 model ID 注册，不触发推理或权重加载。
 
-当前验证结果：
+## 全局 GPU 队列与 quarantine
 
-| 验证 | 结果与边界 |
-| --- | --- |
-| 完整离线质量门禁 | 13 份锁、Ruff、107 个文件格式检查、能力清单、三个 C++ 核心测试、根目录 205 项测试通过 |
-| 生命周期回归 | 登记的 worker 入口、继承入口标记、四种退出结果的抗 TERM 子进程、Free 失败及隔离恢复均有无模型覆盖 |
-| `smoke_worker_bridge.py` | 41 MiB、129 MiB 静音 WAV 经真实 HTTP → Go gRPC → bridge 取回，内容、消费清理及宿主机停止确认通过；不加载模型 |
-| Qwen VoiceDesign | 一个真实短句，24 kHz、76,800 帧、153,644 字节 WAV；shutdown 确认成功 |
-| Qwen Base | 使用上述合成参考做一次 x-vector-only 克隆，24 kHz、76,800 帧、153,644 字节 WAV；shutdown 确认成功 |
-| Qwen 资源记录 | 本轮两次调用可见整卡峰值分别约 5,310 / 5,217 MiB，最终宿主机停止后采样为 1,394 MiB；不等于模型独占显存或完整资源基准 |
-| Qwen 制品指纹 | 本地 metadata revision 与每个快照 13 个非缓存文件 SHA-256 已记入 `versions.json`；未联网核对上游快照 |
+所有模型 API 在共享 llm_local_runtime 的 GPU_LOCK_FILE 上获取有限时长的跨进程 flock；默认排队上限为
+900 秒。GPU 锁同时覆盖 LocalAI 推理、backend shutdown 和 CUDA_RELEASE_DELAY。排队超时或发现 quarantine
+标记时，服务返回 503。该锁必须由以后加入的 GPU 模型继续共用，避免并发占用显存。
 
-大文件 smoke 可独立复现：
+每次 LocalAI 推理持锁期间都会创建锁旁的 .quarantine 标记。若 backend shutdown 或进程回收无法确认，标记会保留，
+阻止所有其他 GPU 模型开始推理。禁止手动删除该标记。
 
-```bash
-uv run --project qa --locked python scripts/localai/smoke_worker_bridge.py
-```
+正常退出 start.sh 会终止全部十个 HTTP 服务进程组，再要求 manager 停止 LocalAI 受管进程组。独立检查或停止：
 
-两个 Qwen 短句仅证明加载、调用、WAV 合同和本次 shutdown 路径可运行；
-不代表听感、克隆相似度、长文本、多语种、错误注入及所有模型的 E2/E3 验收完成。
-TIGER-DnR bridge 的真实模型推理、资源适配与输出质量仍需另行验证。
+~~~bash
+python3 scripts/localai/manager.py status
+python3 scripts/localai/manager.py stop
+~~~
+
+完成 backend 修复后，使用恢复脚本。脚本在 GPU 锁内确认模型/受管进程退出和 loopback 端口关闭后才解除隔离：
+
+~~~bash
+LLM_LOCALAI_ENABLED=true python3 scripts/localai/recover_quarantine.py
+~~~
+
+具体的隔离文件合同和新增 provider 要求见[全局 GPU 锁说明](global-gpu-lock.md)。
+
+## 诊断和能力清单
+
+LocalAI/audio.cpp API 由当前活跃服务清单描述；修改请求字段、路由、端口或请求 schema 后，同步生成并校验能力清单：
+
+~~~bash
+uv run --project qa --locked python scripts/localai/validate_capabilities.py
+bash scripts/quality_gate.sh
+~~~
+
+新增八个模型服务前，能力清单记录了 VoiceDesign 一次真实短句样例；这不能代替新增模型的真实推理与听感验证。
+按顺序运行模型生成样例、指定 WAV 输入要求和输出位置见
+[audio.cpp 冒烟生成说明](../tests/audio_cpp/README.md)。

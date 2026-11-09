@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""用于共享存储和运行时诊断的轻量控制面 API。
-
-模型推理不在这里执行。各模型服务自行管理推理生命周期；本进程只保留
-周边 WebUI 使用的 8300 端口健康检查、上传、文件检查和 CPU 音频导出工具。
-"""
+"""用于运行时诊断、CPU 音频导出和 Steam Audio 渲染的轻量控制面 API。"""
 
 from __future__ import annotations
 
@@ -31,7 +27,6 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from steam_audio_render import SteamAudioRenderError, SteamAudioRenderProcessor
 
 from llm_local_runtime import (
-    AudioReferenceStore,
     AudioUploadError,
     StagedUpload,
     UploadPolicy,
@@ -49,10 +44,6 @@ def expand_path(path: str) -> str:
 
 
 STORAGE_DIR = expand_path(os.getenv("STORAGE_DIR", str(PROJECT_DIR / "storage")))
-TIMBRE_STORAGE_DIR = expand_path(os.getenv("TIMBRE_STORAGE_DIR", str(Path(STORAGE_DIR) / "timbre")))
-TIMBRE_REFERENCE_DIR = str(Path(TIMBRE_STORAGE_DIR) / ".references")
-CLONE_STORAGE_DIR = expand_path(os.getenv("CLONE_STORAGE_DIR", str(Path(STORAGE_DIR) / "clone")))
-PROMPTS_DIR = expand_path(os.getenv("PROMPTS_DIR", CLONE_STORAGE_DIR))
 RUNTIME_CACHE_DIR = expand_path(
     os.getenv("RUNTIME_CACHE_DIR", str(Path(STORAGE_DIR) / ".cache/runtime"))
 )
@@ -123,17 +114,12 @@ LOCAL_FILES_ONLY = os.getenv("LOCAL_FILES_ONLY", "1").lower() in {
 }
 
 for directory in (
-    TIMBRE_STORAGE_DIR,
-    TIMBRE_REFERENCE_DIR,
-    CLONE_STORAGE_DIR,
-    PROMPTS_DIR,
     RUNTIME_CACHE_DIR,
     SPATIAL_EXPORT_CACHE_DIR,
     STEAM_AUDIO_RENDER_CACHE_DIR,
 ):
     os.makedirs(directory, exist_ok=True)
 
-reference_store = AudioReferenceStore(PROMPTS_DIR, TIMBRE_STORAGE_DIR)
 spatial_audio_processor = SpatialAudioProcessor(
     SPATIAL_EXPORT_CACHE_DIR,
     ffmpeg_bin=SPATIAL_EXPORT_FFMPEG_BIN,
@@ -188,21 +174,6 @@ class ForceCORS(BaseHTTPMiddleware):
 app.add_middleware(ForceCORS)
 
 
-def hash_filename(filename: str) -> str:
-    """将 WebUI 的逻辑路径映射为稳定文件名，避免直接使用用户输入作路径。"""
-    return reference_store.clone_path(filename).name
-
-
-def prompt_audio_path(filename: str) -> Path:
-    """解析普通克隆上传，或解析预览时引用的音色设计音频。"""
-    return reference_store.prompt_audio_path(filename)
-
-
-def store_uploaded_audio(staged: StagedUpload, full_path: str) -> dict[str, object]:
-    """在线程池中原子提交流式暂存的参考音频。"""
-    return reference_store.commit_staged_upload(staged, full_path)
-
-
 @app.get("/v1/health")
 @app.get("/v1/control")
 def health():
@@ -212,9 +183,6 @@ def health():
         "code": 200,
         "paths": {
             "storage_dir": STORAGE_DIR,
-            "timbre_storage_dir": TIMBRE_STORAGE_DIR,
-            "clone_storage_dir": CLONE_STORAGE_DIR,
-            "prompts_dir": PROMPTS_DIR,
             "runtime_cache_dir": RUNTIME_CACHE_DIR,
             "spatial_export_cache_dir": SPATIAL_EXPORT_CACHE_DIR,
             "steam_audio_render_cache_dir": STEAM_AUDIO_RENDER_CACHE_DIR,
@@ -252,16 +220,6 @@ def health():
             "max_bytes": STEAM_AUDIO_RENDER_MAX_BYTES,
         },
     }
-
-
-@app.post("/v1/upload_audio")
-async def upload_audio(audio: UploadFile = File(...), full_path: str = Form(...)):
-    """上传克隆参考音频，但不复制已有的音色设计资产。"""
-    try:
-        staged = await stage_audio_upload(audio, Path(RUNTIME_CACHE_DIR) / "uploads")
-        return await run_in_threadpool(store_uploaded_audio, staged, full_path)
-    except AudioUploadError as exc:
-        return JSONResponse(status_code=exc.status_code, content={"detail": str(exc)})
 
 
 @app.post("/v1/audio/export")
@@ -455,17 +413,10 @@ async def render_spatial_audio(
     )
 
 
-@app.get("/v1/check/audio")
-def check_audio_exists(file_name: str):
-    exists = prompt_audio_path(file_name).is_file()
-    return {"code": 200 if exists else 404, "exists": exists}
-
-
 if __name__ == "__main__":
     print("==================================================")
     print("   LLM Local Backend control plane (no model inference)")
     print("==================================================")
     print(f"[配置] storage: {STORAGE_DIR}")
-    print(f"[配置] prompts: {PROMPTS_DIR}")
     print(f"[配置] host={API_HOST}, port={API_PORT}")
     uvicorn.run(app, host=API_HOST, port=API_PORT)
