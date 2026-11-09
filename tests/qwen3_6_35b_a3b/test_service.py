@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import httpx
 from fastapi.testclient import TestClient
@@ -18,6 +19,37 @@ from qwen3_6_35b_a3b.app import API_ROUTE, MODEL_ALIAS, create_qwen_app  # noqa:
 
 
 class QwenServiceTests(unittest.TestCase):
+    def test_quarantine_uses_qwen_identity_from_environment(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            lock_path = Path(temporary) / "gpu-runtime.lock"
+            with patch.dict(
+                "os.environ",
+                {
+                    "QWEN36_BACKEND_PID": "1234",
+                    "QWEN36_BACKEND_PGID": "1234",
+                    "ORNITH_BACKEND_PID": "5678",
+                    "LLAMA_SERVER_BIN": "/opt/llama-server",
+                },
+            ):
+                app = create_qwen_app(
+                    lock_path=lock_path,
+                    transport=httpx.MockTransport(
+                        lambda request: httpx.Response(200, json={"is_sleeping": False})
+                    ),
+                    sleep_timeout=0.005,
+                    sleep_poll_interval=0.001,
+                    cuda_release_delay=0,
+                )
+                with TestClient(app) as client:
+                    response = client.post(API_ROUTE, json={"messages": []})
+
+            self.assertEqual(response.status_code, 503)
+            marker = json.loads(Path(f"{lock_path}.quarantine").read_text())
+            self.assertEqual(marker["model"], MODEL_ALIAS)
+            self.assertEqual(marker["pid"], 1234)
+            self.assertEqual(marker["pgid"], 1234)
+            self.assertEqual(marker["executable"], "/opt/llama-server")
+
     def _app(self, lock_path: Path, handler):
         return create_qwen_app(
             transport=httpx.MockTransport(handler),

@@ -230,63 +230,39 @@ if [[ ! -s "$QWEN36_MODEL_FILE" ]]; then
   echo "Qwen3.6 GGUF 缺失或为空：$QWEN36_MODEL_FILE" >&2
   exit 1
 fi
-for value_name in \
-  ORNITH_CONTEXT_SIZE ORNITH_BATCH_SIZE ORNITH_THREADS \
-  ORNITH_N_GPU_LAYERS ORNITH_N_CPU_MOE ORNITH_SLEEP_IDLE_SECONDS ORNITH_STARTUP_TIMEOUT; do
-  value="${!value_name}"
-  if [[ ! "$value" =~ ^[1-9][0-9]*$ ]]; then
-    echo "$value_name 必须是正整数。" >&2
+for model_prefix in ORNITH QWEN36; do
+  for setting in CONTEXT_SIZE BATCH_SIZE THREADS N_GPU_LAYERS N_CPU_MOE SLEEP_IDLE_SECONDS STARTUP_TIMEOUT; do
+    value_name="${model_prefix}_${setting}"
+    if [[ ! "${!value_name}" =~ ^[1-9][0-9]*$ ]]; then
+      echo "$value_name 必须是正整数。" >&2
+      exit 1
+    fi
+  done
+  value_name="${model_prefix}_CONTEXT_SIZE"
+  if (( ${!value_name} > 32768 )); then
+    echo "$value_name 不得超过 32768。" >&2
     exit 1
   fi
 done
-for value_name in \
-  QWEN36_CONTEXT_SIZE QWEN36_BATCH_SIZE QWEN36_THREADS \
-  QWEN36_N_GPU_LAYERS QWEN36_N_CPU_MOE QWEN36_SLEEP_IDLE_SECONDS QWEN36_STARTUP_TIMEOUT; do
+for value_name in ORNITH_SLEEP_TIMEOUT ORNITH_SLEEP_POLL_INTERVAL \
+  QWEN36_SLEEP_TIMEOUT QWEN36_SLEEP_POLL_INTERVAL GPU_LOCK_WAIT_TIMEOUT; do
   value="${!value_name}"
-  if [[ ! "$value" =~ ^[1-9][0-9]*$ ]]; then
-    echo "$value_name 必须是正整数。" >&2
+  if [[ ! "$value" =~ ^[0-9]+([.][0-9]+)?$ || ! "$value" =~ [1-9] ]]; then
+    echo "$value_name 必须是正数。" >&2
     exit 1
   fi
 done
-if (( QWEN36_CONTEXT_SIZE > 32768 )); then
-  echo "QWEN36_CONTEXT_SIZE 不得超过 32768。" >&2
-  exit 1
-fi
-if (( ORNITH_CONTEXT_SIZE > 32768 )); then
-  echo "ORNITH_CONTEXT_SIZE 不得超过 32768。" >&2
-  exit 1
-fi
-if ! [[ "$ORNITH_SLEEP_TIMEOUT" =~ ^[0-9]+([.][0-9]+)?$ ]] || (( $(awk "BEGIN { print ($ORNITH_SLEEP_TIMEOUT > 0) ? 1 : 0 }") == 0 )); then
-  echo "ORNITH_SLEEP_TIMEOUT 必须是正数。" >&2
-  exit 1
-fi
-if ! [[ "$ORNITH_SLEEP_POLL_INTERVAL" =~ ^[0-9]+([.][0-9]+)?$ ]] || (( $(awk "BEGIN { print ($ORNITH_SLEEP_POLL_INTERVAL > 0) ? 1 : 0 }") == 0 )); then
-  echo "ORNITH_SLEEP_POLL_INTERVAL 必须是正数。" >&2
-  exit 1
-fi
-if ! [[ "$QWEN36_SLEEP_TIMEOUT" =~ ^[0-9]+([.][0-9]+)?$ ]] || (( $(awk "BEGIN { print ($QWEN36_SLEEP_TIMEOUT > 0) ? 1 : 0 }") == 0 )); then
-  echo "QWEN36_SLEEP_TIMEOUT 必须是正数。" >&2
-  exit 1
-fi
-if ! [[ "$QWEN36_SLEEP_POLL_INTERVAL" =~ ^[0-9]+([.][0-9]+)?$ ]] || (( $(awk "BEGIN { print ($QWEN36_SLEEP_POLL_INTERVAL > 0) ? 1 : 0 }") == 0 )); then
-  echo "QWEN36_SLEEP_POLL_INTERVAL 必须是正数。" >&2
-  exit 1
-fi
 if ! [[ "$CUDA_RELEASE_DELAY" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
   echo "CUDA_RELEASE_DELAY 必须是非负数。" >&2
   exit 1
 fi
-if ! [[ "$GPU_LOCK_WAIT_TIMEOUT" =~ ^[0-9]+([.][0-9]+)?$ ]] || (( $(awk "BEGIN { print ($GPU_LOCK_WAIT_TIMEOUT > 0) ? 1 : 0 }") == 0 )); then
-  echo "GPU_LOCK_WAIT_TIMEOUT 必须是正数。" >&2
-  exit 1
-fi
-DEVICE_LIST="$($LLAMA_SERVER_BIN --list-devices 2>&1 || true)"
+DEVICE_LIST="$("$LLAMA_SERVER_BIN" --list-devices 2>&1 || true)"
 if ! grep -q 'CUDA0' <<<"$DEVICE_LIST"; then
   echo "llama-server 未提供 CUDA0 设备；请安装 CUDA 构建的 llama.cpp。" >&2
   printf '%s\n' "$DEVICE_LIST" >&2
   exit 1
 fi
-LLAMA_HELP="$($LLAMA_SERVER_BIN --help 2>&1 || true)"
+LLAMA_HELP="$("$LLAMA_SERVER_BIN" --help 2>&1 || true)"
 for required_flag in --n-cpu-moe --sleep-idle-seconds --mmproj-offload --spec-type; do
   if ! grep -q -- "$required_flag" <<<"$LLAMA_HELP"; then
     echo "llama-server 缺少所需参数：$required_flag。" >&2

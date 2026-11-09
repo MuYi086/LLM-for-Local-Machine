@@ -12,20 +12,6 @@ API_ROUTE = "/v1/qwen/Qwen3.6-35B-A3B-MTP"
 MODEL_ALIAS = "Qwen3.6-35B-A3B-MTP"
 
 
-def _optional_pid(name: str) -> int | None:
-    """读取可选的正 backend 进程号。"""
-    value = os.getenv(name)
-    if value is None:
-        return None
-    try:
-        pid = int(value)
-    except ValueError as exc:
-        raise ValueError(f"{name} 必须是正整数。") from exc
-    if pid <= 0:
-        raise ValueError(f"{name} 必须是正整数。")
-    return pid
-
-
 def create_qwen_app(
     *,
     transport: httpx.AsyncBaseTransport | None = None,
@@ -42,9 +28,6 @@ def create_qwen_app(
         backend_host=os.getenv("QWEN36_BACKEND_HOST", "127.0.0.2"),
         backend_port=int(os.getenv("QWEN36_LLAMA_CPP_PORT", "8400")),
         backend_env_prefix="QWEN36",
-        backend_pid=_optional_pid("QWEN36_BACKEND_PID"),
-        backend_pgid=_optional_pid("QWEN36_BACKEND_PGID"),
-        backend_executable=os.getenv("LLAMA_SERVER_BIN"),
         transport=transport,
         lock_path=lock_path,
         sleep_timeout=sleep_timeout,

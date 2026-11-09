@@ -18,6 +18,28 @@ from ornith_1_5_35b_a3b.app import API_ROUTE, MODEL_ALIAS, create_app  # noqa: E
 
 
 class OrnithServiceTests(unittest.TestCase):
+    def test_sleep_confirmation_retries_without_clearing_quarantine_early(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            lock_path = Path(temporary) / "gpu-runtime.lock"
+            marker_path = Path(f"{lock_path}.quarantine")
+            states = iter([True, True, False, True, True])
+            props_count = 0
+
+            def handle(request: httpx.Request) -> httpx.Response:
+                nonlocal props_count
+                self.assertTrue(marker_path.exists())
+                if request.url.path == "/props":
+                    props_count += 1
+                    return httpx.Response(200, json={"is_sleeping": next(states)})
+                return httpx.Response(200, json={"choices": []})
+
+            with TestClient(self._app(lock_path, handle)) as client:
+                response = client.post(API_ROUTE, json={"messages": []})
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(props_count, 5)
+            self.assertFalse(marker_path.exists())
+
     def _app(self, lock_path: Path, handler, **kwargs):
         options = {
             "sleep_poll_interval": 0.001,
@@ -59,7 +81,7 @@ class OrnithServiceTests(unittest.TestCase):
             chat_request = next(
                 request for request in received if request.url.path.endswith("/chat/completions")
             )
-            self.assertEqual(str(chat_request.url), "http://127.0.0.1:8402/v1/chat/completions")
+            self.assertEqual(str(chat_request.url), "http://127.0.0.1:8403/v1/chat/completions")
             self.assertEqual(json.loads(chat_request.content)["model"], MODEL_ALIAS)
             self.assertTrue(any(request.url.path == "/props" for request in received))
             self.assertFalse(Path(f"{lock_path}.quarantine").exists())

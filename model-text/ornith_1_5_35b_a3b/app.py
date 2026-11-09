@@ -130,7 +130,7 @@ def create_app(
     """
     base_url = _validate_loopback_url(
         backend_base_url
-        or os.getenv(f"{backend_env_prefix}_LLAMA_BASE_URL", "http://127.0.0.1:8402")
+        or os.getenv(f"{backend_env_prefix}_LLAMA_BASE_URL", "http://127.0.0.1:8403")
     )
     request_timeout = _positive_float("ORNITH_REQUEST_TIMEOUT", 1800.0)
     lock_timeout = _positive_float("GPU_LOCK_WAIT_TIMEOUT", 900.0)
@@ -165,7 +165,7 @@ def create_app(
     resolved_backend_port = (
         backend_port
         if backend_port is not None
-        else int(os.getenv(default_backend_port_variable, "8402"))
+        else int(os.getenv(default_backend_port_variable, "8403"))
     )
     if (
         resolved_backend_host != "localhost"
@@ -225,36 +225,29 @@ def create_app(
         """在线程池释放共享 GPU 锁和显存采样器。"""
         await asyncio.to_thread(lease.__exit__, None, None, None)
 
+    async def backend_is_sleeping() -> bool:
+        """查询休眠状态；暂时不可用或响应格式无效时保留隔离状态。"""
+        client: httpx.AsyncClient = app.state.llama_client
+        try:
+            response = await client.get(PROPS_PATH, timeout=5.0)
+            props = response.json() if response.is_success else None
+        except (httpx.RequestError, ValueError):
+            return False
+        return isinstance(props, dict) and props.get("is_sleeping") is True
+
     async def wait_for_sleep_and_clear(marker_content: bytes) -> bool:
         """确认模型休眠、等待 CUDA 缓冲并清除本次隔离标记。"""
-        client: httpx.AsyncClient = app.state.llama_client
         deadline = time.monotonic() + resolved_sleep_timeout
-        props_sleeping = False
         while time.monotonic() < deadline:
-            try:
-                response = await client.get(PROPS_PATH, timeout=5.0)
-                props = response.json() if response.is_success else None
-                props_sleeping = isinstance(props, dict) and props.get("is_sleeping") is True
-            except (httpx.RequestError, json.JSONDecodeError, ValueError):
-                props_sleeping = False
-            if props_sleeping:
+            if await backend_is_sleeping():
                 remaining = deadline - time.monotonic()
                 if resolved_cuda_release_delay > remaining:
                     return False
                 if resolved_cuda_release_delay:
                     await asyncio.sleep(resolved_cuda_release_delay)
-                try:
-                    confirmation = await client.get(PROPS_PATH, timeout=5.0)
-                    confirmation_props = confirmation.json() if confirmation.is_success else None
-                except (httpx.RequestError, json.JSONDecodeError, ValueError):
-                    confirmation_props = None
-                if (
-                    isinstance(confirmation_props, dict)
-                    and confirmation_props.get("is_sleeping") is True
-                    and remove_quarantine_marker(
-                        resolved_lock_path,
-                        expected_content=marker_content,
-                    )
+                if await backend_is_sleeping() and remove_quarantine_marker(
+                    resolved_lock_path,
+                    expected_content=marker_content,
                 ):
                     return True
             await asyncio.sleep(resolved_poll_interval)
@@ -262,15 +255,9 @@ def create_app(
 
     async def wait_until_sleeping() -> bool:
         """仅在 backend 稳定报告休眠后提交请求，避开 sleep-idle 竞态窗口。"""
-        client: httpx.AsyncClient = app.state.llama_client
         deadline = time.monotonic() + resolved_sleep_timeout
         while time.monotonic() < deadline:
-            try:
-                response = await client.get(PROPS_PATH, timeout=5.0)
-                props = response.json() if response.is_success else None
-            except (httpx.RequestError, json.JSONDecodeError, ValueError):
-                props = None
-            if isinstance(props, dict) and props.get("is_sleeping") is True:
+            if await backend_is_sleeping():
                 return True
             await asyncio.sleep(resolved_poll_interval)
         return False

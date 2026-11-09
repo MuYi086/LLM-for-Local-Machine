@@ -110,6 +110,32 @@ def _preflight_environment(root: Path) -> tuple[dict[str, str], Path]:
 
 
 class StartServicesTests(unittest.TestCase):
+    def test_positive_timeouts_reject_zero_and_invalid_decimals_before_startup(self) -> None:
+        for variable in (
+            "ORNITH_SLEEP_TIMEOUT",
+            "ORNITH_SLEEP_POLL_INTERVAL",
+            "QWEN36_SLEEP_TIMEOUT",
+            "QWEN36_SLEEP_POLL_INTERVAL",
+            "GPU_LOCK_WAIT_TIMEOUT",
+        ):
+            for value in ("0", "00.000", "-1", "nan", "1.2.3"):
+                with (
+                    self.subTest(variable=variable, value=value),
+                    tempfile.TemporaryDirectory() as temporary,
+                ):
+                    environment, trace_path = _preflight_environment(Path(temporary))
+                    environment[variable] = value
+                    completed = subprocess.run(
+                        ["bash", str(ROOT / "start.sh")],
+                        capture_output=True,
+                        text=True,
+                        env=environment,
+                        timeout=15,
+                    )
+                    self.assertNotEqual(completed.returncode, 0)
+                    self.assertIn(f"{variable} 必须是正数", completed.stderr)
+                    self.assertNotIn("manager.py", trace_path.read_text())
+
     def test_start_invokes_managed_services_and_both_llama_backends(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -125,7 +151,7 @@ class StartServicesTests(unittest.TestCase):
                 )
                 executable.chmod(0o755)
             _write_fake_python(bin_dir / "python3")
-            llama_server = bin_dir / "llama-server"
+            llama_server = bin_dir / "llama server"
             _write_fake_llama_server(llama_server)
             model_file = root / "Ornith.gguf"
             mmproj_file = root / "mmproj.gguf"
