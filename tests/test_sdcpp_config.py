@@ -48,43 +48,58 @@ class SdcppConfigTests(unittest.TestCase):
         self.manifest = self.root / "models.json"
         self.manifest.write_text(json.dumps(model_document()))
 
-    def test_default_manifest_declares_moss_sft_components_and_runtime(self) -> None:
+    def test_default_manifest_declares_moss_and_flux_components_and_runtime(self) -> None:
         root = Path(__file__).resolve().parents[1]
         mirror = self.root
         with patch.dict(os.environ, {"HF_MIRROR_DIR": str(mirror)}):
             models = load_models(root / "sdcpp/manifests/models.json")
 
-        self.assertEqual(list(models), ["MOSS-Image-SFT-Q8_0"])
-        model = models["MOSS-Image-SFT-Q8_0"]
-        self.assertEqual(model.tasks, ("text-to-image",))
-        self.assertEqual(set(model.components), {"diffusion_model", "llm", "vae", "tokenizer"})
-        self.assertEqual(model.components["diffusion_model"].name, "MOSS-Image-SFT-Q8_0.gguf")
-        self.assertEqual(model.components["llm"].name, "Qwen3.5-9B-Q6_K.gguf")
-        self.assertEqual(model.components["vae"].name, "flux2-vae.safetensors")
-        self.assertEqual(model.components["tokenizer"].name, "tokenizer.json")
-        self.assertEqual(model.defaults["width"], 1024)
-        self.assertEqual(model.defaults["height"], 1024)
-        self.assertEqual(model.defaults["steps"], 20)
-        self.assertEqual(model.defaults["cfg_scale"], 3.0)
-        self.assertEqual(model.limits["width_multiple"], 16)
-        self.assertEqual(model.limits["height_multiple"], 16)
-        self.assertTrue(model.runtime["offload_to_cpu"])
+        self.assertEqual(list(models), ["MOSS-Image-SFT-Q8_0", "FLUX-3-Image-Klein-GGUF-Q8"])
+        moss = models["MOSS-Image-SFT-Q8_0"]
+        self.assertEqual(moss.tasks, ("text-to-image",))
+        self.assertEqual(set(moss.components), {"diffusion_model", "llm", "vae", "tokenizer"})
+        self.assertEqual(moss.components["diffusion_model"].name, "MOSS-Image-SFT-Q8_0.gguf")
+        self.assertEqual(moss.components["llm"].name, "Qwen3.5-9B-Q6_K.gguf")
+        self.assertEqual(moss.components["vae"].name, "flux2-vae.safetensors")
+        self.assertEqual(moss.components["tokenizer"].name, "tokenizer.json")
+        self.assertEqual(moss.defaults["width"], 1024)
+        self.assertEqual(moss.defaults["height"], 1024)
+        self.assertEqual(moss.defaults["steps"], 20)
+        self.assertEqual(moss.defaults["cfg_scale"], 3.0)
+        self.assertEqual(moss.limits["width_multiple"], 16)
+        self.assertEqual(moss.limits["height_multiple"], 16)
+        self.assertTrue(moss.runtime["offload_to_cpu"])
 
-        arguments = model.arguments(
+        moss_arguments = moss.arguments(
             GenerationRequest(task="text-to-image", prompt="a cat"), self.root / "result.png"
         )
-        self.assertIn("--offload-to-cpu", arguments)
+        self.assertIn("--offload-to-cpu", moss_arguments)
         for option, path in (
-            ("--diffusion-model", model.components["diffusion_model"]),
-            ("--llm", model.components["llm"]),
-            ("--vae", model.components["vae"]),
-            ("--tokenizer", model.components["tokenizer"]),
+            ("--diffusion-model", moss.components["diffusion_model"]),
+            ("--llm", moss.components["llm"]),
+            ("--vae", moss.components["vae"]),
+            ("--tokenizer", moss.components["tokenizer"]),
         ):
-            self.assertEqual(arguments[arguments.index(option) + 1], str(path))
+            self.assertEqual(moss_arguments[moss_arguments.index(option) + 1], str(path))
+
+        flux = models["FLUX-3-Image-Klein-GGUF-Q8"]
+        self.assertEqual(flux.tasks, ("text-to-image", "image-to-image"))
+        self.assertEqual(set(flux.components), {"diffusion_model", "llm", "llm_vision", "vae"})
+        self.assertEqual(flux.components["diffusion_model"].name, "flux3-image-klein-Q8_0.gguf")
+        self.assertEqual(flux.components["llm"].name, "Qwen3VL-4B-Instruct-Q8_0.gguf")
+        self.assertEqual(flux.components["llm_vision"].name, "mmproj-Qwen3VL-4B-Instruct-Q8_0.gguf")
+        self.assertEqual(flux.components["vae"].name, "ae.safetensors")
+        self.assertEqual(flux.defaults["width"], 1024)
+        self.assertEqual(flux.defaults["height"], 1024)
+        self.assertEqual(flux.defaults["steps"], 16)
+        self.assertEqual(flux.defaults["cfg_scale"], 1.0)
+        self.assertEqual(flux.defaults["sampler"], "euler")
+        self.assertEqual(flux.runtime["image_to_image_flag"], "ref-image")
 
     def test_tokenizer_component_and_cpu_offload_map_to_cli_arguments(self) -> None:
         document = model_document()
         document["models"][0]["components"]["tokenizer"] = "tokenizer.json"
+        document["models"][0]["components"]["llm_vision"] = "mmproj.gguf"
         document["models"][0]["runtime"] = {"offload_to_cpu": True}
         self.manifest.write_text(json.dumps(document))
 
@@ -96,7 +111,27 @@ class SdcppConfigTests(unittest.TestCase):
         self.assertEqual(
             arguments[arguments.index("--tokenizer") + 1], str(self.root / "tokenizer.json")
         )
+        self.assertEqual(
+            arguments[arguments.index("--llm_vision") + 1], str(self.root / "mmproj.gguf")
+        )
         self.assertIn("--offload-to-cpu", arguments)
+
+    def test_image_to_image_uses_manifest_reference_flag(self) -> None:
+        document = model_document()
+        document["models"][0]["tasks"].append("image-to-image")
+        document["models"][0]["runtime"]["image_to_image_flag"] = "ref-image"
+        self.manifest.write_text(json.dumps(document))
+        image = self.root / "reference.png"
+        image.write_bytes(b"fixture")
+
+        model = load_models(self.manifest)["fixture"]
+        arguments = model.arguments(
+            GenerationRequest(task="image-to-image", prompt="edit this image", init_image=image),
+            self.root / "result.png",
+        )
+
+        self.assertEqual(arguments[arguments.index("--ref-image") + 1], str(image.resolve()))
+        self.assertNotIn("--init-img", arguments)
 
     def test_structured_arguments_keep_prompt_as_one_literal_argument(self) -> None:
         model = load_models(self.manifest)["fixture"]
@@ -162,6 +197,7 @@ class SdcppConfigTests(unittest.TestCase):
             lambda d: d["models"][0]["components"].update(unknown="x"),
             lambda d: d["models"][0]["runtime"].update(max_vram_gib=float("inf")),
             lambda d: d["models"][0]["runtime"].update(backend=[]),
+            lambda d: d["models"][0]["runtime"].update(image_to_image_flag="unknown"),
             lambda d: d["models"][0]["defaults"].update(width=256),
             lambda d: d["models"][0]["defaults"].update(frames=1),
             lambda d: d["models"][0].update(tasks=["unknown"]),

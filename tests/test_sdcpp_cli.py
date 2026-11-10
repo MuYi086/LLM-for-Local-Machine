@@ -18,7 +18,7 @@ from scripts.sdcpp import manager
 
 
 class SdcppCliTests(unittest.TestCase):
-    def test_status_lists_moss_model_without_executing_binary(self) -> None:
+    def test_status_lists_image_models_without_executing_binary(self) -> None:
         output = io.StringIO()
         with (
             patch.dict(os.environ, {"HF_MIRROR_DIR": "/tmp/hf-mirror"}, clear=True),
@@ -30,7 +30,13 @@ class SdcppCliTests(unittest.TestCase):
         status = json.loads(output.getvalue())
         self.assertEqual(
             status["models"],
-            [{"id": "MOSS-Image-SFT-Q8_0", "tasks": ["text-to-image"]}],
+            [
+                {"id": "MOSS-Image-SFT-Q8_0", "tasks": ["text-to-image"]},
+                {
+                    "id": "FLUX-3-Image-Klein-GGUF-Q8",
+                    "tasks": ["text-to-image", "image-to-image"],
+                },
+            ],
         )
         self.assertFalse(status["configured"])
         self.assertEqual(status["model_validation"], "MOSS-Image-SFT-Q8_0-inference-verified")

@@ -11,6 +11,7 @@ MODEL_TEXT_DIR="$PROJECT_DIR/model-text"
 ORNITH_SERVICE_DIR="$MODEL_TEXT_DIR/ornith_1_5_35b_a3b"
 QWEN36_SERVICE_DIR="$MODEL_TEXT_DIR/qwen3_6_35b_a3b"
 MOSS_IMAGE_SERVICE_DIR="$PROJECT_DIR/model-image/MOSS-Image-SFT-Q8_0"
+FLUX3_IMAGE_SERVICE_DIR="$PROJECT_DIR/model-image/FLUX-3-Image-Klein-GGUF-Q8"
 LLM_LOCAL_RUNTIME_SRC="$PROJECT_DIR/llm_local_runtime/src"
 INFERENCE_GATEWAY_SRC="$PROJECT_DIR/inference_gateway/src"
 
@@ -32,6 +33,10 @@ if [[ ! -f "$AUDIO_CPP_RUNTIME_SRC/audio_cpp_runtime/__init__.py" ]]; then
 fi
 if [[ ! -f "$MOSS_IMAGE_SERVICE_DIR/main.py" ]]; then
   echo "缺少 MOSS-Image-SFT 图片服务：$MOSS_IMAGE_SERVICE_DIR/main.py" >&2
+  exit 1
+fi
+if [[ ! -f "$FLUX3_IMAGE_SERVICE_DIR/main.py" ]]; then
+  echo "缺少 FLUX.3 Klein 图片服务：$FLUX3_IMAGE_SERVICE_DIR/main.py" >&2
   exit 1
 fi
 
@@ -58,6 +63,8 @@ export SDCPP_MODEL_MANIFEST="${SDCPP_MODEL_MANIFEST:-$PROJECT_DIR/sdcpp/manifest
 export SDCPP_OUTPUT_DIR="${SDCPP_OUTPUT_DIR:-$RUNTIME_CACHE_DIR/sdcpp}"
 export SDCPP_RUN_TIMEOUT="${SDCPP_RUN_TIMEOUT:-3600}"
 export SDCPP_CLEANUP_TIMEOUT="${SDCPP_CLEANUP_TIMEOUT:-30}"
+export FLUX3_IMAGE_UPLOAD_DIR="${FLUX3_IMAGE_UPLOAD_DIR:-$RUNTIME_CACHE_DIR/sdcpp_uploads}"
+export FLUX3_IMAGE_MAX_UPLOAD_BYTES="${FLUX3_IMAGE_MAX_UPLOAD_BYTES:-67108864}"
 export TIMBRE_STORAGE_DIR="${TIMBRE_STORAGE_DIR:-$STORAGE_DIR/timbre}"
 
 if [[ -z "${LLAMA_SERVER_BIN:-}" ]]; then
@@ -110,6 +117,8 @@ export HOST="${HOST:-0.0.0.0}"
 export PORT="${PORT:-8300}"
 export MOSS_IMAGE_HOST="${MOSS_IMAGE_HOST:-$HOST}"
 export MOSS_IMAGE_PORT="${MOSS_IMAGE_PORT:-8501}"
+export FLUX3_IMAGE_HOST="${FLUX3_IMAGE_HOST:-$HOST}"
+export FLUX3_IMAGE_PORT="${FLUX3_IMAGE_PORT:-8502}"
 export QWEN_VOICEDESIGN_HOST="${QWEN_VOICEDESIGN_HOST:-$HOST}"
 export QWEN_VOICEDESIGN_PORT="${QWEN_VOICEDESIGN_PORT:-8301}"
 export ORNITH_HOST="${ORNITH_HOST:-$HOST}"
@@ -219,6 +228,7 @@ PORT_CHECK_ARGS=(
   'Qwen3.6 API' "$QWEN36_HOST" "$QWEN36_PORT"
   'Qwen3.6 llama.cpp backend' "$QWEN36_BACKEND_HOST" "$QWEN36_LLAMA_CPP_PORT"
   'MOSS-Image-SFT API' "$MOSS_IMAGE_HOST" "$MOSS_IMAGE_PORT"
+  'FLUX.3 Klein Image API' "$FLUX3_IMAGE_HOST" "$FLUX3_IMAGE_PORT"
 )
 for index in "${!AUDIO_CPP_SERVICE_KEYS[@]}"; do
   PORT_CHECK_ARGS+=(
@@ -245,6 +255,21 @@ for model_component in \
   "$MOSS_IMAGE_MODEL_ROOT/tokenizer.json"; do
   if [[ ! -s "$model_component" ]]; then
     echo "MOSS-Image-SFT 模型组件缺失或为空：$model_component" >&2
+    exit 1
+  fi
+done
+if [[ ! "$FLUX3_IMAGE_MAX_UPLOAD_BYTES" =~ ^[1-9][0-9]*$ ]]; then
+  echo "FLUX3_IMAGE_MAX_UPLOAD_BYTES 必须是正整数。" >&2
+  exit 1
+fi
+FLUX3_IMAGE_MODEL_ROOT="$HF_MIRROR_DIR/stable-diffusion-cpp-gguf/FLUX-3-Image-Klein-GGUF"
+for model_component in \
+  "$FLUX3_IMAGE_MODEL_ROOT/flux3-image-klein-Q8_0.gguf" \
+  "$FLUX3_IMAGE_MODEL_ROOT/Qwen3VL-4B-Instruct-Q8_0.gguf" \
+  "$FLUX3_IMAGE_MODEL_ROOT/mmproj-Qwen3VL-4B-Instruct-Q8_0.gguf" \
+  "$FLUX3_IMAGE_MODEL_ROOT/ae.safetensors"; do
+  if [[ ! -s "$model_component" ]]; then
+    echo "FLUX.3 Klein 模型组件缺失或为空：$model_component" >&2
     exit 1
   fi
 done
@@ -370,6 +395,8 @@ if [[ -e "$GPU_LOCK_FILE.quarantine" ]]; then
 fi
 uv run --no-sync --project "$MAIN_PROJECT_DIR" python "$PROJECT_DIR/scripts/sdcpp/manager.py" \
   --manifest "$SDCPP_MODEL_MANIFEST" validate --model MOSS-Image-SFT-Q8_0
+uv run --no-sync --project "$MAIN_PROJECT_DIR" python "$PROJECT_DIR/scripts/sdcpp/manager.py" \
+  --manifest "$SDCPP_MODEL_MANIFEST" validate --model FLUX-3-Image-Klein-GGUF-Q8
 
 if [[ ! -x "$STEAM_AUDIO_RENDERER_BIN" ]]; then
   echo "警告：Steam Audio renderer 不存在或不可执行：$STEAM_AUDIO_RENDERER_BIN" >&2
@@ -398,6 +425,7 @@ echo "Qwen3.6 GGUF:          $QWEN36_MODEL_FILE"
 echo "Qwen3.6 llama-server:  $LLAMA_SERVER_BIN (CUDA0, CPU MoE=$QWEN36_N_CPU_MOE, MTP, $QWEN36_BACKEND_HOST:$QWEN36_LLAMA_CPP_PORT)"
 echo "Qwen3.6 API:           http://$QWEN36_HOST:$QWEN36_PORT/v1/qwen/Qwen3.6-35B-A3B-MTP"
 echo "MOSS-Image-SFT API:   http://$MOSS_IMAGE_HOST:$MOSS_IMAGE_PORT/v1/openmoss/MOSS-Image-SFT-Q8_0"
+echo "FLUX.3 Klein API:     http://$FLUX3_IMAGE_HOST:$FLUX3_IMAGE_PORT/v1/openblack-forest-labs/FLUX-3-Image-Klein-GGUF-Q8"
 echo "VoiceDesign API:       http://$QWEN_VOICEDESIGN_HOST:$QWEN_VOICEDESIGN_PORT/v1/qwen/Qwen3-TTS-1.7B-VoiceDesign"
 for index in "${!AUDIO_CPP_SERVICE_KEYS[@]}"; do
   echo "${AUDIO_CPP_SERVICE_KEYS[$index]} API: http://${AUDIO_CPP_SERVICE_HOSTS[$index]}:${AUDIO_CPP_SERVICE_PORTS[$index]}${AUDIO_CPP_SERVICE_ROUTES[$index]}"
@@ -422,6 +450,7 @@ voicedesign_pid=""
 ornith_pid=""
 qwen36_pid=""
 moss_image_pid=""
+flux3_image_pid=""
 llama_server_pid=""
 qwen36_llama_server_pid=""
 llama_watch_pid=""
@@ -433,7 +462,7 @@ localai_managed_started=0
 
 cleanup() {
   local status=$?
-  local service_pids=("$main_pid" "$voicedesign_pid" "$ornith_pid" "$qwen36_pid" "$moss_image_pid" "$llama_watch_pid" "$qwen36_llama_watch_pid" "${audio_cpp_pids[@]}")
+  local service_pids=("$main_pid" "$voicedesign_pid" "$ornith_pid" "$qwen36_pid" "$moss_image_pid" "$flux3_image_pid" "$llama_watch_pid" "$qwen36_llama_watch_pid" "${audio_cpp_pids[@]}")
   trap - INT TERM EXIT
 
   for pid in "${service_pids[@]}"; do
@@ -648,6 +677,13 @@ HOST="$MOSS_IMAGE_HOST" PORT="$MOSS_IMAGE_PORT" \
   python "$MOSS_IMAGE_SERVICE_DIR/main.py" &
 moss_image_pid=$!
 
+HOST="$FLUX3_IMAGE_HOST" PORT="$FLUX3_IMAGE_PORT" \
+  FLUX3_IMAGE_UPLOAD_DIR="$FLUX3_IMAGE_UPLOAD_DIR" \
+  FLUX3_IMAGE_MAX_UPLOAD_BYTES="$FLUX3_IMAGE_MAX_UPLOAD_BYTES" \
+  setsid uv run --no-sync --project "$MAIN_PROJECT_DIR" \
+  python "$FLUX3_IMAGE_SERVICE_DIR/main.py" &
+flux3_image_pid=$!
+
 setsid bash -c '
   backend_pid="$1"
   while kill -0 "$backend_pid" 2>/dev/null; do sleep 1; done
@@ -662,4 +698,4 @@ setsid bash -c '
 ' _ "$qwen36_llama_server_pid" &
 qwen36_llama_watch_pid=$!
 
-wait -n "$main_pid" "$voicedesign_pid" "$ornith_pid" "$qwen36_pid" "$moss_image_pid" "$llama_watch_pid" "$qwen36_llama_watch_pid" "${audio_cpp_pids[@]}"
+wait -n "$main_pid" "$voicedesign_pid" "$ornith_pid" "$qwen36_pid" "$moss_image_pid" "$flux3_image_pid" "$llama_watch_pid" "$qwen36_llama_watch_pid" "${audio_cpp_pids[@]}"

@@ -19,6 +19,7 @@ COMPONENTS = {
     "clip_g",
     "t5xxl",
     "llm",
+    "llm_vision",
     "clip_vision",
     "tokenizer",
 }
@@ -49,6 +50,7 @@ RUNTIME = {
     "vae_tiling": True,
     "temporal_tiling": False,
     "offload_to_cpu": False,
+    "image_to_image_flag": "init-img",
     "max_vram_gib": 14,
 }
 
@@ -194,7 +196,12 @@ class ModelSpec:
             image = Path(request.init_image).resolve()
             if not image.is_file() or image.stat().st_size == 0:
                 raise ValueError("参考图不存在或为空。")
-            arguments += ["--init-img", str(image)]
+            image_flag = (
+                self.runtime["image_to_image_flag"]
+                if request.task == "image-to-image"
+                else "init-img"
+            )
+            arguments += ["--" + image_flag, str(image)]
         return arguments
 
 
@@ -247,6 +254,7 @@ def load_models(path: Path) -> dict[str, ModelSpec]:
             ("backend", {"cuda0", "cpu"}),
             ("params_backend", {"cuda0", "cpu"}),
             ("flash_attn", {"auto", "on", "off"}),
+            ("image_to_image_flag", {"init-img", "ref-image"}),
         ):
             if not isinstance(runtime[name], str) or runtime[name] not in allowed:
                 raise ValueError("runtime 后端或 Flash Attention 设置无效。")

@@ -83,6 +83,15 @@ def _preflight_environment(root: Path) -> tuple[dict[str, str], Path]:
         "tokenizer.json",
     ):
         (moss_image_root / name).write_bytes(b"MOSS-test-component")
+    flux3_image_root = root / "hf-mirror/stable-diffusion-cpp-gguf/FLUX-3-Image-Klein-GGUF"
+    flux3_image_root.mkdir(parents=True)
+    for name in (
+        "flux3-image-klein-Q8_0.gguf",
+        "Qwen3VL-4B-Instruct-Q8_0.gguf",
+        "mmproj-Qwen3VL-4B-Instruct-Q8_0.gguf",
+        "ae.safetensors",
+    ):
+        (flux3_image_root / name).write_bytes(b"FLUX3-test-component")
     sd_cpp_binary = bin_dir / "sd-cli"
     sd_cpp_binary.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
     sd_cpp_binary.chmod(0o755)
@@ -101,6 +110,10 @@ def _preflight_environment(root: Path) -> tuple[dict[str, str], Path]:
         "SDCPP_BIN_SHA256": hashlib.sha256(sd_cpp_binary.read_bytes()).hexdigest(),
         "MOSS_IMAGE_HOST": "127.0.0.1",
         "MOSS_IMAGE_PORT": "18501",
+        "FLUX3_IMAGE_HOST": "127.0.0.1",
+        "FLUX3_IMAGE_PORT": "18502",
+        "FLUX3_IMAGE_UPLOAD_DIR": str(root / "storage/.cache/runtime/sdcpp_uploads"),
+        "FLUX3_IMAGE_MAX_UPLOAD_BYTES": "67108864",
         "HOST": "127.0.0.1",
         "PORT": "18300",
         "QWEN_VOICEDESIGN_HOST": "127.0.0.1",
@@ -247,6 +260,15 @@ class StartServicesTests(unittest.TestCase):
                 "tokenizer.json",
             ):
                 (moss_image_root / name).write_bytes(b"MOSS-test-component")
+            flux3_image_root = root / "hf-mirror/stable-diffusion-cpp-gguf/FLUX-3-Image-Klein-GGUF"
+            flux3_image_root.mkdir(parents=True)
+            for name in (
+                "flux3-image-klein-Q8_0.gguf",
+                "Qwen3VL-4B-Instruct-Q8_0.gguf",
+                "mmproj-Qwen3VL-4B-Instruct-Q8_0.gguf",
+                "ae.safetensors",
+            ):
+                (flux3_image_root / name).write_bytes(b"FLUX3-test-component")
             sd_cpp_binary = bin_dir / "sd-cli"
             sd_cpp_binary.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
             sd_cpp_binary.chmod(0o755)
@@ -266,6 +288,10 @@ class StartServicesTests(unittest.TestCase):
                 "SDCPP_BIN_SHA256": hashlib.sha256(sd_cpp_binary.read_bytes()).hexdigest(),
                 "MOSS_IMAGE_HOST": "127.0.0.1",
                 "MOSS_IMAGE_PORT": "18501",
+                "FLUX3_IMAGE_HOST": "127.0.0.1",
+                "FLUX3_IMAGE_PORT": "18502",
+                "FLUX3_IMAGE_UPLOAD_DIR": str(root / "storage/.cache/runtime/sdcpp_uploads"),
+                "FLUX3_IMAGE_MAX_UPLOAD_BYTES": "67108864",
                 "HOST": "127.0.0.1",
                 "PORT": "18300",
                 "QWEN_VOICEDESIGN_HOST": "127.0.0.1",
@@ -313,7 +339,7 @@ class StartServicesTests(unittest.TestCase):
             self.assertEqual(completed.returncode, 0, completed.stderr)
             calls = trace_path.read_text(encoding="utf-8").splitlines()
             uv_calls = [call for call in calls if call.startswith("uv ")]
-            self.assertEqual(len(uv_calls), 16)
+            self.assertEqual(len(uv_calls), 18)
             self.assertTrue(any(f"--project {ROOT / 'main'}" in call for call in uv_calls))
             self.assertTrue(
                 any(
@@ -339,6 +365,15 @@ class StartServicesTests(unittest.TestCase):
             self.assertEqual(
                 sum("model-image/MOSS-Image-SFT-Q8_0/main.py" in call for call in uv_calls),
                 1,
+            )
+            self.assertEqual(
+                sum("model-image/FLUX-3-Image-Klein-GGUF-Q8/main.py" in call for call in uv_calls),
+                1,
+            )
+            flux3_validation = [call for call in uv_calls if "scripts/sdcpp/manager.py" in call]
+            self.assertEqual(len(flux3_validation), 2)
+            self.assertTrue(
+                any("--model FLUX-3-Image-Klein-GGUF-Q8" in call for call in flux3_validation)
             )
             audio_cpp_calls = [
                 call
@@ -377,6 +412,7 @@ class StartServicesTests(unittest.TestCase):
                 "18404",
                 "18405",
                 "18501",
+                "18502",
             ):
                 self.assertIn(port, port_check)
             llama_starts = [call for call in calls if call.startswith("llama-server ")]
@@ -497,6 +533,45 @@ class StartServicesTests(unittest.TestCase):
             self.assertNotEqual(completed.returncode, 0)
             self.assertIn("tokenizer.json", completed.stderr)
             self.assertNotIn("scripts/localai/manager.py", trace_path.read_text())
+
+    def test_flux3_missing_component_fails_before_localai_starts(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            environment, trace_path = _preflight_environment(Path(temporary))
+            component = (
+                Path(environment["HF_MIRROR_DIR"])
+                / "stable-diffusion-cpp-gguf/FLUX-3-Image-Klein-GGUF/mmproj-Qwen3VL-4B-Instruct-Q8_0.gguf"
+            )
+            component.unlink()
+
+            completed = subprocess.run(
+                ["bash", str(ROOT / "start.sh")],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=environment,
+                timeout=15,
+            )
+
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertIn("mmproj-Qwen3VL-4B-Instruct-Q8_0.gguf", completed.stderr)
+            self.assertNotIn("scripts/localai/manager.py", trace_path.read_text())
+
+    def test_flux3_upload_limit_must_be_positive_integer(self) -> None:
+        for value in ("0", "-1", "nan", "1.5"):
+            with self.subTest(value=value), tempfile.TemporaryDirectory() as temporary:
+                environment, trace_path = _preflight_environment(Path(temporary))
+                environment["FLUX3_IMAGE_MAX_UPLOAD_BYTES"] = value
+                completed = subprocess.run(
+                    ["bash", str(ROOT / "start.sh")],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                    env=environment,
+                    timeout=15,
+                )
+                self.assertNotEqual(completed.returncode, 0)
+                self.assertIn("FLUX3_IMAGE_MAX_UPLOAD_BYTES 必须是正整数", completed.stderr)
+                self.assertNotIn("scripts/localai/manager.py", trace_path.read_text())
 
     def test_invalid_draft_settings_fail_before_localai_starts(self) -> None:
         for variable, value in (
