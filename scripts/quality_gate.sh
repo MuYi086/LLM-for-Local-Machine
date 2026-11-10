@@ -22,6 +22,7 @@ lint_paths=(
     scripts/sdcpp
     model-text/ornith_1_5_35b_a3b
     model-text/qwen3_6_35b_a3b
+    model-image
 )
 for project in "${lock_projects[@]}"; do
     if [[ ! -d "$project" ]]; then

@@ -1,2 +1,0 @@
-
-你先阅读`/home/muyi086/hf-mirror/unsloth/Qwen3.6-35B-A3B-MTP`然后通过start.sh调用的方式，使用llama.cpp在当前项目中中实现Qwen3.6-35B-A3B-UD-Q5模型的调用，并暴露在`start.sh`中以端口8402对外暴露服务，路由地址设置为`/v1/qwen/Qwen3.6-35B-A3B-MTP`,然后再tests目录生成对应模型的测试目录，测试生成一个例子

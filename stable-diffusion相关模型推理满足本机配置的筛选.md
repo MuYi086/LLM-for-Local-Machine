@@ -45,7 +45,7 @@
 | FLUX.3 Image Klein | [Q8_0，6.15 GB](https://huggingface.co/leejet/flux-3-image-klein-GGUF/tree/main) | Qwen3-VL 编码器放 CPU；单图起步，编辑时减少参考图数量。 |
 | Z-Image Turbo | [Q8_0，6.58 GB](https://huggingface.co/leejet/Z-Image-Turbo-GGUF/tree/main) | Qwen 编码器放 CPU；保留 Turbo 对应采样设置。 |
 | Qwen Image 2.1 | [Q8_0，7.69 GB](https://huggingface.co/leejet/Qwen-Image-2.1-GGUF/tree/main) | 更适合中文提示和画面文字；Qwen3-VL 8B 放 CPU，先用单张、1024 级和 VAE tiling。 |
-| SD 1.5 / SD 2.1 / SDXL | [SD 1.5](https://huggingface.co/stable-diffusion-v1-5/stable-diffusion-v1-5)、[SD 2.1](https://huggingface.co/stabilityai/stable-diffusion-2-1)、[SDXL](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0) F16 权重 | 可直接保留 F16，不必量化；SD 1.5/2.1 显存余量充足，SDXL 建议文本编码器放 CPU。 |
+| SD 2.1 / SDXL | [SD 2.1](https://huggingface.co/stabilityai/stable-diffusion-2-1)、[SDXL](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0) F16 权重 | 可直接保留 F16，不必量化；SD 2.1 显存余量充足，SDXL 建议文本编码器放 CPU。 |
 
 这几种 Q8 主权重文件本身都不超过约 8 GB，配合 9 GiB 显存预算、文本编码器 CPU 参数放置和 batch=1，较适合作为本机高精度起点。遇到显存不足时可开启分段计算或提高 `--max-vram` 至 10 GiB（前提是运行前至少有 11 GiB 空闲显存）。体积更大的原始 Qwen Image Q8_0 约 21.8 GB、FLUX.1-dev Q8_0 约 12.8 GB，也有权重，但要 CPU 参数卸载；原始 Qwen Image 还可能需要磁盘卸载，速度会低很多。
 
@@ -72,7 +72,7 @@ FP8/INT8 文件也要看运行时如何加载：`SD_USE_UPSTREAM_GGML=ON` 的兼
 | 上游模型 | 推理权重/推荐精度 | 输入、输出与用途 | 估算推理峰值（单卡）及条件 |
 | --- | --- | --- | --- |
 | SD v1.4 | [CompVis 原始权重](https://huggingface.co/CompVis/stable-diffusion-v-1-4-original)；F16 | 英文文本生成或图生图，512 级插画/概念图 | **2.5–4 GiB**；原生 F16，通常无需卸载 |
-| SD v1.5 / v2.1 | [v1.5](https://huggingface.co/stable-diffusion-v1-5/stable-diffusion-v1-5)、[v2.1](https://huggingface.co/Manojb/stable-diffusion-2-1-base)；F16 | 文生图、图生图；v1.5 生态微调/LoRA 多，v2.1 常见 768 尺寸 | **3–5 GiB**；F16 即可，叠加 ControlNet 时走 CPU offload |
+| SD v2.1 | [v2.1 Base](https://huggingface.co/Manojb/stable-diffusion-2-1-base)；F16 | 文生图、图生图；常见 768 尺寸 | **3–5 GiB**；F16 即可，叠加 ControlNet 时走 CPU offload |
 | SD-Turbo | [Stability AI 权重](https://huggingface.co/stabilityai/sd-turbo)；F16 | 少步数文生图快速预览 | **3–5 GiB**；遵循 Turbo 的低步数设置 |
 | SDXL / SDXL-Turbo | [Base](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0)、[Turbo](https://huggingface.co/stabilityai/sdxl-turbo)；F16 或 Q8_0，VAE 可用 CPU/tiling | 文生图/图生图，常用 1024×1024；Turbo 快速预览 | **6–9 GiB**；VAE tiling；叠加条件模块时保留 CPU offload |
 | SSD-1B、Vega、tiny SD1/SD2 | [SSD-1B](https://huggingface.co/segmind/SSD-1B)、[Vega](https://huggingface.co/segmind/Segmind-Vega)、[tiny SD](https://huggingface.co/segmind/tiny-sd)、[BK-SDM tiny](https://huggingface.co/nota-ai/bk-sdm-tiny)、[SD2 tiny](https://huggingface.co/nota-ai/bk-sdm-v2-tiny)；F16 | 轻量文生图和草图；权重格式依模型而异 | **3–6 GiB**；部分 Diffusers 权重需按[蒸馏模型说明](https://github.com/leejet/stable-diffusion.cpp/blob/master/docs/distilled_sd.md)转换；LoRA 不可当独立底模 |

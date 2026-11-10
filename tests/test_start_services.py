@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 import subprocess
 import tempfile
@@ -57,7 +58,7 @@ def _write_fake_llama_server(executable: Path) -> None:
 def _preflight_environment(root: Path) -> tuple[dict[str, str], Path]:
     """建立只记录命令的启动环境，避免访问模型与 LocalAI。"""
     bin_dir = root / "bin"
-    bin_dir.mkdir()
+    bin_dir.mkdir(parents=True)
     trace_path = root / "commands.log"
     for command in ("uv",):
         executable = bin_dir / command
@@ -73,6 +74,18 @@ def _preflight_environment(root: Path) -> tuple[dict[str, str], Path]:
     mmproj_file = root / "mmproj.gguf"
     mtp_file = root / "mtp.gguf"
     qwen_model_file = root / "Qwen3.6-35B-A3B-UD-Q5_K_M.gguf"
+    moss_image_root = root / "hf-mirror/stable-diffusion-cpp-gguf/MOSS-Image-SFT-GGUF"
+    moss_image_root.mkdir(parents=True)
+    for name in (
+        "MOSS-Image-SFT-Q8_0.gguf",
+        "Qwen3.5-9B-Q6_K.gguf",
+        "flux2-vae.safetensors",
+        "tokenizer.json",
+    ):
+        (moss_image_root / name).write_bytes(b"MOSS-test-component")
+    sd_cpp_binary = bin_dir / "sd-cli"
+    sd_cpp_binary.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+    sd_cpp_binary.chmod(0o755)
     model_file.write_bytes(b"GGUF-test-model")
     mmproj_file.write_bytes(b"GGUF-test-mmproj")
     mtp_file.write_bytes(b"GGUF-test-mtp")
@@ -83,6 +96,11 @@ def _preflight_environment(root: Path) -> tuple[dict[str, str], Path]:
         "TRACE": str(trace_path),
         "STORAGE_DIR": str(root / "storage"),
         "RUNTIME_CACHE_DIR": str(root / "storage/.cache/runtime"),
+        "HF_MIRROR_DIR": str(root / "hf-mirror"),
+        "SDCPP_BIN": str(sd_cpp_binary),
+        "SDCPP_BIN_SHA256": hashlib.sha256(sd_cpp_binary.read_bytes()).hexdigest(),
+        "MOSS_IMAGE_HOST": "127.0.0.1",
+        "MOSS_IMAGE_PORT": "18501",
         "HOST": "127.0.0.1",
         "PORT": "18300",
         "QWEN_VOICEDESIGN_HOST": "127.0.0.1",
@@ -220,6 +238,18 @@ class StartServicesTests(unittest.TestCase):
             mmproj_file = root / "mmproj.gguf"
             mtp_file = root / "mtp.gguf"
             qwen_model_file = root / "Qwen3.6-35B-A3B-UD-Q5_K_M.gguf"
+            moss_image_root = root / "hf-mirror/stable-diffusion-cpp-gguf/MOSS-Image-SFT-GGUF"
+            moss_image_root.mkdir(parents=True)
+            for name in (
+                "MOSS-Image-SFT-Q8_0.gguf",
+                "Qwen3.5-9B-Q6_K.gguf",
+                "flux2-vae.safetensors",
+                "tokenizer.json",
+            ):
+                (moss_image_root / name).write_bytes(b"MOSS-test-component")
+            sd_cpp_binary = bin_dir / "sd-cli"
+            sd_cpp_binary.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+            sd_cpp_binary.chmod(0o755)
             model_file.write_bytes(b"GGUF-test-model")
             mmproj_file.write_bytes(b"GGUF-test-mmproj")
             mtp_file.write_bytes(b"GGUF-test-mtp")
@@ -231,6 +261,11 @@ class StartServicesTests(unittest.TestCase):
                 "TRACE": str(trace_path),
                 "STORAGE_DIR": str(root / "storage"),
                 "RUNTIME_CACHE_DIR": str(root / "storage/.cache/runtime"),
+                "HF_MIRROR_DIR": str(root / "hf-mirror"),
+                "SDCPP_BIN": str(sd_cpp_binary),
+                "SDCPP_BIN_SHA256": hashlib.sha256(sd_cpp_binary.read_bytes()).hexdigest(),
+                "MOSS_IMAGE_HOST": "127.0.0.1",
+                "MOSS_IMAGE_PORT": "18501",
                 "HOST": "127.0.0.1",
                 "PORT": "18300",
                 "QWEN_VOICEDESIGN_HOST": "127.0.0.1",
@@ -278,7 +313,7 @@ class StartServicesTests(unittest.TestCase):
             self.assertEqual(completed.returncode, 0, completed.stderr)
             calls = trace_path.read_text(encoding="utf-8").splitlines()
             uv_calls = [call for call in calls if call.startswith("uv ")]
-            self.assertEqual(len(uv_calls), 14)
+            self.assertEqual(len(uv_calls), 16)
             self.assertTrue(any(f"--project {ROOT / 'main'}" in call for call in uv_calls))
             self.assertTrue(
                 any(
@@ -287,6 +322,7 @@ class StartServicesTests(unittest.TestCase):
                 )
             )
             self.assertTrue(any("check_ports.py" in call for call in uv_calls))
+            self.assertTrue(any("scripts/sdcpp/manager.py" in call for call in uv_calls))
             self.assertEqual(sum("main/main.py" in call for call in uv_calls), 1)
             self.assertEqual(
                 sum("design_qwen3-tts-1.7b-voicedesign/main.py" in call for call in uv_calls),
@@ -298,6 +334,10 @@ class StartServicesTests(unittest.TestCase):
             )
             self.assertEqual(
                 sum("qwen3_6_35b_a3b/main.py" in call for call in uv_calls),
+                1,
+            )
+            self.assertEqual(
+                sum("model-image/MOSS-Image-SFT-Q8_0/main.py" in call for call in uv_calls),
                 1,
             )
             audio_cpp_calls = [
@@ -336,6 +376,7 @@ class StartServicesTests(unittest.TestCase):
                 "18403",
                 "18404",
                 "18405",
+                "18501",
             ):
                 self.assertIn(port, port_check)
             llama_starts = [call for call in calls if call.startswith("llama-server ")]
@@ -416,6 +457,46 @@ class StartServicesTests(unittest.TestCase):
                     )
                 )
             )
+
+    def test_moss_assets_and_sd_cpp_digest_fail_before_localai_starts(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            cases = (
+                ("SDCPP_BIN", str(Path(temporary) / "missing-sd-cli"), "sd-cli"),
+                ("SDCPP_BIN_SHA256", "invalid", "SDCPP_BIN_SHA256"),
+            )
+            for variable, value, error_text in cases:
+                with self.subTest(variable=variable):
+                    environment, trace_path = _preflight_environment(Path(temporary) / variable)
+                    environment[variable] = value
+                    completed = subprocess.run(
+                        ["bash", str(ROOT / "start.sh")],
+                        check=False,
+                        capture_output=True,
+                        text=True,
+                        env=environment,
+                        timeout=15,
+                    )
+                    self.assertNotEqual(completed.returncode, 0)
+                    self.assertIn(error_text, completed.stderr)
+                    self.assertNotIn("scripts/localai/manager.py", trace_path.read_text())
+
+            environment, trace_path = _preflight_environment(Path(temporary) / "missing-tokenizer")
+            tokenizer = (
+                Path(environment["HF_MIRROR_DIR"])
+                / "stable-diffusion-cpp-gguf/MOSS-Image-SFT-GGUF/tokenizer.json"
+            )
+            tokenizer.unlink()
+            completed = subprocess.run(
+                ["bash", str(ROOT / "start.sh")],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=environment,
+                timeout=15,
+            )
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertIn("tokenizer.json", completed.stderr)
+            self.assertNotIn("scripts/localai/manager.py", trace_path.read_text())
 
     def test_invalid_draft_settings_fail_before_localai_starts(self) -> None:
         for variable, value in (

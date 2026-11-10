@@ -1,8 +1,9 @@
 # stable-diffusion.cpp 执行层
 
-当前提供 stdlib-only CLI provider，供本机操作者以及后续模型 API 复用。默认模型清单为空，
-尚未完成真实模型兼容性、性能和质量验证。它不增加 HTTP 端口，`start.sh` 仍管理原有十四个 HTTP 进程。
-`model-video/` 中退役代码仍为归档。
+当前提供 stdlib-only CLI provider，并已接入 MOSS-Image-SFT-Q8_0 图片 API。图片 API 默认监听 8501，
+由 `start.sh` 管理；默认清单仅注册该 MOSS 模型。真实推理验收状态以
+[`versions.json`](../sdcpp/manifests/versions.json) 为准。`start.sh` 当前管理十五个 HTTP 进程；
+`model-video/` 中退役代码仍为归档，尚未接入视频服务。
 
 ## 已实现边界
 
@@ -14,8 +15,9 @@
   worker 总耗时包括加载、生成和回收，尚不拆分模型加载与采样时间；显存指标不是模型独占显存。
   输出验证目前检查常规文件和格式头，不代替解码、画质或视频时序评估。
 
-本阶段尚不提供 HTTP 任务队列、远程上传、server 常驻复用、编辑 mask、LoRA 或多阶段工作流。
-`image-to-image` 只映射普通参考图与文本条件，不代表所有模型支持图片编辑。
+provider 不提供独立 HTTP 任务队列、远程文件上传或 server 常驻复用。MOSS API 接受同步文生图请求，
+通过全局 GPU 锁串行生成；当前不提供编辑 mask、LoRA 或多阶段工作流。`image-to-image` 只映射普通参考图与文本条件，
+不代表所有模型支持图片编辑。
 
 ## 外部运行时
 
@@ -48,11 +50,36 @@ python3 scripts/sdcpp/manager.py status
 `validate` 校验二进制摘要和组件文件是否存在、非空、可读，不能证明模型结构可用。
 这些命令及隔离恢复只需 Python 3.12 与仓库源码；也可通过 `uv run --project qa --locked python ...` 执行。
 
-## 本地模型清单
+## 模型清单与 MOSS 图片 API
 
-默认 [`models.json`](../sdcpp/manifests/models.json) 为 `{"schema_version": 1, "models": []}`。
-选型后在仓库外创建本地清单，通过 `SDCPP_MODEL_MANIFEST` 或全局 `--manifest` 指定。
-以下是字段示意，名称和路径均为占位值，不代表已经验证某个模型：
+默认 [`models.json`](../sdcpp/manifests/models.json) 注册 `MOSS-Image-SFT-Q8_0` 的
+`text-to-image` 任务和四个只读组件。文件默认位于
+`$HF_MIRROR_DIR/stable-diffusion-cpp-gguf/MOSS-Image-SFT-GGUF/`：MOSS Q8_0 diffusion GGUF、
+Qwen3.5-9B-Q6_K GGUF、FLUX.2 VAE safetensors 和官方 `tokenizer.json`。启动前会检查所有组件和
+sd-cli 摘要，不下载权重或改写模型文件。
+
+默认生成参数为 1024×1024、20 步、CFG 3、Euler，runtime 使用 CUDA0、CPU 参数后端和 CPU offload；
+尺寸上限为 1024×1024、总像素不超过 1,048,576，宽高都必须是 16 的倍数，步数上限为 50。
+MOSS 模型 registry 的 flow shift 默认值为 5；API 不开放覆盖项。若增加其他模型，需先验证实际任务和
+组件组合，再通过 `SDCPP_MODEL_MANIFEST` 或 `--manifest` 指定本机清单。
+
+MOSS API 由 `start.sh` 管理，默认路由为 `POST http://127.0.0.1:8501/v1/openmoss/MOSS-Image-SFT-Q8_0`，
+健康检查为 `GET http://127.0.0.1:8501/v1/health`。健康检查只检查 sd-cli 可执行文件、组件文件和 quarantine，
+不会计算摘要或加载模型。请求字段包括 `prompt`、可选 `negative_prompt`、`size`、`steps`、`cfg_scale` 和 `seed`；
+每次只生成一张 PNG，并以 OpenAI Images 风格的 `b64_json` 返回。
+
+```bash
+curl -X POST http://127.0.0.1:8501/v1/openmoss/MOSS-Image-SFT-Q8_0 \
+  -H 'Content-Type: application/json' \
+  -d '{"prompt":"一只坐在窗边的猫，柔和晨光","size":"1024x1024","steps":20,"cfg_scale":3,"seed":42}'
+
+uv run --project qa --locked python tests/MOSS-Image-SFT-Q8_0/generate_example.py
+```
+
+HTTP demo 会把 PNG 以唯一文件名保存到 `storage/llm_tests/MOSS-Image-SFT-Q8_0/`；API worker 中间产物位于
+`$RUNTIME_CACHE_DIR/sdcpp/<request-id>/`。这两处都属于运行数据，不应提交或由本集成清理。
+
+以下为新增模型时可参考的通用字段示意，模型名和路径是占位值：
 
 ```json
 {
@@ -64,7 +91,8 @@ python3 scripts/sdcpp/manager.py status
       "components": {
         "diffusion_model": "${HF_MIRROR_DIR}/chosen/model.gguf",
         "vae": "${HF_MIRROR_DIR}/chosen/vae.safetensors",
-        "t5xxl": "${HF_MIRROR_DIR}/chosen/text-encoder.gguf"
+        "t5xxl": "${HF_MIRROR_DIR}/chosen/text-encoder.gguf",
+        "tokenizer": "${HF_MIRROR_DIR}/chosen/tokenizer.json"
       },
       "defaults": {
         "width": 512,
@@ -88,6 +116,7 @@ python3 scripts/sdcpp/manager.py status
         "flash_attn": "auto",
         "vae_tiling": true,
         "temporal_tiling": false,
+        "offload_to_cpu": false,
         "max_vram_gib": 14
       }
     }
@@ -96,7 +125,7 @@ python3 scripts/sdcpp/manager.py status
 ```
 
 - 组件允许 `model` 或 `diffusion_model` 二选一，并可配 `high_noise_diffusion_model`、`vae`、
-  `clip_l`、`clip_g`、`t5xxl`、`llm`、`clip_vision`。具体必需组件由选定模型确定。
+  `clip_l`、`clip_g`、`t5xxl`、`llm`、`clip_vision`、`tokenizer`。具体必需组件由选定模型确定。
 - 相对组件路径基于清单所在目录；支持环境变量和 `~`，未定义变量直接报错。
 - 任务允许 `text-to-image`、`image-to-image`、`text-to-video`、`image-to-video`，只能调用清单声明的任务。
 - 视频至少生成 2 帧，需明确覆盖 `defaults.frames` 和 `limits.max_frames`；按模型需要配置 `frame_multiple`、
@@ -105,6 +134,7 @@ python3 scripts/sdcpp/manager.py status
 - 采样器允许 `euler`、`euler_a`、`heun`、`dpm2`、`dpm++2m`、`lcm`，仅使用模型验证过的组合。
 - 运行后端目前允许 `cuda0`、`cpu`；参数放置允许 `cuda0`、`cpu`。即使配置 CPU 计算，本 provider
   仍保守地走全局锁。14 GiB 预算是初始配置建议，不能保证每个模型、分辨率或帧数组合都可运行。
+- `offload_to_cpu` 为布尔选项，对应 sd-cli 的 `--offload-to-cpu`；仅在模型验证过的配置中启用。
 - 不接受任意 CLI flags，不在每次加载时自动量化；提前准备与固定版本兼容的权重。
 
 ```bash
@@ -121,8 +151,9 @@ python3 scripts/sdcpp/manager.py generate \
   --width 832 --height 480 --frames 33 --fps 16
 ```
 
-CLI 的文件路径来自受信任的本机操作者。未来 HTTP 入口必须使用上传和逻辑引用，不能直接把远程请求的
-`full_path` 传给本接口。输入文件只读，推理参数以 argv 传递，不经 shell 展开。
+CLI 的文件路径来自受信任的本机操作者。当前 MOSS HTTP API 只接收提示和生成参数，不接收文件路径；
+未来带参考图的 HTTP 路由必须使用上传和逻辑引用，不能直接把远程请求的 `full_path` 传给本接口。
+输入文件只读，推理参数以 argv 传递，不经 shell 展开。
 
 ## 超时、取消与恢复
 
@@ -144,12 +175,16 @@ worker 先等待父进程通过 stdin 授权。只有原子记录 PID、PGID 和
 python3 scripts/localai/recover_quarantine.py
 ```
 
-恢复入口取得共享锁后重新读取标记；sd.cpp CLI 没有 HTTP 端口，因此只核对进程身份与进程组退出。
+恢复入口取得共享锁后重新读取标记；sd.cpp worker CLI 没有 HTTP 端口，因此只核对进程身份与进程组退出。
 若根进程已经退出但仍有无法核对身份的后代，脚本会保留隔离，需要操作者核查进程，再重新执行恢复入口。
 恢复不删除历史产物或遗留任务目录；不要手动移除 quarantine。
 
-## 后续模型验收
+## MOSS 推理验收记录
 
-按模型分别记录固定 commit、二进制摘要、权重摘要、量化、采样器、seed、尺寸、步数、帧数和 FPS。
-比较冷启动总耗时、峰值显存、系统内存、输出质量以及退出状态；图片先行，视频逐级提升资源参数。
-只有完成真实生成与能力核验，才把对应任务接入模型 API 和当前能力清单。
+2026-11-10 使用固定 stable-diffusion.cpp commit 与 MOSS Q8_0 本地组件，通过 8501 HTTP API 完成
+1024×1024、20 步、CFG 3、Euler、seed 13579 的单张生成。PNG 为有效 1024×1024 RGB，API 返回 200；
+worker 总耗时约 35.98 秒，观测峰值 GPU 显存约 7951 MiB，进程组正常退出且未留下 quarantine。
+该记录验证了组件组合、API 路由和一次真实推理，不代表系统性画质评估。
+
+接入其他图片或视频模型前，仍需按模型记录固定 commit、二进制摘要、权重摘要、量化、采样器、seed、尺寸、
+步数、帧数和 FPS；比较冷启动耗时、峰值显存、系统内存、输出质量与退出状态，再开放相应 API 能力。

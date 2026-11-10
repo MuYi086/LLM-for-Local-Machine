@@ -18,24 +18,30 @@ from scripts.sdcpp import manager
 
 
 class SdcppCliTests(unittest.TestCase):
-    def test_status_with_empty_manifest_never_executes_binary(self) -> None:
+    def test_status_lists_moss_model_without_executing_binary(self) -> None:
         output = io.StringIO()
         with (
-            patch.dict(os.environ, {}, clear=True),
+            patch.dict(os.environ, {"HF_MIRROR_DIR": "/tmp/hf-mirror"}, clear=True),
             patch("subprocess.Popen") as popen,
             contextlib.redirect_stdout(output),
         ):
             code = manager.main(["status"])
         self.assertEqual(code, 0)
         status = json.loads(output.getvalue())
-        self.assertEqual(status["models"], [])
+        self.assertEqual(
+            status["models"],
+            [{"id": "MOSS-Image-SFT-Q8_0", "tasks": ["text-to-image"]}],
+        )
         self.assertFalse(status["configured"])
-        self.assertEqual(status["model_validation"], "pending-selection")
+        self.assertEqual(status["model_validation"], "MOSS-Image-SFT-Q8_0-inference-verified")
         popen.assert_not_called()
 
     def test_generate_without_model_configuration_returns_error(self) -> None:
         error = io.StringIO()
-        with contextlib.redirect_stderr(error):
+        with (
+            patch.dict(os.environ, {"HF_MIRROR_DIR": "/tmp/hf-mirror"}),
+            contextlib.redirect_stderr(error),
+        ):
             code = manager.main(
                 ["generate", "--model", "missing", "--task", "text-to-image", "--prompt", "cat"]
             )

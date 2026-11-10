@@ -1,4 +1,41 @@
 {
   "schema_version": 1,
-  "models": []
+  "models": [
+    {
+      "id": "MOSS-Image-SFT-Q8_0",
+      "tasks": [
+        "text-to-image"
+      ],
+      "components": {
+        "diffusion_model": "${HF_MIRROR_DIR}/stable-diffusion-cpp-gguf/MOSS-Image-SFT-GGUF/MOSS-Image-SFT-Q8_0.gguf",
+        "llm": "${HF_MIRROR_DIR}/stable-diffusion-cpp-gguf/MOSS-Image-SFT-GGUF/Qwen3.5-9B-Q6_K.gguf",
+        "vae": "${HF_MIRROR_DIR}/stable-diffusion-cpp-gguf/MOSS-Image-SFT-GGUF/flux2-vae.safetensors",
+        "tokenizer": "${HF_MIRROR_DIR}/stable-diffusion-cpp-gguf/MOSS-Image-SFT-GGUF/tokenizer.json"
+      },
+      "defaults": {
+        "width": 1024,
+        "height": 1024,
+        "steps": 20,
+        "cfg_scale": 3.0,
+        "sampler": "euler"
+      },
+      "limits": {
+        "max_width": 1024,
+        "max_height": 1024,
+        "max_pixels": 1048576,
+        "max_steps": 50,
+        "width_multiple": 16,
+        "height_multiple": 16
+      },
+      "runtime": {
+        "backend": "cuda0",
+        "params_backend": "cpu",
+        "flash_attn": "auto",
+        "vae_tiling": false,
+        "temporal_tiling": false,
+        "offload_to_cpu": true,
+        "max_vram_gib": 14
+      }
+    }
+  ]
 }

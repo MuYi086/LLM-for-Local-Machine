@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from inference_gateway.sdcpp import GenerationRequest, SdcppConfig, load_models
 
@@ -46,9 +48,55 @@ class SdcppConfigTests(unittest.TestCase):
         self.manifest = self.root / "models.json"
         self.manifest.write_text(json.dumps(model_document()))
 
-    def test_empty_default_manifest_has_no_claimed_models(self) -> None:
+    def test_default_manifest_declares_moss_sft_components_and_runtime(self) -> None:
         root = Path(__file__).resolve().parents[1]
-        self.assertEqual(load_models(root / "sdcpp/manifests/models.json"), {})
+        mirror = self.root
+        with patch.dict(os.environ, {"HF_MIRROR_DIR": str(mirror)}):
+            models = load_models(root / "sdcpp/manifests/models.json")
+
+        self.assertEqual(list(models), ["MOSS-Image-SFT-Q8_0"])
+        model = models["MOSS-Image-SFT-Q8_0"]
+        self.assertEqual(model.tasks, ("text-to-image",))
+        self.assertEqual(set(model.components), {"diffusion_model", "llm", "vae", "tokenizer"})
+        self.assertEqual(model.components["diffusion_model"].name, "MOSS-Image-SFT-Q8_0.gguf")
+        self.assertEqual(model.components["llm"].name, "Qwen3.5-9B-Q6_K.gguf")
+        self.assertEqual(model.components["vae"].name, "flux2-vae.safetensors")
+        self.assertEqual(model.components["tokenizer"].name, "tokenizer.json")
+        self.assertEqual(model.defaults["width"], 1024)
+        self.assertEqual(model.defaults["height"], 1024)
+        self.assertEqual(model.defaults["steps"], 20)
+        self.assertEqual(model.defaults["cfg_scale"], 3.0)
+        self.assertEqual(model.limits["width_multiple"], 16)
+        self.assertEqual(model.limits["height_multiple"], 16)
+        self.assertTrue(model.runtime["offload_to_cpu"])
+
+        arguments = model.arguments(
+            GenerationRequest(task="text-to-image", prompt="a cat"), self.root / "result.png"
+        )
+        self.assertIn("--offload-to-cpu", arguments)
+        for option, path in (
+            ("--diffusion-model", model.components["diffusion_model"]),
+            ("--llm", model.components["llm"]),
+            ("--vae", model.components["vae"]),
+            ("--tokenizer", model.components["tokenizer"]),
+        ):
+            self.assertEqual(arguments[arguments.index(option) + 1], str(path))
+
+    def test_tokenizer_component_and_cpu_offload_map_to_cli_arguments(self) -> None:
+        document = model_document()
+        document["models"][0]["components"]["tokenizer"] = "tokenizer.json"
+        document["models"][0]["runtime"] = {"offload_to_cpu": True}
+        self.manifest.write_text(json.dumps(document))
+
+        model = load_models(self.manifest)["fixture"]
+        arguments = model.arguments(
+            GenerationRequest(task="text-to-image", prompt="cat"), self.root / "result.png"
+        )
+
+        self.assertEqual(
+            arguments[arguments.index("--tokenizer") + 1], str(self.root / "tokenizer.json")
+        )
+        self.assertIn("--offload-to-cpu", arguments)
 
     def test_structured_arguments_keep_prompt_as_one_literal_argument(self) -> None:
         model = load_models(self.manifest)["fixture"]

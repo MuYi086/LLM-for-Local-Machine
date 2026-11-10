@@ -1,6 +1,7 @@
 # LLM Local Backend
 
-本仓库当前提供九个音频模型 HTTP API、两个文本模型 API、一个轻量控制面和一个 CPU 空间音频 renderer。
+本仓库当前提供九个音频模型 HTTP API、两个文本模型 API、一个 MOSS-Image-SFT 图片 API、
+一个轻量控制面和一个 CPU 空间音频 renderer。
 所有 GPU API 共用同一个跨进程文件锁，接入约束、隔离和恢复步骤见[全局 GPU 锁说明](docs/global-gpu-lock.md)。
 
 | 组件 | 端口 | 接口/职责 |
@@ -17,9 +18,10 @@
 | [VoxCPM2](model-audio/tts_voxcpm2/) | 8313 | `POST /v1/OpenBMB/VoxCPM2-GGUF`，TTS、音色设计与可选参考克隆 |
 | [Ornith-1.5-35B-A3B](model-text/ornith_1_5_35b_a3b/) | 8401 | `POST /v1/AtomicChat/Ornith-1.5-35B-A3B-AD-Q5`，CUDA 推理，前 23 层 MoE 专家放 CPU，mmproj 支持图片 |
 | [Qwen3.6-35B-A3B-MTP](model-text/qwen3_6_35b_a3b/) | 8402 | `POST /v1/qwen/Qwen3.6-35B-A3B-MTP`，CUDA + CPU MoE 混合推理，启用 MTP |
+| [MOSS-Image-SFT-Q8_0](model-image/MOSS-Image-SFT-Q8_0/) | 8501 | `POST /v1/openmoss/MOSS-Image-SFT-Q8_0`，stable-diffusion.cpp CUDA 文生图 |
 | [Steam Audio renderer](model-audio/spatial_steam-audio/) | 无 HTTP 端口 | C++17 CPU renderer，由 8300 控制面调用 |
 
-共十四个 HTTP 进程由 `start.sh` 管理，包括两个仅绑定 loopback 的 llama-server 后端：Ornith 在 `127.0.0.1:8403`，
+共十五个 HTTP 进程由 `start.sh` 管理，包括两个仅绑定 loopback 的 llama-server 后端：Ornith 在 `127.0.0.1:8403`，
 Qwen 在 `127.0.0.2:8400`。LocalAI 保持在 `127.0.0.1:8400`，两者通过不同 loopback 地址并存。文本 API 适配器复用
 控制面 Python 项目；八个新增 audio.cpp API 共用轻量 Python 运行环境，不额外安装
 Torch。`storage/` 中的用户运行数据不会由代码清理。
@@ -34,6 +36,10 @@ Torch。`storage/` 中的用户运行数据不会由代码清理。
 `$HF_MIRROR_DIR/unsloth/Qwen3.6-35B-A3B-MTP/` 读取，不复制进仓库。
 版本和宿主制品指纹见[`localai/manifests/versions.json`](localai/manifests/versions.json)。
 运行与恢复步骤见[LocalAI/audio.cpp 运维说明](docs/localai-audiocpp-upgrade.md)。
+图片服务使用固定 commit 的 stable-diffusion.cpp CUDA `sd-cli`。MOSS-Image-SFT、Qwen3.5 文本编码器、
+FLUX.2 VAE 和 tokenizer 默认从 `$HF_MIRROR_DIR/stable-diffusion-cpp-gguf/MOSS-Image-SFT-GGUF/` 读取，
+模型权重、tokenizer、源码和二进制保持在仓库外；运行参数、GPU 锁和 quarantine 流程见
+[sd.cpp 运行说明](docs/sdcpp-runtime.md)。
 
 先准备 LocalAI binary、`audio-cpp` backend 和模型文件，再同步三个 Python 项目及 QA：
 
@@ -54,10 +60,12 @@ bash scripts/build_steam_audio_renderer.sh
 从仓库根目录启动：
 
 ```bash
+export SDCPP_BIN="$HOME/.local/src/stable-diffusion.cpp/build/bin/sd-cli"
+export SDCPP_BIN_SHA256="$(sha256sum "$SDCPP_BIN" | cut -d ' ' -f 1)"
 bash start.sh
 ```
 
-脚本先检查全部十四个监听端口、CUDA 构建的 llama.cpp、两个文本模型文件和必需参数，注册九个 GGUF 候选，
+脚本先检查全部十五个监听端口、sd.cpp 二进制摘要和 MOSS 四个模型组件、CUDA 构建的 llama.cpp、两个文本模型文件和必需参数，注册九个 GGUF 候选，
 启动受管 LocalAI/audio.cpp 并执行 readiness 检查；随后使用共享 GPU 锁依次预热 Ornith 和 Qwen，并确认模型进入 sleep-idle，
 再启动控制面与所有 API。两个文本 API 每次请求结束后持锁等待对应模型卸载，再释放 GPU 给其他 provider。
 任一服务进程退出时会清理其他进程组和 llama-server，再停止受管 LocalAI。按 `Ctrl+C`
@@ -101,6 +109,11 @@ bash start.sh
 | `ORNITH_STARTUP_TIMEOUT` | `1800` 秒 | 等待首次加载并确认 sleep-idle 的最长时间 |
 | `ORNITH_SLEEP_TIMEOUT` | `300` 秒 | 单个请求结束后等待模型卸载的最长时间 |
 | `QWEN36_MODEL_FILE` | `$HF_MIRROR_DIR/unsloth/Qwen3.6-35B-A3B-MTP/Qwen3.6-35B-A3B-UD-Q5_K_M.gguf` | Qwen GGUF，只读加载 |
+| `SDCPP_BIN` | `$HOME/.local/src/stable-diffusion.cpp/build/bin/sd-cli` | 固定版本 stable-diffusion.cpp CLI |
+| `SDCPP_BIN_SHA256` | 必须显式设置 | 启动前校验 sd-cli 文件摘要 |
+| `SDCPP_MODEL_MANIFEST` | `sdcpp/manifests/models.json` | MOSS 模型组件、参数和资源清单 |
+| `MOSS_IMAGE_HOST` / `MOSS_IMAGE_PORT` | 继承 `HOST` / `8501` | MOSS 图片 API 监听地址 |
+| `SDCPP_RUN_TIMEOUT` / `SDCPP_CLEANUP_TIMEOUT` | `3600` / `30` 秒 | 单次图片生成和 worker 回收时限 |
 | `QWEN36_HOST` / `QWEN36_PORT` | 继承 `HOST` / `8402` | Qwen 对外 API 监听地址 |
 | `QWEN36_BACKEND_HOST` / `QWEN36_LLAMA_CPP_PORT` | `127.0.0.2` / `8400` | Qwen llama-server loopback 地址，与 LocalAI 的 `127.0.0.1:8400` 并存 |
 | `QWEN36_CONTEXT_SIZE` / `QWEN36_BATCH_SIZE` | `32768` / `512` | Qwen llama.cpp 上下文和 batch 大小 |
@@ -297,8 +310,9 @@ FastAPI 测试使用 QA 环境中的 `httpx2` 兼容依赖；不得通过执行�
 ## 其他归档资料
 
 旧音频服务源码、历史 LocalAI 报告、任务和设计文档保留作追溯，不代表当前支持的接口或依赖。
-stable-diffusion.cpp 通用 CLI 执行层已加入，默认模型清单为空，尚无新增图片/视频 HTTP 服务。
-配置、共享 GPU 锁、超时和恢复流程见 [sd.cpp 接入说明](docs/sdcpp-runtime.md)。
+stable-diffusion.cpp 通用 CLI 执行层和 MOSS-Image-SFT 图片 API 已接入；调用 demo 见
+[`tests/MOSS-Image-SFT-Q8_0/`](tests/MOSS-Image-SFT-Q8_0/)。视频模型尚未接入，
+退役视频实现继续保留在 `model-video/`。共享 GPU 锁、超时和恢复流程见 [sd.cpp 接入说明](docs/sdcpp-runtime.md)。
 
 纯文本训练实验见 `model-text/`；原视频集成已退役，相关源码留在 `model-video/`。第三方模型、源码、
 Steam Audio SDK 和权重许可各自适用，不由仓库 Apache-2.0 许可覆盖。

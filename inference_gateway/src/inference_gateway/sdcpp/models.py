@@ -20,6 +20,7 @@ COMPONENTS = {
     "t5xxl",
     "llm",
     "clip_vision",
+    "tokenizer",
 }
 DEFAULTS = {
     "width": 512,
@@ -47,6 +48,7 @@ RUNTIME = {
     "flash_attn": "auto",
     "vae_tiling": True,
     "temporal_tiling": False,
+    "offload_to_cpu": False,
     "max_vram_gib": 14,
 }
 
@@ -163,7 +165,7 @@ class ModelSpec:
         for name in ("backend", "params_backend", "flash_attn", "max_vram_gib"):
             flag = "max-vram" if name == "max_vram_gib" else name.replace("_", "-")
             arguments += ["--" + flag, str(self.runtime[name])]
-        for name in ("vae_tiling", "temporal_tiling"):
+        for name in ("vae_tiling", "temporal_tiling", "offload_to_cpu"):
             if self.runtime[name]:
                 arguments.append("--" + name.replace("_", "-"))
         arguments += [
@@ -248,7 +250,7 @@ def load_models(path: Path) -> dict[str, ModelSpec]:
         ):
             if not isinstance(runtime[name], str) or runtime[name] not in allowed:
                 raise ValueError("runtime 后端或 Flash Attention 设置无效。")
-        for name in ("vae_tiling", "temporal_tiling"):
+        for name in ("vae_tiling", "temporal_tiling", "offload_to_cpu"):
             if type(runtime[name]) is not bool:
                 raise ValueError(f"{name} 必须为布尔值。")
         positive_number(runtime["max_vram_gib"], "max_vram_gib")

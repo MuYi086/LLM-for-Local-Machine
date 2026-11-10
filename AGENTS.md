@@ -21,8 +21,9 @@
 
 ## 项目范围和服务
 
-仓库维护九个音频模型服务、Ornith 和 Qwen 两个文本模型 API、一个轻量控制面和 Steam Audio CPU renderer。
-start.sh 管理十四个 HTTP 进程，包括只绑定 loopback 的两个 llama.cpp backend；Steam Audio renderer 由控制面按需调用，
+仓库维护九个音频模型服务、Ornith 和 Qwen 两个文本模型 API、一个 MOSS-Image-SFT 图片 API、
+一个轻量控制面和 Steam Audio CPU renderer。start.sh 管理十五个 HTTP 进程，包括只绑定 loopback 的两个 llama.cpp backend；
+Steam Audio renderer 由控制面按需调用，
 不是 HTTP 服务。八个 audio.cpp 服务共用一个轻量 uv 项目，避免重复安装 Torch 和 Python 推理依赖。
 
 | 服务 | 默认端口 | 主业务接口 | 职责 |
@@ -30,6 +31,7 @@ start.sh 管理十四个 HTTP 进程，包括只绑定 loopback 的两个 llama.
 | main/ 控制面 | 8300 | GET /v1/control；POST /v1/audio/export；POST /v1/audio/spatial/render | 诊断、共享音频处理和空间导出 |
 | model-text/ornith_1_5_35b_a3b/ | 8401 | POST /v1/AtomicChat/Ornith-1.5-35B-A3B-AD-Q5 | llama.cpp 聊天补全适配器 |
 | model-text/qwen3_6_35b_a3b/ | 8402 | POST /v1/qwen/Qwen3.6-35B-A3B-MTP | llama.cpp Qwen3.6 MTP 聊天补全 |
+| model-image/MOSS-Image-SFT-Q8_0/ | 8501 | POST /v1/openmoss/MOSS-Image-SFT-Q8_0 | stable-diffusion.cpp CUDA 文生图 |
 | Ornith llama.cpp backend | 8403（仅 127.0.0.1） | POST /v1/chat/completions | Ornith GGUF、MTP 与 mmproj 推理 |
 | Qwen3.6 llama.cpp backend | 8400（仅 127.0.0.2） | POST /v1/chat/completions | Qwen3.6 GGUF 与 MTP 推理；与 127.0.0.1:8400 LocalAI 并存 |
 | design_qwen3-tts-1.7b-voicedesign/ | 8301 | POST /v1/qwen/Qwen3-TTS-1.7B-VoiceDesign | 文本音色设计与 TTS |
@@ -55,8 +57,9 @@ start.sh 管理十四个 HTTP 进程，包括只绑定 loopback 的两个 llama.
 - inference_gateway/ 只依赖标准库与 llm_local_runtime，负责 LocalAI provider、GPU 锁执行、backend
   shutdown 和 quarantine。backend 停止无法确认时必须保留锁旁的 .quarantine 标记；仅用
   scripts/localai/recover_quarantine.py 在确认进程组和 loopback API 退出后解除隔离。
-- inference_gateway.sdcpp 提供按请求启动的 sd.cpp CLI provider；sdcpp/manifests/ 记录外部版本与默认空模型清单。
-  scripts/sdcpp/manager.py 负责本机状态、预检和生成。尚无图片/视频 HTTP 服务；不得把未验证模型计入当前能力。
+- inference_gateway.sdcpp 提供按请求启动的 sd.cpp CLI provider；sdcpp/manifests/ 记录外部版本与 MOSS-Image-SFT-Q8_0 清单。
+  scripts/sdcpp/manager.py 负责本机状态、预检和生成；model-image/MOSS-Image-SFT-Q8_0/ 提供 8501 图片 API。
+  视频模型尚未接入当前启动项。
   CLI 无 HTTP 端口，隔离恢复按 PID/starttime 与进程组核验，统一使用既有 recover_quarantine.py 入口。
 - model-audio/audio_cpp_runtime/ 是八个新增模型 API 的共享轻量 uv 项目，不安装 Torch。各模型目录的
   main.py 只从清单选择对应的共享服务合同。
@@ -85,7 +88,7 @@ llama.cpp 源码/二进制均在仓库外，不提交权重或第三方源码。
 文本模型默认采用串行实测配置：Ornith 线程 6/8、Qwen 线程 8/8，主 KV 为 Q8、MTP 草稿长度为 4、
 草稿 KV 为 F16、load-mode 为 none；详细步骤与结论见 tests/model_web_comparison/README.md。
 
-bash start.sh 先检查全部十四个 HTTP 端口、两个文本模型权重和 CUDA llama-server，注册九个 LocalAI 候选并执行 readiness
+bash start.sh 先检查全部十五个 HTTP 端口、sd.cpp 可执行文件摘要和 MOSS 四个模型组件、两个文本模型权重和 CUDA llama-server，注册九个 LocalAI 候选并执行 readiness
 预检；之后通过共享 GPU 锁依次预热 Ornith 与 Qwen，确认模型进入 sleep-idle 后再启动控制面和全部 API。
 任一服务退出时清理全部服务进程组并分别确认两个 llama.cpp backend 停止。使用 Ctrl+C 等待正常退出；若 backend 停止状态不能确认，
 保留 quarantine 标记并按恢复流程处理。
@@ -114,6 +117,8 @@ tests/ornith_1_5_35b_a3b/generate_example.py 和 tests/qwen3_6_35b_a3b/generate_
   进程组和各自 loopback API 已退出；仅使用 `scripts/localai/recover_quarantine.py` 完成确认后移除标记。
 - 模型 API 健康检查不加载权重。音频上传按块暂存，默认单文件上限 64 MiB；不得整文件 read()、
   直接覆盖 sidecar 或将临时输入长期保存。
+- MOSS-Image-SFT API 固定使用 text-to-image、官方 tokenizer、CFG 3 和 16 像素尺寸对齐；请求在共享 GPU 锁内生成单张 PNG，
+  worker 未确认退出时必须保留 quarantine。
 - audio.cpp 服务默认值、候选和 API 合同集中在候选 manifest 与 audio_cpp_runtime；修改服务合同后同步
   localai/manifests/capabilities.json 并运行能力清单校验。
 - Ornith API 将 OpenAI Chat Completions 请求转发到 loopback llama-server；主 GGUF 与 F16 mmproj 从镜像目录只读加载，
