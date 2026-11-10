@@ -19,6 +19,7 @@ lint_paths=(
     llm_local_runtime
     inference_gateway
     scripts/localai
+    scripts/sdcpp
     model-text/ornith_1_5_35b_a3b
     model-text/qwen3_6_35b_a3b
 )

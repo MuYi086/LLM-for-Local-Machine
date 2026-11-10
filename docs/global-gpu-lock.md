@@ -45,7 +45,7 @@ Ornith、Qwen 的 backend startup、请求与 shutdown 通过 `llm_local_runtime
 provider 取得文件锁会先检查该标记；标记存在时立即拒绝推理，避免不确定的残留模型继续占用显存。
 不能仅因 HTTP shutdown 返回成功就删除标记，必须确认受管模型/backend 进程组已退出。
 
-LocalAI、Ornith 与 Qwen 共用恢复入口：
+LocalAI、Ornith、Qwen 与 sd.cpp 共用恢复入口：
 
 ```bash
 python3 scripts/localai/recover_quarantine.py
@@ -54,3 +54,13 @@ python3 scripts/localai/recover_quarantine.py
 恢复脚本先确认没有活动 GPU 请求，在同一锁下读取 `provider` 并分派处理。LocalAI 未确认 shutdown，或
 llama.cpp 进程组或 loopback API 仍活动时，会保留隔离标记。只有确认对应 backend 进程组和端口退出后才原子删除标记。
 新增 GPU provider 也必须提供相同强度的进程回收与恢复流程，不能自行绕过 quarantine。
+
+## sd.cpp CLI provider
+
+`inference_gateway.sdcpp.execution.generate` 在锁外完成参数、组件和二进制摘要预检，持锁后才创建
+独立 worker 进程组。父进程持久化 PID、PGID 和 Linux starttime 后，通过 stdin 许可 worker exec sd-cli。
+退出、超时和取消均回收整个进程组，并等待 `CUDA_RELEASE_DELAY`。停止未确认时保留标记和任务目录。
+CLI 没有 loopback API；恢复入口按进程身份和整个进程组是否停止核验，不调用 LocalAI。
+
+排队与执行分别使用 `GPU_LOCK_WAIT_TIMEOUT` 和 `SDCPP_RUN_TIMEOUT`。长视频会占用所有模型共享的串行队列，
+需要根据真实模型测试调整预算；本阶段不承诺优先级或抢占。配置与能力边界见 [sd.cpp 接入说明](sdcpp-runtime.md)。

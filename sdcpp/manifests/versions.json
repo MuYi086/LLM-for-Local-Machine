@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "repository": "https://github.com/leejet/stable-diffusion.cpp",
+  "commit": "a3c49b13be5a64a0b4da2b576af3a17e8ae1ccbf",
+  "executable": "sd-cli",
+  "integration": "cli",
+  "model_validation": "pending-selection"
+}
