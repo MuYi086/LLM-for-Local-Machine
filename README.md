@@ -297,5 +297,8 @@ FastAPI 测试使用 QA 环境中的 `httpx2` 兼容依赖；不得通过执行�
 ## 其他归档资料
 
 旧音频服务源码、历史 LocalAI 报告、任务和设计文档保留作追溯，不代表当前支持的接口或依赖。
-纯文本训练实验见 `model-text/`；视频集成已退役，相关源码留在 `model-video/`。第三方模型、源码、
+stable-diffusion.cpp 通用 CLI 执行层已加入，默认模型清单为空，尚无新增图片/视频 HTTP 服务。
+配置、共享 GPU 锁、超时和恢复流程见 [sd.cpp 接入说明](docs/sdcpp-runtime.md)。
+
+纯文本训练实验见 `model-text/`；原视频集成已退役，相关源码留在 `model-video/`。第三方模型、源码、
 Steam Audio SDK 和权重许可各自适用，不由仓库 Apache-2.0 许可覆盖。

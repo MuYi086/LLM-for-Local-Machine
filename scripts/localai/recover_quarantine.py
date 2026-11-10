@@ -19,6 +19,7 @@ sys.path.insert(0, str(ROOT / "inference_gateway/src"))
 sys.path.insert(0, str(ROOT / "llm_local_runtime/src"))
 sys.path.insert(0, str(ROOT / "model-text"))
 
+from inference_gateway.sdcpp.processes import recover_sdcpp  # noqa: E402
 from ornith_1_5_35b_a3b import runtime as ornith_runtime  # noqa: E402
 
 from inference_gateway import LocalAIClient, load_gateway_config  # noqa: E402
@@ -219,15 +220,6 @@ def main() -> int:
     if not marker_path.is_file():
         print("没有待恢复的 GPU 隔离标记。")
         return 0
-    try:
-        marker = json.loads(marker_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        print(f"隔离标记无法读取：{exc}", file=sys.stderr)
-        return 1
-    if not isinstance(marker, dict):
-        print("隔离标记格式无效，保留隔离状态。", file=sys.stderr)
-        return 1
-
     with lock_path.open("a+", encoding="utf-8") as lock_file:
         try:
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -235,7 +227,29 @@ def main() -> int:
             print("GPU 仍有活动请求，暂不解除隔离。", file=sys.stderr)
             return 1
         try:
+            # 必须在持锁后重读；等待锁期间旧请求可能已更新或删除标记。
+            if not marker_path.exists():
+                print("没有待恢复的 GPU 隔离标记。")
+                return 0
+            try:
+                marker = json.loads(marker_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                print(f"隔离标记无法读取：{exc}", file=sys.stderr)
+                return 1
+            if not isinstance(marker, dict):
+                print("隔离标记格式无效，保留隔离状态。", file=sys.stderr)
+                return 1
             provider = marker.get("provider", "localai")
+            if provider == "stable-diffusion.cpp":
+                try:
+                    recover_sdcpp(
+                        marker_path, marker, float(os.getenv("SDCPP_CLEANUP_TIMEOUT", "30"))
+                    )
+                except (OSError, RuntimeError, ValueError) as exc:
+                    print(f"sd.cpp 恢复失败，保留隔离状态：{exc}", file=sys.stderr)
+                    return 1
+                print("sd.cpp 进程组已确认停止，GPU 隔离已解除。")
+                return 0
             if provider == "llama.cpp":
                 return _recover_ornith(marker_path, marker)
             if provider != "localai":

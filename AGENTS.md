@@ -55,6 +55,9 @@ start.sh 管理十四个 HTTP 进程，包括只绑定 loopback 的两个 llama.
 - inference_gateway/ 只依赖标准库与 llm_local_runtime，负责 LocalAI provider、GPU 锁执行、backend
   shutdown 和 quarantine。backend 停止无法确认时必须保留锁旁的 .quarantine 标记；仅用
   scripts/localai/recover_quarantine.py 在确认进程组和 loopback API 退出后解除隔离。
+- inference_gateway.sdcpp 提供按请求启动的 sd.cpp CLI provider；sdcpp/manifests/ 记录外部版本与默认空模型清单。
+  scripts/sdcpp/manager.py 负责本机状态、预检和生成。尚无图片/视频 HTTP 服务；不得把未验证模型计入当前能力。
+  CLI 无 HTTP 端口，隔离恢复按 PID/starttime 与进程组核验，统一使用既有 recover_quarantine.py 入口。
 - model-audio/audio_cpp_runtime/ 是八个新增模型 API 的共享轻量 uv 项目，不安装 Torch。各模型目录的
   main.py 只从清单选择对应的共享服务合同。
 - scripts/localai/manager.py 管理裸机 LocalAI/audio.cpp 固定版本、九个 GGUF 候选和宿主生命周期；不使用 Docker。
