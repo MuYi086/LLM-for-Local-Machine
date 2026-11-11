@@ -21,11 +21,17 @@
 | [MOSS-Image-SFT-Q8_0](model-image/MOSS-Image-SFT-Q8_0/) | 8501 | `POST /v1/openmoss/MOSS-Image-SFT-Q8_0`，stable-diffusion.cpp CUDA 文生图 |
 | [FLUX-3-Image-Klein-GGUF-Q8](model-image/FLUX-3-Image-Klein-GGUF-Q8/) | 8502 | `POST /v1/openblack-forest-labs/FLUX-3-Image-Klein-GGUF-Q8` 文生图；`POST /v1/openblack-forest-labs/FLUX-3-Image-Klein-GGUF-Q8/edit` 图片编辑 |
 | [Steam Audio renderer](model-audio/spatial_steam-audio/) | 无 HTTP 端口 | C++17 CPU renderer，由 8300 控制面调用 |
+| [Easel API bridge](easel_bridge/) | 8500 | 受 Bearer Key 保护的 OpenAI-compatible 图片、语音和可选聊天接口 |
 
-共十六个 HTTP 进程由 `start.sh` 管理，包括两个仅绑定 loopback 的 llama-server 后端：Ornith 在 `127.0.0.1:8403`，
+共十七个 HTTP 进程由 `start.sh` 管理，包括两个仅绑定 loopback 的 llama-server 后端：Ornith 在 `127.0.0.1:8403`，
 Qwen 在 `127.0.0.2:8400`。LocalAI 保持在 `127.0.0.1:8400`，两者通过不同 loopback 地址并存。文本 API 适配器复用
 控制面 Python 项目；八个新增 audio.cpp API 共用轻量 Python 运行环境，不额外安装
 Torch。`storage/` 中的用户运行数据不会由代码清理。
+
+Easel/OpenCode 桥接服务由 `start.sh` 一并启动在 `127.0.0.1:8500`，只代理 MOSS-Image-SFT、VoxCPM2 和 Qwen3.6 Chat API。
+它不会启动或绕过模型服务，底层 GPU 锁与 sleep-idle 生命周期仍由既有服务管理。MOSS、VoxCPM2 和 Qwen3.6
+这三个桥接上游默认绑定 `127.0.0.1`，避免从网关之外绕过 Bearer 鉴权；可在本机环境变量中显式覆盖绑定地址。
+配置和 Easel 中的模型填写项见 [Easel 本地模型网关](docs/easel-bridge.md)。
 
 ## 安装与启动
 
@@ -67,11 +73,21 @@ export SDCPP_BIN_SHA256="$(sha256sum "$SDCPP_BIN" | cut -d ' ' -f 1)"
 bash start.sh
 ```
 
-脚本先检查全部十六个监听端口、sd.cpp 二进制摘要、MOSS 与 FLUX.3 Klein 的模型组件、CUDA 构建的 llama.cpp、两个文本模型文件和必需参数，注册九个 GGUF 候选，
+首次启动前按 [网关配置说明](docs/easel-bridge.md#配置和启动) 创建 `.env.easel-bridge` 和随机 Key。
+脚本自动读取该文件；也可用 `EASEL_BRIDGE_ENV_FILE` 指定其他配置文件，网关端口由 `EASEL_BRIDGE_PORT` 设置，默认 8500。
+网关 Key 缺失、过短或使用模板占位符时，脚本在启动模型前退出，不会匿名运行。
+
+脚本先检查全部十七个监听端口、sd.cpp 二进制摘要、MOSS 与 FLUX.3 Klein 的模型组件、CUDA 构建的 llama.cpp、两个文本模型文件和必需参数，注册九个 GGUF 候选，
 启动受管 LocalAI/audio.cpp 并执行 readiness 检查；随后使用共享 GPU 锁依次预热 Ornith 和 Qwen，并确认模型进入 sleep-idle，
 再启动控制面与所有 API。两个文本 API 每次请求结束后持锁等待对应模型卸载，再释放 GPU 给其他 provider。
 任一服务进程退出时会清理其他进程组和 llama-server，再停止受管 LocalAI。按 `Ctrl+C`
 正常等待退出；遇到进程异常时，检查 `scripts/localai/manager.py status` 和 GPU quarantine 标记。
+
+每次运行 `start.sh` 都会把完整控制台输出实时同步到 `$RUNTIME_CACHE_DIR/logs/` 下的独立日志文件，
+终端启动时会打印本次日志的完整路径。默认路径为 `storage/.cache/runtime/logs/`；出现 Codex 或服务错误时，
+把对应启动批次的日志文件发回即可。日志文件由 `mktemp` 创建，默认仅当前用户可读写。
+日志进程会避开终端退出信号，由主脚本统一清理服务；日志管道异常时，清理过程直接追加到同一日志文件。
+Ctrl+C、终端挂断及清理期间再次按 Ctrl+C 都会继续完成已启动进程组的退出确认。
 
 默认模型文件路径：
 
@@ -89,6 +105,7 @@ bash start.sh
 | `HOST` / `PORT` | `0.0.0.0` / `8300` | 控制面监听地址与端口 |
 | `QWEN_VOICEDESIGN_HOST` / `QWEN_VOICEDESIGN_PORT` | 继承 `HOST` / `8301` | VoiceDesign 监听地址与端口 |
 | `AUDIO_CPP_*_PORT` | 各服务默认端口 | 八个 audio.cpp 服务端口，可分别覆盖 |
+| `VOXCPM2_HOST` | `127.0.0.1` | Easel 桥接使用的 VoxCPM2 上游监听地址 |
 | `AUDIO_CPP_*_MODEL_FILE` | `$HF_MIRROR_DIR/audio.cpp-gguf/<候选目录>/<固定文件名>` | 各服务 GGUF 路径，完整变量名见模型清单 |
 | `LLAMA_SERVER_BIN` | PATH 中的 `llama-server`，否则尝试 `$HOME/.local/src/llama.cpp/build-cuda/bin/llama-server` | llama.cpp HTTP server 可执行文件；也可显式设置路径 |
 | `ORNITH_MODEL_FILE` | `$HF_MIRROR_DIR/AtomicChat/Ornith-1.5-35B-A3B/Ornith-1.5-35B-A3B-AD-Q5_K-Q4_K.gguf` | Ornith 主模型，只读加载 |
@@ -114,12 +131,12 @@ bash start.sh
 | `SDCPP_BIN` | `$HOME/.local/src/stable-diffusion.cpp/build/bin/sd-cli` | 固定版本 stable-diffusion.cpp CLI |
 | `SDCPP_BIN_SHA256` | 必须显式设置 | 启动前校验 sd-cli 文件摘要 |
 | `SDCPP_MODEL_MANIFEST` | `sdcpp/manifests/models.json` | MOSS 模型组件、参数和资源清单 |
-| `MOSS_IMAGE_HOST` / `MOSS_IMAGE_PORT` | 继承 `HOST` / `8501` | MOSS 图片 API 监听地址 |
+| `MOSS_IMAGE_HOST` / `MOSS_IMAGE_PORT` | `127.0.0.1` / `8501` | MOSS 图片 API 监听地址 |
 | `FLUX3_IMAGE_HOST` / `FLUX3_IMAGE_PORT` | 继承 `HOST` / `8502` | FLUX.3 Klein 图片 API 监听地址 |
 | `FLUX3_IMAGE_UPLOAD_DIR` | `$RUNTIME_CACHE_DIR/sdcpp_uploads` | 图片编辑参考图的临时暂存目录 |
 | `FLUX3_IMAGE_MAX_UPLOAD_BYTES` | `67108864` | 编辑参考图上传上限，单位为字节 |
 | `SDCPP_RUN_TIMEOUT` / `SDCPP_CLEANUP_TIMEOUT` | `3600` / `30` 秒 | 单次图片生成和 worker 回收时限 |
-| `QWEN36_HOST` / `QWEN36_PORT` | 继承 `HOST` / `8402` | Qwen 对外 API 监听地址 |
+| `QWEN36_HOST` / `QWEN36_PORT` | `127.0.0.1` / `8402` | Qwen 网关聊天上游监听地址 |
 | `QWEN36_BACKEND_HOST` / `QWEN36_LLAMA_CPP_PORT` | `127.0.0.2` / `8400` | Qwen llama-server loopback 地址，与 LocalAI 的 `127.0.0.1:8400` 并存 |
 | `QWEN36_CONTEXT_SIZE` / `QWEN36_BATCH_SIZE` | `32768` / `512` | Qwen llama.cpp 上下文和 batch 大小 |
 | `QWEN36_THREADS` / `QWEN36_THREADS_BATCH` | `8` / `8` | 生成及 CPU 批量线程数 |

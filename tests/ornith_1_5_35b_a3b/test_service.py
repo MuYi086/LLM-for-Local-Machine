@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import fcntl
 import json
 import sys
 import tempfile
@@ -18,6 +20,69 @@ from ornith_1_5_35b_a3b.app import API_ROUTE, MODEL_ALIAS, create_app  # noqa: E
 
 
 class OrnithServiceTests(unittest.TestCase):
+    def test_disconnect_during_cleanup_preserves_lease_until_sleep_and_allows_next_request(self):
+        async def scenario(lock_path: Path) -> None:
+            cleanup_started = asyncio.Event()
+            chat_count = 0
+            marker_path = Path(f"{lock_path}.quarantine")
+
+            async def handle(request: httpx.Request) -> httpx.Response:
+                nonlocal chat_count
+                if request.url.path == "/props":
+                    if chat_count == 1 and not cleanup_started.is_set():
+                        self.assertTrue(marker_path.exists())
+                        with lock_path.open("a+") as probe:
+                            with self.assertRaises(BlockingIOError):
+                                fcntl.flock(probe, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        cleanup_started.set()
+                        await asyncio.sleep(0.02)
+                    return httpx.Response(200, json={"is_sleeping": True})
+                chat_count += 1
+                return httpx.Response(
+                    200,
+                    headers={"content-type": "text/event-stream"},
+                    stream=httpx.ByteStream(b"data: [DONE]\n\n"),
+                )
+
+            app = self._app(lock_path, handle, sleep_timeout=0.5)
+            scope = {
+                "type": "http",
+                "method": "POST",
+                "path": API_ROUTE,
+                "headers": [(b"content-type", b"application/json")],
+                "query_string": b"",
+                "http_version": "1.1",
+                "scheme": "http",
+                "asgi": {"version": "3.0", "spec_version": "2.3"},
+            }
+            body_sent = False
+
+            async def receive():
+                nonlocal body_sent
+                if not body_sent:
+                    body_sent = True
+                    return {"type": "http.request", "body": b'{"messages":[],"stream":true}'}
+                await cleanup_started.wait()
+                return {"type": "http.disconnect"}
+
+            async def send(message):
+                pass
+
+            async with app.router.lifespan_context(app):
+                await asyncio.wait_for(app(scope, receive, send), timeout=2)
+                self.assertTrue(cleanup_started.is_set())
+                self.assertFalse(marker_path.exists())
+                async with httpx.AsyncClient(
+                    transport=httpx.ASGITransport(app), base_url="http://test"
+                ) as client:
+                    response = await client.post(API_ROUTE, json={"messages": []})
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(chat_count, 2)
+                self.assertFalse(marker_path.exists())
+
+        with tempfile.TemporaryDirectory() as temporary:
+            asyncio.run(scenario(Path(temporary) / "gpu-runtime.lock"))
+
     def test_sleep_confirmation_retries_without_clearing_quarantine_early(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             lock_path = Path(temporary) / "gpu-runtime.lock"

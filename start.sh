@@ -2,6 +2,17 @@
 set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export STORAGE_DIR="${STORAGE_DIR:-$PROJECT_DIR/storage}"
+export RUNTIME_CACHE_DIR="${RUNTIME_CACHE_DIR:-$STORAGE_DIR/.cache/runtime}"
+START_LOG_DIR="$RUNTIME_CACHE_DIR/logs"
+mkdir -p "$START_LOG_DIR"
+START_LOG_FILE="$(mktemp --suffix=.log "$START_LOG_DIR/start-$(date -u +%Y%m%dT%H%M%SZ)-XXXXXX")"
+# 终端信号交给主脚本收尾。日志进程若先退出，cleanup 的输出会触发 SIGPIPE，
+# 使主脚本在停止独立 setsid 进程组前退出；终端断开时仍继续写日志文件。
+exec > >(trap '' INT TERM HUP; exec tee -a --output-error=warn-nopipe "$START_LOG_FILE") 2>&1
+START_LOG_PID=$!
+printf '[日志] 本次完整控制台日志：%s\n' "$START_LOG_FILE"
+
 MAIN_DIR="$PROJECT_DIR/main"
 MAIN_PROJECT_DIR="$MAIN_DIR"
 VOICEDESIGN_PROJECT_DIR="$PROJECT_DIR/model-audio/design_qwen3-tts-1.7b-voicedesign"
@@ -12,6 +23,7 @@ ORNITH_SERVICE_DIR="$MODEL_TEXT_DIR/ornith_1_5_35b_a3b"
 QWEN36_SERVICE_DIR="$MODEL_TEXT_DIR/qwen3_6_35b_a3b"
 MOSS_IMAGE_SERVICE_DIR="$PROJECT_DIR/model-image/MOSS-Image-SFT-Q8_0"
 FLUX3_IMAGE_SERVICE_DIR="$PROJECT_DIR/model-image/FLUX-3-Image-Klein-GGUF-Q8"
+EASEL_BRIDGE_ENV_FILE="${EASEL_BRIDGE_ENV_FILE:-$PROJECT_DIR/.env.easel-bridge}"
 LLM_LOCAL_RUNTIME_SRC="$PROJECT_DIR/llm_local_runtime/src"
 INFERENCE_GATEWAY_SRC="$PROJECT_DIR/inference_gateway/src"
 
@@ -39,10 +51,33 @@ if [[ ! -f "$FLUX3_IMAGE_SERVICE_DIR/main.py" ]]; then
   echo "缺少 FLUX.3 Klein 图片服务：$FLUX3_IMAGE_SERVICE_DIR/main.py" >&2
   exit 1
 fi
+if [[ ! -f "$PROJECT_DIR/easel_bridge/app.py" ]]; then
+  echo "缺少 OpenAI-compatible 网关：easel_bridge/app.py" >&2
+  exit 1
+fi
+
+# 与单独启动网关时使用同一份本地配置，不在日志中输出密钥。
+if [[ -f "$EASEL_BRIDGE_ENV_FILE" ]]; then
+  set -a
+  source "$EASEL_BRIDGE_ENV_FILE"
+  set +a
+fi
+export EASEL_BRIDGE_PORT="${EASEL_BRIDGE_PORT:-8500}"
+export EASEL_BRIDGE_API_KEY="${EASEL_BRIDGE_API_KEY:-}"
+if [[ ${#EASEL_BRIDGE_API_KEY} -lt 32 ]]; then
+  echo "EASEL_BRIDGE_API_KEY 必须是至少 32 字节的随机值，请配置 .env.easel-bridge。" >&2
+  exit 1
+fi
+if [[ "${EASEL_BRIDGE_API_KEY,,}" == replace-with-* || "$EASEL_BRIDGE_API_KEY" == *[[:space:]]* ]]; then
+  echo "EASEL_BRIDGE_API_KEY 必须是随机值，不能使用模板占位符或空白。" >&2
+  exit 1
+fi
+if [[ ! "$EASEL_BRIDGE_PORT" =~ ^[1-9][0-9]*$ ]] || (( EASEL_BRIDGE_PORT > 65535 )); then
+  echo "EASEL_BRIDGE_PORT 必须在 1 到 65535 之间。" >&2
+  exit 1
+fi
 
 export PYTHONPATH="$MODEL_TEXT_DIR:$AUDIO_CPP_RUNTIME_SRC:$LLM_LOCAL_RUNTIME_SRC:$INFERENCE_GATEWAY_SRC${PYTHONPATH:+:$PYTHONPATH}"
-export STORAGE_DIR="${STORAGE_DIR:-$PROJECT_DIR/storage}"
-export RUNTIME_CACHE_DIR="${RUNTIME_CACHE_DIR:-$STORAGE_DIR/.cache/runtime}"
 export HF_MIRROR_DIR="${HF_MIRROR_DIR:-$HOME/hf-mirror}"
 export QWEN_VOICEDESIGN_MODEL_FILE="${QWEN_VOICEDESIGN_MODEL_FILE:-$HF_MIRROR_DIR/audio.cpp-gguf/Qwen3-TTS-12Hz-1.7B-VoiceDesign-GGUF/qwen3-tts-12hz-1.7b-voicedesign-bf16.gguf}"
 export AUDIO_CPP_CONFUCIUS4_TTS_MODEL_FILE="${AUDIO_CPP_CONFUCIUS4_TTS_MODEL_FILE:-$HF_MIRROR_DIR/audio.cpp-gguf/Confucius4-TTS-GGUF/confucius4-tts-orig.gguf}"
@@ -115,7 +150,7 @@ export LOCAL_FILES_ONLY="${LOCAL_FILES_ONLY:-1}"
 
 export HOST="${HOST:-0.0.0.0}"
 export PORT="${PORT:-8300}"
-export MOSS_IMAGE_HOST="${MOSS_IMAGE_HOST:-$HOST}"
+export MOSS_IMAGE_HOST="${MOSS_IMAGE_HOST:-127.0.0.1}"
 export MOSS_IMAGE_PORT="${MOSS_IMAGE_PORT:-8501}"
 export FLUX3_IMAGE_HOST="${FLUX3_IMAGE_HOST:-$HOST}"
 export FLUX3_IMAGE_PORT="${FLUX3_IMAGE_PORT:-8502}"
@@ -145,7 +180,7 @@ export ORNITH_STARTUP_TIMEOUT="${ORNITH_STARTUP_TIMEOUT:-1800}"
 export ORNITH_SLEEP_TIMEOUT="${ORNITH_SLEEP_TIMEOUT:-300}"
 export ORNITH_SLEEP_POLL_INTERVAL="${ORNITH_SLEEP_POLL_INTERVAL:-0.25}"
 export ORNITH_BACKEND_PID_FILE="${ORNITH_BACKEND_PID_FILE:-$RUNTIME_CACHE_DIR/ornith-llama-server.pid}"
-export QWEN36_HOST="${QWEN36_HOST:-$HOST}"
+export QWEN36_HOST="${QWEN36_HOST:-127.0.0.1}"
 export QWEN36_PORT="${QWEN36_PORT:-8402}"
 export QWEN36_BACKEND_HOST="${QWEN36_BACKEND_HOST:-127.0.0.2}"
 export QWEN36_LLAMA_CPP_PORT="${QWEN36_LLAMA_CPP_PORT:-8400}"
@@ -167,6 +202,11 @@ export QWEN36_STARTUP_TIMEOUT="${QWEN36_STARTUP_TIMEOUT:-1800}"
 export QWEN36_SLEEP_TIMEOUT="${QWEN36_SLEEP_TIMEOUT:-300}"
 export QWEN36_SLEEP_POLL_INTERVAL="${QWEN36_SLEEP_POLL_INTERVAL:-0.25}"
 export QWEN36_BACKEND_PID_FILE="${QWEN36_BACKEND_PID_FILE:-$RUNTIME_CACHE_DIR/qwen3-6-llama-server.pid}"
+
+# 受管 API 改用其他端口时，网关默认跟随；显式上游 URL 仍优先。
+export EASEL_BRIDGE_QWEN_URL="${EASEL_BRIDGE_QWEN_URL:-http://127.0.0.1:$QWEN36_PORT/v1/qwen/Qwen3.6-35B-A3B-MTP}"
+export EASEL_BRIDGE_MOSS_URL="${EASEL_BRIDGE_MOSS_URL:-http://127.0.0.1:$MOSS_IMAGE_PORT/v1/openmoss/MOSS-Image-SFT-Q8_0}"
+export EASEL_BRIDGE_VOXCPM_URL="${EASEL_BRIDGE_VOXCPM_URL:-http://127.0.0.1:${VOXCPM2_PORT:-8313}/v1/OpenBMB/VoxCPM2-GGUF}"
 
 AUDIO_CPP_SERVICE_KEYS=(
   confucius4_tts index_tts25 midashenglm_gen qwen3_asr
@@ -200,7 +240,7 @@ AUDIO_CPP_SERVICE_HOSTS=(
   "${QWEN3_TTS_BASE_HOST:-$HOST}"
   "${SEED_VC_HOST:-$HOST}"
   "${STABLE_AUDIO_SFX_HOST:-$HOST}"
-  "${VOXCPM2_HOST:-$HOST}"
+  "${VOXCPM2_HOST:-127.0.0.1}"
 )
 AUDIO_CPP_SERVICE_PORTS=(
   "${CONFUCIUS4_TTS_PORT:-8331}"
@@ -229,6 +269,7 @@ PORT_CHECK_ARGS=(
   'Qwen3.6 llama.cpp backend' "$QWEN36_BACKEND_HOST" "$QWEN36_LLAMA_CPP_PORT"
   'MOSS-Image-SFT API' "$MOSS_IMAGE_HOST" "$MOSS_IMAGE_PORT"
   'FLUX.3 Klein Image API' "$FLUX3_IMAGE_HOST" "$FLUX3_IMAGE_PORT"
+  'OpenAI-compatible bridge' '127.0.0.1' "$EASEL_BRIDGE_PORT"
 )
 for index in "${!AUDIO_CPP_SERVICE_KEYS[@]}"; do
   PORT_CHECK_ARGS+=(
@@ -426,6 +467,7 @@ echo "Qwen3.6 llama-server:  $LLAMA_SERVER_BIN (CUDA0, CPU MoE=$QWEN36_N_CPU_MOE
 echo "Qwen3.6 API:           http://$QWEN36_HOST:$QWEN36_PORT/v1/qwen/Qwen3.6-35B-A3B-MTP"
 echo "MOSS-Image-SFT API:   http://$MOSS_IMAGE_HOST:$MOSS_IMAGE_PORT/v1/openmoss/MOSS-Image-SFT-Q8_0"
 echo "FLUX.3 Klein API:     http://$FLUX3_IMAGE_HOST:$FLUX3_IMAGE_PORT/v1/openblack-forest-labs/FLUX-3-Image-Klein-GGUF-Q8"
+echo "OpenAI-compatible:    http://127.0.0.1:$EASEL_BRIDGE_PORT/v1 (OpenCode / Easel)"
 echo "VoiceDesign API:       http://$QWEN_VOICEDESIGN_HOST:$QWEN_VOICEDESIGN_PORT/v1/qwen/Qwen3-TTS-1.7B-VoiceDesign"
 for index in "${!AUDIO_CPP_SERVICE_KEYS[@]}"; do
   echo "${AUDIO_CPP_SERVICE_KEYS[$index]} API: http://${AUDIO_CPP_SERVICE_HOSTS[$index]}:${AUDIO_CPP_SERVICE_PORTS[$index]}${AUDIO_CPP_SERVICE_ROUTES[$index]}"
@@ -451,6 +493,7 @@ ornith_pid=""
 qwen36_pid=""
 moss_image_pid=""
 flux3_image_pid=""
+easel_bridge_pid=""
 llama_server_pid=""
 qwen36_llama_server_pid=""
 llama_watch_pid=""
@@ -462,8 +505,17 @@ localai_managed_started=0
 
 cleanup() {
   local status=$?
-  local service_pids=("$main_pid" "$voicedesign_pid" "$ornith_pid" "$qwen36_pid" "$moss_image_pid" "$flux3_image_pid" "$llama_watch_pid" "$qwen36_llama_watch_pid" "${audio_cpp_pids[@]}")
-  trap - INT TERM EXIT
+  # 即使日志管道损坏或用户再次按 Ctrl+C，也必须继续停止所有已登记的进程组。
+  trap '' INT TERM HUP PIPE
+  trap - EXIT
+  set +e
+  if ! kill -0 "$START_LOG_PID" 2>/dev/null; then
+    # 日志进程异常退出时直接追加到原日志，避免 shutdown helper 也因 BrokenPipe 中断。
+    exec >> "$START_LOG_FILE" 2>&1
+  fi
+  local service_pids=("$easel_bridge_pid" "$main_pid" "$voicedesign_pid" "$ornith_pid" "$qwen36_pid" "$moss_image_pid" "$flux3_image_pid" "$llama_watch_pid" "$qwen36_llama_watch_pid" "$llama_server_pid" "$qwen36_llama_server_pid" "${audio_cpp_pids[@]}")
+  local recovery_attempt=1
+  echo "[退出] 收到停止信号，开始停止服务进程组和两个 llama.cpp 后端。"
 
   for pid in "${service_pids[@]}"; do
     if [[ -n "$pid" ]] && kill -0 -- "-$pid" 2>/dev/null; then
@@ -488,8 +540,18 @@ cleanup() {
   fi
 
   if [[ -e "$GPU_LOCK_FILE.quarantine" ]]; then
-    if ! LLM_LOCALAI_ENABLED="$LLM_LOCALAI_ENABLED" \
-      python3 "$PROJECT_DIR/scripts/localai/recover_quarantine.py"; then
+    while [[ -e "$GPU_LOCK_FILE.quarantine" && "$recovery_attempt" -le 10 ]]; do
+      if LLM_LOCALAI_ENABLED="$LLM_LOCALAI_ENABLED" \
+        python3 "$PROJECT_DIR/scripts/localai/recover_quarantine.py"; then
+        break
+      fi
+      if [[ -e "$GPU_LOCK_FILE.quarantine" ]]; then
+        echo "[退出] GPU 隔离仍在收尾，1 秒后重试恢复（$recovery_attempt/10）。" >&2
+        sleep 1
+      fi
+      recovery_attempt=$((recovery_attempt + 1))
+    done
+    if [[ -e "$GPU_LOCK_FILE.quarantine" ]]; then
       echo "GPU quarantine 恢复未确认，保留标记：$GPU_LOCK_FILE.quarantine" >&2
       [[ "$status" != "0" ]] || status=1
     fi
@@ -508,6 +570,7 @@ cleanup() {
       read -r backend_pid < "${backend_pid_files[$backend_index]}" || true
     fi
     if [[ -n "$backend_pid" && "$backend_pid" =~ ^[1-9][0-9]*$ && ! -e "$GPU_LOCK_FILE.quarantine" ]]; then
+      echo "[退出] 正在停止 ${backend_models[$backend_index]}（${backend_hosts[$backend_index]}:${backend_ports[$backend_index]}，PID $backend_pid）。"
       if python3 -m ornith_1_5_35b_a3b.runtime shutdown \
         --lock-file "$GPU_LOCK_FILE" \
         --model "${backend_models[$backend_index]}" \
@@ -520,6 +583,7 @@ cleanup() {
         --cleanup-timeout "${LLM_LOCALAI_CLEANUP_TIMEOUT:-30}" \
         --cuda-release-delay "$CUDA_RELEASE_DELAY"; then
         rm -f -- "${backend_pid_files[$backend_index]}"
+        echo "[退出] 已确认停止 ${backend_models[$backend_index]}。"
       else
         echo "${backend_models[$backend_index]} llama.cpp backend 未确认停止，保留 GPU quarantine 标记。" >&2
         [[ "$status" != "0" ]] || status=1
@@ -529,7 +593,7 @@ cleanup() {
   exit "$status"
 }
 
-trap cleanup INT TERM EXIT
+trap cleanup INT TERM HUP EXIT
 
 if [[ "${LLM_LOCAL_QWEN3_VOICEDESIGN_PROVIDER,,}" != "localai" || "${LLM_LOCAL_AUDIO_CPP_PROVIDER,,}" != "localai" ]]; then
   echo "VoiceDesign 与 audio.cpp 模型服务固定使用 LocalAI provider。" >&2
@@ -684,6 +748,11 @@ HOST="$FLUX3_IMAGE_HOST" PORT="$FLUX3_IMAGE_PORT" \
   python "$FLUX3_IMAGE_SERVICE_DIR/main.py" &
 flux3_image_pid=$!
 
+setsid uv run --no-sync --project "$MAIN_PROJECT_DIR" \
+  python -m uvicorn easel_bridge.app:app --app-dir "$PROJECT_DIR" \
+  --host 127.0.0.1 --port "$EASEL_BRIDGE_PORT" &
+easel_bridge_pid=$!
+
 setsid bash -c '
   backend_pid="$1"
   while kill -0 "$backend_pid" 2>/dev/null; do sleep 1; done
@@ -698,4 +767,4 @@ setsid bash -c '
 ' _ "$qwen36_llama_server_pid" &
 qwen36_llama_watch_pid=$!
 
-wait -n "$main_pid" "$voicedesign_pid" "$ornith_pid" "$qwen36_pid" "$moss_image_pid" "$flux3_image_pid" "$llama_watch_pid" "$qwen36_llama_watch_pid" "${audio_cpp_pids[@]}"
+wait -n "$easel_bridge_pid" "$main_pid" "$voicedesign_pid" "$ornith_pid" "$qwen36_pid" "$moss_image_pid" "$flux3_image_pid" "$llama_watch_pid" "$qwen36_llama_watch_pid" "${audio_cpp_pids[@]}"

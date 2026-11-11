@@ -18,7 +18,12 @@ import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import Response, StreamingResponse
 
-from llm_local_runtime import GpuLockTimeoutError, GpuRuntimeMetrics, gpu_runtime_lock
+from llm_local_runtime import (
+    GpuLockTimeoutError,
+    GpuRuntimeMetrics,
+    gpu_quarantine_path,
+    gpu_runtime_lock,
+)
 
 from .runtime import (
     MODEL_ALIAS,
@@ -306,18 +311,62 @@ def create_app(
         payload["model"] = model_alias
         lease, marker_content, client = await begin_request()
         lease_released = False
+        marker_cleanup_attempted = False
         stream_owns_lease = False
 
+        async def clear_request_marker() -> bool:
+            """客户端取消时也等到后端收尾，再按本次请求身份清除隔离标记。"""
+            nonlocal marker_cleanup_attempted
+            marker_cleanup_attempted = True
+            cleanup_task = asyncio.create_task(wait_for_sleep_and_clear(marker_content))
+            cancellation_received = False
+            while True:
+                try:
+                    sleeping = await asyncio.shield(cleanup_task)
+                    break
+                except asyncio.CancelledError:
+                    cancellation_received = True
+                    if cleanup_task.done():
+                        sleeping = cleanup_task.result()
+                        break
+            if not sleeping:
+                LOGGER.error(
+                    "%s 模型未确认卸载，GPU quarantine 标记已保留。",
+                    model_alias,
+                )
+            if cancellation_received:
+                raise asyncio.CancelledError
+            return sleeping
+
         async def release_once() -> None:
-            """确保异常和取消路径也只释放一次文件锁。"""
+            """清理本次请求的隔离标记，并确保 GPU 租约只释放一次。"""
             nonlocal lease_released
             if not lease_released:
                 lease_released = True
-                await release_lease(lease)
+                cancellation_error: asyncio.CancelledError | None = None
+                try:
+                    marker_path = gpu_quarantine_path(resolved_lock_path)
+                    if not marker_cleanup_attempted and marker_path.exists():
+                        await clear_request_marker()
+                except asyncio.CancelledError as exc:
+                    cancellation_error = exc
+                finally:
+                    release_task = asyncio.create_task(release_lease(lease))
+                    while True:
+                        try:
+                            await asyncio.shield(release_task)
+                            break
+                        except asyncio.CancelledError as exc:
+                            cancellation_error = cancellation_error or exc
+                            if release_task.done():
+                                release_task.result()
+                                break
+                if cancellation_error is not None:
+                    raise cancellation_error
 
         try:
             if not await wait_until_sleeping():
-                sleeping = await wait_for_sleep_and_clear(marker_content)
+                sleeping = await clear_request_marker()
                 if not sleeping:
                     raise HTTPException(
                         status_code=503,
@@ -330,7 +379,7 @@ def create_app(
                     stream=True,
                 )
             except httpx.RequestError as exc:
-                sleeping = await wait_for_sleep_and_clear(marker_content)
+                sleeping = await clear_request_marker()
                 if not sleeping:
                     raise HTTPException(
                         status_code=503,
@@ -351,18 +400,19 @@ def create_app(
                     try:
                         async for chunk in upstream.aiter_raw():
                             yield chunk
+                    except asyncio.CancelledError:
+                        LOGGER.warning(
+                            "%s 流式请求被取消，仍将等待后端收尾后释放 GPU 租约。",
+                            model_alias,
+                        )
+                        raise
                     finally:
                         try:
-                            await upstream.aclose()
-                        except Exception:
-                            LOGGER.exception("关闭 %s 上游流失败。", model_alias)
-                        try:
-                            sleeping = await wait_for_sleep_and_clear(marker_content)
-                            if not sleeping:
-                                LOGGER.error(
-                                    "%s 模型未确认卸载，GPU quarantine 标记已保留。",
-                                    model_alias,
-                                )
+                            try:
+                                await upstream.aclose()
+                            except Exception:
+                                LOGGER.exception("关闭 %s 上游流失败。", model_alias)
+                            await clear_request_marker()
                         finally:
                             await release_once()
 
@@ -380,7 +430,7 @@ def create_app(
                 try:
                     await upstream.aclose()
                 finally:
-                    sleeping = await wait_for_sleep_and_clear(marker_content)
+                    sleeping = await clear_request_marker()
                 if not sleeping:
                     raise HTTPException(
                         status_code=503,
@@ -388,7 +438,7 @@ def create_app(
                     ) from exc
                 raise HTTPException(status_code=503, detail="llama.cpp 服务暂不可用。") from exc
             await upstream.aclose()
-            sleeping = await wait_for_sleep_and_clear(marker_content)
+            sleeping = await clear_request_marker()
             if not sleeping:
                 raise HTTPException(
                     status_code=503,

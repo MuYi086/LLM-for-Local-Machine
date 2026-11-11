@@ -3,11 +3,18 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
+import signal
+import socket
 import subprocess
+import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
+from urllib.error import URLError
+from urllib.request import ProxyHandler, Request, build_opener
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -103,6 +110,9 @@ def _preflight_environment(root: Path) -> tuple[dict[str, str], Path]:
         **os.environ,
         "PATH": f"{bin_dir}:{os.environ['PATH']}",
         "TRACE": str(trace_path),
+        "EASEL_BRIDGE_ENV_FILE": str(root / "bridge.env"),
+        "EASEL_BRIDGE_API_KEY": "test-bridge-secret-" + "x" * 32,
+        "EASEL_BRIDGE_PORT": "18500",
         "STORAGE_DIR": str(root / "storage"),
         "RUNTIME_CACHE_DIR": str(root / "storage/.cache/runtime"),
         "HF_MIRROR_DIR": str(root / "hf-mirror"),
@@ -144,6 +154,156 @@ def _preflight_environment(root: Path) -> tuple[dict[str, str], Path]:
 
 
 class StartServicesTests(unittest.TestCase):
+    def test_bridge_rejects_missing_or_short_key_before_model_startup(self) -> None:
+        for key in ("", "short", "replace-with-" + "x" * 40):
+            with self.subTest(key_length=len(key)), tempfile.TemporaryDirectory() as temporary:
+                environment, trace_path = _preflight_environment(Path(temporary))
+                environment["EASEL_BRIDGE_API_KEY"] = key
+                completed = subprocess.run(
+                    ["bash", str(ROOT / "start.sh")],
+                    capture_output=True,
+                    text=True,
+                    env=environment,
+                    timeout=15,
+                )
+                self.assertNotEqual(completed.returncode, 0)
+                self.assertIn("EASEL_BRIDGE_API_KEY", completed.stdout + completed.stderr)
+                if key:
+                    self.assertNotIn(key, completed.stdout + completed.stderr)
+                calls = trace_path.read_text() if trace_path.exists() else ""
+                self.assertNotIn("manager.py start", calls)
+
+    def test_bridge_loads_env_and_stops_with_supervisor_or_on_its_own_exit(self) -> None:
+        for trigger in (
+            "terminal-interrupt",
+            "terminal-hangup",
+            "repeated-interrupt",
+            "logger-exit",
+            "interrupt",
+            "bridge-exit",
+        ):
+            with self.subTest(trigger=trigger), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                environment, trace_path = _preflight_environment(root)
+                key = environment.pop("EASEL_BRIDGE_API_KEY")
+                Path(environment["EASEL_BRIDGE_ENV_FILE"]).write_text(
+                    f"EASEL_BRIDGE_API_KEY={key}\n", encoding="utf-8"
+                )
+                with socket.socket() as listener:
+                    listener.bind(("127.0.0.1", 0))
+                    port = listener.getsockname()[1]
+                environment["EASEL_BRIDGE_PORT"] = str(port)
+                fake_uv = root / "bin/uv"
+                fake_uv.write_text(
+                    "#!/usr/bin/env bash\n"
+                    'printf \'uv %s\\n\' "$*" >> "$TRACE"\n'
+                    'printf \'service-pid %s\\n\' "$$" >> "$TRACE"\n'
+                    'if [[ "$*" == *"uvicorn easel_bridge.app:app"* ]]; then\n'
+                    '  printf \'bridge-pid %s\\n\' "$$" >> "$TRACE"\n'
+                    '  while [[ "$1" != python ]]; do shift; done\n'
+                    "  shift\n"
+                    f'  exec "{sys.executable}" "$@"\n'
+                    "fi\n"
+                    'if [[ "$*" == *main.py* ]]; then exec sleep 120; fi\n',
+                    encoding="utf-8",
+                )
+                with (root / "console.log").open("w+") as console:
+                    process = subprocess.Popen(
+                        ["bash", str(ROOT / "start.sh")],
+                        stdout=console,
+                        stderr=subprocess.STDOUT,
+                        env=environment,
+                        start_new_session=True,
+                    )
+                    try:
+                        request = Request(
+                            f"http://127.0.0.1:{port}/v1/models",
+                            headers={"Authorization": f"Bearer {key}"},
+                        )
+                        opener = build_opener(ProxyHandler({}))
+                        deadline = time.monotonic() + 15
+                        while time.monotonic() < deadline and process.poll() is None:
+                            try:
+                                with opener.open(request, timeout=0.5) as response:
+                                    models = json.load(response)
+                                break
+                            except (URLError, TimeoutError):
+                                time.sleep(0.05)
+                        else:
+                            console.seek(0)
+                            self.fail(f"网关未就绪：{console.read()}")
+                        self.assertIn(
+                            "Qwen3.6-35B-A3B-MTP", [model["id"] for model in models["data"]]
+                        )
+                        if trigger == "interrupt":
+                            process.send_signal(signal.SIGINT)
+                        elif trigger.startswith("terminal-") or trigger == "repeated-interrupt":
+                            terminal_signal = (
+                                signal.SIGHUP if trigger == "terminal-hangup" else signal.SIGINT
+                            )
+                            os.killpg(process.pid, terminal_signal)
+                            if trigger == "repeated-interrupt":
+                                time.sleep(0.1)
+                                os.killpg(process.pid, signal.SIGINT)
+                        elif trigger == "logger-exit":
+                            for child in Path("/proc").iterdir():
+                                if not child.name.isdigit():
+                                    continue
+                                try:
+                                    arguments = (child / "cmdline").read_bytes().split(b"\0")
+                                    parent = int(
+                                        (child / "stat").read_text().rsplit(")", 1)[1].split()[1]
+                                    )
+                                except (FileNotFoundError, ProcessLookupError):
+                                    continue
+                                if parent == process.pid and arguments[0] == b"tee":
+                                    os.kill(int(child.name), signal.SIGKILL)
+                                    break
+                            else:
+                                self.fail("未找到启动脚本的日志进程")
+                            time.sleep(0.1)
+                            process.send_signal(signal.SIGINT)
+                        else:
+                            bridge_pid = next(
+                                int(line.split()[1])
+                                for line in trace_path.read_text().splitlines()
+                                if line.startswith("bridge-pid ")
+                            )
+                            os.kill(bridge_pid, signal.SIGTERM)
+                        process.wait(timeout=20)
+                        with socket.socket() as probe:
+                            self.assertNotEqual(
+                                probe.connect_ex(("127.0.0.1", port)), 0, "退出后网关仍在监听"
+                            )
+                        with socket.socket() as listener:
+                            listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                            listener.bind(("127.0.0.1", port))
+                        runtime = root / "storage/.cache/runtime"
+                        self.assertFalse((runtime / "gpu-runtime.lock.quarantine").exists())
+                        for name in ("ornith-llama-server.pid", "qwen3-6-llama-server.pid"):
+                            self.assertFalse((runtime / name).exists())
+                        console.seek(0)
+                        self.assertNotIn(key, console.read())
+                    finally:
+                        if process.poll() is None:
+                            process.terminate()
+                            process.wait(timeout=20)
+                        # 即使回归失败，也只清理该测试启动的独立进程组，避免污染后续端口。
+                        groups = {
+                            int(line.split()[1])
+                            for line in trace_path.read_text().splitlines()
+                            if line.startswith("service-pid ")
+                        }
+                        for name in ("ornith-llama-server.pid", "qwen3-6-llama-server.pid"):
+                            pid_file = root / "storage/.cache/runtime" / name
+                            if pid_file.exists():
+                                groups.add(int(pid_file.read_text()))
+                        for pgid in groups:
+                            try:
+                                os.killpg(pgid, signal.SIGKILL)
+                            except ProcessLookupError:
+                                pass
+
     def test_positive_timeouts_reject_zero_and_invalid_decimals_before_startup(self) -> None:
         for variable in (
             "ORNITH_SLEEP_TIMEOUT",
@@ -167,7 +327,7 @@ class StartServicesTests(unittest.TestCase):
                         timeout=15,
                     )
                     self.assertNotEqual(completed.returncode, 0)
-                    self.assertIn(f"{variable} 必须是正数", completed.stderr)
+                    self.assertIn(f"{variable} 必须是正数", completed.stdout + completed.stderr)
                     self.assertNotIn("manager.py", trace_path.read_text())
 
     def test_default_text_settings_match_measured_profile(self) -> None:
@@ -216,7 +376,7 @@ class StartServicesTests(unittest.TestCase):
                 env=environment,
                 timeout=30,
             )
-            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
             starts = [
                 line
                 for line in trace_path.read_text().splitlines()
@@ -240,7 +400,12 @@ class StartServicesTests(unittest.TestCase):
                 executable = bin_dir / command
                 executable.write_text(
                     f"#!/usr/bin/env bash\nprintf '%s %s\\n' '{command}' \"$*\" >> \"$TRACE\"\n"
-                    'if [[ "$*" == *main.py* ]]; then sleep 1; exit 0; fi\n',
+                    'if [[ "$*" == *"uvicorn easel_bridge.app:app"* ]]; then\n'
+                    "  printf 'bridge-upstreams %s %s %s\\n' "
+                    '"$EASEL_BRIDGE_QWEN_URL" "$EASEL_BRIDGE_MOSS_URL" '
+                    '"$EASEL_BRIDGE_VOXCPM_URL" >> "$TRACE"\n'
+                    "fi\n"
+                    'if [[ "$*" == *main.py* || "$*" == *"uvicorn easel_bridge.app:app"* ]]; then sleep 1; exit 0; fi\n',
                     encoding="utf-8",
                 )
                 executable.chmod(0o755)
@@ -281,18 +446,20 @@ class StartServicesTests(unittest.TestCase):
                 **os.environ,
                 "PATH": f"{bin_dir}:{os.environ['PATH']}",
                 "TRACE": str(trace_path),
+                "EASEL_BRIDGE_ENV_FILE": str(root / "bridge.env"),
+                "EASEL_BRIDGE_API_KEY": "test-bridge-secret-" + "x" * 32,
+                "EASEL_BRIDGE_PORT": "18500",
                 "STORAGE_DIR": str(root / "storage"),
                 "RUNTIME_CACHE_DIR": str(root / "storage/.cache/runtime"),
                 "HF_MIRROR_DIR": str(root / "hf-mirror"),
                 "SDCPP_BIN": str(sd_cpp_binary),
                 "SDCPP_BIN_SHA256": hashlib.sha256(sd_cpp_binary.read_bytes()).hexdigest(),
-                "MOSS_IMAGE_HOST": "127.0.0.1",
                 "MOSS_IMAGE_PORT": "18501",
                 "FLUX3_IMAGE_HOST": "127.0.0.1",
                 "FLUX3_IMAGE_PORT": "18502",
                 "FLUX3_IMAGE_UPLOAD_DIR": str(root / "storage/.cache/runtime/sdcpp_uploads"),
                 "FLUX3_IMAGE_MAX_UPLOAD_BYTES": "67108864",
-                "HOST": "127.0.0.1",
+                "HOST": "0.0.0.0",
                 "PORT": "18300",
                 "QWEN_VOICEDESIGN_HOST": "127.0.0.1",
                 "QWEN_VOICEDESIGN_PORT": "18301",
@@ -327,6 +494,15 @@ class StartServicesTests(unittest.TestCase):
                 "LLM_LOCAL_QWEN3_VOICEDESIGN_PROVIDER": "localai",
                 "LLM_LOCAL_AUDIO_CPP_PROVIDER": "localai",
             }
+            environment.pop("MOSS_IMAGE_HOST", None)
+            environment.pop("QWEN36_HOST", None)
+            environment.pop("VOXCPM2_HOST", None)
+            for variable in (
+                "EASEL_BRIDGE_QWEN_URL",
+                "EASEL_BRIDGE_MOSS_URL",
+                "EASEL_BRIDGE_VOXCPM_URL",
+            ):
+                environment.pop(variable, None)
             completed = subprocess.run(
                 ["bash", str(ROOT / "start.sh")],
                 check=False,
@@ -336,10 +512,19 @@ class StartServicesTests(unittest.TestCase):
                 timeout=15,
             )
 
-            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+            self.assertIn("http://127.0.0.1:18501/v1/openmoss/", completed.stdout)
+            self.assertIn("http://127.0.0.1:18404/v1/qwen/", completed.stdout)
+            self.assertIn("http://127.0.0.1:8313/v1/OpenBMB/VoxCPM2-GGUF", completed.stdout)
             calls = trace_path.read_text(encoding="utf-8").splitlines()
             uv_calls = [call for call in calls if call.startswith("uv ")]
-            self.assertEqual(len(uv_calls), 18)
+            self.assertEqual(len(uv_calls), 19)
+            bridge_call = next(call for call in uv_calls if "uvicorn easel_bridge.app:app" in call)
+            self.assertIn("--host 127.0.0.1 --port 18500", bridge_call)
+            upstreams = next(call for call in calls if call.startswith("bridge-upstreams "))
+            self.assertIn("http://127.0.0.1:18404/v1/qwen/Qwen3.6-35B-A3B-MTP", upstreams)
+            self.assertIn("http://127.0.0.1:18501/v1/openmoss/MOSS-Image-SFT-Q8_0", upstreams)
+            self.assertIn("http://127.0.0.1:8313/v1/OpenBMB/VoxCPM2-GGUF", upstreams)
             self.assertTrue(any(f"--project {ROOT / 'main'}" in call for call in uv_calls))
             self.assertTrue(
                 any(
@@ -413,6 +598,7 @@ class StartServicesTests(unittest.TestCase):
                 "18405",
                 "18501",
                 "18502",
+                "18500",
             ):
                 self.assertIn(port, port_check)
             llama_starts = [call for call in calls if call.startswith("llama-server ")]
@@ -513,7 +699,7 @@ class StartServicesTests(unittest.TestCase):
                         timeout=15,
                     )
                     self.assertNotEqual(completed.returncode, 0)
-                    self.assertIn(error_text, completed.stderr)
+                    self.assertIn(error_text, completed.stdout + completed.stderr)
                     self.assertNotIn("scripts/localai/manager.py", trace_path.read_text())
 
             environment, trace_path = _preflight_environment(Path(temporary) / "missing-tokenizer")
@@ -531,7 +717,7 @@ class StartServicesTests(unittest.TestCase):
                 timeout=15,
             )
             self.assertNotEqual(completed.returncode, 0)
-            self.assertIn("tokenizer.json", completed.stderr)
+            self.assertIn("tokenizer.json", completed.stdout + completed.stderr)
             self.assertNotIn("scripts/localai/manager.py", trace_path.read_text())
 
     def test_flux3_missing_component_fails_before_localai_starts(self) -> None:
@@ -553,7 +739,9 @@ class StartServicesTests(unittest.TestCase):
             )
 
             self.assertNotEqual(completed.returncode, 0)
-            self.assertIn("mmproj-Qwen3VL-4B-Instruct-Q8_0.gguf", completed.stderr)
+            self.assertIn(
+                "mmproj-Qwen3VL-4B-Instruct-Q8_0.gguf", completed.stdout + completed.stderr
+            )
             self.assertNotIn("scripts/localai/manager.py", trace_path.read_text())
 
     def test_flux3_upload_limit_must_be_positive_integer(self) -> None:
@@ -570,7 +758,9 @@ class StartServicesTests(unittest.TestCase):
                     timeout=15,
                 )
                 self.assertNotEqual(completed.returncode, 0)
-                self.assertIn("FLUX3_IMAGE_MAX_UPLOAD_BYTES 必须是正整数", completed.stderr)
+                self.assertIn(
+                    "FLUX3_IMAGE_MAX_UPLOAD_BYTES 必须是正整数", completed.stdout + completed.stderr
+                )
                 self.assertNotIn("scripts/localai/manager.py", trace_path.read_text())
 
     def test_invalid_draft_settings_fail_before_localai_starts(self) -> None:
@@ -595,7 +785,7 @@ class StartServicesTests(unittest.TestCase):
                     timeout=15,
                 )
                 self.assertNotEqual(completed.returncode, 0)
-                self.assertIn(variable, completed.stderr)
+                self.assertIn(variable, completed.stdout + completed.stderr)
                 self.assertNotIn("manager.py", trace_path.read_text())
 
     def test_missing_llama_server_fails_before_localai_starts(self) -> None:
@@ -614,7 +804,7 @@ class StartServicesTests(unittest.TestCase):
             )
 
             self.assertNotEqual(completed.returncode, 0)
-            self.assertIn("llama-server", completed.stderr)
+            self.assertIn("llama-server", completed.stdout + completed.stderr)
             calls = trace_path.read_text(encoding="utf-8").splitlines()
             self.assertFalse(any("manager.py" in call for call in calls))
 
@@ -642,8 +832,8 @@ class StartServicesTests(unittest.TestCase):
             )
 
             self.assertNotEqual(completed.returncode, 0)
-            self.assertIn("Ornith GGUF 缺失或为空", completed.stderr)
-            self.assertNotIn("找不到可执行的 llama-server", completed.stderr)
+            self.assertIn("Ornith GGUF 缺失或为空", completed.stdout + completed.stderr)
+            self.assertNotIn("找不到可执行的 llama-server", completed.stdout + completed.stderr)
             calls = trace_path.read_text(encoding="utf-8").splitlines()
             self.assertFalse(any("manager.py" in call for call in calls))
 
@@ -662,7 +852,7 @@ class StartServicesTests(unittest.TestCase):
                 env=environment,
                 timeout=30,
             )
-            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
             calls = trace_path.read_text(encoding="utf-8").splitlines()
             ornith_start = next(call for call in calls if call.startswith("llama-server "))
             self.assertIn("--spec-type none", ornith_start)
@@ -682,7 +872,7 @@ class StartServicesTests(unittest.TestCase):
                 timeout=15,
             )
             self.assertNotEqual(completed.returncode, 0)
-            self.assertIn("Ornith MTP 缺失或为空", completed.stderr)
+            self.assertIn("Ornith MTP 缺失或为空", completed.stdout + completed.stderr)
             calls = trace_path.read_text(encoding="utf-8").splitlines()
             self.assertFalse(any("manager.py" in call for call in calls))
 
@@ -702,7 +892,7 @@ class StartServicesTests(unittest.TestCase):
             )
 
             self.assertNotEqual(completed.returncode, 0)
-            self.assertIn("GGUF 缺失或为空", completed.stderr)
+            self.assertIn("GGUF 缺失或为空", completed.stdout + completed.stderr)
             calls = trace_path.read_text(encoding="utf-8").splitlines()
             self.assertFalse(any("manager.py" in call for call in calls))
 
@@ -722,7 +912,7 @@ class StartServicesTests(unittest.TestCase):
             )
 
             self.assertNotEqual(completed.returncode, 0)
-            self.assertIn("mmproj 缺失或为空", completed.stderr)
+            self.assertIn("mmproj 缺失或为空", completed.stdout + completed.stderr)
             calls = trace_path.read_text(encoding="utf-8").splitlines()
             self.assertFalse(any("manager.py" in call for call in calls))
 
@@ -742,7 +932,7 @@ class StartServicesTests(unittest.TestCase):
             )
 
             self.assertNotEqual(completed.returncode, 0)
-            self.assertIn("Qwen3.6 GGUF 缺失或为空", completed.stderr)
+            self.assertIn("Qwen3.6 GGUF 缺失或为空", completed.stdout + completed.stderr)
             calls = trace_path.read_text(encoding="utf-8").splitlines()
             self.assertFalse(any("manager.py" in call for call in calls))
 
@@ -766,7 +956,7 @@ class StartServicesTests(unittest.TestCase):
                 )
 
                 self.assertNotEqual(completed.returncode, 0)
-                self.assertIn(message, completed.stderr)
+                self.assertIn(message, completed.stdout + completed.stderr)
                 calls = trace_path.read_text(encoding="utf-8").splitlines()
                 self.assertFalse(any("manager.py" in call for call in calls))
 
@@ -820,7 +1010,7 @@ class StartServicesTests(unittest.TestCase):
             )
 
             self.assertNotEqual(completed.returncode, 0)
-            self.assertIn("未提供 CUDA0", completed.stderr)
+            self.assertIn("未提供 CUDA0", completed.stdout + completed.stderr)
             calls = trace_path.read_text(encoding="utf-8").splitlines()
             self.assertFalse(any("manager.py" in call for call in calls))
 

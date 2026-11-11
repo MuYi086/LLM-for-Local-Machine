@@ -22,7 +22,7 @@
 ## 项目范围和服务
 
 仓库维护九个音频模型服务、Ornith 和 Qwen 两个文本模型 API、MOSS 与 FLUX.3 Klein 两个图片 API、
-一个轻量控制面和 Steam Audio CPU renderer。start.sh 管理十六个 HTTP 进程，包括只绑定 loopback 的两个 llama.cpp backend；
+一个轻量控制面、Steam Audio CPU renderer 和 Easel/OpenCode API bridge。start.sh 管理十七个 HTTP 进程，包括只绑定 loopback 的两个 llama.cpp backend；
 Steam Audio renderer 由控制面按需调用，
 不是 HTTP 服务。八个 audio.cpp 服务共用一个轻量 uv 项目，避免重复安装 Torch 和 Python 推理依赖。
 
@@ -45,10 +45,15 @@ Steam Audio renderer 由控制面按需调用，
 | gen_stable-audio-3-small-sfx/ | 8343 | POST /v1/stabilityai/Stable-Audio-3-Small-SFX-GGUF | 音效生成 |
 | tts_voxcpm2/ | 8313 | POST /v1/OpenBMB/VoxCPM2-GGUF | TTS、音色设计和可选参考克隆 |
 | spatial_steam-audio/ | 无 HTTP 端口 | 由 8300 控制面调用 | C++17 CPU 空间 renderer |
+| easel_bridge/ | 8500（仅 127.0.0.1） | GET /v1/models；POST /v1/images/generations、/v1/audio/speech、/v1/chat/completions | Bearer 鉴权及 OpenAI-compatible 路由代理；只调用现有模型 API |
 
 文档按源码描述已接入的接口，不把上游 family 声明等同于模型能力。项目介绍、部署和 API 示例见
 [README.md](README.md)。GGUF 文件名、环境变量、LocalAI model ID、family/task、路由与端口以
 [audio-cpp-models.json](localai/manifests/audio-cpp-models.json) 为准。
+
+Easel bridge 必须只监听 loopback，启动时必须设置至少 32 字节的随机 `EASEL_BRIDGE_API_KEY`；严禁匿名运行或把该 Key 转发到上游。
+图片、语音与 Qwen 请求只转发给既有 MOSS、VoxCPM2、Qwen3.6 API，不得直接加载模型或绕过共享 GPU 锁。
+路由与兼容限制见 [Easel 网关说明](docs/easel-bridge.md)。
 
 ## 目录职责和运行环境
 
@@ -89,7 +94,7 @@ llama.cpp 源码/二进制均在仓库外，不提交权重或第三方源码。
 文本模型默认采用串行实测配置：Ornith 线程 6/8、Qwen 线程 8/8，主 KV 为 Q8、MTP 草稿长度为 4、
 草稿 KV 为 F16、load-mode 为 none；详细步骤与结论见 tests/model_web_comparison/README.md。
 
-bash start.sh 先检查全部十六个 HTTP 端口、sd.cpp 可执行文件摘要和 MOSS、FLUX.3 Klein 各自四个模型组件、两个文本模型权重和 CUDA llama-server，注册九个 LocalAI 候选并执行 readiness
+bash start.sh 自动读取 `.env.easel-bridge`，校验网关 Key，再检查全部十七个 HTTP 端口、sd.cpp 可执行文件摘要和 MOSS、FLUX.3 Klein 各自四个模型组件、两个文本模型权重和 CUDA llama-server，注册九个 LocalAI 候选并执行 readiness
 预检；之后通过共享 GPU 锁依次预热 Ornith 与 Qwen，确认模型进入 sleep-idle 后再启动控制面和全部 API。
 任一服务退出时清理全部服务进程组并分别确认两个 llama.cpp backend 停止。使用 Ctrl+C 等待正常退出；若 backend 停止状态不能确认，
 保留 quarantine 标记并按恢复流程处理。
