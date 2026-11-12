@@ -6,22 +6,24 @@ import asyncio
 import email
 import io
 import json
+import tempfile
 import unittest
 import wave
 from email import policy
+from unittest.mock import patch
 
 import httpx
 from fastapi.testclient import TestClient
 
 from easel_bridge.app import (
     MOSS_MODEL_ID,
-    QWEN_MODEL_ID,
+    CHAT_MODEL_ID,
     VOXCPM_MODEL_ID,
     create_app,
 )
 
 API_KEY = "bridge-test-secret-00000000000000000000000000000000"
-QWEN_URL = "http://qwen.test/v1/qwen/Qwen3.6-35B-A3B-MTP"
+CHAT_URL = "http://ornith.test/v1/AtomicChat/Ornith-1.5-35B-A3B-AD-Q5"
 MOSS_URL = "http://moss.test/v1/openmoss/MOSS-Image-SFT-Q8_0"
 VOXCPM_URL = "http://voice.test/v1/OpenBMB/VoxCPM2-GGUF"
 PNG_B64 = "iVBORw0KGgo="
@@ -65,12 +67,18 @@ class _AsyncBytesStream(httpx.AsyncByteStream):
 
 class EaselBridgeTests(unittest.TestCase):
     def setUp(self) -> None:
+        directory = self.enterContext(tempfile.TemporaryDirectory())
+        self.enterContext(
+            patch.dict(
+                "os.environ", {"MODEL_TELEMETRY_DIR": directory, "MODEL_TELEMETRY_ENABLED": "true"}
+            )
+        )
         self.requests: list[httpx.Request] = []
         self.wav = _wav_bytes()
 
         def upstream(request: httpx.Request) -> httpx.Response:
             self.requests.append(request)
-            if request.url == httpx.URL(QWEN_URL):
+            if request.url == httpx.URL(CHAT_URL):
                 if json.loads(request.content).get("stream"):
                     return httpx.Response(
                         200,
@@ -97,7 +105,7 @@ class EaselBridgeTests(unittest.TestCase):
         self.transport = httpx.MockTransport(upstream)
         self.app = create_app(
             api_key=API_KEY,
-            qwen_url=QWEN_URL,
+            chat_url=CHAT_URL,
             moss_url=MOSS_URL,
             voxcpm_url=VOXCPM_URL,
             transport=self.transport,
@@ -130,7 +138,7 @@ class EaselBridgeTests(unittest.TestCase):
             await incoming.put(
                 {
                     "type": "http.request",
-                    "body": json.dumps({"model": QWEN_MODEL_ID, "stream": True}).encode(),
+                    "body": json.dumps({"model": CHAT_MODEL_ID, "stream": True}).encode(),
                     "more_body": False,
                 }
             )
@@ -169,7 +177,7 @@ class EaselBridgeTests(unittest.TestCase):
         self.assertEqual(allowed.status_code, 200)
         self.assertEqual(
             {model["id"] for model in allowed.json()["data"]},
-            {QWEN_MODEL_ID, MOSS_MODEL_ID, VOXCPM_MODEL_ID},
+            {CHAT_MODEL_ID, MOSS_MODEL_ID, VOXCPM_MODEL_ID},
         )
 
     def test_image_generation_maps_to_moss_route_and_returns_openai_image_shape(self) -> None:
@@ -228,7 +236,7 @@ class EaselBridgeTests(unittest.TestCase):
             "/v1/chat/completions",
             headers=self._headers(),
             json={
-                "model": QWEN_MODEL_ID,
+                "model": CHAT_MODEL_ID,
                 "messages": [{"role": "user", "content": "hello"}],
                 "stream": True,
             },
@@ -237,8 +245,12 @@ class EaselBridgeTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.headers["content-type"].startswith("text/event-stream"))
         self.assertIn(b"data: [DONE]", response.content)
-        self.assertEqual(self.requests[-1].url, httpx.URL(QWEN_URL))
-        self.assertEqual(json.loads(self.requests[-1].content)["model"], QWEN_MODEL_ID)
+        self.assertEqual(self.requests[-1].url, httpx.URL(CHAT_URL))
+        self.assertEqual(json.loads(self.requests[-1].content)["model"], CHAT_MODEL_ID)
+        self.assertEqual(
+            response.headers["x-model-request-id"], self.requests[-1].headers["x-model-request-id"]
+        )
+        self.assertNotIn("authorization", self.requests[-1].headers)
 
     def test_speech_maps_openai_json_to_voxcpm_multipart_and_returns_wav(self) -> None:
         response = self.client.post(
@@ -267,7 +279,7 @@ class EaselBridgeTests(unittest.TestCase):
     def test_speech_converts_wav_to_mp3_when_requested(self) -> None:
         app = create_app(
             api_key=API_KEY,
-            qwen_url=QWEN_URL,
+            chat_url=CHAT_URL,
             moss_url=MOSS_URL,
             voxcpm_url=VOXCPM_URL,
             transport=self.transport,
@@ -303,7 +315,7 @@ class EaselBridgeTests(unittest.TestCase):
 
         app = create_app(
             api_key=API_KEY,
-            qwen_url=QWEN_URL,
+            chat_url=CHAT_URL,
             moss_url=MOSS_URL,
             voxcpm_url=VOXCPM_URL,
             transport=httpx.MockTransport(unavailable),
@@ -321,7 +333,7 @@ class EaselBridgeTests(unittest.TestCase):
     def test_large_request_body_is_rejected_before_model_dispatch(self) -> None:
         app = create_app(
             api_key=API_KEY,
-            qwen_url=QWEN_URL,
+            chat_url=CHAT_URL,
             moss_url=MOSS_URL,
             voxcpm_url=VOXCPM_URL,
             transport=self.transport,
@@ -340,7 +352,7 @@ class EaselBridgeTests(unittest.TestCase):
     def test_application_refuses_to_start_without_a_bearer_key(self) -> None:
         app = create_app(
             api_key="",
-            qwen_url=QWEN_URL,
+            chat_url=CHAT_URL,
             moss_url=MOSS_URL,
             voxcpm_url=VOXCPM_URL,
             transport=self.transport,
@@ -355,7 +367,7 @@ class EaselBridgeTests(unittest.TestCase):
             with self.subTest(key=key):
                 app = create_app(
                     api_key=key,
-                    qwen_url=QWEN_URL,
+                    chat_url=CHAT_URL,
                     moss_url=MOSS_URL,
                     voxcpm_url=VOXCPM_URL,
                     transport=self.transport,

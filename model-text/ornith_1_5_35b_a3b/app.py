@@ -17,6 +17,7 @@ from urllib.parse import urlsplit
 import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import Response, StreamingResponse
+from llm_local_runtime.telemetry import TelemetryMiddleware, numeric_fields
 
 from llm_local_runtime import (
     GpuLockTimeoutError,
@@ -212,6 +213,7 @@ def create_app(
             await app.state.llama_client.aclose()
 
     app = FastAPI(title=f"{model_alias} API", lifespan=lifespan)
+    app.add_middleware(TelemetryMiddleware, service=backend_env_prefix.lower(), paths={api_route})
 
     async def acquire_lease() -> AbstractContextManager[GpuRuntimeMetrics]:
         """在线程池等待共享 GPU 锁，避免阻塞异步事件循环。"""
@@ -309,7 +311,28 @@ def create_app(
             raise HTTPException(status_code=400, detail="请求正文必须是 JSON 对象。")
 
         payload["model"] = model_alias
+        trace = request.scope.get("model_telemetry")
+        if trace:
+            if payload.get("stream") is True:
+                options = payload.get("stream_options")
+                if options is None:
+                    payload["stream_options"] = {"include_usage": True}
+                elif isinstance(options, dict):
+                    options.setdefault("include_usage", True)
+            trace.metadata["generation"] = numeric_fields(
+                payload, {"max_tokens", "max_completion_tokens", "temperature", "top_p", "seed"}
+            )
+            trace.mark("queue_enter")
+            trace.metadata.update(
+                {
+                    "backend_pid": resolved_backend_pid,
+                    "model": model_alias,
+                    "stream": payload.get("stream") is True,
+                }
+            )
         lease, marker_content, client = await begin_request()
+        if trace:
+            trace.mark("lease_acquired")
         lease_released = False
         marker_cleanup_attempted = False
         stream_owns_lease = False
@@ -318,6 +341,8 @@ def create_app(
             """客户端取消时也等到后端收尾，再按本次请求身份清除隔离标记。"""
             nonlocal marker_cleanup_attempted
             marker_cleanup_attempted = True
+            if trace:
+                trace.mark("cleanup_start")
             cleanup_task = asyncio.create_task(wait_for_sleep_and_clear(marker_content))
             cancellation_received = False
             while True:
@@ -351,6 +376,8 @@ def create_app(
                 except asyncio.CancelledError as exc:
                     cancellation_error = exc
                 finally:
+                    if trace:
+                        trace.mark("cleanup_end")
                     release_task = asyncio.create_task(release_lease(lease))
                     while True:
                         try:
@@ -361,6 +388,8 @@ def create_app(
                             if release_task.done():
                                 release_task.result()
                                 break
+                if trace:
+                    trace.mark("lease_released")
                 if cancellation_error is not None:
                     raise cancellation_error
 
@@ -373,6 +402,8 @@ def create_app(
                         detail="llama.cpp 请求前未确认模型休眠，GPU 已隔离，请运行恢复流程。",
                     )
                 raise HTTPException(status_code=503, detail="llama.cpp 服务尚未进入 sleep-idle。")
+            if trace:
+                trace.mark("backend_send")
             try:
                 upstream = await client.send(
                     client.build_request("POST", CHAT_COMPLETIONS_PATH, json=payload),
@@ -387,6 +418,8 @@ def create_app(
                     ) from exc
                 raise HTTPException(status_code=503, detail="llama.cpp 服务暂不可用。") from exc
 
+            if trace:
+                trace.mark("backend_headers")
             response_headers = (
                 {"content-type": upstream.headers["content-type"]}
                 if "content-type" in upstream.headers

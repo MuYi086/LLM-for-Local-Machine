@@ -1,0 +1,92 @@
+diff --git a/tools/server/server-context.cpp b/tools/server/server-context.cpp
+index 78c8ef1..cfa6573 100644
+--- a/tools/server/server-context.cpp
++++ b/tools/server/server-context.cpp
+@@ -5301,13 +5301,20 @@ server_context_meta server_context::get_meta() const {
+ // generator-like API for HTTP response generation
+ // may have bypass_sleep = true if the task does not use ctx_server
+ struct server_res_generator : server_res_spipe {
++    server_queue * model_request_queue = nullptr;
+     server_response_reader rd;
+     server_res_generator(server_queue & queue_tasks, server_response & queue_results, int sleep_idle_seconds, bool bypass_sleep = false)
+             : rd(queue_tasks, queue_results, HTTP_POLLING_SECONDS) {
+         // fast path in case sleeping is disabled
+         bypass_sleep |= sleep_idle_seconds < 0;
+         if (!bypass_sleep) {
+-            queue_tasks.wait_until_no_sleep();
++            queue_tasks.acquire_model_request();
++            model_request_queue = &queue_tasks;
++        }
++    }
++    ~server_res_generator() override {
++        if (model_request_queue) {
++            model_request_queue->release_model_request();
+         }
+     }
+     void ok(const json & response_data) {
+diff --git a/tools/server/server-queue.cpp b/tools/server/server-queue.cpp
+index c4ce907..f2b84d4 100644
+--- a/tools/server/server-queue.cpp
++++ b/tools/server/server-queue.cpp
+@@ -129,6 +129,29 @@ void server_queue::wait_until_no_sleep() {
+     }
+ }
+ 
++void server_queue::acquire_model_request() {
++    // Reserve before waking: no gap may allow idle unload after wakeup.
++    {
++        std::unique_lock<std::mutex> lock(mutex_tasks);
++        ++active_model_requests;
++    }
++    try {
++        wait_until_no_sleep();
++    } catch (...) {
++        release_model_request();
++        throw;
++    }
++}
++
++void server_queue::release_model_request() {
++    std::unique_lock<std::mutex> lock(mutex_tasks);
++    GGML_ASSERT(active_model_requests > 0);
++    if (--active_model_requests == 0) {
++        time_last_task = ggml_time_ms();
++        condition_tasks.notify_all();
++    }
++}
++
+ void server_queue::terminate() {
+     std::unique_lock<std::mutex> lock(mutex_tasks);
+     running = false;
+@@ -289,7 +312,7 @@ void server_queue::start_loop(int64_t idle_sleep_ms) {
+     constexpr auto max_wait_time = std::chrono::seconds(1);
+     auto should_sleep = [&]() -> bool {
+         // caller must hold mutex_tasks
+-        if (idle_sleep_ms < 0) {
++        if (idle_sleep_ms < 0 || active_model_requests > 0) {
+             return false;
+         }
+         int64_t now = ggml_time_ms();
+diff --git a/tools/server/server-queue.h b/tools/server/server-queue.h
+index 692255e..25e5198 100644
+--- a/tools/server/server-queue.h
++++ b/tools/server/server-queue.h
+@@ -19,6 +19,7 @@ private:
+     bool sleeping = false;
+     bool req_stop_sleeping = false;
+     int64_t time_last_task = 0;
++    size_t active_model_requests = 0; // guarded by mutex_tasks
+ 
+     // queues
+     std::deque<server_task> queue_tasks;
+@@ -69,6 +70,10 @@ public:
+     // returns immediately if not sleeping
+     void wait_until_no_sleep();
+ 
++    // Keep model/vocab alive from HTTP preprocessing through response destruction.
++    void acquire_model_request();
++    void release_model_request();
++
+     bool is_sleeping() {
+         std::unique_lock<std::mutex> lock(mutex_tasks);
+         return sleeping;

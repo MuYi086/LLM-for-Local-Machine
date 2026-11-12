@@ -1,6 +1,6 @@
 # LLM Local Backend
 
-本仓库当前提供九个音频模型 HTTP API、两个文本模型 API、MOSS 与 FLUX.3 Klein 两个图片 API、
+本仓库当前提供九个音频模型 HTTP API、一个文本模型 API、MOSS 与 FLUX.3 Klein 两个图片 API、
 一个轻量控制面和一个 CPU 空间音频 renderer。
 所有 GPU API 共用同一个跨进程文件锁，接入约束、隔离和恢复步骤见[全局 GPU 锁说明](docs/global-gpu-lock.md)。
 
@@ -17,20 +17,17 @@
 | [Stable Audio SFX](model-audio/gen_stable-audio-3-small-sfx/) | 8343 | `POST /v1/stabilityai/Stable-Audio-3-Small-SFX-GGUF`，音效生成 |
 | [VoxCPM2](model-audio/tts_voxcpm2/) | 8313 | `POST /v1/OpenBMB/VoxCPM2-GGUF`，TTS、音色设计与可选参考克隆 |
 | [Ornith-1.5-35B-A3B](model-text/ornith_1_5_35b_a3b/) | 8401 | `POST /v1/AtomicChat/Ornith-1.5-35B-A3B-AD-Q5`，CUDA 推理，前 23 层 MoE 专家放 CPU，mmproj 支持图片 |
-| [Qwen3.6-35B-A3B-MTP](model-text/qwen3_6_35b_a3b/) | 8402 | `POST /v1/qwen/Qwen3.6-35B-A3B-MTP`，CUDA + CPU MoE 混合推理，启用 MTP |
 | [MOSS-Image-SFT-Q8_0](model-image/MOSS-Image-SFT-Q8_0/) | 8501 | `POST /v1/openmoss/MOSS-Image-SFT-Q8_0`，stable-diffusion.cpp CUDA 文生图 |
 | [FLUX-3-Image-Klein-GGUF-Q8](model-image/FLUX-3-Image-Klein-GGUF-Q8/) | 8502 | `POST /v1/openblack-forest-labs/FLUX-3-Image-Klein-GGUF-Q8` 文生图；`POST /v1/openblack-forest-labs/FLUX-3-Image-Klein-GGUF-Q8/edit` 图片编辑 |
 | [Steam Audio renderer](model-audio/spatial_steam-audio/) | 无 HTTP 端口 | C++17 CPU renderer，由 8300 控制面调用 |
 | [Easel API bridge](easel_bridge/) | 8500 | 受 Bearer Key 保护的 OpenAI-compatible 图片、语音和可选聊天接口 |
 
-共十七个 HTTP 进程由 `start.sh` 管理，包括两个仅绑定 loopback 的 llama-server 后端：Ornith 在 `127.0.0.1:8403`，
-Qwen 在 `127.0.0.2:8400`。LocalAI 保持在 `127.0.0.1:8400`，两者通过不同 loopback 地址并存。文本 API 适配器复用
+共十五个 HTTP 进程由 `start.sh` 管理，包括一个仅绑定 loopback 的 Ornith llama-server 后端 `127.0.0.1:8403`。LocalAI 保持在 `127.0.0.1:8400`。文本 API 适配器复用
 控制面 Python 项目；八个新增 audio.cpp API 共用轻量 Python 运行环境，不额外安装
 Torch。`storage/` 中的用户运行数据不会由代码清理。
 
-Easel/OpenCode 桥接服务由 `start.sh` 一并启动在 `127.0.0.1:8500`，只代理 MOSS-Image-SFT、VoxCPM2 和 Qwen3.6 Chat API。
-它不会启动或绕过模型服务，底层 GPU 锁与 sleep-idle 生命周期仍由既有服务管理。MOSS、VoxCPM2 和 Qwen3.6
-这三个桥接上游默认绑定 `127.0.0.1`，避免从网关之外绕过 Bearer 鉴权；可在本机环境变量中显式覆盖绑定地址。
+Easel/OpenCode 桥接服务由 `start.sh` 一并启动在 `127.0.0.1:8500`，只代理 MOSS-Image-SFT、VoxCPM2 和 Ornith Chat API。
+它不会启动或绕过模型服务，底层 GPU 锁与 sleep-idle 生命周期仍由既有服务管理。MOSS、VoxCPM2 与 Ornith 的聊天桥接上游默认绑定 `127.0.0.1`，避免从网关之外绕过 Bearer 鉴权；可在本机环境变量中显式覆盖绑定地址。
 配置和 Easel 中的模型填写项见 [Easel 本地模型网关](docs/easel-bridge.md)。
 
 ## 安装与启动
@@ -39,8 +36,7 @@ Easel/OpenCode 桥接服务由 `start.sh` 一并启动在 `127.0.0.1:8500`，只
 固定版本 LocalAI/audio.cpp，以及带 CUDA、CUDA0、`--spec-type draft-mtp` 和 sleep-idle 支持的 llama.cpp `llama-server`。九个音频模型 GGUF 从
 `$HF_MIRROR_DIR/audio.cpp-gguf/` 读取；固定文件名、family/task 和服务路由见
 [`localai/manifests/audio-cpp-models.json`](localai/manifests/audio-cpp-models.json)。Ornith 的 GGUF 与 mmproj
-从 `$HF_MIRROR_DIR/AtomicChat/Ornith-1.5-35B-A3B/` 读取，Qwen GGUF 从
-`$HF_MIRROR_DIR/unsloth/Qwen3.6-35B-A3B-MTP/` 读取，不复制进仓库。
+从 `$HF_MIRROR_DIR/AtomicChat/Ornith-1.5-35B-A3B/` 读取，不复制进仓库。
 版本和宿主制品指纹见[`localai/manifests/versions.json`](localai/manifests/versions.json)。
 运行与恢复步骤见[LocalAI/audio.cpp 运维说明](docs/localai-audiocpp-upgrade.md)。
 图片服务使用固定 commit 的 stable-diffusion.cpp CUDA `sd-cli`。MOSS-Image-SFT 组件从
@@ -77,9 +73,9 @@ bash start.sh
 脚本自动读取该文件；也可用 `EASEL_BRIDGE_ENV_FILE` 指定其他配置文件，网关端口由 `EASEL_BRIDGE_PORT` 设置，默认 8500。
 网关 Key 缺失、过短或使用模板占位符时，脚本在启动模型前退出，不会匿名运行。
 
-脚本先检查全部十七个监听端口、sd.cpp 二进制摘要、MOSS 与 FLUX.3 Klein 的模型组件、CUDA 构建的 llama.cpp、两个文本模型文件和必需参数，注册九个 GGUF 候选，
-启动受管 LocalAI/audio.cpp 并执行 readiness 检查；随后使用共享 GPU 锁依次预热 Ornith 和 Qwen，并确认模型进入 sleep-idle，
-再启动控制面与所有 API。两个文本 API 每次请求结束后持锁等待对应模型卸载，再释放 GPU 给其他 provider。
+脚本先检查全部十五个监听端口、sd.cpp 二进制摘要、MOSS 与 FLUX.3 Klein 的模型组件、CUDA 构建的 llama.cpp、Ornith 模型文件和必需参数，注册九个 GGUF 候选，
+启动受管 LocalAI/audio.cpp 并执行 readiness 检查；随后使用共享 GPU 锁预热 Ornith，并确认模型进入 sleep-idle，
+再启动控制面与所有 API。文本 API 每次请求结束后持锁等待模型卸载，再释放 GPU 给其他 provider。
 任一服务进程退出时会清理其他进程组和 llama-server，再停止受管 LocalAI。按 `Ctrl+C`
 正常等待退出；遇到进程异常时，检查 `scripts/localai/manager.py status` 和 GPU quarantine 标记。
 
@@ -95,8 +91,8 @@ Ctrl+C、终端挂断及清理期间再次按 Ctrl+C 都会继续完成已启动
 ~/hf-mirror/audio.cpp-gguf/Qwen3-TTS-12Hz-1.7B-VoiceDesign-GGUF/qwen3-tts-12hz-1.7b-voicedesign-bf16.gguf
 ```
 
-`start.sh` 的 Ornith 与 Qwen 默认参数已采用本机三次完整实测选定的配置；复测步骤、性能及资源结论见
-[文本模型对比测试](tests/model_web_comparison/README.md)。所有参数仍可通过环境变量覆盖。
+`start.sh` 的 Ornith 默认参数采用本机实测选定的配置；复测步骤、性能及资源结论见
+[文本模型对比测试](tests/model_web_comparison/README.md)。归档中的 Qwen3.6 数据仅供历史追溯。所有参数仍可通过环境变量覆盖。
 
 主要环境变量：
 
@@ -116,7 +112,7 @@ Ctrl+C、终端挂断及清理期间再次按 Ctrl+C 都会继续完成已启动
 | `ORNITH_SPEC_DRAFT_CACHE_TYPE_K` / `ORNITH_SPEC_DRAFT_CACHE_TYPE_V` | `f16` / `f16` | 独立 MTP 的 K/V 缓存类型 |
 | `ORNITH_HOST` / `ORNITH_PORT` | 继承 `HOST` / `8401` | Ornith 对外 API 监听地址 |
 | `LLAMA_CPP_PORT` | `8403` | Ornith llama-server loopback 端口，不绑定外部网卡 |
-| `ORNITH_CONTEXT_SIZE` | `32768` | llama.cpp 上下文长度，最大 `32768` |
+| `ORNITH_CONTEXT_SIZE` | `98304` | 当前 96k 测试配置；允许最大 `98304`，实际舒适度以本轮测试为准 |
 | `ORNITH_BATCH_SIZE` | `512` | llama.cpp logical batch size |
 | `ORNITH_THREADS` | `6` | llama.cpp CPU 推理线程数 |
 | `ORNITH_THREADS_BATCH` | `8` | 提示处理及 MTP 验证的 CPU 批量线程数 |
@@ -127,7 +123,6 @@ Ctrl+C、终端挂断及清理期间再次按 Ctrl+C 都会继续完成已启动
 | `ORNITH_SLEEP_IDLE_SECONDS` | `1` | llama.cpp 空闲后卸载模型和 KV cache 的秒数 |
 | `ORNITH_STARTUP_TIMEOUT` | `1800` 秒 | 等待首次加载并确认 sleep-idle 的最长时间 |
 | `ORNITH_SLEEP_TIMEOUT` | `300` 秒 | 单个请求结束后等待模型卸载的最长时间 |
-| `QWEN36_MODEL_FILE` | `$HF_MIRROR_DIR/unsloth/Qwen3.6-35B-A3B-MTP/Qwen3.6-35B-A3B-UD-Q5_K_M.gguf` | Qwen GGUF，只读加载 |
 | `SDCPP_BIN` | `$HOME/.local/src/stable-diffusion.cpp/build/bin/sd-cli` | 固定版本 stable-diffusion.cpp CLI |
 | `SDCPP_BIN_SHA256` | 必须显式设置 | 启动前校验 sd-cli 文件摘要 |
 | `SDCPP_MODEL_MANIFEST` | `sdcpp/manifests/models.json` | MOSS 模型组件、参数和资源清单 |
@@ -136,16 +131,6 @@ Ctrl+C、终端挂断及清理期间再次按 Ctrl+C 都会继续完成已启动
 | `FLUX3_IMAGE_UPLOAD_DIR` | `$RUNTIME_CACHE_DIR/sdcpp_uploads` | 图片编辑参考图的临时暂存目录 |
 | `FLUX3_IMAGE_MAX_UPLOAD_BYTES` | `67108864` | 编辑参考图上传上限，单位为字节 |
 | `SDCPP_RUN_TIMEOUT` / `SDCPP_CLEANUP_TIMEOUT` | `3600` / `30` 秒 | 单次图片生成和 worker 回收时限 |
-| `QWEN36_HOST` / `QWEN36_PORT` | `127.0.0.1` / `8402` | Qwen 网关聊天上游监听地址 |
-| `QWEN36_BACKEND_HOST` / `QWEN36_LLAMA_CPP_PORT` | `127.0.0.2` / `8400` | Qwen llama-server loopback 地址，与 LocalAI 的 `127.0.0.1:8400` 并存 |
-| `QWEN36_CONTEXT_SIZE` / `QWEN36_BATCH_SIZE` | `32768` / `512` | Qwen llama.cpp 上下文和 batch 大小 |
-| `QWEN36_THREADS` / `QWEN36_THREADS_BATCH` | `8` / `8` | 生成及 CPU 批量线程数 |
-| `QWEN36_CACHE_TYPE_K` / `QWEN36_CACHE_TYPE_V` | `q8_0` / `q8_0` | 主模型 K/V 缓存 |
-| `QWEN36_LOAD_MODE` | `none` | llama.cpp 加载方式 |
-| `QWEN36_SPEC_DRAFT_N_MAX` | `4` | 最大 MTP 草稿长度 |
-| `QWEN36_SPEC_DRAFT_CACHE_TYPE_K` / `QWEN36_SPEC_DRAFT_CACHE_TYPE_V` | `f16` / `f16` | MTP 草稿 K/V 缓存 |
-| `QWEN36_N_GPU_LAYERS` / `QWEN36_N_CPU_MOE` | `99` / `23` | CUDA0 层卸载与 CPU MoE 层数，默认混合推理配置 |
-| `QWEN36_SLEEP_IDLE_SECONDS` | `1` | llama.cpp 空闲后卸载模型和 KV cache 的秒数 |
 | `HF_MIRROR_DIR` | `~/hf-mirror` | 本地模型镜像根目录 |
 | `QWEN_VOICEDESIGN_MODEL_FILE` | 上述 GGUF 路径 | VoiceDesign 模型文件 |
 | `LLM_LOCALAI_DATA_DIR` | `$STORAGE_DIR/.cache/localai` | LocalAI binary、models、backend 和状态数据根目录 |
@@ -224,21 +209,6 @@ curl -X POST http://127.0.0.1:8401/v1/AtomicChat/Ornith-1.5-35B-A3B-AD-Q5 \
 ```
 
 真实模型样例生成入口见[`tests/ornith_1_5_35b_a3b/README.md`](tests/ornith_1_5_35b_a3b/README.md)。
-
-### Qwen3.6-35B-A3B-MTP 聊天补全
-
-Qwen 使用本机 `Qwen3.6-35B-A3B-UD-Q5_K_M.gguf`，固定 alias 为 `Qwen3.6-35B-A3B-MTP`。默认启用 CUDA0、
-25 个 CPU MoE 层和 `draft-mtp`；backend 绑定 `127.0.0.2:8400`，可与 `127.0.0.1:8400` 的 LocalAI 并存。
-对外接口为 `POST /v1/qwen/Qwen3.6-35B-A3B-MTP`：
-
-```bash
-curl -X POST http://127.0.0.1:8402/v1/qwen/Qwen3.6-35B-A3B-MTP \
-  -H 'Content-Type: application/json' \
-  -d '{"messages":[{"role":"user","content":"用中文简要解释 MTP。"}],"max_tokens":128}'
-uv run --project qa --locked python tests/qwen3_6_35b_a3b/generate_example.py
-```
-
-真实生成的非空文本默认写入 `storage/llm_tests/qwen3_6_35b_a3b/`。样例请求关闭 thinking，普通 API 请求保留客户端参数。
 
 ### Qwen3-TTS VoiceDesign
 
@@ -339,3 +309,11 @@ stable-diffusion.cpp 通用 CLI 执行层及 MOSS、FLUX.3 Klein 图片 API 已�
 
 纯文本训练实验见 `model-text/`；原视频集成已退役，相关源码留在 `model-video/`。第三方模型、源码、
 Steam Audio SDK 和权重许可各自适用，不由仓库 Apache-2.0 许可覆盖。
+
+### 模型测试性能记录
+
+`bash start.sh` 默认开启逐请求性能与资源记录，输出独立的性能目录。测试完成后可将
+[`config/model-telemetry.env`](config/model-telemetry.env) 中 `MODEL_TELEMETRY_ENABLED` 改为 `false` 并重启。
+每轮测试使用 `python3 scripts/model_telemetry.py begin --label 32k-run1` 创建标记，回复结束后运行
+`python3 scripts/model_telemetry.py end <测试ID>` 生成报告。采集范围、操作步骤与指标口径见
+[模型性能记录说明](docs/model-telemetry.md)。

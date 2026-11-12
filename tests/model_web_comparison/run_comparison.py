@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""用相同网页任务串行比较 Ornith 与 Qwen 的生成结果和资源占用。"""
+"""运行 Ornith 网页任务并记录生成结果和资源占用。"""
 
 from __future__ import annotations
 
@@ -35,15 +35,7 @@ MODELS = (
         "backend_port": 8403,
         "output_dir": ROOT / "tests/ornith_1_5_35b_a3b/outputs",
     },
-    {
-        "key": "qwen3_6_35b_a3b",
-        "name": "Qwen3.6-35B-A3B-MTP",
-        "api_base": "http://127.0.0.1:8402",
-        "route": "/v1/qwen/Qwen3.6-35B-A3B-MTP",
-        "backend_host": "127.0.0.2",
-        "backend_port": 8400,
-        "output_dir": ROOT / "tests/qwen3_6_35b_a3b/outputs",
-    },
+
 )
 
 
@@ -374,8 +366,6 @@ def inspect_page_quality(model_key: str, page: str) -> list[str]:
             f"aria-label 字符串拼接有 {len(malformed_label_fragments)} 处引号错误，"
             "原始页的内联 JavaScript 无法解析；并排预览副本只补齐这些引号，原始页保持不变。"
         )
-    if model_key == "qwen3_6_35b_a3b" and "目的地" not in page:
-        notes.append("没有实现任务要求的目的地输入框。")
     return notes
 
 
@@ -502,7 +492,7 @@ def format_memory_triplet(
 
 
 def write_comparison_page(report: dict[str, Any]) -> None:
-    """生成不依赖跨文件权限、可并排预览两份 HTML 页面的索引。"""
+    """生成离线预览页面。"""
     frames = []
     for result in report["results"]:
         source_path = ROOT / result["preview_file"]
@@ -519,13 +509,13 @@ def write_comparison_page(report: dict[str, Any]) -> None:
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Ornith 与 Qwen 网页任务对比</title>
+  <title>Ornith 网页任务结果</title>
   <style>
     :root { color-scheme: light; font-family: system-ui, sans-serif; }
     body { margin: 0; background: #f3f5f8; color: #172033; }
     header { padding: 1rem 1.5rem; background: #fff; border-bottom: 1px solid #dfe4ec; }
     h1 { margin: 0; font-size: 1.2rem; }
-    main { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; padding: 1rem; }
+    main { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; padding: 1rem; }
     section { min-width: 0; }
     h2 { margin: 0 0 .5rem; font-size: 1rem; }
     .note { margin: 0 0 .5rem; color: #9a3412; font-size: .85rem; }

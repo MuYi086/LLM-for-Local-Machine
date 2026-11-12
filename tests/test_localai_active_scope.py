@@ -142,7 +142,7 @@ class LocalAIActiveScopeTests(unittest.TestCase):
         self.assertEqual(client_factory.call_args.args[0].model, config.model)
         self.assertFalse(marker_path.exists())
 
-    def test_quarantine_recovery_stops_qwen_group_on_secondary_loopback(self) -> None:
+    def test_quarantine_recovery_stops_llama_group_on_loopback(self) -> None:
         group_states = iter([True, False])
         with tempfile.TemporaryDirectory() as temporary:
             lock_path = Path(temporary) / "gpu-runtime.lock"
@@ -152,9 +152,9 @@ class LocalAIActiveScopeTests(unittest.TestCase):
                     {
                         "schema_version": 1,
                         "provider": "llama.cpp",
-                        "model": "Qwen3.6-35B-A3B-MTP",
-                        "host": "127.0.0.2",
-                        "port": 18400,
+                        "model": "Ornith-1.5-35B-A3B-AD-Q5",
+                        "host": "127.0.0.1",
+                        "port": 18403,
                         "pid": 999991,
                         "pgid": 999991,
                         "pid_start_time": "12345",
@@ -175,7 +175,7 @@ class LocalAIActiveScopeTests(unittest.TestCase):
                 patch.object(
                     recover_quarantine,
                     "_process_command_line",
-                    return_value=["/opt/llama.cpp/llama-server", "--port", "18400"],
+                    return_value=["/opt/llama.cpp/llama-server", "--port", "18403"],
                 ),
                 patch.object(
                     recover_quarantine,
@@ -193,7 +193,7 @@ class LocalAIActiveScopeTests(unittest.TestCase):
             self.assertEqual(result, 0)
             self.assertEqual(killpg.call_args.args, (999991, recover_quarantine.signal.SIGTERM))
             self.assertTrue(port_open.called)
-            self.assertEqual(port_open.call_args.args, ("127.0.0.2", 18400))
+            self.assertEqual(port_open.call_args.args, ("127.0.0.1", 18403))
             self.assertFalse(marker_path.exists())
 
     def test_ornith_recovery_keeps_marker_while_loopback_api_is_open(self) -> None:
@@ -204,9 +204,9 @@ class LocalAIActiveScopeTests(unittest.TestCase):
                 json.dumps(
                     {
                         "provider": "llama.cpp",
-                        "model": "Qwen3.6-35B-A3B-MTP",
-                        "host": "127.0.0.2",
-                        "port": 18400,
+                        "model": "Ornith-1.5-35B-A3B-AD-Q5",
+                        "host": "127.0.0.1",
+                        "port": 18403,
                         "pid": None,
                         "pgid": None,
                     }

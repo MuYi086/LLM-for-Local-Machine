@@ -20,7 +20,6 @@ AUDIO_CPP_RUNTIME_PROJECT_DIR="$PROJECT_DIR/model-audio/audio_cpp_runtime"
 AUDIO_CPP_RUNTIME_SRC="$AUDIO_CPP_RUNTIME_PROJECT_DIR/src"
 MODEL_TEXT_DIR="$PROJECT_DIR/model-text"
 ORNITH_SERVICE_DIR="$MODEL_TEXT_DIR/ornith_1_5_35b_a3b"
-QWEN36_SERVICE_DIR="$MODEL_TEXT_DIR/qwen3_6_35b_a3b"
 MOSS_IMAGE_SERVICE_DIR="$PROJECT_DIR/model-image/MOSS-Image-SFT-Q8_0"
 FLUX3_IMAGE_SERVICE_DIR="$PROJECT_DIR/model-image/FLUX-3-Image-Klein-GGUF-Q8"
 EASEL_BRIDGE_ENV_FILE="${EASEL_BRIDGE_ENV_FILE:-$PROJECT_DIR/.env.easel-bridge}"
@@ -62,6 +61,24 @@ if [[ -f "$EASEL_BRIDGE_ENV_FILE" ]]; then
   source "$EASEL_BRIDGE_ENV_FILE"
   set +a
 fi
+# 显式环境变量优先于可编辑的默认配置，false 不影响必要的运行/故障日志。
+telemetry_enabled_override="${MODEL_TELEMETRY_ENABLED-}"
+telemetry_interval_override="${MODEL_TELEMETRY_INTERVAL_SECONDS-}"
+MODEL_TELEMETRY_CONFIG_FILE="${MODEL_TELEMETRY_CONFIG_FILE:-$PROJECT_DIR/config/model-telemetry.env}"
+if [[ -f "$MODEL_TELEMETRY_CONFIG_FILE" ]]; then
+  source "$MODEL_TELEMETRY_CONFIG_FILE"
+fi
+export MODEL_TELEMETRY_ENABLED="${telemetry_enabled_override:-${MODEL_TELEMETRY_ENABLED:-true}}"
+export MODEL_TELEMETRY_INTERVAL_SECONDS="${telemetry_interval_override:-${MODEL_TELEMETRY_INTERVAL_SECONDS:-1}}"
+case "${MODEL_TELEMETRY_ENABLED,,}" in
+  true|false|1|0|yes|no|on|off) ;;
+  *) echo "MODEL_TELEMETRY_ENABLED 必须为 true 或 false。" >&2; exit 1 ;;
+esac
+if [[ ! "$MODEL_TELEMETRY_INTERVAL_SECONDS" =~ ^([0-9]+([.][0-9]+)?|[.][0-9]+)$ ]] ||
+   [[ -z "${MODEL_TELEMETRY_INTERVAL_SECONDS//[.0]/}" ]]; then
+  echo "MODEL_TELEMETRY_INTERVAL_SECONDS 必须为正数。" >&2
+  exit 1
+fi
 export EASEL_BRIDGE_PORT="${EASEL_BRIDGE_PORT:-8500}"
 export EASEL_BRIDGE_API_KEY="${EASEL_BRIDGE_API_KEY:-}"
 if [[ ${#EASEL_BRIDGE_API_KEY} -lt 32 ]]; then
@@ -91,7 +108,6 @@ export AUDIO_CPP_VOXCPM2_MODEL_FILE="${AUDIO_CPP_VOXCPM2_MODEL_FILE:-$HF_MIRROR_
 export ORNITH_MODEL_FILE="${ORNITH_MODEL_FILE:-$HF_MIRROR_DIR/AtomicChat/Ornith-1.5-35B-A3B/Ornith-1.5-35B-A3B-AD-Q5_K-Q4_K.gguf}"
 export ORNITH_MMPROJ_FILE="${ORNITH_MMPROJ_FILE:-$HF_MIRROR_DIR/AtomicChat/Ornith-1.5-35B-A3B/mmproj-Ornith-1.5-35B-A3B-F16.gguf}"
 export ORNITH_MTP_FILE="${ORNITH_MTP_FILE:-$HF_MIRROR_DIR/AtomicChat/Ornith-1.5-35B-A3B/mtp-Ornith-1.5-35B-A3B-Q8_0.gguf}"
-export QWEN36_MODEL_FILE="${QWEN36_MODEL_FILE:-$HF_MIRROR_DIR/unsloth/Qwen3.6-35B-A3B-MTP/Qwen3.6-35B-A3B-UD-Q5_K_M.gguf}"
 export SDCPP_BIN="${SDCPP_BIN:-$HOME/.local/src/stable-diffusion.cpp/build/bin/sd-cli}"
 export SDCPP_BIN_SHA256="${SDCPP_BIN_SHA256:-}"
 export SDCPP_MODEL_MANIFEST="${SDCPP_MODEL_MANIFEST:-$PROJECT_DIR/sdcpp/manifests/models.json}"
@@ -160,8 +176,8 @@ export ORNITH_HOST="${ORNITH_HOST:-$HOST}"
 export ORNITH_PORT="${ORNITH_PORT:-8401}"
 export LLAMA_CPP_PORT="${LLAMA_CPP_PORT:-8403}"
 export ORNITH_LLAMA_BASE_URL="${ORNITH_LLAMA_BASE_URL:-http://127.0.0.1:$LLAMA_CPP_PORT}"
-# 默认采用同权重、32K 上下文下的实测配置，记录见 tests/model_web_comparison/README.md。
-export ORNITH_CONTEXT_SIZE="${ORNITH_CONTEXT_SIZE:-32768}"
+# 当前测试采用 96K 上下文；其他推理参数沿用既有实测配置，96K 性能需单独评估。
+export ORNITH_CONTEXT_SIZE="${ORNITH_CONTEXT_SIZE:-98304}"
 export ORNITH_BATCH_SIZE="${ORNITH_BATCH_SIZE:-512}"
 export ORNITH_THREADS="${ORNITH_THREADS:-6}"
 export ORNITH_THREADS_BATCH="${ORNITH_THREADS_BATCH:-8}"
@@ -180,31 +196,7 @@ export ORNITH_STARTUP_TIMEOUT="${ORNITH_STARTUP_TIMEOUT:-1800}"
 export ORNITH_SLEEP_TIMEOUT="${ORNITH_SLEEP_TIMEOUT:-300}"
 export ORNITH_SLEEP_POLL_INTERVAL="${ORNITH_SLEEP_POLL_INTERVAL:-0.25}"
 export ORNITH_BACKEND_PID_FILE="${ORNITH_BACKEND_PID_FILE:-$RUNTIME_CACHE_DIR/ornith-llama-server.pid}"
-export QWEN36_HOST="${QWEN36_HOST:-127.0.0.1}"
-export QWEN36_PORT="${QWEN36_PORT:-8402}"
-export QWEN36_BACKEND_HOST="${QWEN36_BACKEND_HOST:-127.0.0.2}"
-export QWEN36_LLAMA_CPP_PORT="${QWEN36_LLAMA_CPP_PORT:-8400}"
-export QWEN36_LLAMA_BASE_URL="${QWEN36_LLAMA_BASE_URL:-http://$QWEN36_BACKEND_HOST:$QWEN36_LLAMA_CPP_PORT}"
-export QWEN36_CONTEXT_SIZE="${QWEN36_CONTEXT_SIZE:-32768}"
-export QWEN36_BATCH_SIZE="${QWEN36_BATCH_SIZE:-512}"
-export QWEN36_THREADS="${QWEN36_THREADS:-8}"
-export QWEN36_THREADS_BATCH="${QWEN36_THREADS_BATCH:-8}"
-export QWEN36_CACHE_TYPE_K="${QWEN36_CACHE_TYPE_K:-q8_0}"
-export QWEN36_CACHE_TYPE_V="${QWEN36_CACHE_TYPE_V:-q8_0}"
-export QWEN36_LOAD_MODE="${QWEN36_LOAD_MODE:-none}"
-export QWEN36_SPEC_DRAFT_N_MAX="${QWEN36_SPEC_DRAFT_N_MAX:-4}"
-export QWEN36_SPEC_DRAFT_CACHE_TYPE_K="${QWEN36_SPEC_DRAFT_CACHE_TYPE_K:-f16}"
-export QWEN36_SPEC_DRAFT_CACHE_TYPE_V="${QWEN36_SPEC_DRAFT_CACHE_TYPE_V:-f16}"
-export QWEN36_N_GPU_LAYERS="${QWEN36_N_GPU_LAYERS:-99}"
-export QWEN36_N_CPU_MOE="${QWEN36_N_CPU_MOE:-23}"
-export QWEN36_SLEEP_IDLE_SECONDS="${QWEN36_SLEEP_IDLE_SECONDS:-1}"
-export QWEN36_STARTUP_TIMEOUT="${QWEN36_STARTUP_TIMEOUT:-1800}"
-export QWEN36_SLEEP_TIMEOUT="${QWEN36_SLEEP_TIMEOUT:-300}"
-export QWEN36_SLEEP_POLL_INTERVAL="${QWEN36_SLEEP_POLL_INTERVAL:-0.25}"
-export QWEN36_BACKEND_PID_FILE="${QWEN36_BACKEND_PID_FILE:-$RUNTIME_CACHE_DIR/qwen3-6-llama-server.pid}"
-
-# 受管 API 改用其他端口时，网关默认跟随；显式上游 URL 仍优先。
-export EASEL_BRIDGE_QWEN_URL="${EASEL_BRIDGE_QWEN_URL:-http://127.0.0.1:$QWEN36_PORT/v1/qwen/Qwen3.6-35B-A3B-MTP}"
+export EASEL_BRIDGE_CHAT_URL="${EASEL_BRIDGE_CHAT_URL:-http://127.0.0.1:$ORNITH_PORT/v1/AtomicChat/Ornith-1.5-35B-A3B-AD-Q5}"
 export EASEL_BRIDGE_MOSS_URL="${EASEL_BRIDGE_MOSS_URL:-http://127.0.0.1:$MOSS_IMAGE_PORT/v1/openmoss/MOSS-Image-SFT-Q8_0}"
 export EASEL_BRIDGE_VOXCPM_URL="${EASEL_BRIDGE_VOXCPM_URL:-http://127.0.0.1:${VOXCPM2_PORT:-8313}/v1/OpenBMB/VoxCPM2-GGUF}"
 
@@ -265,8 +257,6 @@ PORT_CHECK_ARGS=(
   'Qwen3-TTS VoiceDesign' "$QWEN_VOICEDESIGN_HOST" "$QWEN_VOICEDESIGN_PORT"
   'Ornith API' "$ORNITH_HOST" "$ORNITH_PORT"
   'Ornith llama.cpp backend' '127.0.0.1' "$LLAMA_CPP_PORT"
-  'Qwen3.6 API' "$QWEN36_HOST" "$QWEN36_PORT"
-  'Qwen3.6 llama.cpp backend' "$QWEN36_BACKEND_HOST" "$QWEN36_LLAMA_CPP_PORT"
   'MOSS-Image-SFT API' "$MOSS_IMAGE_HOST" "$MOSS_IMAGE_PORT"
   'FLUX.3 Klein Image API' "$FLUX3_IMAGE_HOST" "$FLUX3_IMAGE_PORT"
   'OpenAI-compatible bridge' '127.0.0.1' "$EASEL_BRIDGE_PORT"
@@ -319,17 +309,6 @@ if [[ "$ORNITH_LLAMA_BASE_URL" != "http://127.0.0.1:$LLAMA_CPP_PORT" ]]; then
   echo "ORNITH_LLAMA_BASE_URL 必须与 Ornith backend 的 127.0.0.1:$LLAMA_CPP_PORT 一致。" >&2
   exit 1
 fi
-case "$QWEN36_BACKEND_HOST" in
-  127.*|localhost) ;;
-  *)
-    echo "QWEN36_BACKEND_HOST 必须是 loopback 地址。" >&2
-    exit 1
-    ;;
-esac
-if [[ "$QWEN36_LLAMA_BASE_URL" != "http://$QWEN36_BACKEND_HOST:$QWEN36_LLAMA_CPP_PORT" ]]; then
-  echo "QWEN36_LLAMA_BASE_URL 必须与 Qwen3.6 backend host 和 port 一致。" >&2
-  exit 1
-fi
 
 if [[ -z "$LLAMA_SERVER_BIN" || ! -x "$LLAMA_SERVER_BIN" ]]; then
   echo "找不到可执行的 llama-server；请安装 llama.cpp 或设置 LLAMA_SERVER_BIN。" >&2
@@ -363,11 +342,8 @@ if [[ "$ORNITH_SPEC_TYPE" == draft-mtp ]]; then
     --spec-draft-type-v "$ORNITH_SPEC_DRAFT_CACHE_TYPE_V"
   )
 fi
-if [[ ! -s "$QWEN36_MODEL_FILE" ]]; then
-  echo "Qwen3.6 GGUF 缺失或为空：$QWEN36_MODEL_FILE" >&2
-  exit 1
-fi
-for model_prefix in ORNITH QWEN36; do
+
+for model_prefix in ORNITH; do
   for setting in CONTEXT_SIZE BATCH_SIZE THREADS THREADS_BATCH N_GPU_LAYERS N_CPU_MOE SLEEP_IDLE_SECONDS STARTUP_TIMEOUT; do
     value_name="${model_prefix}_${setting}"
     if [[ ! "${!value_name}" =~ ^[1-9][0-9]*$ ]]; then
@@ -376,13 +352,14 @@ for model_prefix in ORNITH QWEN36; do
     fi
   done
   value_name="${model_prefix}_CONTEXT_SIZE"
-  if (( ${!value_name} > 32768 )); then
-    echo "$value_name 不得超过 32768。" >&2
+  context_limit=98304
+  if (( ${!value_name} > context_limit )); then
+    echo "$value_name 不得超过 $context_limit。" >&2
     exit 1
   fi
 done
-for model_prefix in ORNITH QWEN36; do
-  if [[ "$model_prefix" == ORNITH && "$ORNITH_SPEC_TYPE" == none ]]; then
+for model_prefix in ORNITH; do
+  if [[ "$ORNITH_SPEC_TYPE" == none ]]; then
     continue
   fi
   value_name="${model_prefix}_SPEC_DRAFT_N_MAX"
@@ -401,8 +378,7 @@ for model_prefix in ORNITH QWEN36; do
     esac
   done
 done
-for value_name in ORNITH_SLEEP_TIMEOUT ORNITH_SLEEP_POLL_INTERVAL \
-  QWEN36_SLEEP_TIMEOUT QWEN36_SLEEP_POLL_INTERVAL GPU_LOCK_WAIT_TIMEOUT; do
+for value_name in ORNITH_SLEEP_TIMEOUT ORNITH_SLEEP_POLL_INTERVAL GPU_LOCK_WAIT_TIMEOUT; do
   value="${!value_name}"
   if [[ ! "$value" =~ ^[0-9]+([.][0-9]+)?$ || ! "$value" =~ [1-9] ]]; then
     echo "$value_name 必须是正数。" >&2
@@ -462,9 +438,6 @@ if [[ "$ORNITH_SPEC_TYPE" == draft-mtp ]]; then
 fi
 echo "Ornith llama-server:   $LLAMA_SERVER_BIN (CUDA0, CPU MoE=$ORNITH_N_CPU_MOE, 127.0.0.1:$LLAMA_CPP_PORT)"
 echo "Ornith API:            http://$ORNITH_HOST:$ORNITH_PORT/v1/AtomicChat/Ornith-1.5-35B-A3B-AD-Q5"
-echo "Qwen3.6 GGUF:          $QWEN36_MODEL_FILE"
-echo "Qwen3.6 llama-server:  $LLAMA_SERVER_BIN (CUDA0, CPU MoE=$QWEN36_N_CPU_MOE, MTP, $QWEN36_BACKEND_HOST:$QWEN36_LLAMA_CPP_PORT)"
-echo "Qwen3.6 API:           http://$QWEN36_HOST:$QWEN36_PORT/v1/qwen/Qwen3.6-35B-A3B-MTP"
 echo "MOSS-Image-SFT API:   http://$MOSS_IMAGE_HOST:$MOSS_IMAGE_PORT/v1/openmoss/MOSS-Image-SFT-Q8_0"
 echo "FLUX.3 Klein API:     http://$FLUX3_IMAGE_HOST:$FLUX3_IMAGE_PORT/v1/openblack-forest-labs/FLUX-3-Image-Klein-GGUF-Q8"
 echo "OpenAI-compatible:    http://127.0.0.1:$EASEL_BRIDGE_PORT/v1 (OpenCode / Easel)"
@@ -490,18 +463,15 @@ cd "$PROJECT_DIR"
 main_pid=""
 voicedesign_pid=""
 ornith_pid=""
-qwen36_pid=""
 moss_image_pid=""
 flux3_image_pid=""
 easel_bridge_pid=""
 llama_server_pid=""
-qwen36_llama_server_pid=""
 llama_watch_pid=""
-qwen36_llama_watch_pid=""
 ornith_backend_start_attempted=0
-qwen36_backend_start_attempted=0
 audio_cpp_pids=()
 localai_managed_started=0
+telemetry_pid=""
 
 cleanup() {
   local status=$?
@@ -513,9 +483,9 @@ cleanup() {
     # 日志进程异常退出时直接追加到原日志，避免 shutdown helper 也因 BrokenPipe 中断。
     exec >> "$START_LOG_FILE" 2>&1
   fi
-  local service_pids=("$easel_bridge_pid" "$main_pid" "$voicedesign_pid" "$ornith_pid" "$qwen36_pid" "$moss_image_pid" "$flux3_image_pid" "$llama_watch_pid" "$qwen36_llama_watch_pid" "$llama_server_pid" "$qwen36_llama_server_pid" "${audio_cpp_pids[@]}")
+  local service_pids=("$easel_bridge_pid" "$main_pid" "$voicedesign_pid" "$ornith_pid" "$moss_image_pid" "$flux3_image_pid" "$llama_watch_pid" "$llama_server_pid" "${audio_cpp_pids[@]}")
   local recovery_attempt=1
-  echo "[退出] 收到停止信号，开始停止服务进程组和两个 llama.cpp 后端。"
+  echo "[退出] 收到停止信号，开始停止服务进程组和 llama.cpp 后端。"
 
   for pid in "${service_pids[@]}"; do
     if [[ -n "$pid" ]] && kill -0 -- "-$pid" 2>/dev/null; then
@@ -556,12 +526,12 @@ cleanup() {
       [[ "$status" != "0" ]] || status=1
     fi
   fi
-  local backend_models=(Ornith-1.5-35B-A3B-AD-Q5 Qwen3.6-35B-A3B-MTP)
-  local backend_hosts=(127.0.0.1 "$QWEN36_BACKEND_HOST")
-  local backend_ports=("$LLAMA_CPP_PORT" "$QWEN36_LLAMA_CPP_PORT")
-  local backend_pid_files=("$ORNITH_BACKEND_PID_FILE" "$QWEN36_BACKEND_PID_FILE")
-  local backend_attempted=("$ornith_backend_start_attempted" "$qwen36_backend_start_attempted")
-  local backend_pids=("$llama_server_pid" "$qwen36_llama_server_pid")
+  local backend_models=(Ornith-1.5-35B-A3B-AD-Q5)
+  local backend_hosts=(127.0.0.1)
+  local backend_ports=("$LLAMA_CPP_PORT")
+  local backend_pid_files=("$ORNITH_BACKEND_PID_FILE")
+  local backend_attempted=("$ornith_backend_start_attempted")
+  local backend_pids=("$llama_server_pid")
   local backend_count="${#backend_models[@]}"
   local backend_index
   for ((backend_index = 0; backend_index < backend_count; backend_index++)); do
@@ -590,10 +560,37 @@ cleanup() {
       fi
     fi
   done
+  # 服务和 backend 收尾后才停止采样，保留卸载阶段及结束快照。
+  if [[ -n "$telemetry_pid" ]]; then
+    kill -TERM -- "-$telemetry_pid" 2>/dev/null || true
+    for _ in {1..60}; do
+      kill -0 "$telemetry_pid" 2>/dev/null || break
+      sleep 0.1
+    done
+    kill -KILL -- "-$telemetry_pid" 2>/dev/null || true
+    wait "$telemetry_pid" 2>/dev/null || true
+  fi
   exit "$status"
 }
 
 trap cleanup INT TERM HUP EXIT
+
+if is_enabled "$MODEL_TELEMETRY_ENABLED"; then
+  telemetry_root="${MODEL_TELEMETRY_ROOT:-$RUNTIME_CACHE_DIR/telemetry}"
+  mkdir -p "$telemetry_root"
+  MODEL_TELEMETRY_DIR="$(mktemp -d "$telemetry_root/run-$(date -u +%Y%m%dT%H%M%SZ)-XXXXXX")"
+  export MODEL_TELEMETRY_DIR
+  # 固定入口只指向本次启动，旧批次仍独立保留。
+  mkdir -p "$PROJECT_DIR/storage/.cache/runtime"
+  printf '%s\n' "$MODEL_TELEMETRY_DIR" > "$PROJECT_DIR/storage/.cache/runtime/telemetry-current.tmp"
+  mv "$PROJECT_DIR/storage/.cache/runtime/telemetry-current.tmp" "$PROJECT_DIR/storage/.cache/runtime/telemetry-current"
+  echo "[性能记录] 已开启，目录：$MODEL_TELEMETRY_DIR"
+  setsid python3 "$PROJECT_DIR/scripts/model_telemetry.py" --directory "$MODEL_TELEMETRY_DIR" \
+    collect --owner-pid "$$" --interval "$MODEL_TELEMETRY_INTERVAL_SECONDS" --log "$START_LOG_FILE" &
+  telemetry_pid=$!
+else
+  echo "[性能记录] 已关闭。"
+fi
 
 if [[ "${LLM_LOCAL_QWEN3_VOICEDESIGN_PROVIDER,,}" != "localai" || "${LLM_LOCAL_AUDIO_CPP_PROVIDER,,}" != "localai" ]]; then
   echo "VoiceDesign 与 audio.cpp 模型服务固定使用 LocalAI provider。" >&2
@@ -654,49 +651,6 @@ if [[ ! "$llama_server_pid" =~ ^[1-9][0-9]*$ ]]; then
   exit 1
 fi
 
-rm -f -- "$QWEN36_BACKEND_PID_FILE"
-qwen36_backend_start_attempted=1
-python3 -m ornith_1_5_35b_a3b.runtime startup \
-  --lock-file "$GPU_LOCK_FILE" \
-  --pid-file "$QWEN36_BACKEND_PID_FILE" \
-  --host "$QWEN36_BACKEND_HOST" \
-  --port "$QWEN36_LLAMA_CPP_PORT" \
-  --model Qwen3.6-35B-A3B-MTP \
-  --base-url "$QWEN36_LLAMA_BASE_URL" \
-  --executable "$LLAMA_SERVER_BIN" \
-  --lock-timeout "$GPU_LOCK_WAIT_TIMEOUT" \
-  --timeout "$QWEN36_STARTUP_TIMEOUT" \
-  --interval "$QWEN36_SLEEP_POLL_INTERVAL" \
-  --cuda-release-delay "$CUDA_RELEASE_DELAY" \
-  -- \
-  --model "$QWEN36_MODEL_FILE" \
-  --host "$QWEN36_BACKEND_HOST" \
-  --port "$QWEN36_LLAMA_CPP_PORT" \
-  --alias Qwen3.6-35B-A3B-MTP \
-  --device CUDA0 \
-  --gpu-layers "$QWEN36_N_GPU_LAYERS" \
-  --n-cpu-moe "$QWEN36_N_CPU_MOE" \
-  --spec-type draft-mtp \
-  --spec-draft-n-max "$QWEN36_SPEC_DRAFT_N_MAX" \
-  --spec-draft-type-k "$QWEN36_SPEC_DRAFT_CACHE_TYPE_K" \
-  --spec-draft-type-v "$QWEN36_SPEC_DRAFT_CACHE_TYPE_V" \
-  --flash-attn on \
-  --jinja \
-  --ctx-size "$QWEN36_CONTEXT_SIZE" \
-  --batch-size "$QWEN36_BATCH_SIZE" \
-  --threads "$QWEN36_THREADS" \
-  --threads-batch "$QWEN36_THREADS_BATCH" \
-  --cache-type-k "$QWEN36_CACHE_TYPE_K" \
-  --cache-type-v "$QWEN36_CACHE_TYPE_V" \
-  --load-mode "$QWEN36_LOAD_MODE" \
-  --parallel 1 \
-  --sleep-idle-seconds "$QWEN36_SLEEP_IDLE_SECONDS"
-read -r qwen36_llama_server_pid < "$QWEN36_BACKEND_PID_FILE"
-if [[ ! "$qwen36_llama_server_pid" =~ ^[1-9][0-9]*$ ]]; then
-  echo "Qwen3.6 startup helper 未返回有效 backend PID。" >&2
-  exit 1
-fi
-
 setsid uv run --no-sync --project "$MAIN_PROJECT_DIR" python "$MAIN_DIR/main.py" &
 main_pid=$!
 QWEN_VOICEDESIGN_HOST="$QWEN_VOICEDESIGN_HOST" \
@@ -725,17 +679,6 @@ ORNITH_HOST="$ORNITH_HOST" \
   python "$ORNITH_SERVICE_DIR/main.py" &
 ornith_pid=$!
 
-QWEN36_HOST="$QWEN36_HOST" \
-  QWEN36_PORT="$QWEN36_PORT" \
-  QWEN36_LLAMA_BASE_URL="$QWEN36_LLAMA_BASE_URL" \
-  QWEN36_BACKEND_HOST="$QWEN36_BACKEND_HOST" \
-  QWEN36_LLAMA_CPP_PORT="$QWEN36_LLAMA_CPP_PORT" \
-  QWEN36_BACKEND_PID="$qwen36_llama_server_pid" \
-  QWEN36_BACKEND_PGID="$qwen36_llama_server_pid" \
-  setsid uv run --no-sync --project "$MAIN_PROJECT_DIR" \
-  python "$QWEN36_SERVICE_DIR/main.py" &
-qwen36_pid=$!
-
 HOST="$MOSS_IMAGE_HOST" PORT="$MOSS_IMAGE_PORT" \
   setsid uv run --no-sync --project "$MAIN_PROJECT_DIR" \
   python "$MOSS_IMAGE_SERVICE_DIR/main.py" &
@@ -760,11 +703,4 @@ setsid bash -c '
 ' _ "$llama_server_pid" &
 llama_watch_pid=$!
 
-setsid bash -c '
-  backend_pid="$1"
-  while kill -0 "$backend_pid" 2>/dev/null; do sleep 1; done
-  exit 1
-' _ "$qwen36_llama_server_pid" &
-qwen36_llama_watch_pid=$!
-
-wait -n "$easel_bridge_pid" "$main_pid" "$voicedesign_pid" "$ornith_pid" "$qwen36_pid" "$moss_image_pid" "$flux3_image_pid" "$llama_watch_pid" "$qwen36_llama_watch_pid" "${audio_cpp_pids[@]}"
+wait -n "$easel_bridge_pid" "$main_pid" "$voicedesign_pid" "$ornith_pid" "$moss_image_pid" "$flux3_image_pid" "$llama_watch_pid" "${audio_cpp_pids[@]}"

@@ -20,8 +20,8 @@ lint_paths=(
     inference_gateway
     scripts/localai
     scripts/sdcpp
+    scripts/model_telemetry.py
     model-text/ornith_1_5_35b_a3b
-    model-text/qwen3_6_35b_a3b
     model-image
     easel_bridge
 )

@@ -29,7 +29,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--label", required=True)
     parser.add_argument(
-        "--models", nargs="+", choices=("ornith", "qwen"), default=["ornith", "qwen"]
+        "--models", nargs="+", choices=("ornith",), default=["ornith"]
     )
     parser.add_argument("--max-tokens", type=int, default=1024)
     parser.add_argument("--repeats", type=int, default=2)
@@ -53,7 +53,7 @@ def main() -> None:
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     cache_dir = Path(os.getenv("RUNTIME_CACHE_DIR", ROOT / "storage/.cache/runtime"))
     lock_path = Path(os.getenv("GPU_LOCK_FILE", cache_dir / "gpu-runtime.lock"))
-    for short_name, model in zip(("ornith", "qwen"), MODELS, strict=True):
+    for short_name, model in zip(("ornith",), MODELS, strict=True):
         if short_name not in args.models:
             continue
         for repeat in range(1, args.repeats + 1):

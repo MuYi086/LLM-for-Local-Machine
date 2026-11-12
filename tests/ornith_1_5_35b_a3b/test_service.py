@@ -9,6 +9,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import httpx
 from fastapi.testclient import TestClient
@@ -20,6 +21,43 @@ from ornith_1_5_35b_a3b.app import API_ROUTE, MODEL_ALIAS, create_app  # noqa: E
 
 
 class OrnithServiceTests(unittest.TestCase):
+    def setUp(self):
+        self.telemetry_temp = self.enterContext(tempfile.TemporaryDirectory())
+        self.enterContext(
+            patch.dict(
+                "os.environ",
+                {"MODEL_TELEMETRY_DIR": self.telemetry_temp, "MODEL_TELEMETRY_ENABLED": "true"},
+            )
+        )
+
+    def test_telemetry_records_native_timings_and_lease_cleanup(self):
+        def handle(request):
+            if request.url.path == "/props":
+                return httpx.Response(200, json={"is_sleeping": True})
+            payload = json.loads(request.content)
+            self.assertTrue(payload["stream_options"]["include_usage"])
+            return httpx.Response(
+                200,
+                headers={"content-type": "text/event-stream"},
+                stream=httpx.ByteStream(
+                    b'data: {"choices":[],"usage":{"prompt_tokens":42,"completion_tokens":7},"timings":{"prompt_ms":10,"predicted_ms":20,"draft_n":8,"draft_n_accepted":5}}\n\ndata: [DONE]\n\n'
+                ),
+            )
+
+        with tempfile.TemporaryDirectory() as root:
+            app = self._app(Path(root) / "gpu.lock", handle)
+            with TestClient(app) as client:
+                response = client.post(API_ROUTE, json={"messages": [], "stream": True})
+            self.assertEqual(response.status_code, 200)
+            row = json.loads(next(Path(self.telemetry_temp).glob("requests-*.jsonl")).read_text())
+            self.assertEqual(row["usage"]["prompt_tokens"], 42)
+            self.assertEqual(row["timings"]["draft_n_accepted"], 5)
+            stages = row["stages_ms"]
+            self.assertLessEqual(stages["queue_enter"], stages["lease_acquired"])
+            self.assertLessEqual(stages["backend_send"], stages["cleanup_end"])
+            self.assertLessEqual(stages["cleanup_end"], stages["lease_released"])
+            self.assertEqual(response.headers["x-model-request-id"], row["request_id"])
+
     def test_disconnect_during_cleanup_preserves_lease_until_sleep_and_allows_next_request(self):
         async def scenario(lock_path: Path) -> None:
             cleanup_started = asyncio.Event()
@@ -278,8 +316,8 @@ class OrnithServiceTests(unittest.TestCase):
     def test_custom_route_forwards_model_alias_to_loopback_backend(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             lock_path = Path(temporary) / "gpu-runtime.lock"
-            route = "/v1/qwen/Qwen3.6-35B-A3B-MTP"
-            alias = "Qwen3.6-35B-A3B-MTP"
+            route = "/v1/custom/ornith"
+            alias = "Ornith-custom-test"
             received: list[httpx.Request] = []
 
             def handle(request: httpx.Request) -> httpx.Response:
@@ -296,9 +334,9 @@ class OrnithServiceTests(unittest.TestCase):
                 handle,
                 api_route=route,
                 model_alias=alias,
-                backend_base_url="http://127.0.0.2:8400",
-                backend_host="127.0.0.2",
-                backend_port=8400,
+                backend_base_url="http://127.0.0.1:8403",
+                backend_host="127.0.0.1",
+                backend_port=8403,
             )
             with TestClient(app) as client:
                 response = client.post(
@@ -309,14 +347,14 @@ class OrnithServiceTests(unittest.TestCase):
             chat_request = next(
                 request for request in received if request.url.path == "/v1/chat/completions"
             )
-            self.assertEqual(str(chat_request.url), "http://127.0.0.2:8400/v1/chat/completions")
+            self.assertEqual(str(chat_request.url), "http://127.0.0.1:8403/v1/chat/completions")
             self.assertEqual(json.loads(chat_request.content)["model"], alias)
 
     def test_custom_backend_identity_is_recorded_when_sleep_cannot_be_confirmed(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             lock_path = Path(temporary) / "gpu-runtime.lock"
-            route = "/v1/qwen/Qwen3.6-35B-A3B-MTP"
-            alias = "Qwen3.6-35B-A3B-MTP"
+            route = "/v1/custom/ornith"
+            alias = "Ornith-custom-test"
             app = self._app(
                 lock_path,
                 lambda request: httpx.Response(
@@ -327,9 +365,9 @@ class OrnithServiceTests(unittest.TestCase):
                 ),
                 api_route=route,
                 model_alias=alias,
-                backend_base_url="http://127.0.0.2:8400",
-                backend_host="127.0.0.2",
-                backend_port=8400,
+                backend_base_url="http://127.0.0.1:8403",
+                backend_host="127.0.0.1",
+                backend_port=8403,
                 backend_pid=1234,
                 backend_pgid=1234,
                 backend_executable="/opt/llama-server",
@@ -342,8 +380,8 @@ class OrnithServiceTests(unittest.TestCase):
             self.assertEqual(response.status_code, 503)
             marker = json.loads(Path(f"{lock_path}.quarantine").read_text(encoding="utf-8"))
             self.assertEqual(marker["model"], alias)
-            self.assertEqual(marker["host"], "127.0.0.2")
-            self.assertEqual(marker["port"], 8400)
+            self.assertEqual(marker["host"], "127.0.0.1")
+            self.assertEqual(marker["port"], 8403)
             self.assertEqual(marker["pid"], 1234)
             self.assertEqual(marker["executable"], "/opt/llama-server")
 

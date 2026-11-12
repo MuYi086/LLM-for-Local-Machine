@@ -1,7 +1,7 @@
 # Easel 本地模型网关
 
 `easel_bridge` 提供 OpenAI-compatible API，把 Easel 的图片、语音请求转发到本仓库已经运行的 MOSS-Image-SFT 与
-VoxCPM2 服务。它也可以把 Qwen3.6 暴露为兼容聊天 API，但不会更改 Easel 当前选择的 Codex 执行引擎。
+VoxCPM2 服务。它也可以把 Ornith 暴露为兼容聊天 API，但不会更改 Easel 当前选择的 Codex 执行引擎。
 所有推理继续由现有模型 API、共享 GPU 锁和 sleep-idle 机制执行。
 
 ## 接口
@@ -13,7 +13,7 @@ VoxCPM2 服务。它也可以把 Qwen3.6 暴露为兼容聊天 API，但不会�
 | `GET /v1/models` | — | 返回网关支持的模型列表 |
 | `POST /v1/images/generations` | `MOSS-Image-SFT-Q8_0` | 映射到 MOSS；`n` 最多 4，每张依次生成；尺寸使用 `WIDTHxHEIGHT`，例如 `1024x1024` |
 | `POST /v1/audio/speech` | `OpenBMB/VoxCPM2-GGUF` | 映射到 VoxCPM2 multipart `text`/`instruction`；接受 `voice=alloy`，仅支持默认 `speed=1`，输出 WAV 或 MP3 |
-| `POST /v1/chat/completions` | `Qwen3.6-35B-A3B-MTP` | 原样转发 JSON 与 SSE 流到现有 Qwen 适配器 |
+| `POST /v1/chat/completions` | `Ornith-1.5-35B-A3B-AD-Q5` | 原样转发 JSON 与 SSE 流到现有 Ornith 适配器 |
 
 网关不会向上游转发客户端 API Key。上游 URL 只能由服务端环境变量指定，HTTP 重定向关闭。请求体默认上限为 12 MiB，
 响应体上限为 64 MiB；上游访问超时默认为 900 秒。MP3 由本机 FFmpeg 从 VoxCPM2 的 WAV 响应转换，不写临时音频文件。
@@ -28,7 +28,7 @@ python3 -c 'import secrets; print(secrets.token_urlsafe(32))'
 chmod 600 .env.easel-bridge
 ```
 
-`start.sh` 的 MOSS、Qwen3.6 与 VoxCPM2 API 默认监听 `127.0.0.1`，其余已有服务配置不变。若此前已经启动了旧版本，
+`start.sh` 的 MOSS 与 VoxCPM2 API 默认监听 `127.0.0.1`，其余已有服务配置不变。若此前已经启动了旧版本，
 需在维护窗口重新启动模型栈后，新的 loopback 默认绑定才会生效。确保 WSL 中的 FFmpeg 可运行：
 
 ```bash
@@ -46,7 +46,7 @@ bash start.sh
 检查 8500 端口，并将网关纳入进程监控。Ctrl+C 或任一服务退出时，网关与模型服务一起停止。
 `EASEL_BRIDGE_ENV_FILE` 可指定其他配置文件，`EASEL_BRIDGE_PORT` 可覆盖默认端口；配置文件中的值覆盖同名环境变量。
 网关固定绑定 `127.0.0.1`。日志只打印地址，不打印 Key。
-上游 URL 未显式配置时，`start.sh` 使用 `127.0.0.1` 并跟随 Qwen、MOSS、VoxCPM2 的受管 API 端口。
+上游 URL 未显式配置时，`start.sh` 使用 `127.0.0.1` 并跟随 Ornith、MOSS、VoxCPM2 的受管 API 端口。
 需要其他绑定地址时，或旧配置文件已经写死 URL 时，通过对应 `EASEL_BRIDGE_*_URL` 显式配置。
 
 排查网关时仍可单独启动；此时不要同时用 `start.sh` 启动同端口网关：
@@ -67,14 +67,14 @@ curl http://127.0.0.1:8500/v1/models \
   -H "Authorization: Bearer $EASEL_BRIDGE_API_KEY"
 ```
 
-第一条应返回 `401`，第二条应返回 MOSS、VoxCPM2、Qwen3.6 三个模型 ID。Easel 网页由 Windows 浏览器打开时，WSL2 通常可通过
+第一条应返回 `401`，第二条应返回 MOSS、VoxCPM2、Ornith 三个模型 ID。Easel 网页由 Windows 浏览器打开时，WSL2 通常可通过
 Windows 的 `localhost` 转发访问 WSL 端口；如果 Easel 服务在 Windows 原生环境运行，应从 Easel 所在进程实际发起连接测试，
 并保持桥接服务只监听 WSL loopback，不要为方便而将 GPU 上游端口重新绑定到所有网卡。
 
 ## OpenCode 一次配置
 
 OpenCode v2 的本地 Provider 使用 `providers`、`package`、`settings`，Base URL 为
-`http://127.0.0.1:8500/v1`，模型 ID 为 `Qwen3.6-35B-A3B-MTP`，上下文设置为 32768。
+`http://127.0.0.1:8500/v1`，模型 ID 为 `Ornith-1.5-35B-A3B-AD-Q5`，上下文设置为 32768。
 不要直接连接 llama.cpp 后端，否则会绕过上游 API 的共享 GPU 锁。
 
 在运行 OpenCode 的 WSL 用户下，把 Key 保存为独立文件，供新终端和后台服务读取：
@@ -88,7 +88,7 @@ mkdir -p ~/.config/opencode
 chmod 600 ~/.config/opencode/easel-bridge-api-key
 ```
 
-将已有 `opencode.json` 的 `providers.local-qwen.settings.apiKey` 改为文件引用：
+将已有 `opencode.json` 的 `providers.local-ornith.settings.apiKey` 改为文件引用：
 
 ```json
 "apiKey": "{file:~/.config/opencode/easel-bridge-api-key}"
@@ -139,8 +139,8 @@ VOICE_INSTRUCT_MODE=field
 ```
 
 Easel 的音频脚本默认请求 MP3，因此系统需要安装 FFmpeg；也可以使用 WAV 输出。VoxCPM2 当前不接受速度调节，Easel 侧将速度保持为 `1`。
-当前 Codex 运行时可以继续作为“对话与脚本”的执行引擎；图片和语音调用单独走以上模型配置。若以后希望直接调用本地 Qwen，
-聊天 Provider 使用相同的 Base URL 与 Key，模型 ID 为 `Qwen3.6-35B-A3B-MTP`。
+当前 Codex 运行时可以继续作为“对话与脚本”的执行引擎；图片和语音调用单独走以上模型配置。若要直接调用本地 Ornith，
+聊天 Provider 使用相同的 Base URL 与 Key，模型 ID 为 `Ornith-1.5-35B-A3B-AD-Q5`。
 
 ## 故障定位
 
