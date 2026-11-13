@@ -121,8 +121,11 @@ export TIMBRE_STORAGE_DIR="${TIMBRE_STORAGE_DIR:-$STORAGE_DIR/timbre}"
 if [[ -z "${LLAMA_SERVER_BIN:-}" ]]; then
   LLAMA_SERVER_BIN="$(command -v llama-server || true)"
   if [[ -z "$LLAMA_SERVER_BIN" ]]; then
+    local_cached_llama_server="$HOME/.local/src/llama.cpp/build-sleep-cache/bin/llama-server"
     local_cuda_llama_server="$HOME/.local/src/llama.cpp/build-cuda/bin/llama-server"
-    if [[ -x "$local_cuda_llama_server" ]]; then
+    if [[ -x "$local_cached_llama_server" ]]; then
+      LLAMA_SERVER_BIN="$local_cached_llama_server"
+    elif [[ -x "$local_cuda_llama_server" ]]; then
       LLAMA_SERVER_BIN="$local_cuda_llama_server"
     fi
   fi
@@ -186,6 +189,9 @@ export ORNITH_CACHE_TYPE_V="${ORNITH_CACHE_TYPE_V:-q8_0}"
 export ORNITH_LOAD_MODE="${ORNITH_LOAD_MODE:-none}"
 export ORNITH_SPEC_TYPE="${ORNITH_SPEC_TYPE:-draft-mtp}"
 export ORNITH_SPEC_DRAFT_N_MAX="${ORNITH_SPEC_DRAFT_N_MAX:-4}"
+export ORNITH_9B_SLEEP_CACHE="${ORNITH_9B_SLEEP_CACHE:-1}"
+export ORNITH_9B_CACHE_RAM_MIB="${ORNITH_9B_CACHE_RAM_MIB:-4096}"
+export LLAMA_SERVER_SLEEP_PROMPT_CACHE="$ORNITH_9B_SLEEP_CACHE"
 export ORNITH_SPEC_DRAFT_CACHE_TYPE_K="${ORNITH_SPEC_DRAFT_CACHE_TYPE_K:-f16}"
 export ORNITH_SPEC_DRAFT_CACHE_TYPE_V="${ORNITH_SPEC_DRAFT_CACHE_TYPE_V:-f16}"
 export ORNITH_N_GPU_LAYERS="${ORNITH_N_GPU_LAYERS:-99}"
@@ -322,6 +328,14 @@ if [[ ! -s "$ORNITH_MMPROJ_FILE" ]]; then
   echo "Ornith mmproj 缺失或为空：$ORNITH_MMPROJ_FILE" >&2
   exit 1
 fi
+if [[ "$ORNITH_9B_SLEEP_CACHE" != "0" && "$ORNITH_9B_SLEEP_CACHE" != "1" ]]; then
+  echo "ORNITH_9B_SLEEP_CACHE 必须是 0 或 1。" >&2
+  exit 1
+fi
+if [[ ! "$ORNITH_9B_CACHE_RAM_MIB" =~ ^[1-9][0-9]*$ ]]; then
+  echo "ORNITH_9B_CACHE_RAM_MIB 必须是正整数。" >&2
+  exit 1
+fi
 case "$ORNITH_SPEC_TYPE" in
   none|draft-mtp) ;;
   *)
@@ -397,6 +411,7 @@ if ! grep -q 'CUDA0' <<<"$DEVICE_LIST"; then
 fi
 LLAMA_HELP="$("$LLAMA_SERVER_BIN" --help 2>&1 || true)"
 REQUIRED_LLAMA_FLAGS=(--n-cpu-moe --sleep-idle-seconds --mmproj-offload --spec-type)
+REQUIRED_LLAMA_FLAGS+=(--cache-ram)
 if [[ "$ORNITH_SPEC_TYPE" == draft-mtp ]]; then
   REQUIRED_LLAMA_FLAGS+=(--spec-draft-model)
 fi
@@ -611,7 +626,7 @@ uv run --no-sync --project "$MAIN_PROJECT_DIR" \
 
 rm -f -- "$ORNITH_BACKEND_PID_FILE"
 ornith_backend_start_attempted=1
-python3 -m ornith_1_5_35b_a3b.runtime startup \
+python3 -m llama_cpp_runtime.runtime startup \
   --lock-file "$GPU_LOCK_FILE" \
   --pid-file "$ORNITH_BACKEND_PID_FILE" \
   --host 127.0.0.1 \
@@ -642,6 +657,7 @@ python3 -m ornith_1_5_35b_a3b.runtime startup \
   --threads-batch "$ORNITH_THREADS_BATCH" \
   --cache-type-k "$ORNITH_CACHE_TYPE_K" \
   --cache-type-v "$ORNITH_CACHE_TYPE_V" \
+  --cache-ram "$ORNITH_9B_CACHE_RAM_MIB" \
   --load-mode "$ORNITH_LOAD_MODE" \
   --parallel 1 \
   --sleep-idle-seconds "$ORNITH_SLEEP_IDLE_SECONDS"

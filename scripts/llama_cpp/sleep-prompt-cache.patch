@@ -1,0 +1,64 @@
+--- a/tools/server/server-context.cpp
++++ b/tools/server/server-context.cpp
+@@ -44,6 +44,11 @@
+ #endif
+ 
+ constexpr int HTTP_POLLING_SECONDS = 1;
++
++static bool sleep_prompt_cache_enabled(const common_params & params) {
++    const char * enabled = getenv("LLAMA_SERVER_SLEEP_PROMPT_CACHE");
++    return enabled && std::string(enabled) == "1" && params.cache_ram_mib > 0;
++}
+ 
+ static common_speculative_output_limits server_output_limits(const common_params & params) {
+     if (!params.mmproj.path.empty()) {
+@@ -1159,6 +1164,28 @@
+                 // note: for sleeping == false, event is emitted by load_model()
+             }
+             SRV_INF("%s", "server is entering sleeping state\n");
++            if (sleep_prompt_cache_enabled(params_base) && prompt_cache) {
++                const int64_t t_start = ggml_time_us();
++                try {
++                    for (const auto & slot : slots) {
++                        if (!slot.is_processing() && slot.prompt.n_tokens() > 0) {
++                            slot.prompt_save(*prompt_cache);
++                        }
++                    }
++                    prompt_cache->update();
++                    SRV_INF("sleep prompt cache: %zu entries, %.3f MiB, save %.2f ms\n",
++                            prompt_cache->states.size(), prompt_cache->size() / (1024.0 * 1024.0),
++                            (ggml_time_us() - t_start) / 1000.0);
++                } catch (const std::exception & error) {
++                    // 缓存是可选优化，快照失败后仍须完整卸载并允许下一轮冷算。
++                    SRV_WRN("sleep prompt cache snapshot failed: %s; discarding cache\n", error.what());
++                    prompt_cache.reset();
++                }
++                // 缓存只保留 CPU 状态，slot 的检查点引用也必须在卸载时释放。
++                for (auto & slot : slots) {
++                    slot.prompt.clear();
++                }
++            }
+             destroy();
+         } else {
+             SRV_INF("%s", "server is exiting sleeping state\n");
+@@ -1602,7 +1629,10 @@
+             }
+             SRV_TRC("%s", "use `--cache-ram 0` to disable the prompt cache\n");
+ 
+-            prompt_cache = std::make_unique<server_prompt_cache>(params_base.cache_ram_mib, n_ctx);
++            // 唤醒后沿用有界 CPU 缓存，由原生 token 前缀匹配恢复主模型和草稿状态。
++            if (!sleep_prompt_cache_enabled(params_base) || !prompt_cache || prompt_cache->limit_tokens != size_t(n_ctx)) {
++                prompt_cache = std::make_unique<server_prompt_cache>(params_base.cache_ram_mib, n_ctx);
++            }
+         } else {
+             SRV_TRC("%s", "prompt cache is disabled - use `--cache-ram N` to enable it\n");
+         }
+@@ -5729,6 +5759,8 @@
+         { "eos_token",                   meta.eos_token_str },
+         { "build_info",                  meta.build_info },
+         { "is_sleeping",                 is_sleeping },
++        { "sleep_prompt_cache_supported", true },
++        { "sleep_prompt_cache_enabled",   sleep_prompt_cache_enabled(params) },
+         { "cors_proxy_enabled",          params.ui_mcp_proxy },
+     };
+ 
