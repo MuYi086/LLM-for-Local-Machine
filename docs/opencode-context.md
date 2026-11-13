@@ -1,8 +1,10 @@
 # OpenCode 本地模型压缩失败排查与修复
 
+2026-11-13 当前的 97,441 输入挤占摘要输出空间故障，以及 v6 归档简报/实际预算保护，见 [压缩预算修复](opencode-compaction-budget.md)。下文保留此前版本的故障和配置记录。
+
 ## 本次已确认的故障
 
-本机为 OpenCode 2.2.7，本地模型声明 context=32768、output=4096，compaction.auto=true、buffer=8192、keep.tokens=4096。
+故障记录中的 OpenCode 2.2.7 配置声明 context=32768、output=4096，compaction.auto=true、buffer=8192、keep.tokens=4096；这些是当时的设置。
 
 失败会话 `ses_e324e4744ffeF0aAlf4pZ7vGhL` 的持久化消息显示：模型虽然声称每次读 150 行，却在同一次回复里发了四个只有 path、没有 offset/limit 的 read。工具实际返回 start.sh 1–816、网关 1–605、适配器 1–492、runtime 1–643，总计 2556 行。原生 read 默认最多 2000 行、50 KiB，因此不会自动执行提示词里的 150 行限制。
 
@@ -14,10 +16,10 @@
 
 `.opencode/plugins/local-model-context/` 是 OpenCode V2 自动发现的本地插件，无 npm 依赖。只针对 local-ornith provider，在本仓库生效：
 
-- 识别执行 CONTEXT_BENCHMARK_PROMPT.md 的会话，在 read 执行前为四个源码补齐/限制 limit≤150、offset≥1。同次模型回复的第二个源码 read 返回明确工具错误，避免一轮灌入四个文件；其他文件/会话不改。
+- 识别执行 CONTEXT_BENCHMARK_PROMPT.md 的会话，在 read 执行前为五个源码补齐/限制 limit≤150、offset≥1。同次模型回复的第二个源码 read 返回明确工具错误，避免一轮灌入多个文件；其他文件/会话不改。
 - 压缩请求单独使用精简摘要 system，明确将历史任务格式当作待总结数据，要求原生英文检查点标题。只替换压缩请求的 system 和工具，不更改持久化历史或主任务 system。
 - 仅压缩请求设置 temperature=0、输出上限最多 4096（保留更低的既有预算），并在 HTTP 请求构造后设置 chat_template_kwargs.enable_thinking=false；正文、既有其他模板参数和鉴权头保留。仍只通过原有网关和共享 GPU 锁，不新增模型请求或直连后端。
-- 不关闭自动压缩，不修改 32768 上下文、主任务输出上限或全局 OpenCode 配置。buffer 8192/keep 4096 保持原值。
+- 不关闭自动压缩；插件不修改主任务上下文或输出上限。当前 OpenCode 配置使用 98304 上下文、buffer 16384、keep.tokens 10240。
 
 固定提示词 v4 缩短了操作说明，加入实际 read JSON 参数、一次一个分页调用、检查点格式优先和压缩后续读规则。v4 与旧版工具行为不同，性能比较需要重新建立各档基线，不把旧失败样本当成功结果。
 
@@ -63,7 +65,7 @@ Node 单元测试覆盖压缩模板隔离、非本地模型不变、150 行限�
 
 ## 当前模型配置
 
-后续已移除项目中的 Qwen3.6 服务与权重，仓库插件及 OpenCode 用户配置改用 `local-ornith/Ornith-1.5-35B-A3B-AD-Q5`。本文前面的会话 ID、错误和日志是当时 Qwen 运行记录，保留用于故障追溯。
+后续已移除项目中的 Qwen3.6 与 Ornith 35B 服务及权重，OpenCode 用户配置现在使用 `local-ornith/Ornith-1.5-9B-GGUF`，context=98304、output=4096、compaction.buffer=16384、keep.tokens=10240。96k 尚待真实 OpenCode 测试；本文前面的会话 ID、错误和日志仍是历史记录，仅用于故障追溯。
 
 ## Ornith 摘要输出耗尽与中文交互
 

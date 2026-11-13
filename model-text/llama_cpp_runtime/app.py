@@ -10,13 +10,14 @@ import os
 import time
 from collections.abc import AsyncIterator
 from contextlib import AbstractContextManager, asynccontextmanager
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from llm_local_runtime.telemetry import TelemetryMiddleware, numeric_fields
 
 from llm_local_runtime import (
@@ -26,13 +27,14 @@ from llm_local_runtime import (
     gpu_runtime_lock,
 )
 
+from .context_budget import ContextBudgetExceeded, ContextBudgetUnavailable, check_context_budget
 from .runtime import (
     MODEL_ALIAS,
     create_quarantine_marker,
     remove_quarantine_marker,
 )
 
-API_ROUTE = "/v1/AtomicChat/Ornith-1.5-35B-A3B-AD-Q5"
+API_ROUTE = "/v1/chat/completions"
 CHAT_COMPLETIONS_PATH = "/v1/chat/completions"
 PROPS_PATH = "/props"
 LOGGER = logging.getLogger(__name__)
@@ -103,7 +105,7 @@ def create_app(
     backend_base_url: str | None = None,
     backend_host: str | None = None,
     backend_port: int | None = None,
-    backend_env_prefix: str = "ORNITH",
+    backend_env_prefix: str = "LLAMA_CPP",
     backend_pid: int | None = None,
     backend_pgid: int | None = None,
     backend_executable: str | None = None,
@@ -134,11 +136,15 @@ def create_app(
     Returns:
         配置好的 FastAPI 应用。
     """
-    base_url = _validate_loopback_url(
-        backend_base_url
-        or os.getenv(f"{backend_env_prefix}_LLAMA_BASE_URL", "http://127.0.0.1:8403")
+    base_url_env = (
+        "LLAMA_CPP_BASE_URL"
+        if backend_env_prefix == "LLAMA_CPP"
+        else f"{backend_env_prefix}_LLAMA_BASE_URL"
     )
-    request_timeout = _positive_float("ORNITH_REQUEST_TIMEOUT", 1800.0)
+    base_url = _validate_loopback_url(
+        backend_base_url or os.getenv(base_url_env, "http://127.0.0.1:8504")
+    )
+    request_timeout = _positive_float(f"{backend_env_prefix}_REQUEST_TIMEOUT", 1800.0)
     lock_timeout = _positive_float("GPU_LOCK_WAIT_TIMEOUT", 900.0)
     resolved_sleep_timeout = (
         sleep_timeout
@@ -165,13 +171,13 @@ def create_app(
     )
     default_backend_port_variable = (
         "LLAMA_CPP_PORT"
-        if backend_env_prefix == "ORNITH"
+        if backend_env_prefix == "LLAMA_CPP"
         else f"{backend_env_prefix}_LLAMA_CPP_PORT"
     )
     resolved_backend_port = (
         backend_port
         if backend_port is not None
-        else int(os.getenv(default_backend_port_variable, "8403"))
+        else int(os.getenv(default_backend_port_variable, "8504"))
     )
     if (
         resolved_backend_host != "localhost"
@@ -310,6 +316,10 @@ def create_app(
         if not isinstance(payload, dict):
             raise HTTPException(status_code=400, detail="请求正文必须是 JSON 对象。")
 
+        context_guard = payload.pop("llm_context_guard", False)
+        if not isinstance(context_guard, bool):
+            raise HTTPException(status_code=400, detail="llm_context_guard 必须为布尔值。")
+
         payload["model"] = model_alias
         trace = request.scope.get("model_telemetry")
         if trace:
@@ -402,6 +412,34 @@ def create_app(
                         detail="llama.cpp 请求前未确认模型休眠，GPU 已隔离，请运行恢复流程。",
                     )
                 raise HTTPException(status_code=503, detail="llama.cpp 服务尚未进入 sleep-idle。")
+            if context_guard:
+                if trace:
+                    trace.mark("context_guard_start")
+                try:
+                    budget = await check_context_budget(client, payload)
+                except ContextBudgetExceeded as exc:
+                    if trace:
+                        trace.metadata["context_budget"] = asdict(exc.budget)
+                    return JSONResponse(
+                        status_code=400,
+                        content={
+                            "error": {
+                                "type": "invalid_request_error",
+                                "code": "context_length_exceeded",
+                                "param": "messages",
+                                "message": str(exc),
+                            }
+                        },
+                    )
+                except ContextBudgetUnavailable as exc:
+                    raise HTTPException(status_code=503, detail=str(exc)) from exc
+                except ValueError as exc:
+                    raise HTTPException(status_code=400, detail=str(exc)) from exc
+                finally:
+                    if trace:
+                        trace.mark("context_guard_end")
+                if trace:
+                    trace.metadata["context_budget"] = asdict(budget)
             if trace:
                 trace.mark("backend_send")
             try:

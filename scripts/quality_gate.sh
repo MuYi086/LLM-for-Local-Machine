@@ -19,9 +19,11 @@ lint_paths=(
     llm_local_runtime
     inference_gateway
     scripts/localai
+    scripts/llama_cpp
     scripts/sdcpp
     scripts/model_telemetry.py
-    model-text/ornith_1_5_35b_a3b
+    model-text/llama_cpp_runtime
+    model-text/Ornith-1.5-9B-GGUF
     model-image
     easel_bridge
 )
@@ -53,4 +55,3 @@ uv run --project qa --locked ruff format --check "${lint_paths[@]}"
 uv run --project qa --locked python scripts/localai/validate_capabilities.py
 uv run --project qa --locked python -m unittest discover -s tests -v
 # 此目录没有 __init__.py，默认 discovery 不会递归进入，需要显式执行。
-uv run --project qa --locked python -m unittest discover -s tests/ornith_1_5_35b_a3b -v

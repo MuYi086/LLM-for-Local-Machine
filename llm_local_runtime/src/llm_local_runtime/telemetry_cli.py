@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from .telemetry import enabled, telemetry_directory
+from .telemetry_brief import render_brief
 from .telemetry_resources import collect
 
 
@@ -129,21 +130,35 @@ def build_report(directory: Path, start: str, end: str) -> dict[str, Any]:
             if row.get("first_content_ms") is not None
             and row.get("metadata", {}).get("response_mode") != "nonstream"
         ]
-        first_events = [min(values) for row in selected
-                        if (values := [row[key] for key in
-                            ("first_content_ms", "first_tool_ms", "first_reasoning_ms")
-                            if row.get(key) is not None])
-                        and row.get("metadata", {}).get("response_mode") != "nonstream"]
+        first_events = [
+            min(values)
+            for row in selected
+            if (
+                values := [
+                    row[key]
+                    for key in ("first_content_ms", "first_tool_ms", "first_reasoning_ms")
+                    if row.get(key) is not None
+                ]
+            )
+            and row.get("metadata", {}).get("response_mode") != "nonstream"
+        ]
         native = [row.get("timings", {}) for row in selected]
-        valid_native = [t for t in native if isinstance(t.get("predicted_n"), (int, float))
-                        and isinstance(t.get("predicted_ms"), (int, float))
-                        and t["predicted_ms"] > 0]
+        valid_native = [
+            t
+            for t in native
+            if isinstance(t.get("predicted_n"), (int, float))
+            and isinstance(t.get("predicted_ms"), (int, float))
+            and t["predicted_ms"] > 0
+        ]
         services[service] = {
             "mean_first_event_ms": statistics.mean(first_events) if first_events else None,
             "weighted_decode_tokens_per_second": (
-                sum(t["predicted_n"] for t in valid_native) * 1000
+                sum(t["predicted_n"] for t in valid_native)
+                * 1000
                 / sum(t["predicted_ms"] for t in valid_native)
-            ) if valid_native else None,
+            )
+            if valid_native
+            else None,
             "native_speed_coverage": f"{len(valid_native)}/{len(selected)}",
             "requests": len(selected),
             "completion_tokens": sum(tokens)
@@ -327,12 +342,19 @@ def render_markdown(report: dict[str, Any]) -> str:
         lines.append(
             f"| {service} | {stats['requests']} | {_display(stats['completion_tokens'])} | {stats['usage_coverage']} | {_display(stats['median_first_content_ms'])} |"
         )
-    lines += ["", "## 上下文对比指标", "",
-              "首事件为服务端收到的首个正文、reasoning 或工具参数事件，包含排队/加载等等待；不是客户端首 token 时间。生成速度按原生 decode 总 tokens / 总秒数加权，缺失请求不补零。", "",
-              "| 服务 | 首事件平均 ms | 加权 decode tok/s | 原生速度覆盖 |",
-              "| --- | --- | --- | --- |"]
+    lines += [
+        "",
+        "## 上下文对比指标",
+        "",
+        "首事件为服务端收到的首个正文、reasoning 或工具参数事件，包含排队/加载等等待；不是客户端首 token 时间。生成速度按原生 decode 总 tokens / 总秒数加权，缺失请求不补零。",
+        "",
+        "| 服务 | 首事件平均 ms | 加权 decode tok/s | 原生速度覆盖 |",
+        "| --- | --- | --- | --- |",
+    ]
     for service, stats in report["services"].items():
-        lines.append(f"| {service} | {_display(stats.get('mean_first_event_ms'))} | {_display(stats.get('weighted_decode_tokens_per_second'))} | {stats.get('native_speed_coverage', '未知')} |")
+        lines.append(
+            f"| {service} | {_display(stats.get('mean_first_event_ms'))} | {_display(stats.get('weighted_decode_tokens_per_second'))} | {stats.get('native_speed_coverage', '未知')} |"
+        )
     lines += [
         "",
         "完整阶段时间、reasoning/工具首事件、finish_reason 和可用 timing 见同名 JSON。服务分别统计，网关与适配器的 token 不能相加。",
@@ -495,6 +517,9 @@ def main() -> None:
     end.add_argument("test_id")
     end.add_argument("--attach-result", type=Path, help="更新含相同测试 ID 标记的本轮结果 Markdown")
     end.add_argument(
+        "--brief", action="store_true", help="只输出最多 4096 字节的指标和合并状态简报"
+    )
+    end.add_argument(
         "--settle-seconds",
         type=float,
         default=10,
@@ -503,6 +528,7 @@ def main() -> None:
     report = commands.add_parser("report")
     report.add_argument("--test-id")
     report.add_argument("--attach-result", type=Path, help="将本轮快照写入已有结果的统计块")
+    report.add_argument("--brief", action="store_true", help="只输出有字节上限的指标简报")
     report.add_argument("--start")
     report.add_argument("--end")
     args = parser.parse_args()
@@ -568,10 +594,14 @@ def main() -> None:
             json.dump(result, output, ensure_ascii=False, indent=2)
         with markdown_path.open("x", encoding="utf-8") as output:
             output.write(render_markdown(result))
-        print(f"JSON：{json_path}\n报告：{markdown_path}")
         if args.attach_result:
             attach_result(args.attach_result, result, json_path)
-            print(f"已更新本轮结果：{args.attach_result}")
+        if args.brief:
+            print(render_brief(result, json_path, args.attach_result))
+        else:
+            print(f"JSON：{json_path}\n报告：{markdown_path}")
+            if args.attach_result:
+                print(f"已更新本轮结果：{args.attach_result}")
     except (OSError, ValueError, KeyError) as exc:
         parser.error(str(exc))
 

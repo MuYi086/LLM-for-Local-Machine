@@ -14,7 +14,7 @@
     {
       "model": "Ornith-1.5-35B-A3B-AD-Q5",
       "key": "ornith_1_5_35b_a3b",
-      "html_file": "tests/ornith_1_5_35b_a3b/outputs/20261109T091118Z.html",
+      "html_file": "tests/model_web_comparison/legacy_outputs/20261109T091118Z.html",
       "metrics": {
         "elapsed_seconds": 234.884,
         "time_to_first_token_seconds": 5.359,
@@ -44,7 +44,7 @@
       "quality_notes": [
         "aria-label 字符串拼接有 3 处引号错误，原始页的内联 JavaScript 无法解析；并排预览副本只补齐这些引号，原始页保持不变。"
       ],
-      "preview_file": "tests/ornith_1_5_35b_a3b/outputs/20261109T091118Z.preview.html"
+      "preview_file": "tests/model_web_comparison/legacy_outputs/20261109T091118Z.preview.html"
     },
     {
       "model": "Qwen3.6-35B-A3B-MTP",

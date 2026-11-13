@@ -47,8 +47,28 @@ class OpenCodeContextGuardTests(unittest.TestCase):
                     any(m.get("role") == "tool" for m in item.get("messages", []))
                     for item in requests[:-1]
                 )
+                if compact and not any(item.get("_test_overflow") for item in requests[:-1]):
+                    body["_test_overflow"] = True
+                    error = json.dumps(
+                        {
+                            "error": {
+                                "type": "invalid_request_error",
+                                "code": "context_length_exceeded",
+                                "message": "This model's maximum context length is 32768 tokens. Reduce the messages.",
+                            }
+                        }
+                    ).encode()
+                    self.send_response(400)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(error)))
+                    self.end_headers()
+                    self.wfile.write(error)
+                    return
                 if compact:
                     content, finish, usage = {"content": summary}, "stop", 1000
+                elif not body.get("tools") and not tools:
+                    # 标题等辅助调用不能伪造一个过大的上下文并提前触发压缩。
+                    content, finish, usage = {"content": "test session"}, "stop", 100
                 elif tools or not first:
                     content, finish, usage = {"content": "done"}, "stop", 1000
                 else:
@@ -69,7 +89,7 @@ class OpenCodeContextGuardTests(unittest.TestCase):
                             ]
                         },
                         "tool_calls",
-                        30000,
+                        20000,
                     )
                 self.send_response(200)
                 self.send_header("Content-Type", "text/event-stream")
@@ -79,7 +99,7 @@ class OpenCodeContextGuardTests(unittest.TestCase):
                         "id": "test",
                         "object": "chat.completion.chunk",
                         "created": 1,
-                        "model": "Ornith-1.5-35B-A3B-AD-Q5",
+                        "model": "Ornith-1.5-9B-GGUF",
                         "choices": [
                             {
                                 "index": 0,
@@ -92,7 +112,7 @@ class OpenCodeContextGuardTests(unittest.TestCase):
                         "id": "test",
                         "object": "chat.completion.chunk",
                         "created": 1,
-                        "model": "Ornith-1.5-35B-A3B-AD-Q5",
+                        "model": "Ornith-1.5-9B-GGUF",
                         "choices": [{"index": 0, "delta": {}, "finish_reason": finish}],
                         "usage": {
                             "prompt_tokens": usage,
@@ -114,7 +134,7 @@ class OpenCodeContextGuardTests(unittest.TestCase):
                 project / ".opencode/plugins/local-model-context",
             )
             (project / "start.sh").write_text(
-                "".join(f"# line {index}\n" for index in range(1, 221))
+                "".join(f"# line {index} " + "fixture " * 32 + "\n" for index in range(1, 221))
             )
             server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
             worker = threading.Thread(target=server.serve_forever, daemon=True)
@@ -123,7 +143,7 @@ class OpenCodeContextGuardTests(unittest.TestCase):
                 config_dir = temporary / "config/opencode"
                 config_dir.mkdir(parents=True)
                 config = {
-                    "model": "local-ornith/Ornith-1.5-35B-A3B-AD-Q5",
+                    "model": "local-ornith/Ornith-1.5-9B-GGUF",
                     "providers": {
                         "local-ornith": {
                             "package": "@opencode/ai/providers/openai-compatible",
@@ -132,7 +152,7 @@ class OpenCodeContextGuardTests(unittest.TestCase):
                                 "apiKey": "fake",
                             },
                             "models": {
-                                "Ornith-1.5-35B-A3B-AD-Q5": {
+                                "Ornith-1.5-9B-GGUF": {
                                     "limit": {"context": 32768, "output": 4096},
                                     "capabilities": {
                                         "tools": True,
@@ -171,7 +191,17 @@ class OpenCodeContextGuardTests(unittest.TestCase):
                     text=True,
                     timeout=50,
                 )
-                self.assertEqual(result.returncode, 0, (result.stdout + result.stderr)[-5000:])
+                self.assertEqual(
+                    result.returncode,
+                    0,
+                    str(
+                        [
+                            (len(json.dumps(b.get("messages", []))), b.get("_test_overflow"))
+                            for b in requests
+                        ]
+                    )
+                    + (result.stdout + result.stderr)[-5000:],
+                )
                 compact = [
                     body
                     for body in requests
@@ -181,6 +211,20 @@ class OpenCodeContextGuardTests(unittest.TestCase):
                     )
                 ]
                 self.assertTrue(compact, (result.stdout + result.stderr)[-5000:])
+                self.assertGreaterEqual(len(compact), 2)
+                self.assertTrue(all(body.get("llm_context_guard") is True for body in compact))
+                self.assertTrue(any(body.get("_test_overflow") for body in compact))
+                self.assertLess(
+                    min(len(json.dumps(item["messages"])) for item in compact[1:]),
+                    len(json.dumps(compact[0]["messages"])),
+                    str(
+                        [
+                            (len(json.dumps(b["messages"])), [m.get("role") for m in b["messages"]])
+                            for b in compact
+                        ]
+                    )
+                    + result.stdout[-2000:],
+                )
                 self.assertTrue(
                     all(
                         body.get("chat_template_kwargs", {}).get("enable_thinking") is False
@@ -189,7 +233,7 @@ class OpenCodeContextGuardTests(unittest.TestCase):
                 )
                 self.assertTrue(
                     all(
-                        0 < body.get("max_tokens", body.get("max_completion_tokens", 0)) <= 2048
+                        0 < body.get("max_tokens", body.get("max_completion_tokens", 0)) <= 4096
                         for body in compact
                     )
                 )

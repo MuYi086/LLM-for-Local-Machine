@@ -14,8 +14,8 @@
     {
       "model": "Ornith-1.5-35B-A3B-AD-Q5",
       "key": "ornith_1_5_35b_a3b",
-      "html_file": "tests/ornith_1_5_35b_a3b/outputs/20261109T143300Z.html",
-      "preview_file": "tests/ornith_1_5_35b_a3b/outputs/20261109T143300Z.html",
+      "html_file": "tests/model_web_comparison/legacy_outputs/20261109T143300Z.html",
+      "preview_file": "tests/model_web_comparison/legacy_outputs/20261109T143300Z.html",
       "quality_notes": [],
       "metrics": {
         "elapsed_seconds": 107.415,

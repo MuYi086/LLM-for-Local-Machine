@@ -20,14 +20,14 @@ sys.path.insert(0, str(ROOT / "llm_local_runtime/src"))
 sys.path.insert(0, str(ROOT / "model-text"))
 
 from inference_gateway.sdcpp.processes import recover_sdcpp  # noqa: E402
-from ornith_1_5_35b_a3b import runtime as ornith_runtime  # noqa: E402
+from llama_cpp_runtime import runtime as llama_runtime  # noqa: E402
 
 from inference_gateway import LocalAIClient, load_gateway_config  # noqa: E402
 from llm_local_runtime import gpu_quarantine_path  # noqa: E402
 from scripts.localai.manager import LocalAIManager, LocalAIManagerError  # noqa: E402
 
-_loopback_port_open = ornith_runtime.loopback_port_open
-process_start_time = ornith_runtime.process_start_time
+_loopback_port_open = llama_runtime.loopback_port_open
+process_start_time = llama_runtime.process_start_time
 
 
 def _environment_lock_path() -> Path:
@@ -70,7 +70,9 @@ def _process_command_line(pid: int) -> list[str] | None:
     return [argument.decode(errors="replace") for argument in raw.split(b"\0") if argument]
 
 
-def _validate_ornith_marker(marker: dict[str, object]) -> tuple[str, int, int | None, int | None]:
+def _validate_llama_cpp_marker(
+    marker: dict[str, object],
+) -> tuple[str, int, int | None, int | None]:
     """检查 llama.cpp 标记中的 backend 地址和进程身份。"""
     host = marker.get("host")
     port = marker.get("port")
@@ -97,10 +99,10 @@ def _validate_ornith_marker(marker: dict[str, object]) -> tuple[str, int, int | 
     return host, port, pid, pgid
 
 
-def _recover_ornith(marker_path: Path, marker: dict[str, object]) -> int:
+def _recover_llama_cpp(marker_path: Path, marker: dict[str, object]) -> int:
     """停止 llama.cpp backend，并确认进程组与 loopback API 均已退出。"""
     try:
-        host, port, pid, pgid = _validate_ornith_marker(marker)
+        host, port, pid, pgid = _validate_llama_cpp_marker(marker)
         timeout = float(os.getenv("LLM_LOCALAI_CLEANUP_TIMEOUT", "30"))
         if timeout <= 0:
             raise ValueError("LLM_LOCALAI_CLEANUP_TIMEOUT 必须为正数。")
@@ -251,7 +253,7 @@ def main() -> int:
                 print("sd.cpp 进程组已确认停止，GPU 隔离已解除。")
                 return 0
             if provider == "llama.cpp":
-                return _recover_ornith(marker_path, marker)
+                return _recover_llama_cpp(marker_path, marker)
             if provider != "localai":
                 print(f"隔离标记 provider 不受支持：{provider}。", file=sys.stderr)
                 return 1

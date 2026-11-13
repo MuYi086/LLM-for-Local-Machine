@@ -226,9 +226,9 @@
         }
       },
       "html_files": [
-        "tests/ornith_1_5_35b_a3b/outputs/20261109T143300Z.html",
-        "tests/ornith_1_5_35b_a3b/outputs/20261109T143615Z.html",
-        "tests/ornith_1_5_35b_a3b/outputs/20261109T143932Z.html"
+        "tests/model_web_comparison/legacy_outputs/20261109T143300Z.html",
+        "tests/model_web_comparison/legacy_outputs/20261109T143615Z.html",
+        "tests/model_web_comparison/legacy_outputs/20261109T143932Z.html"
       ],
       "html_sha256": [
         "dbb5e9d27244aaec6093365a4bf6b4e36db8f9865d459cc49ef4c9e671188aa3",
@@ -412,7 +412,7 @@
   "browser": [
     {
       "model": "ornith_1_5_35b_a3b",
-      "html_file": "tests/ornith_1_5_35b_a3b/outputs/20261109T143932Z.html",
+      "html_file": "tests/model_web_comparison/legacy_outputs/20261109T143932Z.html",
       "all_scripts_parse": true,
       "scripts": [
         {

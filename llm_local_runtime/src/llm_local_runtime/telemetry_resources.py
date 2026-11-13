@@ -121,7 +121,7 @@ def read_processes(owner_pid: int, *, pss: bool) -> list[dict[str, Any]]:
     # backend 由短生命周期 helper 创建，helper 退出后会被 reparent，不能仅靠启动树。
     backend_roles = {}
     executable = os.getenv("LLAMA_SERVER_BIN")
-    for prefix, role in (("ORNITH", "ornith_backend"),):
+    for prefix, role in (("ORNITH_9B", "ornith_backend"),):
         pidfile = os.getenv(f"{prefix}_BACKEND_PID_FILE")
         if not pidfile or not executable:
             continue
@@ -155,7 +155,7 @@ def read_processes(owner_pid: int, *, pss: bool) -> list[dict[str, Any]]:
             if role == "service_tree":
                 command = (path / "cmdline").read_bytes()
                 for marker, label in (
-                    (b"ornith_1_5_35b_a3b/main.py", "ornith_adapter"),
+                    (b"Ornith-1.5-9B-GGUF/main.py", "ornith_adapter"),
                     (b"easel_bridge.app:app", "bridge"),
                 ):
                     if marker in command:
@@ -228,18 +228,17 @@ def collect(directory: Path, owner_pid: int, interval: float, log_path: Path | N
         "THREADS",
         "THREADS_BATCH",
         "BATCH_SIZE",
-        "N_CPU_MOE",
+        "UBATCH_SIZE",
         "N_GPU_LAYERS",
-        "CACHE_TYPE_K",
-        "CACHE_TYPE_V",
-        "LOAD_MODE",
-        "SPEC_DRAFT_N_MAX",
-        "SPEC_DRAFT_CACHE_TYPE_K",
-        "SPEC_DRAFT_CACHE_TYPE_V",
+        "SLEEP_IDLE_SECONDS",
+        "SPEC_TYPE",
+        "DRAFT_MAX",
+        "SLEEP_CACHE",
+        "CACHE_RAM_MIB",
     )
     config = {
         key: os.environ[key]
-        for prefix in ("ORNITH",)
+        for prefix in ("ORNITH_9B",)
         for suffix in allowed
         if (key := f"{prefix}_{suffix}") in os.environ
     }
@@ -252,7 +251,7 @@ def collect(directory: Path, owner_pid: int, interval: float, log_path: Path | N
     except (OSError, StopIteration, IndexError):
         cpu_model = None
     model_files = {}
-    for key in ("ORNITH_MODEL_FILE", "ORNITH_MTP_FILE", "ORNITH_MMPROJ_FILE"):
+    for key in ("ORNITH_9B_MODEL_FILE",):
         if key in os.environ:
             path = Path(os.environ[key])
             try:

@@ -16,14 +16,14 @@ import httpx
 from fastapi.testclient import TestClient
 
 from easel_bridge.app import (
-    MOSS_MODEL_ID,
     CHAT_MODEL_ID,
+    MOSS_MODEL_ID,
     VOXCPM_MODEL_ID,
     create_app,
 )
 
 API_KEY = "bridge-test-secret-00000000000000000000000000000000"
-CHAT_URL = "http://ornith.test/v1/AtomicChat/Ornith-1.5-35B-A3B-AD-Q5"
+CHAT_URL = "http://ornith.test/v1/ornith-ai/Ornith-1.5-9B-GGUF"
 MOSS_URL = "http://moss.test/v1/openmoss/MOSS-Image-SFT-Q8_0"
 VOXCPM_URL = "http://voice.test/v1/OpenBMB/VoxCPM2-GGUF"
 PNG_B64 = "iVBORw0KGgo="

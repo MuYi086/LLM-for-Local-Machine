@@ -27,7 +27,7 @@
 ## 页面预览
 
 - [并排预览](optimized_v3_comparison.html)
-- [Ornith-1.5-35B-A3B-AD-Q5 原始 HTML](../ornith_1_5_35b_a3b/outputs/20261109T143932Z.html)
+- [Ornith-1.5-35B-A3B-AD-Q5 原始 HTML](legacy_outputs/20261109T143932Z.html)
 - [Qwen3.6-35B-A3B-MTP 原始 HTML](../qwen3_6_35b_a3b/outputs/20261109T143932Z.html)
 
 任务耗时包含 HTTP 排队、模型加载、流式生成和服务端卸载等待。速度使用服务返回的实际 `completion_tokens` 除以首末文本块到达时间差。内存与显存每 0.25 秒采样一次，短暂峰值可能未被采到；系统其他进程会影响全局内存和显存读数。源码观察为静态检查，不是浏览器交互测试。

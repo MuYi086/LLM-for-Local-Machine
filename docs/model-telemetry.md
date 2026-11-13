@@ -2,7 +2,11 @@
 
 `bash start.sh` 默认启用性能记录。采集器不加载模型、不调用推理 API、不获取 GPU 锁；Ornith 仍使用原有共享 GPU 租约及 quarantine 收尾。
 
+跨 sleep RAM cache 启用后，manifest 记录 `ORNITH_9B_SLEEP_CACHE`、`ORNITH_9B_CACHE_RAM_MIB`。`usage.prompt_tokens` 仍为完整输入，`timings.cache_n` 为复用部分，`timings.prompt_n` 才是本轮实际 prefill 的 token 数。命中后应比较 prefill 毫秒、首事件及持锁时间，不以小批次 tok/s 判断是否加速。CPU RSS 包括有界缓存，sleep 后 RSS 较高不代表 CUDA 未释放；保存开销计入请求收尾。部署及实测见 [缓存补丁说明](llama-cpp-sleep-cache.md)。
+
 ## 开关与目录
+
+模型执行收尾时使用 `end/report --brief`：简报只含固定服务指标、资源峰值、warnings 摘录和 attached 状态，stdout 最多 4096 UTF-8 字节；完整数据仍落盘。attached=true 且 test_state=ended 即确认统计块，不再读完整 JSON/Markdown。当前工作流与预算保护见 [说明](opencode-compaction-budget.md)。
 
 修改仓库中的 `config/model-telemetry.env`：
 
@@ -32,7 +36,7 @@ MODEL_TELEMETRY_INTERVAL_SECONDS=1
 服务启动并就绪后，在仓库根目录的另一个终端执行：
 
 ```bash
-python3 scripts/model_telemetry.py begin --label 32k-run1
+python3 scripts/model_telemetry.py begin --label 96k-run1
 ```
 
 保存输出的“性能目录”和“测试 ID”，然后在新的 OpenCode 会话提交原有固定任务。记录不需要 agent 读取日志，也不改变固定任务。
@@ -67,7 +71,7 @@ python3 scripts/model_telemetry.py --directory <性能目录> report \
 
 ## 将统计写入 OpenCode 的同一份结果报告
 
-固定测试提示词已升级为 v3，具体工作流见仓库根目录 `CONTEXT_BENCHMARK_PROMPT.md`。测试前执行 begin，并将实际性能目录和测试 ID 一同发给 OpenCode；不要仅让它寻找“最新日志”。服务启动批次和测试 ID 在整轮中固定，不得复用旧 ID。时间窗口筛选不等于会话识别，本轮应独占模型调用；如有其他客户端请求，必须注明归属不确定。
+当前固定任务 v6 由插件自动绑定本轮目录、ID 和已有结果文件，具体流程见 `CONTEXT_BENCHMARK_PROMPT.md`，无需额外 begin/end。下列标记和手动命令用于说明格式及人工恢复；不要让 agent 寻找“最新日志”或另开分析循环。服务启动批次和测试 ID 在整轮中固定，不得复用旧 ID。时间窗口筛选不等于会话识别，本轮应独占模型调用；如有其他客户端请求，必须注明归属不确定。
 
 OpenCode 在自己的结果 Markdown 中创建且只创建一个统计块，示意如下（实际 ID 替换占位符，标记本身不放在代码围栏中）：
 
@@ -116,6 +120,6 @@ python3 scripts/model_telemetry.py --directory '<本轮性能目录>' \
 
 ## 固定上下文测试准备
 
-运行 `python3 scripts/prepare_context_benchmark.py --directory '<本轮采集目录>' --context 32768`，将输出的完整指令交给新 OpenCode 会话。准备器校验采样新鲜度和启动器上下文，提前创建如 `32k-日期-时间-ID.md` 的报告及 begin 标记。OpenCode 必须在同一文件追加正文；回复结束后执行准备器打印的 end 命令，才会计入最终回复。缺少标记的旧报告不能凭时间相近或最新目录补成精确样本。
+运行 `python3 scripts/prepare_context_benchmark.py --directory '<本轮采集目录>' --context 98304`，将输出的完整指令交给新 OpenCode 会话。准备器校验采样新鲜度和启动器上下文，提前创建如 `96k-日期-时间-ID.md` 的报告及 begin 标记。OpenCode 必须在同一文件追加正文；回复结束后执行准备器打印的 end 命令，才会计入最终回复。缺少标记的旧报告不能凭时间相近或最新目录补成精确样本。
 
 汇总包含 RAM/VRAM 基线、观测峰值与增量；首事件平均延迟包括正文、reasoning 和工具调用，另保留首正文延迟。加权 decode 速度为有效请求原生 predicted_n 总和 / predicted_ms 总和，显示覆盖率。它不是 agent 总耗时吞吐率，也不是客户端 UI 的 tok/s。

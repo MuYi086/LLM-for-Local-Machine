@@ -23,11 +23,11 @@ from llm_local_runtime.telemetry import TelemetryMiddleware
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-CHAT_MODEL_ID = "Ornith-1.5-35B-A3B-AD-Q5"
+CHAT_MODEL_ID = "Ornith-1.5-9B-GGUF"
 MOSS_MODEL_ID = "MOSS-Image-SFT-Q8_0"
 VOXCPM_MODEL_ID = "OpenBMB/VoxCPM2-GGUF"
 
-DEFAULT_CHAT_URL = "http://127.0.0.1:8401/v1/AtomicChat/Ornith-1.5-35B-A3B-AD-Q5"
+DEFAULT_CHAT_URL = "http://127.0.0.1:8503/v1/ornith-ai/Ornith-1.5-9B-GGUF"
 DEFAULT_MOSS_URL = "http://127.0.0.1:8501/v1/openmoss/MOSS-Image-SFT-Q8_0"
 DEFAULT_VOXCPM_URL = "http://127.0.0.1:8313/v1/OpenBMB/VoxCPM2-GGUF"
 

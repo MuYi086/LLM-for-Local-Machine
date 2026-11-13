@@ -13,7 +13,7 @@ VoxCPM2 服务。它也可以把 Ornith 暴露为兼容聊天 API，但不会更
 | `GET /v1/models` | — | 返回网关支持的模型列表 |
 | `POST /v1/images/generations` | `MOSS-Image-SFT-Q8_0` | 映射到 MOSS；`n` 最多 4，每张依次生成；尺寸使用 `WIDTHxHEIGHT`，例如 `1024x1024` |
 | `POST /v1/audio/speech` | `OpenBMB/VoxCPM2-GGUF` | 映射到 VoxCPM2 multipart `text`/`instruction`；接受 `voice=alloy`，仅支持默认 `speed=1`，输出 WAV 或 MP3 |
-| `POST /v1/chat/completions` | `Ornith-1.5-35B-A3B-AD-Q5` | 原样转发 JSON 与 SSE 流到现有 Ornith 适配器 |
+| `POST /v1/chat/completions` | `Ornith-1.5-9B-GGUF` | 原样转发 JSON 与 SSE 流到现有 Ornith 适配器 |
 
 网关不会向上游转发客户端 API Key。上游 URL 只能由服务端环境变量指定，HTTP 重定向关闭。请求体默认上限为 12 MiB，
 响应体上限为 64 MiB；上游访问超时默认为 900 秒。MP3 由本机 FFmpeg 从 VoxCPM2 的 WAV 响应转换，不写临时音频文件。
@@ -74,7 +74,7 @@ Windows 的 `localhost` 转发访问 WSL 端口；如果 Easel 服务在 Windows
 ## OpenCode 一次配置
 
 OpenCode v2 的本地 Provider 使用 `providers`、`package`、`settings`，Base URL 为
-`http://127.0.0.1:8500/v1`，模型 ID 为 `Ornith-1.5-35B-A3B-AD-Q5`，上下文设置为 32768。
+`http://127.0.0.1:8500/v1`，模型 ID 为 `Ornith-1.5-9B-GGUF`，上下文设置为 98304（96k）。
 不要直接连接 llama.cpp 后端，否则会绕过上游 API 的共享 GPU 锁。
 
 在运行 OpenCode 的 WSL 用户下，把 Key 保存为独立文件，供新终端和后台服务读取：
@@ -140,7 +140,7 @@ VOICE_INSTRUCT_MODE=field
 
 Easel 的音频脚本默认请求 MP3，因此系统需要安装 FFmpeg；也可以使用 WAV 输出。VoxCPM2 当前不接受速度调节，Easel 侧将速度保持为 `1`。
 当前 Codex 运行时可以继续作为“对话与脚本”的执行引擎；图片和语音调用单独走以上模型配置。若要直接调用本地 Ornith，
-聊天 Provider 使用相同的 Base URL 与 Key，模型 ID 为 `Ornith-1.5-35B-A3B-AD-Q5`。
+聊天 Provider 使用相同的 Base URL 与 Key，模型 ID 为 `Ornith-1.5-9B-GGUF`。
 
 ## 故障定位
 

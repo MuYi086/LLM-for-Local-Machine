@@ -28,9 +28,7 @@ def main() -> None:
     """串行发送限长请求并保存原始 SSE、后端命令和测速结果。"""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--label", required=True)
-    parser.add_argument(
-        "--models", nargs="+", choices=("ornith",), default=["ornith"]
-    )
+    parser.add_argument("--models", nargs="+", choices=("ornith",), default=["ornith"])
     parser.add_argument("--max-tokens", type=int, default=1024)
     parser.add_argument("--repeats", type=int, default=2)
     parser.add_argument(

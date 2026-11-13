@@ -23,7 +23,7 @@ def _write_fake_python(executable: Path) -> None:
     executable.write_text(
         "#!/usr/bin/env bash\n"
         'printf \'python3 %s\\n\' "$*" >> "$TRACE"\n'
-        'if [[ "$*" == *"-m ornith_1_5_35b_a3b.runtime"* || "$*" == *scripts/model_telemetry.py* ]]; then exec /usr/bin/python3 "$@"; fi\n',
+        'if [[ "$*" == *"-m llama_cpp_runtime.runtime"* || "$*" == *scripts/model_telemetry.py* ]]; then exec /usr/bin/python3 "$@"; fi\n',
         encoding="utf-8",
     )
     executable.chmod(0o755)
@@ -38,16 +38,15 @@ def _write_fake_llama_server(executable: Path) -> None:
         "    print('Available devices: CUDA0')\n"
         "    raise SystemExit(0)\n"
         "if '--help' in sys.argv:\n"
-        "    print('--n-cpu-moe --sleep-idle-seconds --mmproj-offload --spec-type --spec-draft-model')\n"
+        "    print('--sleep-idle-seconds --load-mode --spec-type --spec-draft-n-max --ubatch-size --cache-ram')\n"
         "    raise SystemExit(0)\n"
-
         "with open(os.environ['TRACE'], 'a', encoding='utf-8') as trace:\n"
         "    trace.write('llama-server ' + ' '.join(sys.argv[1:]) + '\\n')\n"
         "port = int(sys.argv[sys.argv.index('--port') + 1])\n"
         "host = sys.argv[sys.argv.index('--host') + 1]\n"
         "class Handler(BaseHTTPRequestHandler):\n"
         "    def do_GET(self):\n"
-        "        body = json.dumps({'is_sleeping': True, 'status': 'ok'}).encode()\n"
+        "        body = json.dumps({'is_sleeping': True, 'status': 'ok', 'sleep_prompt_cache_supported': os.getenv('FAKE_SLEEP_CACHE_SUPPORTED', '1') == '1', 'sleep_prompt_cache_enabled': True}).encode()\n"
         "        self.send_response(200)\n"
         "        self.send_header('Content-Type', 'application/json')\n"
         "        self.send_header('Content-Length', str(len(body)))\n"
@@ -80,9 +79,6 @@ def _preflight_environment(root: Path) -> tuple[dict[str, str], Path]:
     gpu_query.chmod(0o755)
     llama_server = bin_dir / "llama-server"
     _write_fake_llama_server(llama_server)
-    model_file = root / "Ornith.gguf"
-    mmproj_file = root / "mmproj.gguf"
-    mtp_file = root / "mtp.gguf"
     moss_image_root = root / "hf-mirror/stable-diffusion-cpp-gguf/MOSS-Image-SFT-GGUF"
     moss_image_root.mkdir(parents=True)
     for name in (
@@ -104,9 +100,9 @@ def _preflight_environment(root: Path) -> tuple[dict[str, str], Path]:
     sd_cpp_binary = bin_dir / "sd-cli"
     sd_cpp_binary.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
     sd_cpp_binary.chmod(0o755)
-    model_file.write_bytes(b"GGUF-test-model")
-    mmproj_file.write_bytes(b"GGUF-test-mmproj")
-    mtp_file.write_bytes(b"GGUF-test-mtp")
+    ornith_9b_model_file = root / "hf-mirror/ornith-ai/Ornith-1.5-9B-GGUF/Ornith-1.5-9B-Q8_0.gguf"
+    ornith_9b_model_file.parent.mkdir(parents=True)
+    ornith_9b_model_file.write_bytes(b"GGUF-test-9b-model")
     environment = {
         **os.environ,
         "PATH": f"{bin_dir}:{os.environ['PATH']}",
@@ -129,16 +125,14 @@ def _preflight_environment(root: Path) -> tuple[dict[str, str], Path]:
         "PORT": "18300",
         "QWEN_VOICEDESIGN_HOST": "127.0.0.1",
         "QWEN_VOICEDESIGN_PORT": "18301",
-        "ORNITH_HOST": "127.0.0.1",
-        "ORNITH_PORT": "18401",
-        "LLAMA_CPP_PORT": "18403",
         "LLAMA_SERVER_BIN": str(llama_server),
-        "ORNITH_MODEL_FILE": str(model_file),
-        "ORNITH_MTP_FILE": str(mtp_file),
-        "ORNITH_MMPROJ_FILE": str(mmproj_file),
-        "ORNITH_STARTUP_TIMEOUT": "5",
-        "ORNITH_SLEEP_TIMEOUT": "1",
-        "ORNITH_SLEEP_POLL_INTERVAL": "0.01",
+        "ORNITH_9B_MODEL_FILE": str(ornith_9b_model_file),
+        "ORNITH_9B_HOST": "127.0.0.1",
+        "ORNITH_9B_PORT": "18503",
+        "ORNITH_9B_LLAMA_CPP_PORT": "18504",
+        "ORNITH_9B_STARTUP_TIMEOUT": "5",
+        "ORNITH_9B_SLEEP_TIMEOUT": "1",
+        "ORNITH_9B_SLEEP_POLL_INTERVAL": "0.01",
         "LLM_LOCALAI_ENABLED": "true",
         "LLM_LOCALAI_MANAGED": "true",
         "LLM_LOCAL_QWEN3_VOICEDESIGN_PROVIDER": "localai",
@@ -148,6 +142,27 @@ def _preflight_environment(root: Path) -> tuple[dict[str, str], Path]:
 
 
 class StartServicesTests(unittest.TestCase):
+    def test_rejects_backend_without_sleep_cache_support(self) -> None:
+        """启用缓存时拒绝未打补丁的 backend，并确认启动失败清理隔离标记。"""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            environment, trace_path = _preflight_environment(root)
+            environment.update(ORNITH_9B_SLEEP_CACHE="1", FAKE_SLEEP_CACHE_SUPPORTED="0")
+            completed = subprocess.run(
+                ["bash", str(ROOT / "start.sh")],
+                capture_output=True,
+                text=True,
+                env=environment,
+                timeout=30,
+                check=False,
+            )
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertIn(
+                "backend 未支持或未启用 sleep prompt cache", completed.stdout + completed.stderr
+            )
+            self.assertFalse((root / "storage/.cache/runtime/gpu-runtime.lock.quarantine").exists())
+            self.assertNotIn("main/main.py", trace_path.read_text())
+
     def test_disabled_telemetry_does_not_start_sampler(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -243,7 +258,7 @@ class StartServicesTests(unittest.TestCase):
                             console.seek(0)
                             self.fail(f"网关未就绪：{console.read()}")
                         self.assertIn(
-                            "Ornith-1.5-35B-A3B-AD-Q5", [model["id"] for model in models["data"]]
+                            "Ornith-1.5-9B-GGUF", [model["id"] for model in models["data"]]
                         )
                         if trigger == "interrupt":
                             process.send_signal(signal.SIGINT)
@@ -297,7 +312,7 @@ class StartServicesTests(unittest.TestCase):
                         self.assertGreaterEqual(len(samples), 2)
                         self.assertIsNone(json.loads(samples[-1])["gpu"]["gpus"])
                         self.assertFalse((runtime / "gpu-runtime.lock.quarantine").exists())
-                        for name in ("ornith-llama-server.pid",):
+                        for name in ("ornith-9b-llama-server.pid",):
                             self.assertFalse((runtime / name).exists())
                         console.seek(0)
                         self.assertNotIn(key, console.read())
@@ -311,7 +326,7 @@ class StartServicesTests(unittest.TestCase):
                             for line in trace_path.read_text().splitlines()
                             if line.startswith("service-pid ")
                         }
-                        for name in ("ornith-llama-server.pid",):
+                        for name in ("ornith-9b-llama-server.pid",):
                             pid_file = root / "storage/.cache/runtime" / name
                             if pid_file.exists():
                                 groups.add(int(pid_file.read_text()))
@@ -323,8 +338,8 @@ class StartServicesTests(unittest.TestCase):
 
     def test_positive_timeouts_reject_zero_and_invalid_decimals_before_startup(self) -> None:
         for variable in (
-            "ORNITH_SLEEP_TIMEOUT",
-            "ORNITH_SLEEP_POLL_INTERVAL",
+            "ORNITH_9B_SLEEP_TIMEOUT",
+            "ORNITH_9B_SLEEP_POLL_INTERVAL",
             "GPU_LOCK_WAIT_TIMEOUT",
         ):
             for value in ("0", "00.000", "-1", "nan", "1.2.3"):
@@ -345,43 +360,23 @@ class StartServicesTests(unittest.TestCase):
                     self.assertIn(f"{variable} 必须是正数", completed.stdout + completed.stderr)
                     self.assertNotIn("manager.py", trace_path.read_text())
 
-    def test_default_text_settings_match_measured_profile(self) -> None:
-        expected = {
-            "ORNITH": {"threads": "6", "threads-batch": "8"},
-        }
-        common = {
-            "n-cpu-moe": "23",
-            "ctx-size": "98304",
-            "batch-size": "512",
-            "cache-type-k": "q8_0",
-            "cache-type-v": "q8_0",
-            "load-mode": "none",
-            "spec-type": "draft-mtp",
-            "spec-draft-n-max": "4",
-            "spec-draft-type-k": "f16",
-            "spec-draft-type-v": "f16",
-            "parallel": "1",
-            "sleep-idle-seconds": "1",
-        }
+    def test_default_text_settings_use_96k_profile(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             environment, trace_path = _preflight_environment(Path(temporary))
-            for prefix in expected:
-                for setting in (
-                    "THREADS",
-                    "THREADS_BATCH",
-                    "N_CPU_MOE",
-                    "CONTEXT_SIZE",
-                    "BATCH_SIZE",
-                    "CACHE_TYPE_K",
-                    "CACHE_TYPE_V",
-                    "LOAD_MODE",
-                    "SPEC_TYPE",
-                    "SPEC_DRAFT_N_MAX",
-                    "SPEC_DRAFT_CACHE_TYPE_K",
-                    "SPEC_DRAFT_CACHE_TYPE_V",
-                    "SLEEP_IDLE_SECONDS",
-                ):
-                    environment.pop(f"{prefix}_{setting}", None)
+            for setting in (
+                "CONTEXT_SIZE",
+                "BATCH_SIZE",
+                "UBATCH_SIZE",
+                "THREADS",
+                "THREADS_BATCH",
+                "N_GPU_LAYERS",
+                "SLEEP_IDLE_SECONDS",
+                "SPEC_TYPE",
+                "DRAFT_MAX",
+                "SLEEP_CACHE",
+                "CACHE_RAM_MIB",
+            ):
+                environment.pop(f"ORNITH_9B_{setting}", None)
             completed = subprocess.run(
                 ["bash", str(ROOT / "start.sh")],
                 check=False,
@@ -397,12 +392,25 @@ class StartServicesTests(unittest.TestCase):
                 if line.startswith("llama-server ")
             ]
             self.assertEqual(len(starts), 1)
-            for command, (prefix, settings) in zip(starts, expected.items(), strict=True):
-                arguments = command.split()
-                for flag, value in (common | settings).items():
-                    with self.subTest(model=prefix, flag=flag):
-                        self.assertIn(f"--{flag}", arguments)
-                        self.assertEqual(arguments[arguments.index(f"--{flag}") + 1], value)
+            ornith_start = starts[0]
+            arguments = ornith_start.split()
+            self.assertIn("--alias Ornith-1.5-9B-GGUF", ornith_start)
+            for flag, value in {
+                "ctx-size": "98304",
+                "batch-size": "1024",
+                "ubatch-size": "1024",
+                "threads": "6",
+                "threads-batch": "8",
+                "load-mode": "none",
+                "parallel": "1",
+                "sleep-idle-seconds": "1",
+                "spec-type": "draft-mtp",
+                "spec-draft-n-max": "4",
+                "cache-ram": "4096",
+            }.items():
+                with self.subTest(flag=flag):
+                    self.assertIn(f"--{flag}", arguments)
+                    self.assertEqual(arguments[arguments.index(f"--{flag}") + 1], value)
 
     def test_start_invokes_managed_services_and_ornith_backend(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -429,9 +437,6 @@ class StartServicesTests(unittest.TestCase):
             gpu_query.chmod(0o755)
             llama_server = bin_dir / "llama server"
             _write_fake_llama_server(llama_server)
-            model_file = root / "Ornith.gguf"
-            mmproj_file = root / "mmproj.gguf"
-            mtp_file = root / "mtp.gguf"
             moss_image_root = root / "hf-mirror/stable-diffusion-cpp-gguf/MOSS-Image-SFT-GGUF"
             moss_image_root.mkdir(parents=True)
             for name in (
@@ -453,9 +458,11 @@ class StartServicesTests(unittest.TestCase):
             sd_cpp_binary = bin_dir / "sd-cli"
             sd_cpp_binary.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
             sd_cpp_binary.chmod(0o755)
-            model_file.write_bytes(b"GGUF-test-model")
-            mmproj_file.write_bytes(b"GGUF-test-mmproj")
-            mtp_file.write_bytes(b"GGUF-test-mtp")
+            ornith_9b_model_file = (
+                root / "hf-mirror/ornith-ai/Ornith-1.5-9B-GGUF/Ornith-1.5-9B-Q8_0.gguf"
+            )
+            ornith_9b_model_file.parent.mkdir(parents=True)
+            ornith_9b_model_file.write_bytes(b"GGUF-test-9b-model")
 
             environment = {
                 **os.environ,
@@ -478,20 +485,14 @@ class StartServicesTests(unittest.TestCase):
                 "PORT": "18300",
                 "QWEN_VOICEDESIGN_HOST": "127.0.0.1",
                 "QWEN_VOICEDESIGN_PORT": "18301",
-                "ORNITH_HOST": "127.0.0.1",
-                "ORNITH_PORT": "18401",
-                "LLAMA_CPP_PORT": "18403",
                 "LLAMA_SERVER_BIN": str(llama_server),
-                "ORNITH_MODEL_FILE": str(model_file),
-                "ORNITH_MMPROJ_FILE": str(mmproj_file),
-                "ORNITH_MTP_FILE": str(mtp_file),
-                "ORNITH_N_CPU_MOE": "24",
-                "ORNITH_SPEC_DRAFT_N_MAX": "5",
-                "ORNITH_SPEC_DRAFT_CACHE_TYPE_K": "q8_0",
-                "ORNITH_SPEC_DRAFT_CACHE_TYPE_V": "q8_0",
-                "ORNITH_STARTUP_TIMEOUT": "5",
-                "ORNITH_SLEEP_TIMEOUT": "1",
-                "ORNITH_SLEEP_POLL_INTERVAL": "0.01",
+                "ORNITH_9B_MODEL_FILE": str(ornith_9b_model_file),
+                "ORNITH_9B_HOST": "127.0.0.1",
+                "ORNITH_9B_PORT": "18503",
+                "ORNITH_9B_LLAMA_CPP_PORT": "18504",
+                "ORNITH_9B_STARTUP_TIMEOUT": "5",
+                "ORNITH_9B_SLEEP_TIMEOUT": "1",
+                "ORNITH_9B_SLEEP_POLL_INTERVAL": "0.01",
                 "LLM_LOCALAI_ENABLED": "true",
                 "LLM_LOCALAI_MANAGED": "true",
                 "LLM_LOCAL_QWEN3_VOICEDESIGN_PROVIDER": "localai",
@@ -540,7 +541,7 @@ class StartServicesTests(unittest.TestCase):
                 1,
             )
             self.assertEqual(
-                sum("ornith_1_5_35b_a3b/main.py" in call for call in uv_calls),
+                sum("model-text/Ornith-1.5-9B-GGUF/main.py" in call for call in uv_calls),
                 1,
             )
             self.assertEqual(
@@ -588,8 +589,8 @@ class StartServicesTests(unittest.TestCase):
                 "8342",
                 "8343",
                 "8313",
-                "18401",
-                "18403",
+                "18503",
+                "18504",
                 "18501",
                 "18502",
                 "18500",
@@ -598,40 +599,35 @@ class StartServicesTests(unittest.TestCase):
             llama_starts = [call for call in calls if call.startswith("llama-server ")]
             self.assertEqual(len(llama_starts), 1)
             ornith_start = llama_starts[0]
-            self.assertIn(f"--model {model_file}", ornith_start)
-            self.assertIn(f"--mmproj {mmproj_file}", ornith_start)
-            self.assertIn(f"--spec-draft-model {mtp_file}", ornith_start)
-            self.assertIn("--spec-type draft-mtp", ornith_start)
-            self.assertIn("--spec-draft-n-max 5", ornith_start)
-            self.assertIn("--spec-draft-type-k q8_0", ornith_start)
-            self.assertIn("--spec-draft-type-v q8_0", ornith_start)
+            self.assertIn(f"--model {environment['ORNITH_9B_MODEL_FILE']}", ornith_start)
             self.assertIn("--host 127.0.0.1", ornith_start)
-            self.assertIn("--port 18403", ornith_start)
-            self.assertIn("--alias Ornith-1.5-35B-A3B-AD-Q5", ornith_start)
+            self.assertIn("--port 18504", ornith_start)
+            self.assertIn("--alias Ornith-1.5-9B-GGUF", ornith_start)
             self.assertIn("--device CUDA0", ornith_start)
             self.assertIn("--gpu-layers 99", ornith_start)
-            self.assertIn("--n-cpu-moe 24", ornith_start)
-            self.assertIn("--mmproj-offload", ornith_start)
-            self.assertIn("--flash-attn on", ornith_start)
-            self.assertIn("--jinja", ornith_start)
             self.assertIn("--ctx-size 98304", ornith_start)
             self.assertIn("--sleep-idle-seconds 1", ornith_start)
-            commands_before_main = calls.index(ornith_start)
+            self.assertNotIn("--mmproj", ornith_start)
+            self.assertNotIn("--spec-draft-model", ornith_start)
+            commands_before_backend = calls.index(ornith_start)
             first_service_start = next(
                 index
                 for index, call in enumerate(calls)
                 if call.startswith("uv ") and "main/main.py" in call
             )
-            self.assertLess(commands_before_main, first_service_start)
+            self.assertLess(commands_before_backend, first_service_start)
+            shutdowns = [
+                call
+                for call in calls
+                if call.startswith("python3 -m llama_cpp_runtime.runtime shutdown ")
+            ]
+            self.assertEqual(len(shutdowns), 1)
+            self.assertIn("--model Ornith-1.5-9B-GGUF", shutdowns[0])
             source = (ROOT / "start.sh").read_text(encoding="utf-8")
             self.assertIn('AUDIO_CPP_RUNTIME_SRC="$AUDIO_CPP_RUNTIME_PROJECT_DIR/src"', source)
             self.assertIn('export PYTHONPATH="$MODEL_TEXT_DIR:$AUDIO_CPP_RUNTIME_SRC:', source)
             self.assertIn(
-                "$HF_MIRROR_DIR/AtomicChat/Ornith-1.5-35B-A3B/Ornith-1.5-35B-A3B-AD-Q5_K-Q4_K.gguf",
-                source,
-            )
-            self.assertIn(
-                "$HF_MIRROR_DIR/AtomicChat/Ornith-1.5-35B-A3B/mmproj-Ornith-1.5-35B-A3B-F16.gguf",
+                "$HF_MIRROR_DIR/ornith-ai/Ornith-1.5-9B-GGUF/Ornith-1.5-9B-Q8_0.gguf",
                 source,
             )
             self.assertIn(
@@ -655,6 +651,25 @@ class StartServicesTests(unittest.TestCase):
                     )
                 )
             )
+
+    def test_missing_ornith_9b_gguf_fails_before_localai_starts(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            environment, trace_path = _preflight_environment(root)
+            environment["ORNITH_9B_MODEL_FILE"] = str(root / "missing-Ornith-9B.gguf")
+
+            completed = subprocess.run(
+                ["bash", str(ROOT / "start.sh")],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=environment,
+                timeout=15,
+            )
+
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertIn("Ornith 9B GGUF 缺失或为空", completed.stdout + completed.stderr)
+            self.assertNotIn("scripts/localai/manager.py", trace_path.read_text())
 
     def test_moss_assets_and_sd_cpp_digest_fail_before_localai_starts(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -739,28 +754,6 @@ class StartServicesTests(unittest.TestCase):
                 )
                 self.assertNotIn("scripts/localai/manager.py", trace_path.read_text())
 
-    def test_invalid_draft_settings_fail_before_localai_starts(self) -> None:
-        for variable, value in (
-            ("ORNITH_SPEC_TYPE", "draft-simple"),
-            ("ORNITH_SPEC_DRAFT_N_MAX", "-1"),
-            ("ORNITH_SPEC_DRAFT_CACHE_TYPE_K", "invalid"),
-            ("ORNITH_SPEC_DRAFT_CACHE_TYPE_V", "invalid"),
-        ):
-            with self.subTest(variable=variable), tempfile.TemporaryDirectory() as temporary:
-                environment, trace_path = _preflight_environment(Path(temporary))
-                environment[variable] = value
-                completed = subprocess.run(
-                    ["bash", str(ROOT / "start.sh")],
-                    check=False,
-                    capture_output=True,
-                    text=True,
-                    env=environment,
-                    timeout=15,
-                )
-                self.assertNotEqual(completed.returncode, 0)
-                self.assertIn(variable, completed.stdout + completed.stderr)
-                self.assertNotIn("manager.py", trace_path.read_text())
-
     def test_missing_llama_server_fails_before_localai_starts(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -793,7 +786,7 @@ class StartServicesTests(unittest.TestCase):
             fallback.parent.mkdir(parents=True)
             _write_fake_llama_server(fallback)
             environment["HOME"] = str(home)
-            environment["ORNITH_MODEL_FILE"] = str(root / "missing-Ornith.gguf")
+            environment["ORNITH_9B_MODEL_FILE"] = str(root / "missing-Ornith-9B.gguf")
 
             completed = subprocess.run(
                 ["bash", str(ROOT / "start.sh")],
@@ -805,87 +798,8 @@ class StartServicesTests(unittest.TestCase):
             )
 
             self.assertNotEqual(completed.returncode, 0)
-            self.assertIn("Ornith GGUF 缺失或为空", completed.stdout + completed.stderr)
+            self.assertIn("Ornith 9B GGUF 缺失或为空", completed.stdout + completed.stderr)
             self.assertNotIn("找不到可执行的 llama-server", completed.stdout + completed.stderr)
-            calls = trace_path.read_text(encoding="utf-8").splitlines()
-            self.assertFalse(any("manager.py" in call for call in calls))
-
-    def test_ornith_without_mtp_preserves_legacy_startup(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            environment, trace_path = _preflight_environment(root)
-            environment["ORNITH_SPEC_TYPE"] = "none"
-            environment["ORNITH_MTP_FILE"] = str(root / "missing-mtp.gguf")
-            environment["ORNITH_SPEC_DRAFT_N_MAX"] = "unused"
-            completed = subprocess.run(
-                ["bash", str(ROOT / "start.sh")],
-                check=False,
-                capture_output=True,
-                text=True,
-                env=environment,
-                timeout=30,
-            )
-            self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
-            calls = trace_path.read_text(encoding="utf-8").splitlines()
-            ornith_start = next(call for call in calls if call.startswith("llama-server "))
-            self.assertIn("--spec-type none", ornith_start)
-            self.assertNotIn("--spec-draft-", ornith_start)
-
-    def test_missing_ornith_mtp_fails_before_localai_starts(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            environment, trace_path = _preflight_environment(root)
-            environment["ORNITH_MTP_FILE"] = str(root / "missing-mtp.gguf")
-            completed = subprocess.run(
-                ["bash", str(ROOT / "start.sh")],
-                check=False,
-                capture_output=True,
-                text=True,
-                env=environment,
-                timeout=15,
-            )
-            self.assertNotEqual(completed.returncode, 0)
-            self.assertIn("Ornith MTP 缺失或为空", completed.stdout + completed.stderr)
-            calls = trace_path.read_text(encoding="utf-8").splitlines()
-            self.assertFalse(any("manager.py" in call for call in calls))
-
-    def test_missing_ornith_weights_fail_before_localai_starts(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            environment, trace_path = _preflight_environment(root)
-            environment["ORNITH_MODEL_FILE"] = str(root / "missing-Ornith.gguf")
-
-            completed = subprocess.run(
-                ["bash", str(ROOT / "start.sh")],
-                check=False,
-                capture_output=True,
-                text=True,
-                env=environment,
-                timeout=15,
-            )
-
-            self.assertNotEqual(completed.returncode, 0)
-            self.assertIn("GGUF 缺失或为空", completed.stdout + completed.stderr)
-            calls = trace_path.read_text(encoding="utf-8").splitlines()
-            self.assertFalse(any("manager.py" in call for call in calls))
-
-    def test_missing_ornith_mmproj_fails_before_localai_starts(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            environment, trace_path = _preflight_environment(root)
-            environment["ORNITH_MMPROJ_FILE"] = str(root / "missing-mmproj.gguf")
-
-            completed = subprocess.run(
-                ["bash", str(ROOT / "start.sh")],
-                check=False,
-                capture_output=True,
-                text=True,
-                env=environment,
-                timeout=15,
-            )
-
-            self.assertNotEqual(completed.returncode, 0)
-            self.assertIn("mmproj 缺失或为空", completed.stdout + completed.stderr)
             calls = trace_path.read_text(encoding="utf-8").splitlines()
             self.assertFalse(any("manager.py" in call for call in calls))
 
@@ -897,7 +811,7 @@ class StartServicesTests(unittest.TestCase):
             cpu_server.write_text(
                 "#!/usr/bin/env bash\n"
                 'if [[ "$1" == "--list-devices" ]]; then echo "Available devices: (none)"; exit 0; fi\n'
-                'echo "--n-cpu-moe --sleep-idle-seconds --mmproj-offload"\n',
+                'echo "--sleep-idle-seconds --load-mode"\n',
                 encoding="utf-8",
             )
             cpu_server.chmod(0o755)

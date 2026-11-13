@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""调用本机 Ornith API 并将生成文本保存到运行数据目录。"""
+"""调用本机 Ornith-1.5-9B-GGUF API 并保存生成文本。"""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
-API_ROUTE = "/v1/AtomicChat/Ornith-1.5-35B-A3B-AD-Q5"
+API_ROUTE = "/v1/ornith-ai/Ornith-1.5-9B-GGUF"
 DEFAULT_PROMPT = "请用简洁的中文介绍一下你自己，并说明你擅长处理哪些任务。"
 
 
@@ -34,6 +34,7 @@ def write_sample(
     output_dir: str | Path,
     *,
     timestamp: datetime | None = None,
+    pid: int | None = None,
 ) -> Path:
     """将生成文本以独占方式写入运行数据目录。"""
     if not text.strip():
@@ -41,7 +42,8 @@ def write_sample(
     directory = Path(output_dir)
     directory.mkdir(parents=True, exist_ok=True)
     created_at = timestamp or datetime.now(UTC)
-    filename = f"ornith-example-{created_at:%Y%m%dT%H%M%S}-{os.getpid()}.txt"
+    process_id = pid if pid is not None else os.getpid()
+    filename = f"ornith-9b-example-{created_at:%Y%m%dT%H%M%S%fZ}-{process_id}.txt"
     output_path = directory / filename
     with output_path.open("x", encoding="utf-8") as output_file:
         output_file.write(text.strip())
@@ -53,13 +55,14 @@ def request_completion(
     *,
     base_url: str,
     prompt: str,
+    max_tokens: int = 256,
     timeout_seconds: float = 1800.0,
 ) -> str:
-    """请求固定 Ornith 路由并返回 assistant 文本。"""
+    """请求 9B 固定路由并返回 assistant 文本。"""
     payload = json.dumps(
         {
             "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": 256,
+            "max_tokens": max_tokens,
             "temperature": 0,
         },
         ensure_ascii=False,
@@ -75,11 +78,11 @@ def request_completion(
             result = json.loads(response.read())
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"Ornith API 返回 HTTP {exc.code}: {detail}") from exc
+        raise RuntimeError(f"Ornith 9B API 返回 HTTP {exc.code}: {detail}") from exc
     except (urllib.error.URLError, TimeoutError) as exc:
-        raise RuntimeError(f"无法连接 Ornith API：{exc}") from exc
+        raise RuntimeError(f"无法连接 Ornith 9B API：{exc}") from exc
     except json.JSONDecodeError as exc:
-        raise RuntimeError("Ornith API 返回了无效 JSON。") from exc
+        raise RuntimeError("Ornith 9B API 返回了无效 JSON。") from exc
     return extract_assistant_text(result)
 
 
@@ -88,33 +91,35 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--base-url",
-        default=os.getenv("ORNITH_TEST_BASE_URL", "http://127.0.0.1:8401"),
-        help="Ornith API 根地址。",
+        default=os.getenv("ORNITH_9B_TEST_BASE_URL", "http://127.0.0.1:8503"),
+        help="Ornith 9B API 根地址。",
     )
     parser.add_argument("--prompt", default=DEFAULT_PROMPT, help="发送给模型的中文提示。")
+    parser.add_argument("--max-tokens", type=int, default=256, help="生成 token 上限。")
     parser.add_argument("--timeout", type=float, default=1800.0, help="请求超时秒数。")
     parser.add_argument(
         "--output-dir",
         default=os.getenv(
-            "ORNITH_TEST_OUTPUT_DIR",
-            str(Path(os.getenv("STORAGE_DIR", ROOT / "storage")) / "llm_tests/ornith_1_5_35b_a3b"),
+            "ORNITH_9B_TEST_OUTPUT_DIR",
+            str(Path(os.getenv("STORAGE_DIR", ROOT / "storage")) / "llm_tests/ornith_1_5_9b_gguf"),
         ),
         help="生成文本输出目录。",
     )
     args = parser.parse_args()
-    if not args.prompt.strip() or args.timeout <= 0:
-        parser.error("prompt 必须非空且 timeout 必须为正数。")
+    if not args.prompt.strip() or args.max_tokens <= 0 or args.timeout <= 0:
+        parser.error("prompt 必须非空，max-tokens 和 timeout 必须为正数。")
     try:
         text = request_completion(
             base_url=args.base_url,
             prompt=args.prompt,
+            max_tokens=args.max_tokens,
             timeout_seconds=args.timeout,
         )
         output_path = write_sample(text, args.output_dir)
     except (OSError, RuntimeError, ValueError) as exc:
-        print(f"Ornith 样例生成失败：{exc}", file=sys.stderr)
+        print(f"Ornith 9B 样例生成失败：{exc}", file=sys.stderr)
         return 1
-    print(f"Ornith 样例已保存：{output_path}")
+    print(f"Ornith 9B 样例已保存：{output_path}")
     return 0
 
 

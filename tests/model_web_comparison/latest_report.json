@@ -14,8 +14,8 @@
     {
       "model": "Ornith-1.5-35B-A3B-AD-Q5",
       "key": "ornith_1_5_35b_a3b",
-      "html_file": "tests/ornith_1_5_35b_a3b/outputs/20261109T143932Z.html",
-      "preview_file": "tests/ornith_1_5_35b_a3b/outputs/20261109T143932Z.html",
+      "html_file": "tests/model_web_comparison/legacy_outputs/20261109T143932Z.html",
+      "preview_file": "tests/model_web_comparison/legacy_outputs/20261109T143932Z.html",
       "quality_notes": [
         "浏览器实测删除行程无效：点击后数量未减少。"
       ],
