@@ -26,7 +26,7 @@ python3 scripts/model_telemetry.py --directory '<directory>' end '<test_id>' \
 
 ## 实际 token 预算
 
-仅 local-ornith 的 compaction HTTP body 添加 `llm_context_guard=true`；普通请求不增加模板或分词调用。桥接仍经相同的 8500→8503 链路，不转发 Key 给 backend，也不新建推理路由。
+仅 local-ornith 的 compaction HTTP body 添加 `llm_context_guard=true`；普通请求不增加模板或分词调用。OpenCode 的 MTP 默认路由经 8500→8504→8506；普通 9B 仍可经 8500→8503→8505 选择。网关不转发 Key 给 backend，预算检查使用被选模型 backend 的实际上下文。
 
 适配器在取得既有 GPU 租约、确认初始 sleep 后，剥离本地字段，调用同一 backend：
 
@@ -39,7 +39,7 @@ python3 scripts/model_telemetry.py --directory '<directory>' end '<test_id>' \
 
 如果不可省略的最新用户输入或检查点本身已经过大，OpenCode 仍可能明确报告无法继续缩减；预算保护不保证任意大输入都能自动摘要成功。隔离测试用 32k 临时模型配置，让首次正常请求有充足空间，实际读取大工具结果后才触发压缩；标题辅助请求不伪造过大的 usage，避免在尚无可缩减内容时提前触发。
 
-context=98304、output=4096、buffer=16384、keep.tokens=10240 保持原值。buffer 是触发余量，无法独自阻止单次大工具结果跨过余量，因此同时限制工具输出和核验实际预算。
+MTP 与普通 9B 的 context 均为 98304；OpenCode output=4096、buffer=16384、keep.tokens=10240 保持原值。buffer 是触发余量，无法独自阻止单次大工具结果跨过余量，因此同时限制工具输出和核验实际预算。
 
 ## 验证
 

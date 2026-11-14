@@ -19,9 +19,9 @@ def main() -> None:
     sys.path.insert(0, str(ROOT / "model-text"))
     from llama_cpp_runtime.app import create_app
 
-    base = os.getenv("ORNITH_9B_LLAMA_BASE_URL", "http://127.0.0.1:8504")
+    base = os.getenv("ORNITH_9B_LLAMA_BASE_URL", "http://127.0.0.1:8505")
     parsed = urlsplit(base)
-    pid = find_backend_pid(parsed.port or 8504)
+    pid = find_backend_pid(parsed.port or 8505)
     directory = (
         ROOT
         / "storage/llm_tests/ornith_1_5_9b_gguf"
@@ -38,7 +38,7 @@ def main() -> None:
             backend_env_prefix="ORNITH_9B",
             backend_base_url=base,
             backend_host=parsed.hostname,
-            backend_port=parsed.port or 8504,
+            backend_port=parsed.port or 8505,
             backend_pid=pid,
             backend_pgid=pid,
             backend_executable=str(Path(f"/proc/{pid}/exe").resolve()),

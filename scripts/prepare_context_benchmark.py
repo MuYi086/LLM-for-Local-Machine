@@ -41,7 +41,7 @@ def main():
     target.parent.mkdir(exist_ok=True)
     with target.open('x') as output:
         output.write(f'# Ornith {label} 上下文舒适度测试\n\n上下文：{args.context} tokens（启动器配置，非后端运行验证）。\n创建时间：{now.isoformat()}\n性能目录：{directory}\n测试 ID：{test_id}\n\n<!-- MODEL_TELEMETRY_BEGIN test_id={test_id} -->\n等待本轮汇总。\n<!-- MODEL_TELEMETRY_END -->\n\n## 模型任务报告\n\n待执行。\n')
-    instruction = f'请读取 CONTEXT_BENCHMARK_PROMPT.md，只执行“固定任务”一节。\n本轮模型：Ornith-1.5-9B-GGUF\n本轮上下文上限：{args.context} tokens\n本轮性能目录：{directory}\n本轮测试 ID：{test_id}\n本轮结果文件已创建：{target}\n请在该文件追加报告，保留统计标记，不另建结果文件。\n'
+    instruction = f'请读取 CONTEXT_BENCHMARK_PROMPT.md，只执行“固定任务”一节。\n本轮模型：Ornith-1.5-9B-MTP-GGUF-Q8\n本轮上下文上限：{args.context} tokens\n本轮性能目录：{directory}\n本轮测试 ID：{test_id}\n本轮结果文件已创建：{target}\n请在该文件追加报告，保留统计标记，不另建结果文件。\n'
     instruction_path = directory / 'tests' / f'{test_id}.prompt.txt'
     instruction_path.write_text(instruction)
     result = {'directory': str(directory), 'test_id': test_id, 'context': args.context, 'report': str(target)}

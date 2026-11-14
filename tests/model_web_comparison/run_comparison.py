@@ -32,7 +32,7 @@ MODELS = (
         "api_base": "http://127.0.0.1:8503",
         "route": "/v1/ornith-ai/Ornith-1.5-9B-GGUF",
         "backend_host": "127.0.0.1",
-        "backend_port": 8504,
+        "backend_port": 8505,
         "output_dir": ROOT / "tests/ornith_1_5_9b_gguf/outputs",
     },
 )

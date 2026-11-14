@@ -57,12 +57,13 @@ def create_quarantine_marker(
     pgid: int | None,
     executable: str | None,
     model_alias: str = MODEL_ALIAS,
+    backends: list[dict[str, object]] | None = None,
 ) -> bytes:
     """原子创建一次 llama.cpp GPU 使用隔离标记。"""
     marker_path = Path(f"{lock_path}.quarantine")
     marker_path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
-        "schema_version": 1,
+        "schema_version": 2 if backends is not None else 1,
         "provider": PROVIDER,
         "request_id": uuid.uuid4().hex,
         "model": model_alias,
@@ -74,6 +75,8 @@ def create_quarantine_marker(
         "pid_start_time": process_start_time(pid),
         "executable": executable,
     }
+    if backends is not None:
+        payload["backends"] = backends
     content = json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
     descriptor, temporary_name = tempfile.mkstemp(
         prefix=".llama-cpp-quarantine-", dir=marker_path.parent
@@ -371,6 +374,182 @@ def stop_backend(
         raise TimeoutError("llama.cpp 进程组或 loopback API 未确认退出，保留 quarantine。")
 
 
+def stop_backends(
+    *,
+    lock_path: str | Path,
+    backends: list[tuple[str, str, int, int, int, str]],
+    lock_timeout: float,
+    cleanup_timeout: float,
+    cuda_release_delay: float,
+) -> None:
+    """在一个共享隔离标记下停止并确认多个 llama.cpp backend。"""
+    if not backends:
+        raise ValueError("shutdown-many 至少需要一个 backend。")
+
+    requested_targets = [
+        {
+            "model": model_alias,
+            "host": host,
+            "port": port,
+            "pid": pid,
+            "pgid": pgid,
+            "pid_start_time": process_start_time(pid),
+            "executable": str(Path(executable).resolve()),
+        }
+        for model_alias, host, port, pid, pgid, executable in backends
+    ]
+    lock_path = Path(lock_path)
+    marker_path = Path(f"{lock_path}.quarantine")
+
+    with gpu_runtime_lock(
+        lock_path,
+        "llama.cpp/shutdown-many",
+        timeout_seconds=lock_timeout,
+        allow_quarantine=True,
+    ):
+        marker_owner = PROVIDER
+        if marker_path.exists():
+            marker = json.loads(marker_path.read_text(encoding="utf-8"))
+            if not isinstance(marker, dict):
+                raise ValueError("现有 GPU quarantine 标记格式无效。")
+            marker_owner = str(marker.get("provider", "localai"))
+            marker_key = "backends" if marker_owner == PROVIDER else "llama_cpp_backends"
+            existing_targets = marker.get(marker_key)
+            if existing_targets is None:
+                existing_targets = (
+                    [
+                        {
+                            key: marker.get(key)
+                            for key in (
+                                "model",
+                                "host",
+                                "port",
+                                "pid",
+                                "pgid",
+                                "pid_start_time",
+                                "executable",
+                            )
+                        }
+                    ]
+                    if marker_owner == PROVIDER
+                    else []
+                )
+            if not isinstance(existing_targets, list) or not all(
+                isinstance(target, dict) for target in existing_targets
+            ):
+                raise ValueError("现有 GPU quarantine backend 列表格式无效。")
+            merged_targets = list(existing_targets)
+            existing_identities = {
+                (target.get("model"), target.get("host"), target.get("port"), target.get("pid"))
+                for target in merged_targets
+            }
+            for target in requested_targets:
+                identity = (target["model"], target["host"], target["port"], target["pid"])
+                if identity not in existing_identities:
+                    merged_targets.append(target)
+                    existing_identities.add(identity)
+            marker[marker_key] = merged_targets
+            if marker_owner == PROVIDER:
+                marker["schema_version"] = 2
+            _replace_marker(marker_path, marker)
+            marker_content = marker_path.read_bytes()
+            stop_targets = merged_targets
+        else:
+            first = requested_targets[0]
+            marker_content = create_quarantine_marker(
+                lock_path,
+                host=str(first["host"]),
+                port=int(first["port"]),
+                pid=int(first["pid"]),
+                pgid=int(first["pgid"]),
+                executable=str(first["executable"]),
+                model_alias=str(first["model"]),
+                backends=requested_targets,
+            )
+            stop_targets = requested_targets
+
+        signalable_targets: list[dict[str, object]] = []
+        for target in stop_targets:
+            pid = target.get("pid")
+            pgid = target.get("pgid")
+            executable = target.get("executable")
+            port = target.get("port")
+            if pid is not None:
+                if not isinstance(pid, int) or not isinstance(pgid, int) or pgid != pid:
+                    raise ValueError("llama.cpp backend quarantine PID/PGID 无效。")
+                start_time = process_start_time(pid)
+                recorded_start_time = target.get("pid_start_time")
+                if (
+                    start_time is not None
+                    and recorded_start_time == start_time
+                    and (
+                        not isinstance(executable, str)
+                        or not isinstance(port, int)
+                        or not _command_matches_backend(pid, executable, port)
+                    )
+                ):
+                    raise RuntimeError(
+                        "llama.cpp backend PID 与可执行文件或端口不匹配，保留 quarantine。"
+                    )
+                if start_time is not None and recorded_start_time == start_time:
+                    signalable_targets.append(target)
+                if target in signalable_targets and _process_group_exists(pgid):
+                    os.killpg(pgid, signal.SIGTERM)
+
+        term_deadline = time.monotonic() + min(cleanup_timeout, 5.0)
+        while time.monotonic() < term_deadline:
+            if all(
+                target.get("pgid") is None or not _process_group_exists(int(target["pgid"]))
+                for target in stop_targets
+            ):
+                break
+            time.sleep(0.1)
+        for target in signalable_targets:
+            pid = target.get("pid")
+            pgid = target.get("pgid")
+            executable = target.get("executable")
+            port = target.get("port")
+            if (
+                isinstance(pid, int)
+                and isinstance(pgid, int)
+                and process_start_time(pid) == target.get("pid_start_time")
+                and isinstance(executable, str)
+                and isinstance(port, int)
+                and _command_matches_backend(pid, executable, port)
+                and _process_group_exists(pgid)
+            ):
+                os.killpg(int(pgid), signal.SIGKILL)
+
+        cleanup_deadline = time.monotonic() + cleanup_timeout
+        while time.monotonic() < cleanup_deadline:
+            if all(
+                (target.get("pgid") is None or not _process_group_exists(int(target["pgid"])))
+                and not loopback_port_open(str(target["host"]), int(target["port"]))
+                for target in stop_targets
+            ):
+                if cuda_release_delay:
+                    time.sleep(cuda_release_delay)
+                if all(
+                    (target.get("pgid") is None or not _process_group_exists(int(target["pgid"])))
+                    and not loopback_port_open(str(target["host"]), int(target["port"]))
+                    for target in stop_targets
+                ):
+                    break
+            time.sleep(0.1)
+        else:
+            raise TimeoutError(
+                "llama.cpp backend 进程组或 loopback API 未全部确认退出，保留 quarantine。"
+            )
+
+        if marker_owner == PROVIDER:
+            if not remove_quarantine_marker(lock_path, expected_content=marker_content):
+                raise RuntimeError("llama.cpp backend 已停止，但隔离标记发生变化。")
+        else:
+            marker = json.loads(marker_path.read_text(encoding="utf-8"))
+            marker.pop("llama_cpp_backends", None)
+            _replace_marker(marker_path, marker)
+
+
 def start_backend(
     *,
     lock_path: str | Path,
@@ -558,6 +737,18 @@ def main() -> int:
     shutdown_parser.add_argument("--lock-timeout", type=_positive_float, required=True)
     shutdown_parser.add_argument("--cleanup-timeout", type=_positive_float, default=30.0)
     shutdown_parser.add_argument("--cuda-release-delay", type=float, default=2.0)
+    shutdown_many_parser = subparsers.add_parser("shutdown-many")
+    shutdown_many_parser.add_argument("--lock-file", required=True)
+    shutdown_many_parser.add_argument("--lock-timeout", type=_positive_float, required=True)
+    shutdown_many_parser.add_argument("--cleanup-timeout", type=_positive_float, default=30.0)
+    shutdown_many_parser.add_argument("--cuda-release-delay", type=float, default=2.0)
+    shutdown_many_parser.add_argument(
+        "--backend",
+        action="append",
+        nargs=6,
+        required=True,
+        metavar=("MODEL", "HOST", "PORT", "PID", "PGID", "EXECUTABLE"),
+    )
     args = parser.parse_args()
 
     try:
@@ -636,6 +827,34 @@ def main() -> int:
                 cleanup_timeout=args.cleanup_timeout,
                 cuda_release_delay=args.cuda_release_delay,
                 model_alias=args.model,
+            )
+        elif args.command == "shutdown-many":
+            if args.cuda_release_delay < 0:
+                raise ValueError("shutdown-many 需要非负 CUDA_RELEASE_DELAY。")
+            backends = []
+            for model_alias, host, port, pid, pgid, executable in args.backend:
+                if not model_alias.strip():
+                    raise ValueError("shutdown-many backend model 不能为空。")
+                parsed_pid = _positive_int(pid)
+                parsed_pgid = _positive_int(pgid)
+                if parsed_pid != parsed_pgid:
+                    raise ValueError("shutdown-many 需要匹配的进程组和 PID。")
+                backends.append(
+                    (
+                        model_alias,
+                        host,
+                        _positive_int(port),
+                        parsed_pid,
+                        parsed_pgid,
+                        executable,
+                    )
+                )
+            stop_backends(
+                lock_path=args.lock_file,
+                backends=backends,
+                lock_timeout=args.lock_timeout,
+                cleanup_timeout=args.cleanup_timeout,
+                cuda_release_delay=args.cuda_release_delay,
             )
         return 0
     except (OSError, RuntimeError, TimeoutError, ValueError, json.JSONDecodeError) as exc:

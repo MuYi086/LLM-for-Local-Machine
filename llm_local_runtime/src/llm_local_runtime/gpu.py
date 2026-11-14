@@ -128,12 +128,14 @@ def gpu_runtime_lock(
     label: str,
     *,
     timeout_seconds: float | None = None,
+    allow_quarantine: bool = False,
 ) -> Iterator[GpuRuntimeMetrics]:
     """获取共享 GPU 锁并返回本次请求指标。
 
     锁文件用于服务进程间的互斥；锁释放必须位于 ``finally``，否则 worker
     崩溃或请求异常会让后续任务永久堵塞。默认等待 900 秒，部署方可以通过
     ``GPU_LOCK_WAIT_TIMEOUT`` 调整，设为非正值时保留无限等待语义。
+    ``allow_quarantine`` 仅供关闭/恢复路径在隔离状态下持锁清理进程，不允许借此执行推理。
     """
     path = Path(lock_path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -157,7 +159,7 @@ def gpu_runtime_lock(
 
         metrics.queue_wait_seconds = time.perf_counter() - started
         quarantine = gpu_quarantine_path(path)
-        if quarantine.exists():
+        if quarantine.exists() and not allow_quarantine:
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
             raise GpuQuarantinedError(quarantine)
         execution_started = time.perf_counter()

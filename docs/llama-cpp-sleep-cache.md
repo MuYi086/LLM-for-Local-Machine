@@ -30,6 +30,13 @@ python scripts/llama_cpp/build_sleep_cache.py \
 
 ## 配置与核验
 
+本机 32k OpenCode 对比配置（2026-11-14）：MTP Q8、draft=3、纯文本、显式 `--fit off`。
+适配器支持 `<backend_env_prefix>_CUDA_RELEASE_DELAY` 覆盖全局缓冲；本轮
+`ORNITH_MTP_9B_CUDA_RELEASE_DELAY=0.5`，全局 `CUDA_RELEASE_DELAY` 仍为原值。
+本机补丁在 `destroy()` 完成后才报告休眠，适配器仍在持锁期间等待缓冲并二次确认休眠，
+确认失败仍保留 quarantine。每次减少 1.5 秒固定等待，实际端到端收益与 GPU 释放表现待真实复测。
+这轮继续逐请求卸载；连续驻留需要单独设计租约交接。回退时删除 MTP 专属覆盖项或设为 `2`。
+
 | 环境变量 | 默认值 | 作用 |
 | --- | ---: | --- |
 | `ORNITH_9B_SLEEP_CACHE` | `1` | 启用跨 sleep 缓存；设 `0` 回退原生命周期 |
@@ -92,3 +99,15 @@ uv run --project main --no-sync python tests/ornith_1_5_9b_gguf/benchmark_sleep_
 - `sleep-cache-20261113T065329324416Z`：最终补丁，1 MiB 预算无法容纳条目；追加、分叉、前部改写和换题全部安全冷算，答案检查通过。
 
 原报告窗口遗漏会话尾段的问题仍然存在于手动标记流程；后续 OpenCode 复测须在最终回答完成后再结束窗口，并单独记录客户端总耗时。
+
+## 32k 第二阶段等待优化（修正）
+
+当前 CLI 拒绝 sleep-idle=0，内部队列允许该值不能证明 CLI 支持。已恢复
+`ORNITH_MTP_9B_SLEEP_IDLE_SECONDS=1` 并在启动器拒绝 0，避免启动第二个 backend 后才失败。
+MTP 专属释放缓冲保持 0.5 秒。
+
+已按用户要求恢复 145f5307 对应的 32k 运行行为：采样线程退出后再释放 GPU 文件锁，撤回采样回收顺序优化。
+当前参数为 context=32768、draft=3、vision=off、fit=off、sleep-idle=1、MTP CUDA 缓冲=0.5 秒；
+OpenCode output=4096、buffer=8192、keep.tokens=4096。实际运行进程须重启才能加载恢复后的代码。
+
+当前本机复测档位已调整为 64k：context=65536、OpenCode output=4096、buffer=12288、keep.tokens=8192；继续沿用 145f5307 对应的 draft=3、vision=off、fit=off、sleep-idle=1、MTP CUDA 缓冲=0.5 秒与采样线程退出后释放锁的行为。

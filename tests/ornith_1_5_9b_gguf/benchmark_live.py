@@ -468,7 +468,7 @@ def main() -> int:
         help="Ornith 9B API 根地址。",
     )
     parser.add_argument(
-        "--backend-port", type=int, default=int(os.getenv("ORNITH_9B_LLAMA_CPP_PORT", "8504"))
+        "--backend-port", type=int, default=int(os.getenv("ORNITH_9B_LLAMA_CPP_PORT", "8505"))
     )
     parser.add_argument("--prompt", default=DEFAULT_PROMPT, help="发送给模型的中文提示。")
     parser.add_argument("--max-tokens", type=int, default=256, help="生成 token 上限。")

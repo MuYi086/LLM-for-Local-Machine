@@ -37,6 +37,22 @@ service_app = _load_service_module("ornith_1_5_9b_gguf_app", SERVICE_DIR / "app.
 
 
 class Ornith9BServiceTests(unittest.TestCase):
+    def test_default_backend_uses_loopback_port_8505(self) -> None:
+        seen_urls = []
+
+        def handle(request: httpx.Request) -> httpx.Response:
+            seen_urls.append(request.url)
+            return httpx.Response(200, json={"status": "ok"})
+
+        with patch.dict(os.environ, {}, clear=True):
+            app = service_app.create_app(transport=httpx.MockTransport(handle))
+            with TestClient(app) as client:
+                response = client.get("/v1/health")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(seen_urls[0].host, "127.0.0.1")
+        self.assertEqual(seen_urls[0].port, 8505)
+
     def test_app_registers_exact_route_and_forces_9b_model_alias(self) -> None:
         seen_payloads: list[dict[str, object]] = []
 

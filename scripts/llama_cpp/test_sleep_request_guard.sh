@@ -18,3 +18,4 @@ c++ -std=c++17 -pthread "${flags[@]}" \
   -lllama-common -lmtmd -lllama -lggml -lggml-base \
   -o "$test_dir/sleep-request-guard"
 "$test_dir/sleep-request-guard"
+"$test_dir/sleep-request-guard" 0

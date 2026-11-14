@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import httpx
@@ -44,12 +45,21 @@ def create_app(
     Returns:
         配置好的 FastAPI 应用。
     """
+    resolved_backend_port = (
+        backend_port
+        if backend_port is not None
+        else int(os.getenv("ORNITH_9B_LLAMA_CPP_PORT", "8505"))
+    )
+    resolved_backend_base_url = backend_base_url or os.getenv(
+        "ORNITH_9B_LLAMA_BASE_URL",
+        f"http://127.0.0.1:{resolved_backend_port}",
+    )
     return create_shared_app(
         api_route=API_ROUTE,
         model_alias=MODEL_ALIAS,
-        backend_base_url=backend_base_url,
+        backend_base_url=resolved_backend_base_url,
         backend_host=backend_host,
-        backend_port=backend_port,
+        backend_port=resolved_backend_port,
         backend_env_prefix="ORNITH_9B",
         backend_pid=backend_pid,
         backend_pgid=backend_pgid,

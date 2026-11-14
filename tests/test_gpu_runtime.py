@@ -64,6 +64,20 @@ class GpuRuntimeLockTests(unittest.TestCase):
                 with gpu_runtime_lock(lock_path, "model-c", timeout_seconds=1):
                     pass
 
+    def test_maintenance_can_acquire_lock_to_stop_processes_while_quarantined(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            lock_path = Path(temporary) / "gpu-runtime.lock"
+            gpu_quarantine_path(lock_path).touch()
+
+            with patch.object(gpu_module, "_read_gpu_memory_mib", return_value=None):
+                with gpu_runtime_lock(
+                    lock_path,
+                    "llama.cpp/shutdown-many",
+                    timeout_seconds=1,
+                    allow_quarantine=True,
+                ):
+                    pass
+
     def test_exception_releases_lock_for_the_next_model(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             lock_path = Path(temporary) / "gpu-runtime.lock"

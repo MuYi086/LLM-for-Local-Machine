@@ -38,12 +38,14 @@ def _write_fake_llama_server(executable: Path) -> None:
         "    print('Available devices: CUDA0')\n"
         "    raise SystemExit(0)\n"
         "if '--help' in sys.argv:\n"
-        "    print('--sleep-idle-seconds --load-mode --spec-type --spec-draft-n-max --ubatch-size --cache-ram')\n"
+        "    print('--sleep-idle-seconds --load-mode --spec-type --spec-draft-n-max --ubatch-size --cache-ram --mmproj --mmproj-offload')\n"
         "    raise SystemExit(0)\n"
         "with open(os.environ['TRACE'], 'a', encoding='utf-8') as trace:\n"
         "    trace.write('llama-server ' + ' '.join(sys.argv[1:]) + '\\n')\n"
         "port = int(sys.argv[sys.argv.index('--port') + 1])\n"
         "host = sys.argv[sys.argv.index('--host') + 1]\n"
+        "if os.getenv('FAKE_LLAMA_EXIT_PORT') == str(port):\n"
+        "    raise SystemExit(1)\n"
         "class Handler(BaseHTTPRequestHandler):\n"
         "    def do_GET(self):\n"
         "        body = json.dumps({'is_sleeping': True, 'status': 'ok', 'sleep_prompt_cache_supported': os.getenv('FAKE_SLEEP_CACHE_SUPPORTED', '1') == '1', 'sleep_prompt_cache_enabled': True}).encode()\n"
@@ -68,7 +70,16 @@ def _preflight_environment(root: Path) -> tuple[dict[str, str], Path]:
     for command in ("uv",):
         executable = bin_dir / command
         executable.write_text(
-            f"#!/usr/bin/env bash\nprintf '%s %s\\n' '{command}' \"$*\" >> \"$TRACE\"\n",
+            f"#!/usr/bin/env bash\nprintf '%s %s\\n' '{command}' \"$*\" >> \"$TRACE\"\n"
+            + 'if [[ "$*" == *check_ports.py* ]]; then\n'
+            + "  parsed=()\n"
+            + "  capture=0\n"
+            + '  for argument in "$@"; do\n'
+            + '    if [[ "$argument" == */check_ports.py ]]; then capture=1; continue; fi\n'
+            + '    if [[ "$capture" == 1 ]]; then parsed+=("$argument"); fi\n'
+            + "  done\n"
+            + f"  exec /usr/bin/python3 '{ROOT / 'main/check_ports.py'}' \"${{parsed[@]}}\"\n"
+            + "fi\n",
             encoding="utf-8",
         )
         executable.chmod(0o755)
@@ -103,6 +114,12 @@ def _preflight_environment(root: Path) -> tuple[dict[str, str], Path]:
     ornith_9b_model_file = root / "hf-mirror/ornith-ai/Ornith-1.5-9B-GGUF/Ornith-1.5-9B-Q8_0.gguf"
     ornith_9b_model_file.parent.mkdir(parents=True)
     ornith_9b_model_file.write_bytes(b"GGUF-test-9b-model")
+    ornith_mtp_root = root / "hf-mirror/ornith-ai/Ornith-1.5-9B-MTP-GGUF"
+    ornith_mtp_root.mkdir(parents=True)
+    ornith_mtp_model_file = ornith_mtp_root / "Ornith-1.5-9B-MTP-Q8_0.gguf"
+    ornith_mtp_model_file.write_bytes(b"GGUF-test-mtp-model")
+    ornith_mtp_mmproj_file = ornith_mtp_root / "mmproj-Ornith-1.5-9B-BF16.gguf"
+    ornith_mtp_mmproj_file.write_bytes(b"GGUF-test-mtp-mmproj")
     environment = {
         **os.environ,
         "PATH": f"{bin_dir}:{os.environ['PATH']}",
@@ -129,10 +146,18 @@ def _preflight_environment(root: Path) -> tuple[dict[str, str], Path]:
         "ORNITH_9B_MODEL_FILE": str(ornith_9b_model_file),
         "ORNITH_9B_HOST": "127.0.0.1",
         "ORNITH_9B_PORT": "18503",
-        "ORNITH_9B_LLAMA_CPP_PORT": "18504",
+        "ORNITH_9B_LLAMA_CPP_PORT": "18505",
         "ORNITH_9B_STARTUP_TIMEOUT": "5",
         "ORNITH_9B_SLEEP_TIMEOUT": "1",
         "ORNITH_9B_SLEEP_POLL_INTERVAL": "0.01",
+        "ORNITH_MTP_9B_MODEL_FILE": str(ornith_mtp_model_file),
+        "ORNITH_MTP_9B_MMPROJ_FILE": str(ornith_mtp_mmproj_file),
+        "ORNITH_MTP_9B_HOST": "127.0.0.1",
+        "ORNITH_MTP_9B_PORT": "18504",
+        "ORNITH_MTP_9B_LLAMA_CPP_PORT": "18506",
+        "ORNITH_MTP_9B_STARTUP_TIMEOUT": "5",
+        "ORNITH_MTP_9B_SLEEP_TIMEOUT": "1",
+        "ORNITH_MTP_9B_SLEEP_POLL_INTERVAL": "0.01",
         "LLM_LOCALAI_ENABLED": "true",
         "LLM_LOCALAI_MANAGED": "true",
         "LLM_LOCAL_QWEN3_VOICEDESIGN_PROVIDER": "localai",
@@ -142,6 +167,16 @@ def _preflight_environment(root: Path) -> tuple[dict[str, str], Path]:
 
 
 class StartServicesTests(unittest.TestCase):
+    def test_llama_backends_are_stopped_only_by_identity_checked_helper(self) -> None:
+        source = (ROOT / "start.sh").read_text(encoding="utf-8")
+        service_pid_assignment = next(
+            line for line in source.splitlines() if "local service_pids=" in line
+        )
+
+        self.assertNotIn("$ornith_9b_llama_server_pid", service_pid_assignment)
+        self.assertNotIn("$ornith_mtp_9b_llama_server_pid", service_pid_assignment)
+        self.assertIn("llama_cpp_runtime.runtime shutdown-many", source)
+
     def test_rejects_backend_without_sleep_cache_support(self) -> None:
         """启用缓存时拒绝未打补丁的 backend，并确认启动失败清理隔离标记。"""
         with tempfile.TemporaryDirectory() as temporary:
@@ -391,26 +426,31 @@ class StartServicesTests(unittest.TestCase):
                 for line in trace_path.read_text().splitlines()
                 if line.startswith("llama-server ")
             ]
-            self.assertEqual(len(starts), 1)
-            ornith_start = starts[0]
-            arguments = ornith_start.split()
-            self.assertIn("--alias Ornith-1.5-9B-GGUF", ornith_start)
-            for flag, value in {
-                "ctx-size": "98304",
-                "batch-size": "1024",
-                "ubatch-size": "1024",
-                "threads": "6",
-                "threads-batch": "8",
-                "load-mode": "none",
-                "parallel": "1",
-                "sleep-idle-seconds": "1",
-                "spec-type": "draft-mtp",
-                "spec-draft-n-max": "4",
-                "cache-ram": "4096",
-            }.items():
-                with self.subTest(flag=flag):
-                    self.assertIn(f"--{flag}", arguments)
-                    self.assertEqual(arguments[arguments.index(f"--{flag}") + 1], value)
+            self.assertEqual(len(starts), 2)
+            expected_aliases = {
+                "Ornith-1.5-9B-GGUF",
+                "Ornith-1.5-9B-MTP-GGUF-Q8",
+            }
+            for start in starts:
+                arguments = start.split()
+                alias_index = arguments.index("--alias")
+                self.assertIn(arguments[alias_index + 1], expected_aliases)
+                for flag, value in {
+                    "ctx-size": "98304",
+                    "batch-size": "1024",
+                    "ubatch-size": "1024",
+                    "threads": "6",
+                    "threads-batch": "8",
+                    "load-mode": "none",
+                    "parallel": "1",
+                    "sleep-idle-seconds": "1",
+                    "spec-type": "draft-mtp",
+                    "spec-draft-n-max": "4",
+                    "cache-ram": "4096",
+                }.items():
+                    with self.subTest(alias=arguments[alias_index + 1], flag=flag):
+                        self.assertIn(f"--{flag}", arguments)
+                        self.assertEqual(arguments[arguments.index(f"--{flag}") + 1], value)
 
     def test_start_invokes_managed_services_and_ornith_backend(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -422,9 +462,19 @@ class StartServicesTests(unittest.TestCase):
                 executable = bin_dir / command
                 executable.write_text(
                     f"#!/usr/bin/env bash\nprintf '%s %s\\n' '{command}' \"$*\" >> \"$TRACE\"\n"
+                    'if [[ "$*" == *check_ports.py* ]]; then\n'
+                    "  parsed=()\n"
+                    "  capture=0\n"
+                    '  for argument in "$@"; do\n'
+                    '    if [[ "$argument" == */check_ports.py ]]; then capture=1; continue; fi\n'
+                    '    if [[ "$capture" == 1 ]]; then parsed+=("$argument"); fi\n'
+                    "  done\n"
+                    f"  exec /usr/bin/python3 '{ROOT / 'main/check_ports.py'}' \"${{parsed[@]}}\"\n"
+                    "fi\n"
                     'if [[ "$*" == *"uvicorn easel_bridge.app:app"* ]]; then\n'
-                    "  printf 'bridge-upstreams %s %s %s\\n' "
-                    '"$EASEL_BRIDGE_CHAT_URL" "$EASEL_BRIDGE_MOSS_URL" '
+                    "  printf 'bridge-upstreams %s %s %s %s\\n' "
+                    '"$EASEL_BRIDGE_CHAT_URL" "$EASEL_BRIDGE_MTP_CHAT_URL" '
+                    '"$EASEL_BRIDGE_MOSS_URL" '
                     '"$EASEL_BRIDGE_VOXCPM_URL" >> "$TRACE"\n'
                     "fi\n"
                     'if [[ "$*" == *main.py* || "$*" == *"uvicorn easel_bridge.app:app"* ]]; then sleep 1; exit 0; fi\n',
@@ -463,6 +513,12 @@ class StartServicesTests(unittest.TestCase):
             )
             ornith_9b_model_file.parent.mkdir(parents=True)
             ornith_9b_model_file.write_bytes(b"GGUF-test-9b-model")
+            ornith_mtp_root = root / "hf-mirror/ornith-ai/Ornith-1.5-9B-MTP-GGUF"
+            ornith_mtp_root.mkdir(parents=True)
+            ornith_mtp_model_file = ornith_mtp_root / "Ornith-1.5-9B-MTP-Q8_0.gguf"
+            ornith_mtp_model_file.write_bytes(b"GGUF-test-mtp-model")
+            ornith_mtp_mmproj_file = ornith_mtp_root / "mmproj-Ornith-1.5-9B-BF16.gguf"
+            ornith_mtp_mmproj_file.write_bytes(b"GGUF-test-mtp-mmproj")
 
             environment = {
                 **os.environ,
@@ -489,10 +545,18 @@ class StartServicesTests(unittest.TestCase):
                 "ORNITH_9B_MODEL_FILE": str(ornith_9b_model_file),
                 "ORNITH_9B_HOST": "127.0.0.1",
                 "ORNITH_9B_PORT": "18503",
-                "ORNITH_9B_LLAMA_CPP_PORT": "18504",
+                "ORNITH_9B_LLAMA_CPP_PORT": "18505",
                 "ORNITH_9B_STARTUP_TIMEOUT": "5",
                 "ORNITH_9B_SLEEP_TIMEOUT": "1",
                 "ORNITH_9B_SLEEP_POLL_INTERVAL": "0.01",
+                "ORNITH_MTP_9B_MODEL_FILE": str(ornith_mtp_model_file),
+                "ORNITH_MTP_9B_MMPROJ_FILE": str(ornith_mtp_mmproj_file),
+                "ORNITH_MTP_9B_HOST": "127.0.0.1",
+                "ORNITH_MTP_9B_PORT": "18504",
+                "ORNITH_MTP_9B_LLAMA_CPP_PORT": "18506",
+                "ORNITH_MTP_9B_STARTUP_TIMEOUT": "5",
+                "ORNITH_MTP_9B_SLEEP_TIMEOUT": "1",
+                "ORNITH_MTP_9B_SLEEP_POLL_INTERVAL": "0.01",
                 "LLM_LOCALAI_ENABLED": "true",
                 "LLM_LOCALAI_MANAGED": "true",
                 "LLM_LOCAL_QWEN3_VOICEDESIGN_PROVIDER": "localai",
@@ -502,6 +566,7 @@ class StartServicesTests(unittest.TestCase):
             environment.pop("VOXCPM2_HOST", None)
             for variable in (
                 "EASEL_BRIDGE_CHAT_URL",
+                "EASEL_BRIDGE_MTP_CHAT_URL",
                 "EASEL_BRIDGE_MOSS_URL",
                 "EASEL_BRIDGE_VOXCPM_URL",
             ):
@@ -518,14 +583,26 @@ class StartServicesTests(unittest.TestCase):
             self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
             self.assertIn("http://127.0.0.1:18501/v1/openmoss/", completed.stdout)
             self.assertIn("http://127.0.0.1:8313/v1/OpenBMB/VoxCPM2-GGUF", completed.stdout)
+            self.assertIn(
+                "http://127.0.0.1:18504/v1/ornith-ai/Ornith-1.5-9B-MTP-GGUF-Q8",
+                completed.stdout,
+            )
             calls = trace_path.read_text(encoding="utf-8").splitlines()
             uv_calls = [call for call in calls if call.startswith("uv ")]
-            self.assertEqual(len(uv_calls), 18)
+            self.assertEqual(len(uv_calls), 19)
             bridge_call = next(call for call in uv_calls if "uvicorn easel_bridge.app:app" in call)
             self.assertIn("--host 127.0.0.1 --port 18500", bridge_call)
             upstreams = next(call for call in calls if call.startswith("bridge-upstreams "))
             self.assertIn("http://127.0.0.1:18501/v1/openmoss/MOSS-Image-SFT-Q8_0", upstreams)
             self.assertIn("http://127.0.0.1:8313/v1/OpenBMB/VoxCPM2-GGUF", upstreams)
+            self.assertIn(
+                "http://127.0.0.1:18503/v1/ornith-ai/Ornith-1.5-9B-GGUF",
+                upstreams,
+            )
+            self.assertIn(
+                "http://127.0.0.1:18504/v1/ornith-ai/Ornith-1.5-9B-MTP-GGUF-Q8",
+                upstreams,
+            )
             self.assertTrue(any(f"--project {ROOT / 'main'}" in call for call in uv_calls))
             self.assertTrue(
                 any(
@@ -542,6 +619,10 @@ class StartServicesTests(unittest.TestCase):
             )
             self.assertEqual(
                 sum("model-text/Ornith-1.5-9B-GGUF/main.py" in call for call in uv_calls),
+                1,
+            )
+            self.assertEqual(
+                sum("model-text/Ornith-1.5-9B-MTP-GGUF/main.py" in call for call in uv_calls),
                 1,
             )
             self.assertEqual(
@@ -591,25 +672,36 @@ class StartServicesTests(unittest.TestCase):
                 "8313",
                 "18503",
                 "18504",
+                "18505",
+                "18506",
                 "18501",
                 "18502",
                 "18500",
             ):
                 self.assertIn(port, port_check)
             llama_starts = [call for call in calls if call.startswith("llama-server ")]
-            self.assertEqual(len(llama_starts), 1)
-            ornith_start = llama_starts[0]
-            self.assertIn(f"--model {environment['ORNITH_9B_MODEL_FILE']}", ornith_start)
-            self.assertIn("--host 127.0.0.1", ornith_start)
-            self.assertIn("--port 18504", ornith_start)
-            self.assertIn("--alias Ornith-1.5-9B-GGUF", ornith_start)
-            self.assertIn("--device CUDA0", ornith_start)
-            self.assertIn("--gpu-layers 99", ornith_start)
-            self.assertIn("--ctx-size 98304", ornith_start)
-            self.assertIn("--sleep-idle-seconds 1", ornith_start)
-            self.assertNotIn("--mmproj", ornith_start)
-            self.assertNotIn("--spec-draft-model", ornith_start)
-            commands_before_backend = calls.index(ornith_start)
+            self.assertEqual(len(llama_starts), 2)
+            old_start = next(call for call in llama_starts if "--alias Ornith-1.5-9B-GGUF" in call)
+            mtp_start = next(
+                call for call in llama_starts if "--alias Ornith-1.5-9B-MTP-GGUF-Q8" in call
+            )
+            self.assertIn(f"--model {environment['ORNITH_9B_MODEL_FILE']}", old_start)
+            self.assertIn("--host 127.0.0.1", old_start)
+            self.assertIn("--port 18505", old_start)
+            self.assertNotIn("--mmproj", old_start)
+            self.assertIn(f"--model {environment['ORNITH_MTP_9B_MODEL_FILE']}", mtp_start)
+            self.assertIn(f"--mmproj {environment['ORNITH_MTP_9B_MMPROJ_FILE']}", mtp_start)
+            self.assertIn("--host 127.0.0.1", mtp_start)
+            self.assertIn("--port 18506", mtp_start)
+            self.assertIn("--mmproj-offload", mtp_start)
+            self.assertIn("--device CUDA0", mtp_start)
+            self.assertIn("--gpu-layers 99", mtp_start)
+            self.assertIn("--ctx-size 98304", mtp_start)
+            self.assertIn("--sleep-idle-seconds 1", mtp_start)
+            self.assertIn("--spec-type draft-mtp", mtp_start)
+            self.assertIn("--spec-draft-n-max 4", mtp_start)
+            self.assertNotIn("--spec-draft-model", mtp_start)
+            commands_before_backend = max(calls.index(old_start), calls.index(mtp_start))
             first_service_start = next(
                 index
                 for index, call in enumerate(calls)
@@ -619,15 +711,20 @@ class StartServicesTests(unittest.TestCase):
             shutdowns = [
                 call
                 for call in calls
-                if call.startswith("python3 -m llama_cpp_runtime.runtime shutdown ")
+                if call.startswith("python3 -m llama_cpp_runtime.runtime shutdown-many ")
             ]
             self.assertEqual(len(shutdowns), 1)
-            self.assertIn("--model Ornith-1.5-9B-GGUF", shutdowns[0])
+            self.assertIn("--backend Ornith-1.5-9B-GGUF 127.0.0.1 18505", shutdowns[0])
+            self.assertIn("--backend Ornith-1.5-9B-MTP-GGUF-Q8 127.0.0.1 18506", shutdowns[0])
             source = (ROOT / "start.sh").read_text(encoding="utf-8")
             self.assertIn('AUDIO_CPP_RUNTIME_SRC="$AUDIO_CPP_RUNTIME_PROJECT_DIR/src"', source)
             self.assertIn('export PYTHONPATH="$MODEL_TEXT_DIR:$AUDIO_CPP_RUNTIME_SRC:', source)
             self.assertIn(
                 "$HF_MIRROR_DIR/ornith-ai/Ornith-1.5-9B-GGUF/Ornith-1.5-9B-Q8_0.gguf",
+                source,
+            )
+            self.assertIn(
+                "$HF_MIRROR_DIR/ornith-ai/Ornith-1.5-9B-MTP-GGUF/Ornith-1.5-9B-MTP-Q8_0.gguf",
                 source,
             )
             self.assertIn(
@@ -652,6 +749,44 @@ class StartServicesTests(unittest.TestCase):
                 )
             )
 
+    def test_mtp_backend_startup_failure_stops_previous_backend(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            environment, trace_path = _preflight_environment(root)
+            environment["FAKE_LLAMA_EXIT_PORT"] = "18506"
+            completed = subprocess.run(
+                ["bash", str(ROOT / "start.sh")],
+                capture_output=True,
+                text=True,
+                env=environment,
+                timeout=30,
+                check=False,
+            )
+
+            calls = trace_path.read_text(encoding="utf-8").splitlines()
+            self.assertNotEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+            self.assertEqual(sum(call.startswith("llama-server ") for call in calls), 2)
+            shutdowns = [
+                call
+                for call in calls
+                if call.startswith("python3 -m llama_cpp_runtime.runtime shutdown-many ")
+            ]
+            self.assertEqual(len(shutdowns), 1)
+            self.assertIn("--backend Ornith-1.5-9B-GGUF 127.0.0.1 18505", shutdowns[0])
+            self.assertNotIn("--backend Ornith-1.5-9B-MTP-GGUF-Q8", shutdowns[0])
+            self.assertFalse(
+                any(
+                    "model-text/Ornith-1.5-9B-MTP-GGUF/main.py" in call
+                    for call in calls
+                    if call.startswith("uv ")
+                )
+            )
+            self.assertFalse((root / "storage/.cache/runtime/gpu-runtime.lock.quarantine").exists())
+            self.assertFalse((root / "storage/.cache/runtime/ornith-9b-llama-server.pid").exists())
+            self.assertFalse(
+                (root / "storage/.cache/runtime/ornith-mtp-9b-llama-server.pid").exists()
+            )
+
     def test_missing_ornith_9b_gguf_fails_before_localai_starts(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -669,6 +804,51 @@ class StartServicesTests(unittest.TestCase):
 
             self.assertNotEqual(completed.returncode, 0)
             self.assertIn("Ornith 9B GGUF 缺失或为空", completed.stdout + completed.stderr)
+            self.assertNotIn("scripts/localai/manager.py", trace_path.read_text())
+
+    def test_missing_ornith_mtp_asset_fails_before_localai_starts(self) -> None:
+        for variable, missing_name, error_text in (
+            ("ORNITH_MTP_9B_MODEL_FILE", "missing-MTP.gguf", "Ornith MTP 9B GGUF"),
+            ("ORNITH_MTP_9B_MMPROJ_FILE", "missing-mmproj.gguf", "Ornith MTP 9B mmproj"),
+        ):
+            with (
+                self.subTest(variable=variable),
+                tempfile.TemporaryDirectory() as temporary,
+            ):
+                root = Path(temporary)
+                environment, trace_path = _preflight_environment(root)
+                environment[variable] = str(root / missing_name)
+
+                completed = subprocess.run(
+                    ["bash", str(ROOT / "start.sh")],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                    env=environment,
+                    timeout=15,
+                )
+
+                self.assertNotEqual(completed.returncode, 0)
+                self.assertIn(error_text, completed.stdout + completed.stderr)
+                self.assertNotIn("scripts/localai/manager.py", trace_path.read_text())
+
+    def test_mtp_api_backend_port_conflict_fails_before_localai_starts(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            environment, trace_path = _preflight_environment(root)
+            environment["ORNITH_MTP_9B_LLAMA_CPP_PORT"] = "18504"
+
+            completed = subprocess.run(
+                ["bash", str(ROOT / "start.sh")],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=environment,
+                timeout=15,
+            )
+
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertIn("端口检查失败", completed.stdout + completed.stderr)
             self.assertNotIn("scripts/localai/manager.py", trace_path.read_text())
 
     def test_moss_assets_and_sd_cpp_digest_fail_before_localai_starts(self) -> None:

@@ -99,8 +99,8 @@ def _validate_llama_cpp_marker(
     return host, port, pid, pgid
 
 
-def _recover_llama_cpp(marker_path: Path, marker: dict[str, object]) -> int:
-    """停止 llama.cpp backend，并确认进程组与 loopback API 均已退出。"""
+def _recover_llama_cpp_target(marker: dict[str, object]) -> int:
+    """停止一个 llama.cpp backend，并确认进程组与 loopback API 均已退出。"""
     try:
         host, port, pid, pgid = _validate_llama_cpp_marker(marker)
         timeout = float(os.getenv("LLM_LOCALAI_CLEANUP_TIMEOUT", "30"))
@@ -152,9 +152,7 @@ def _recover_llama_cpp(marker_path: Path, marker: dict[str, object]) -> int:
             group_stopped = pgid is None or not _process_group_exists(pgid)
             api_stopped = not _loopback_port_open(host, port)
             if group_stopped and api_stopped:
-                marker_path.unlink()
-                _sync_marker_directory(marker_path)
-                print("llama.cpp 进程组和 loopback API 已退出，GPU 隔离已解除。")
+                print(f"llama.cpp 进程组和 loopback API 已退出：{host}:{port}")
                 return 0
             time.sleep(0.2)
         print(
@@ -165,6 +163,30 @@ def _recover_llama_cpp(marker_path: Path, marker: dict[str, object]) -> int:
     except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
         print(f"llama.cpp backend 恢复失败，保留隔离标记：{exc}", file=sys.stderr)
         return 1
+
+
+def _recover_llama_cpp_targets(targets: object) -> int:
+    """按 marker 中的完整列表停止并确认每个 llama.cpp backend。"""
+    if not isinstance(targets, list) or not targets:
+        print("llama.cpp 隔离标记缺少有效 backend 列表。", file=sys.stderr)
+        return 1
+    for target in targets:
+        if not isinstance(target, dict) or _recover_llama_cpp_target(target) != 0:
+            return 1
+    return 0
+
+
+def _recover_llama_cpp(marker_path: Path, marker: dict[str, object]) -> int:
+    """停止 marker 中所有 llama.cpp backend 后再解除共享 GPU 隔离。"""
+    targets = marker.get("backends")
+    if targets is None:
+        targets = [marker]
+    if _recover_llama_cpp_targets(targets) != 0:
+        return 1
+    marker_path.unlink()
+    _sync_marker_directory(marker_path)
+    print("所有 llama.cpp 进程组和 loopback API 已退出，GPU 隔离已解除。")
+    return 0
 
 
 def _recover_localai(marker_path: Path, marker: dict[str, object]) -> int:
@@ -242,6 +264,9 @@ def main() -> int:
                 print("隔离标记格式无效，保留隔离状态。", file=sys.stderr)
                 return 1
             provider = marker.get("provider", "localai")
+            if provider != "llama.cpp" and "llama_cpp_backends" in marker:
+                if _recover_llama_cpp_targets(marker["llama_cpp_backends"]) != 0:
+                    return 1
             if provider == "stable-diffusion.cpp":
                 try:
                     recover_sdcpp(

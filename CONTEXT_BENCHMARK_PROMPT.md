@@ -10,7 +10,9 @@
 
 性能记录默认开启。固定入口为 `storage/.cache/runtime/telemetry-current`，内容是本次启动的独立采集目录。插件自动在首个基准请求前创建本轮 ID 和带上下文档位的结果文件，并将绑定信息放入会话指令。无需用户复制目录或执行 begin/end。测试不同上下文时仍需使后端与 OpenCode 配置一致。
 
-当前测试预设：后端与 OpenCode 上下文均为 98304（96k），OpenCode buffer=16384（16k）、keep.tokens=10240（10k），输出上限 4096。名义压缩触发位置约 80k，实际触发以 OpenCode 行为为准。每轮仍以自动绑定的上下文值归档。
+当前本机对比预设：MTP Q8，后端与 OpenCode 上下文均为 65536（64k），OpenCode buffer=12288（12k）、keep.tokens=8192（8k），输出上限 4096；MTP 草稿长度 3，关闭 vision projector；显式 --fit off，MTP 空闲休眠阈值为 1 秒，休眠确认后的 CUDA 缓冲为 0.5 秒，采样线程退出后再释放 GPU 锁（沿用 145f5307 对应运行行为，仅调整为 64k 档位）。context−buffer 为 52k，仅为名义余量位置，实际压缩触发以 OpenCode 行为为准。每轮以上述自动绑定的 context 为归档依据；本段预设不作为后端实际运行值的证明。
+
+本轮模型 ID 为 `Ornith-1.5-9B-MTP-GGUF-Q8`，调用链为 OpenCode → Easel 网关（8500）→ MTP 适配器（8504）→ llama-server（8506）。
 
 ## 固定任务
 
@@ -30,7 +32,7 @@
 
 1. `start.sh`
 2. `easel_bridge/app.py`
-3. `model-text/Ornith-1.5-9B-GGUF/app.py`
+3. `model-text/Ornith-1.5-9B-MTP-GGUF/app.py`
 4. `model-text/llama_cpp_runtime/app.py`
 5. `model-text/llama_cpp_runtime/runtime.py`
 

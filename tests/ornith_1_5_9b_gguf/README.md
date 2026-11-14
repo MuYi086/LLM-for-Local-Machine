@@ -14,9 +14,9 @@ uv run --project main --no-sync python tests/ornith_1_5_9b_gguf/tune_backend.py 
   --profiles baseline mtp4-b1024 --repeats 2 --context-copies 11
 ```
 
-实验脚本在独立 loopback 端口 28504 使用既有 startup/shutdown 助手管理临时 backend；启动、推理和退出均取得共享 GPU 锁，推理前核验既有 8504 backend 休眠。异常卸载无法确认时保留 quarantine。若部署覆盖了 GPU 锁或既有 backend 地址，需传入相同的 `--lock-file`、`--existing-backend`（也读取 `GPU_LOCK_FILE`、`ORNITH_9B_LLAMA_BASE_URL`）。请先让 OpenCode 停止发请求；脚本不重启既有服务。原生 timings、首 token、RSS、guest 内存与整卡显存及输出样本保存于运行数据目录；不属于无模型测试。
+实验脚本在独立 loopback 端口 28504 使用既有 startup/shutdown 助手管理临时 backend；启动、推理和退出均取得共享 GPU 锁，推理前核验既有 8505 backend 休眠。异常卸载无法确认时保留 quarantine。若部署覆盖了 GPU 锁或既有 backend 地址，需传入相同的 `--lock-file`、`--existing-backend`（也读取 `GPU_LOCK_FILE`、`ORNITH_9B_LLAMA_BASE_URL`）。请先让 OpenCode 停止发请求；脚本不重启既有服务。原生 timings、首 token、RSS、guest 内存与整卡显存及输出样本保存于运行数据目录；不属于无模型测试。
 
-此目录包含不加载模型的 API 合同测试和一条显式执行的真实模型调用 demo。服务由仓库根目录的 `start.sh` 启动；9B API 监听 `8503`，llama-server backend 只绑定 `127.0.0.1:8504`。模型从 `$HF_MIRROR_DIR/ornith-ai/Ornith-1.5-9B-GGUF/Ornith-1.5-9B-Q8_0.gguf` 只读加载，每次推理使用与其他 GPU provider 共用的 GPU 锁。
+此目录包含不加载模型的 API 合同测试和一条显式执行的真实模型调用 demo。服务由仓库根目录的 `start.sh` 启动；9B API 监听 `8503`，llama-server backend 只绑定 `127.0.0.1:8505`。模型从 `$HF_MIRROR_DIR/ornith-ai/Ornith-1.5-9B-GGUF/Ornith-1.5-9B-Q8_0.gguf` 只读加载，每次推理使用与其他 GPU provider 共用的 GPU 锁。
 
 要验证实际模型调用并记录性能，服务启动后运行：
 

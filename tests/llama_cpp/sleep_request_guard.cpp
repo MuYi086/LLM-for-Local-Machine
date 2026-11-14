@@ -5,14 +5,15 @@
 #include <iostream>
 #include <thread>
 
-int main() {
+int main(int argc, char ** argv) {
     using namespace std::chrono_literals;
     server_queue queue;
     std::atomic<int> sleeps{0};
     queue.on_new_task([](server_task &&, bool) { return true; });
     queue.on_update_slots([] {});
     queue.on_sleeping_state([&](bool sleeping) { if (sleeping) ++sleeps; });
-    std::thread loop([&] { queue.start_loop(50); });
+    const int idle_ms = argc > 1 ? std::stoi(argv[1]) : 50;
+    std::thread loop([&] { queue.start_loop(idle_ms); });
     // 等待第一次休眠，模拟请求唤醒后耗时的模板处理和分词。
     const auto deadline = std::chrono::steady_clock::now() + 5s;
     while (!queue.is_sleeping() && std::chrono::steady_clock::now() < deadline) std::this_thread::sleep_for(10ms);

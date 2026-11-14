@@ -19,7 +19,7 @@
 - 识别执行 CONTEXT_BENCHMARK_PROMPT.md 的会话，在 read 执行前为五个源码补齐/限制 limit≤150、offset≥1。同次模型回复的第二个源码 read 返回明确工具错误，避免一轮灌入多个文件；其他文件/会话不改。
 - 压缩请求单独使用精简摘要 system，明确将历史任务格式当作待总结数据，要求原生英文检查点标题。只替换压缩请求的 system 和工具，不更改持久化历史或主任务 system。
 - 仅压缩请求设置 temperature=0、输出上限最多 4096（保留更低的既有预算），并在 HTTP 请求构造后设置 chat_template_kwargs.enable_thinking=false；正文、既有其他模板参数和鉴权头保留。仍只通过原有网关和共享 GPU 锁，不新增模型请求或直连后端。
-- 不关闭自动压缩；插件不修改主任务上下文或输出上限。当前 OpenCode 配置使用 98304 上下文、buffer 16384、keep.tokens 10240。
+- 不关闭自动压缩；插件不修改主任务上下文或输出上限。当前默认模型为 MTP Q8，OpenCode 上下文 98304、buffer 16384、keep.tokens 10240；预算保护查询所选 backend 的实际上下文。
 
 固定提示词 v4 缩短了操作说明，加入实际 read JSON 参数、一次一个分页调用、检查点格式优先和压缩后续读规则。v4 与旧版工具行为不同，性能比较需要重新建立各档基线，不把旧失败样本当成功结果。
 
@@ -65,7 +65,7 @@ Node 单元测试覆盖压缩模板隔离、非本地模型不变、150 行限�
 
 ## 当前模型配置
 
-后续已移除项目中的 Qwen3.6 与 Ornith 35B 服务及权重，OpenCode 用户配置现在使用 `local-ornith/Ornith-1.5-9B-GGUF`，context=98304、output=4096、compaction.buffer=16384、keep.tokens=10240。96k 尚待真实 OpenCode 测试；本文前面的会话 ID、错误和日志仍是历史记录，仅用于故障追溯。
+后续已移除项目中的 Qwen3.6 与 Ornith 35B 服务及权重。当前 OpenCode 默认使用 `local-ornith/Ornith-1.5-9B-MTP-GGUF-Q8`，context=98304、output=4096、compaction.buffer=16384、keep.tokens=10240；普通 9B 仍可选。96k MTP 尚待真实 OpenCode 测试；本文前面的会话 ID、错误和日志仍是历史记录，仅用于故障追溯。
 
 ## Ornith 摘要输出耗尽与中文交互
 

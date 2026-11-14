@@ -46,7 +46,7 @@ def main() -> None:
         ),
     )
     parser.add_argument(
-        "--existing-backend", default=os.getenv("ORNITH_9B_LLAMA_BASE_URL", "http://127.0.0.1:8504")
+        "--existing-backend", default=os.getenv("ORNITH_9B_LLAMA_BASE_URL", "http://127.0.0.1:8505")
     )
     args = parser.parse_args()
     if args.cache_mib <= 0 or args.context_copies < 1:

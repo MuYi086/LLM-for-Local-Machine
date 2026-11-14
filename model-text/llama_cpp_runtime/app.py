@@ -159,7 +159,10 @@ def create_app(
     resolved_cuda_release_delay = (
         cuda_release_delay
         if cuda_release_delay is not None
-        else _nonnegative_float("CUDA_RELEASE_DELAY", 2.0)
+        else _nonnegative_float(
+            f"{backend_env_prefix}_CUDA_RELEASE_DELAY",
+            _nonnegative_float("CUDA_RELEASE_DELAY", 2.0),
+        )
     )
     if resolved_cuda_release_delay < 0:
         raise ValueError("CUDA_RELEASE_DELAY 必须为非负数。")

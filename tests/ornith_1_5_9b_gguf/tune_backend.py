@@ -149,7 +149,7 @@ def main() -> None:
         ),
     )
     parser.add_argument(
-        "--existing-backend", default=os.getenv("ORNITH_9B_LLAMA_BASE_URL", "http://127.0.0.1:8504")
+        "--existing-backend", default=os.getenv("ORNITH_9B_LLAMA_BASE_URL", "http://127.0.0.1:8505")
     )
     parser.add_argument(
         "--profiles", nargs="+", choices=PROFILES, default=["baseline", "mtp2", "mtp4", "mtp4-q8kv"]
