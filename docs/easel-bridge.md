@@ -13,7 +13,6 @@ VoxCPM2 服务。它也可以把 Ornith 暴露为兼容聊天 API，但不会更
 | `GET /v1/models` | — | 返回网关支持的模型列表 |
 | `POST /v1/images/generations` | `MOSS-Image-SFT-Q8_0` | 映射到 MOSS；`n` 最多 4，每张依次生成；尺寸使用 `WIDTHxHEIGHT`，例如 `1024x1024` |
 | `POST /v1/audio/speech` | `OpenBMB/VoxCPM2-GGUF` | 映射到 VoxCPM2 multipart `text`/`instruction`；接受 `voice=alloy`，仅支持默认 `speed=1`，输出 WAV 或 MP3 |
-| `POST /v1/chat/completions` | `Ornith-1.5-9B-GGUF` | 转发到 8503 的普通 9B 适配器 |
 | `POST /v1/chat/completions` | `Ornith-1.5-9B-MTP-GGUF-Q8` | 转发到 8504 的 MTP 9B 适配器 |
 
 网关不会向上游转发客户端 API Key。上游 URL 只能由服务端环境变量指定，HTTP 重定向关闭。请求体默认上限为 12 MiB，
@@ -46,7 +45,7 @@ bash start.sh
 `start.sh` 自动读取 `.env.easel-bridge`，在启动模型前拒绝缺失、过短或占位符 Key，
 检查 8500 端口，并将网关纳入进程监控。Ctrl+C 或任一服务退出时，网关与模型服务一起停止。
 `EASEL_BRIDGE_ENV_FILE` 可指定其他配置文件，`EASEL_BRIDGE_PORT` 可覆盖默认端口；配置文件中的值覆盖同名环境变量。
-聊天上游分别使用 `EASEL_BRIDGE_CHAT_URL`（普通 9B，默认 8503）和 `EASEL_BRIDGE_MTP_CHAT_URL`（MTP，默认 8504）。
+聊天上游使用 `EASEL_BRIDGE_MTP_CHAT_URL`，默认转发至8504的MTP适配器。
 网关固定绑定 `127.0.0.1`。日志只打印地址，不打印 Key。
 上游 URL 未显式配置时，`start.sh` 使用 `127.0.0.1` 并跟随 Ornith、MOSS、VoxCPM2 的受管 API 端口。
 需要其他绑定地址时，或旧配置文件已经写死 URL 时，通过对应 `EASEL_BRIDGE_*_URL` 显式配置。
@@ -69,7 +68,7 @@ curl http://127.0.0.1:8500/v1/models \
   -H "Authorization: Bearer $EASEL_BRIDGE_API_KEY"
 ```
 
-第一条应返回 `401`，第二条应返回 MOSS、VoxCPM2、普通 9B 与 MTP 9B 四个模型 ID。Easel 网页由 Windows 浏览器打开时，WSL2 通常可通过
+第一条应返回 `401`，第二条应返回 MOSS、VoxCPM2、MTP 9B 三个模型 ID。Easel 网页由 Windows 浏览器打开时，WSL2 通常可通过
 Windows 的 `localhost` 转发访问 WSL 端口；如果 Easel 服务在 Windows 原生环境运行，应从 Easel 所在进程实际发起连接测试，
 并保持桥接服务只监听 WSL loopback，不要为方便而将 GPU 上游端口重新绑定到所有网卡。
 
@@ -78,8 +77,7 @@ Windows 的 `localhost` 转发访问 WSL 端口；如果 Easel 服务在 Windows
 OpenCode v2 的本地 Provider 使用 `providers`、`package`、`settings`，Base URL 为
 `http://127.0.0.1:8500/v1`。将默认模型设为 `local-ornith/Ornith-1.5-9B-MTP-GGUF-Q8`，模型 ID 为
 `Ornith-1.5-9B-MTP-GGUF-Q8`，上下文与后端一致设为 98304（96k），输出上限为 4096。
-普通 `Ornith-1.5-9B-GGUF` 仍可作为同一 Provider 下的另一个模型选择。OpenCode 的压缩预算保护会通过
-8500 网关到达对应适配器，并读取实际 backend 上下文。
+OpenCode 的压缩预算保护通过8500网关到达MTP适配器，并读取实际backend上下文。
 不要直接连接 llama.cpp 后端，否则会绕过上游 API 的共享 GPU 锁。
 
 在运行 OpenCode 的 WSL 用户下，把 Key 保存为独立文件，供新终端和后台服务读取：
@@ -145,8 +143,7 @@ VOICE_INSTRUCT_MODE=field
 
 Easel 的音频脚本默认请求 MP3，因此系统需要安装 FFmpeg；也可以使用 WAV 输出。VoxCPM2 当前不接受速度调节，Easel 侧将速度保持为 `1`。
 当前 Codex 运行时可以继续作为“对话与脚本”的执行引擎；图片和语音调用单独走以上模型配置。若要直接调用本地 Ornith，
-聊天 Provider 使用相同的 Base URL 与 Key，可选择 `Ornith-1.5-9B-GGUF` 或
-`Ornith-1.5-9B-MTP-GGUF-Q8`。
+聊天 Provider 使用相同的 Base URL 与 Key，可选择 `Ornith-1.5-9B-MTP-GGUF-Q8`。
 
 ## 故障定位
 

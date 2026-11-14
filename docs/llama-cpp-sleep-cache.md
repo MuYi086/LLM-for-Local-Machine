@@ -39,8 +39,8 @@ python scripts/llama_cpp/build_sleep_cache.py \
 
 | 环境变量 | 默认值 | 作用 |
 | --- | ---: | --- |
-| `ORNITH_9B_SLEEP_CACHE` | `1` | 启用跨 sleep 缓存；设 `0` 回退原生命周期 |
-| `ORNITH_9B_CACHE_RAM_MIB` | `4096` | 正数的原生 RAM 缓存预算，超限跳过该条目 |
+| `ORNITH_MTP_9B_SLEEP_CACHE` | `1` | 启用跨 sleep 缓存；设 `0` 回退原生命周期 |
+| `ORNITH_MTP_9B_CACHE_RAM_MIB` | `4096` | 正数的原生 RAM 缓存预算，超限跳过该条目 |
 | `LLAMA_SERVER_SLEEP_PROMPT_CACHE` | 由上一开关导出 | 本地补丁识别的后端开关，精确值 `1` 才启用 |
 
 96k、Q8 主权重、MTP 4、batch/ubatch 1024、F16 KV、线程 6/8、1 秒 sleep-idle 均保持原配置。启动器在初次休眠后核验 `/props` 的 `sleep_prompt_cache_supported=true` 和 `sleep_prompt_cache_enabled=true`。旧二进制缺少能力或预算导致实际关闭时，停止本次 backend，不静默忽略；停止不能确认则沿用 quarantine 恢复协议。
@@ -48,7 +48,7 @@ python scripts/llama_cpp/build_sleep_cache.py \
 回退命令：
 
 ```bash
-ORNITH_9B_SLEEP_CACHE=0 bash start.sh
+ORNITH_MTP_9B_SLEEP_CACHE=0 bash start.sh
 ```
 
 OpenCode 仍使用 8500 网关、同一模型 ID 和 Key；无需修改客户端配置。服务只保留计算状态，健康检查不加载权重。
@@ -81,14 +81,14 @@ API `usage.prompt_tokens` 仍是完整输入量；`timings.prompt_n` 是实际�
 bash scripts/llama_cpp/test_sleep_prompt_cache.sh "$LLAMA_SOURCE_DIR" "$LLAMA_BUILD_DIR"
 
 # 真实模型：显式执行；先让其他模型客户端停止发请求
-uv run --project main --no-sync python tests/ornith_1_5_9b_gguf/benchmark_sleep_cache.py \
-  --server-bin "$LLAMA_SERVER_BIN" --model-file "$ORNITH_9B_MODEL_FILE" \
+uv run --project main --no-sync python tests/ornith_1_5_9b_mtp_benchmarks/benchmark_sleep_cache.py \
+  --server-bin "$LLAMA_SERVER_BIN" --model-file "$ORNITH_MTP_9B_MODEL_FILE" \
   --mtp draft-mtp --context-copies 11 --tool-turn --cache 1 --expect-cache
 ```
 
 缓存关闭对照用 `--cache 0`，超限测试用 `--cache 1 --cache-mib 1`（不加 expect-cache）。可通过 `--source-file` 固定跨实验相同输入；脚本保存实际 prompt、请求 hash、JSON timings、SSE 输出、整个 lease 的资源汇总、sleep 快照及 backend 日志，且不会覆盖已有运行目录。GPU 锁和既有 backend URL 可用 CLI 覆盖，默认读取相同部署环境。
 
-证据目录位于 `storage/llm_tests/ornith_1_5_9b_gguf/`：
+证据目录位于 `storage/llm_tests/ornith_1_5_9b_mtp_benchmarks/`：
 
 - `sleep-cache-20261113T063651785634Z`：原二进制、缓存关闭，无 MTP。
 - `sleep-cache-20261113T063808158036Z`：无 MTP，跨 sleep 追加与分叉。
@@ -110,4 +110,4 @@ MTP 专属释放缓冲保持 0.5 秒。
 当前参数为 context=32768、draft=3、vision=off、fit=off、sleep-idle=1、MTP CUDA 缓冲=0.5 秒；
 OpenCode output=4096、buffer=8192、keep.tokens=4096。实际运行进程须重启才能加载恢复后的代码。
 
-当前本机复测档位已调整为 64k：context=65536、OpenCode output=4096、buffer=12288、keep.tokens=8192；继续沿用 145f5307 对应的 draft=3、vision=off、fit=off、sleep-idle=1、MTP CUDA 缓冲=0.5 秒与采样线程退出后释放锁的行为。
+当前本机复测档位已调整为 96k：context=98304、OpenCode output=4096、buffer=16384、keep.tokens=10240；继续沿用 145f5307 对应的 draft=3、vision=off、fit=off、sleep-idle=1、MTP CUDA 缓冲=0.5 秒与采样线程退出后释放锁的行为。

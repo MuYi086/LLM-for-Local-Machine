@@ -27,7 +27,7 @@ def main():
             print(binding.read_text())
             return
     manifest = json.loads((directory / 'manifest.jsonl').read_text())
-    configured = int(manifest['config']['ORNITH_9B_CONTEXT_SIZE'])
+    configured = int(manifest['config']['ORNITH_MTP_9B_CONTEXT_SIZE'])
     args.context = configured if args.context is None else args.context
     if args.context <= 0 or configured != args.context:
         parser.error(f'上下文与采集批次配置不匹配：{configured}')

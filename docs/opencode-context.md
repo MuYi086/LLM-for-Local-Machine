@@ -65,7 +65,7 @@ Node 单元测试覆盖压缩模板隔离、非本地模型不变、150 行限�
 
 ## 当前模型配置
 
-后续已移除项目中的 Qwen3.6 与 Ornith 35B 服务及权重。当前 OpenCode 默认使用 `local-ornith/Ornith-1.5-9B-MTP-GGUF-Q8`，context=98304、output=4096、compaction.buffer=16384、keep.tokens=10240；普通 9B 仍可选。96k MTP 尚待真实 OpenCode 测试；本文前面的会话 ID、错误和日志仍是历史记录，仅用于故障追溯。
+后续已移除项目中的 Qwen3.6 与 Ornith 35B 服务及权重。当前 OpenCode 默认使用 `local-ornith/Ornith-1.5-9B-MTP-GGUF-Q8`，context=98304、output=4096、compaction.buffer=16384、keep.tokens=10240。96k MTP 尚待真实 OpenCode 测试；本文前面的会话 ID、错误和日志仍是历史记录，仅用于故障追溯。
 
 ## Ornith 摘要输出耗尽与中文交互
 

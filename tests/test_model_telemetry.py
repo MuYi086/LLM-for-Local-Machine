@@ -299,7 +299,10 @@ class ResourceAndReportTests(unittest.TestCase):
                 pidfile.write_text(str(process.pid))
                 with patch.dict(
                     "os.environ",
-                    {"ORNITH_9B_BACKEND_PID_FILE": str(pidfile), "LLAMA_SERVER_BIN": executable},
+                    {
+                        "ORNITH_MTP_9B_BACKEND_PID_FILE": str(pidfile),
+                        "LLAMA_SERVER_BIN": executable,
+                    },
                 ):
                     rows = read_processes(2147483647, pss=False)
                 row = next((row for row in rows if row["pid"] == process.pid), None)

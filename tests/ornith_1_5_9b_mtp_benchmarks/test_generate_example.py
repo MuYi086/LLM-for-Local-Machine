@@ -1,4 +1,4 @@
-"""验证 Ornith-1.5-9B-GGUF 样例脚本的 API 合同和输出保护。"""
+"""验证 Ornith-1.5-9B-MTP-GGUF-Q8 样例脚本的 API 合同和输出保护。"""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import patch
 
-from tests.ornith_1_5_9b_gguf.generate_example import (
+from tests.ornith_1_5_9b_mtp_benchmarks.generate_example import (
     API_ROUTE,
     extract_assistant_text,
     request_completion,
@@ -50,38 +50,38 @@ class Ornith9BExampleTests(unittest.TestCase):
 
         captured = []
         with patch(
-            "tests.ornith_1_5_9b_gguf.generate_example.urllib.request.urlopen",
+            "tests.ornith_1_5_9b_mtp_benchmarks.generate_example.urllib.request.urlopen",
             side_effect=lambda request, timeout: (
                 captured.append((request, timeout)) or FakeResponse()
             ),
         ):
             text = request_completion(
-                base_url="http://127.0.0.1:8503/",
+                base_url="http://127.0.0.1:8504/",
                 prompt="请回答",
                 timeout_seconds=12,
             )
 
         request, timeout = captured[0]
         self.assertEqual(text, "回答")
-        self.assertEqual(request.full_url, f"http://127.0.0.1:8503{API_ROUTE}")
+        self.assertEqual(request.full_url, f"http://127.0.0.1:8504{API_ROUTE}")
         self.assertEqual(request.method, "POST")
         self.assertEqual(json.loads(request.data)["messages"][0]["content"], "请回答")
         self.assertEqual(timeout, 12)
 
     def test_http_error_reports_status_and_backend_detail(self) -> None:
         error = urllib.error.HTTPError(
-            f"http://127.0.0.1:8503{API_ROUTE}",
+            f"http://127.0.0.1:8504{API_ROUTE}",
             503,
             "unavailable",
             hdrs=None,
             fp=None,
         )
         with patch(
-            "tests.ornith_1_5_9b_gguf.generate_example.urllib.request.urlopen",
+            "tests.ornith_1_5_9b_mtp_benchmarks.generate_example.urllib.request.urlopen",
             side_effect=error,
         ):
             with self.assertRaisesRegex(RuntimeError, "HTTP 503"):
-                request_completion(base_url="http://127.0.0.1:8503", prompt="你好")
+                request_completion(base_url="http://127.0.0.1:8504", prompt="你好")
 
     def test_writes_unique_text_sample_without_overwriting(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

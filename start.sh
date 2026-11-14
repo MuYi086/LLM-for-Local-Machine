@@ -19,7 +19,6 @@ VOICEDESIGN_PROJECT_DIR="$PROJECT_DIR/model-audio/design_qwen3-tts-1.7b-voicedes
 AUDIO_CPP_RUNTIME_PROJECT_DIR="$PROJECT_DIR/model-audio/audio_cpp_runtime"
 AUDIO_CPP_RUNTIME_SRC="$AUDIO_CPP_RUNTIME_PROJECT_DIR/src"
 MODEL_TEXT_DIR="$PROJECT_DIR/model-text"
-ORNITH_9B_SERVICE_DIR="$MODEL_TEXT_DIR/Ornith-1.5-9B-GGUF"
 ORNITH_MTP_9B_SERVICE_DIR="$MODEL_TEXT_DIR/Ornith-1.5-9B-MTP-GGUF"
 MOSS_IMAGE_SERVICE_DIR="$PROJECT_DIR/model-image/MOSS-Image-SFT-Q8_0"
 FLUX3_IMAGE_SERVICE_DIR="$PROJECT_DIR/model-image/FLUX-3-Image-Klein-GGUF-Q8"
@@ -49,10 +48,6 @@ if [[ ! -f "$MOSS_IMAGE_SERVICE_DIR/main.py" ]]; then
 fi
 if [[ ! -f "$FLUX3_IMAGE_SERVICE_DIR/main.py" ]]; then
   echo "缺少 FLUX.3 Klein 图片服务：$FLUX3_IMAGE_SERVICE_DIR/main.py" >&2
-  exit 1
-fi
-if [[ ! -f "$ORNITH_9B_SERVICE_DIR/main.py" ]]; then
-  echo "缺少 Ornith-1.5-9B-GGUF 服务：$ORNITH_9B_SERVICE_DIR/main.py" >&2
   exit 1
 fi
 if [[ ! -f "$ORNITH_MTP_9B_SERVICE_DIR/main.py" ]]; then
@@ -114,7 +109,6 @@ export AUDIO_CPP_QWEN3_TTS_BASE_MODEL_FILE="${AUDIO_CPP_QWEN3_TTS_BASE_MODEL_FIL
 export AUDIO_CPP_SEED_VC_MODEL_FILE="${AUDIO_CPP_SEED_VC_MODEL_FILE:-$HF_MIRROR_DIR/audio.cpp-gguf/SeedVC-MLX-GGUF/seed-vc-mlx-f16.gguf}"
 export AUDIO_CPP_STABLE_AUDIO_SFX_MODEL_FILE="${AUDIO_CPP_STABLE_AUDIO_SFX_MODEL_FILE:-$HF_MIRROR_DIR/audio.cpp-gguf/Stable-Audio-3-Small-SFX-GGUF/stable-audio-3-small-sfx-f16.gguf}"
 export AUDIO_CPP_VOXCPM2_MODEL_FILE="${AUDIO_CPP_VOXCPM2_MODEL_FILE:-$HF_MIRROR_DIR/audio.cpp-gguf/VoxCPM2-GGUF/voxcpm2-q8_0.gguf}"
-export ORNITH_9B_MODEL_FILE="${ORNITH_9B_MODEL_FILE:-$HF_MIRROR_DIR/ornith-ai/Ornith-1.5-9B-GGUF/Ornith-1.5-9B-Q8_0.gguf}"
 export ORNITH_MTP_9B_MODEL_FILE="${ORNITH_MTP_9B_MODEL_FILE:-$HF_MIRROR_DIR/ornith-ai/Ornith-1.5-9B-MTP-GGUF/Ornith-1.5-9B-MTP-Q8_0.gguf}"
 export ORNITH_MTP_9B_MMPROJ_FILE="${ORNITH_MTP_9B_MMPROJ_FILE:-$HF_MIRROR_DIR/ornith-ai/Ornith-1.5-9B-MTP-GGUF/mmproj-Ornith-1.5-9B-BF16.gguf}"
 export SDCPP_BIN="${SDCPP_BIN:-$HOME/.local/src/stable-diffusion.cpp/build/bin/sd-cli}"
@@ -184,39 +178,28 @@ export FLUX3_IMAGE_HOST="${FLUX3_IMAGE_HOST:-$HOST}"
 export FLUX3_IMAGE_PORT="${FLUX3_IMAGE_PORT:-8502}"
 export QWEN_VOICEDESIGN_HOST="${QWEN_VOICEDESIGN_HOST:-$HOST}"
 export QWEN_VOICEDESIGN_PORT="${QWEN_VOICEDESIGN_PORT:-8301}"
-export ORNITH_9B_HOST="${ORNITH_9B_HOST:-$HOST}"
-export ORNITH_9B_PORT="${ORNITH_9B_PORT:-8503}"
-export ORNITH_9B_BACKEND_HOST=127.0.0.1
-export ORNITH_9B_LLAMA_CPP_PORT="${ORNITH_9B_LLAMA_CPP_PORT:-8505}"
-export ORNITH_9B_LLAMA_BASE_URL="${ORNITH_9B_LLAMA_BASE_URL:-http://127.0.0.1:$ORNITH_9B_LLAMA_CPP_PORT}"
-export ORNITH_9B_CONTEXT_SIZE="${ORNITH_9B_CONTEXT_SIZE:-98304}"
-export ORNITH_9B_BATCH_SIZE="${ORNITH_9B_BATCH_SIZE:-1024}"
-export ORNITH_9B_UBATCH_SIZE="${ORNITH_9B_UBATCH_SIZE:-1024}"
-export ORNITH_9B_THREADS="${ORNITH_9B_THREADS:-6}"
-export ORNITH_9B_THREADS_BATCH="${ORNITH_9B_THREADS_BATCH:-8}"
-export ORNITH_9B_N_GPU_LAYERS="${ORNITH_9B_N_GPU_LAYERS:-99}"
-export ORNITH_9B_SPEC_TYPE="${ORNITH_9B_SPEC_TYPE:-draft-mtp}"
-export ORNITH_9B_DRAFT_MAX="${ORNITH_9B_DRAFT_MAX:-4}"
-export ORNITH_9B_SLEEP_CACHE="${ORNITH_9B_SLEEP_CACHE:-1}"
-export ORNITH_9B_CACHE_RAM_MIB="${ORNITH_9B_CACHE_RAM_MIB:-4096}"
-export LLAMA_SERVER_SLEEP_PROMPT_CACHE="$ORNITH_9B_SLEEP_CACHE"
-export ORNITH_9B_SLEEP_IDLE_SECONDS="${ORNITH_9B_SLEEP_IDLE_SECONDS:-1}"
-export ORNITH_9B_STARTUP_TIMEOUT="${ORNITH_9B_STARTUP_TIMEOUT:-1800}"
-export ORNITH_9B_SLEEP_TIMEOUT="${ORNITH_9B_SLEEP_TIMEOUT:-300}"
-export ORNITH_9B_SLEEP_POLL_INTERVAL="${ORNITH_9B_SLEEP_POLL_INTERVAL:-0.25}"
-export ORNITH_9B_BACKEND_PID_FILE="${ORNITH_9B_BACKEND_PID_FILE:-$RUNTIME_CACHE_DIR/ornith-9b-llama-server.pid}"
+export ORNITH_MTP_9B_CONTEXT_SIZE="${ORNITH_MTP_9B_CONTEXT_SIZE:-98304}"
+export ORNITH_MTP_9B_BATCH_SIZE="${ORNITH_MTP_9B_BATCH_SIZE:-1024}"
+export ORNITH_MTP_9B_UBATCH_SIZE="${ORNITH_MTP_9B_UBATCH_SIZE:-1024}"
+export ORNITH_MTP_9B_THREADS="${ORNITH_MTP_9B_THREADS:-6}"
+export ORNITH_MTP_9B_THREADS_BATCH="${ORNITH_MTP_9B_THREADS_BATCH:-8}"
+export ORNITH_MTP_9B_N_GPU_LAYERS="${ORNITH_MTP_9B_N_GPU_LAYERS:-99}"
+export ORNITH_MTP_9B_SPEC_TYPE="${ORNITH_MTP_9B_SPEC_TYPE:-draft-mtp}"
+export ORNITH_MTP_9B_DRAFT_MAX="${ORNITH_MTP_9B_DRAFT_MAX:-4}"
+export ORNITH_MTP_9B_SLEEP_CACHE="${ORNITH_MTP_9B_SLEEP_CACHE:-1}"
+export ORNITH_MTP_9B_CACHE_RAM_MIB="${ORNITH_MTP_9B_CACHE_RAM_MIB:-4096}"
+export LLAMA_SERVER_SLEEP_PROMPT_CACHE="$ORNITH_MTP_9B_SLEEP_CACHE"
+export ORNITH_MTP_9B_SLEEP_IDLE_SECONDS="${ORNITH_MTP_9B_SLEEP_IDLE_SECONDS:-1}"
+export ORNITH_MTP_9B_STARTUP_TIMEOUT="${ORNITH_MTP_9B_STARTUP_TIMEOUT:-1800}"
+export ORNITH_MTP_9B_SLEEP_TIMEOUT="${ORNITH_MTP_9B_SLEEP_TIMEOUT:-300}"
+export ORNITH_MTP_9B_SLEEP_POLL_INTERVAL="${ORNITH_MTP_9B_SLEEP_POLL_INTERVAL:-0.25}"
 export ORNITH_MTP_9B_HOST="${ORNITH_MTP_9B_HOST:-$HOST}"
 export ORNITH_MTP_9B_VISION_ENABLED="${ORNITH_MTP_9B_VISION_ENABLED:-1}"
-export ORNITH_MTP_9B_SLEEP_IDLE_SECONDS="${ORNITH_MTP_9B_SLEEP_IDLE_SECONDS:-$ORNITH_9B_SLEEP_IDLE_SECONDS}"
 export ORNITH_MTP_9B_PORT="${ORNITH_MTP_9B_PORT:-8504}"
 export ORNITH_MTP_9B_BACKEND_HOST=127.0.0.1
 export ORNITH_MTP_9B_LLAMA_CPP_PORT="${ORNITH_MTP_9B_LLAMA_CPP_PORT:-8506}"
 export ORNITH_MTP_9B_LLAMA_BASE_URL="${ORNITH_MTP_9B_LLAMA_BASE_URL:-http://127.0.0.1:$ORNITH_MTP_9B_LLAMA_CPP_PORT}"
-export ORNITH_MTP_9B_STARTUP_TIMEOUT="${ORNITH_MTP_9B_STARTUP_TIMEOUT:-$ORNITH_9B_STARTUP_TIMEOUT}"
-export ORNITH_MTP_9B_SLEEP_TIMEOUT="${ORNITH_MTP_9B_SLEEP_TIMEOUT:-$ORNITH_9B_SLEEP_TIMEOUT}"
-export ORNITH_MTP_9B_SLEEP_POLL_INTERVAL="${ORNITH_MTP_9B_SLEEP_POLL_INTERVAL:-$ORNITH_9B_SLEEP_POLL_INTERVAL}"
 export ORNITH_MTP_9B_BACKEND_PID_FILE="${ORNITH_MTP_9B_BACKEND_PID_FILE:-$RUNTIME_CACHE_DIR/ornith-mtp-9b-llama-server.pid}"
-export EASEL_BRIDGE_CHAT_URL="${EASEL_BRIDGE_CHAT_URL:-http://127.0.0.1:$ORNITH_9B_PORT/v1/ornith-ai/Ornith-1.5-9B-GGUF}"
 export EASEL_BRIDGE_MTP_CHAT_URL="${EASEL_BRIDGE_MTP_CHAT_URL:-http://127.0.0.1:$ORNITH_MTP_9B_PORT/v1/ornith-ai/Ornith-1.5-9B-MTP-GGUF-Q8}"
 export EASEL_BRIDGE_MOSS_URL="${EASEL_BRIDGE_MOSS_URL:-http://127.0.0.1:$MOSS_IMAGE_PORT/v1/openmoss/MOSS-Image-SFT-Q8_0}"
 export EASEL_BRIDGE_VOXCPM_URL="${EASEL_BRIDGE_VOXCPM_URL:-http://127.0.0.1:${VOXCPM2_PORT:-8313}/v1/OpenBMB/VoxCPM2-GGUF}"
@@ -276,8 +259,6 @@ mkdir -p \
 PORT_CHECK_ARGS=(
   'Control-plane' "$HOST" "$PORT"
   'Qwen3-TTS VoiceDesign' "$QWEN_VOICEDESIGN_HOST" "$QWEN_VOICEDESIGN_PORT"
-  'Ornith API' "$ORNITH_9B_HOST" "$ORNITH_9B_PORT"
-  'Ornith llama.cpp backend' "$ORNITH_9B_BACKEND_HOST" "$ORNITH_9B_LLAMA_CPP_PORT"
   'Ornith MTP 9B API' "$ORNITH_MTP_9B_HOST" "$ORNITH_MTP_9B_PORT"
   'Ornith MTP 9B llama.cpp backend' "$ORNITH_MTP_9B_BACKEND_HOST" "$ORNITH_MTP_9B_LLAMA_CPP_PORT"
   'MOSS-Image-SFT API' "$MOSS_IMAGE_HOST" "$MOSS_IMAGE_PORT"
@@ -328,10 +309,6 @@ for model_component in \
   fi
 done
 
-if [[ "$ORNITH_9B_LLAMA_BASE_URL" != "http://127.0.0.1:$ORNITH_9B_LLAMA_CPP_PORT" ]]; then
-  echo "ORNITH_9B_LLAMA_BASE_URL 必须与 Ornith 9B backend 的 127.0.0.1:$ORNITH_9B_LLAMA_CPP_PORT 一致。" >&2
-  exit 1
-fi
 if [[ "$ORNITH_MTP_9B_LLAMA_BASE_URL" != "http://127.0.0.1:$ORNITH_MTP_9B_LLAMA_CPP_PORT" ]]; then
   echo "ORNITH_MTP_9B_LLAMA_BASE_URL 必须与 MTP backend 的 127.0.0.1:$ORNITH_MTP_9B_LLAMA_CPP_PORT 一致。" >&2
   exit 1
@@ -339,10 +316,6 @@ fi
 
 if [[ -z "$LLAMA_SERVER_BIN" || ! -x "$LLAMA_SERVER_BIN" ]]; then
   echo "找不到可执行的 llama-server；请安装 llama.cpp 或设置 LLAMA_SERVER_BIN。" >&2
-  exit 1
-fi
-if [[ ! -s "$ORNITH_9B_MODEL_FILE" ]]; then
-  echo "Ornith 9B GGUF 缺失或为空：$ORNITH_9B_MODEL_FILE" >&2
   exit 1
 fi
 if [[ ! -s "$ORNITH_MTP_9B_MODEL_FILE" ]]; then
@@ -354,7 +327,7 @@ if [[ ! -s "$ORNITH_MTP_9B_MMPROJ_FILE" ]]; then
   exit 1
 fi
 for setting in CONTEXT_SIZE BATCH_SIZE UBATCH_SIZE THREADS THREADS_BATCH N_GPU_LAYERS DRAFT_MAX CACHE_RAM_MIB SLEEP_IDLE_SECONDS STARTUP_TIMEOUT; do
-  value_name="ORNITH_9B_${setting}"
+  value_name="ORNITH_MTP_9B_${setting}"
   if [[ ! "${!value_name}" =~ ^[1-9][0-9]*$ ]]; then
     echo "$value_name 必须是正整数。" >&2
     exit 1
@@ -364,19 +337,19 @@ if [[ ! "$ORNITH_MTP_9B_SLEEP_IDLE_SECONDS" =~ ^[1-9][0-9]*$ ]]; then
   echo "ORNITH_MTP_9B_SLEEP_IDLE_SECONDS 必须是正整数；当前后端不接受 0。" >&2
   exit 1
 fi
-if [[ "$ORNITH_9B_SLEEP_CACHE" != "0" && "$ORNITH_9B_SLEEP_CACHE" != "1" ]]; then
-  echo "ORNITH_9B_SLEEP_CACHE 必须是 0 或 1。" >&2
+if [[ "$ORNITH_MTP_9B_SLEEP_CACHE" != "0" && "$ORNITH_MTP_9B_SLEEP_CACHE" != "1" ]]; then
+  echo "ORNITH_MTP_9B_SLEEP_CACHE 必须是 0 或 1。" >&2
   exit 1
 fi
-if [[ "$ORNITH_9B_SPEC_TYPE" != "none" && "$ORNITH_9B_SPEC_TYPE" != "draft-mtp" ]]; then
-  echo "ORNITH_9B_SPEC_TYPE 必须是 none 或 draft-mtp。" >&2
+if [[ "$ORNITH_MTP_9B_SPEC_TYPE" != "none" && "$ORNITH_MTP_9B_SPEC_TYPE" != "draft-mtp" ]]; then
+  echo "ORNITH_MTP_9B_SPEC_TYPE 必须是 none 或 draft-mtp。" >&2
   exit 1
 fi
-if (( ORNITH_9B_CONTEXT_SIZE > 163840 )); then
-  echo "ORNITH_9B_CONTEXT_SIZE 不得超过 163840。" >&2
+if (( ORNITH_MTP_9B_CONTEXT_SIZE > 163840 )); then
+  echo "ORNITH_MTP_9B_CONTEXT_SIZE 不得超过 163840。" >&2
   exit 1
 fi
-for value_name in ORNITH_9B_SLEEP_TIMEOUT ORNITH_9B_SLEEP_POLL_INTERVAL GPU_LOCK_WAIT_TIMEOUT; do
+for value_name in ORNITH_MTP_9B_SLEEP_TIMEOUT ORNITH_MTP_9B_SLEEP_POLL_INTERVAL GPU_LOCK_WAIT_TIMEOUT; do
   value="${!value_name}"
   if [[ ! "$value" =~ ^[0-9]+([.][0-9]+)?$ || ! "$value" =~ [1-9] ]]; then
     echo "$value_name 必须是正数。" >&2
@@ -438,11 +411,8 @@ echo "Spatial render:        http://$HOST:$PORT/v1/audio/spatial/render"
 echo "VoiceDesign project:   $VOICEDESIGN_PROJECT_DIR"
 echo "audio.cpp runtime:     $AUDIO_CPP_RUNTIME_PROJECT_DIR"
 echo "VoiceDesign GGUF:      $QWEN_VOICEDESIGN_MODEL_FILE"
-echo "Ornith GGUF:           $ORNITH_9B_MODEL_FILE"
-echo "Ornith llama-server:   $LLAMA_SERVER_BIN (CUDA0, 127.0.0.1:$ORNITH_9B_LLAMA_CPP_PORT)"
-echo "Ornith profile:        ctx=$ORNITH_9B_CONTEXT_SIZE batch=$ORNITH_9B_BATCH_SIZE/$ORNITH_9B_UBATCH_SIZE spec=$ORNITH_9B_SPEC_TYPE draft=$ORNITH_9B_DRAFT_MAX"
-echo "Ornith sleep cache:    enabled=$ORNITH_9B_SLEEP_CACHE CPU budget=${ORNITH_9B_CACHE_RAM_MIB}MiB"
-echo "Ornith API:            http://$ORNITH_9B_HOST:$ORNITH_9B_PORT/v1/ornith-ai/Ornith-1.5-9B-GGUF"
+echo "Ornith profile:        ctx=$ORNITH_MTP_9B_CONTEXT_SIZE batch=$ORNITH_MTP_9B_BATCH_SIZE/$ORNITH_MTP_9B_UBATCH_SIZE spec=$ORNITH_MTP_9B_SPEC_TYPE draft=$ORNITH_MTP_9B_DRAFT_MAX"
+echo "Ornith sleep cache:    enabled=$ORNITH_MTP_9B_SLEEP_CACHE CPU budget=${ORNITH_MTP_9B_CACHE_RAM_MIB}MiB"
 echo "Ornith MTP GGUF:       $ORNITH_MTP_9B_MODEL_FILE"
 echo "Ornith MTP mmproj:     $ORNITH_MTP_9B_MMPROJ_FILE"
 echo "Ornith MTP backend:    $LLAMA_SERVER_BIN (CUDA0, 127.0.0.1:$ORNITH_MTP_9B_LLAMA_CPP_PORT)"
@@ -471,16 +441,12 @@ cd "$PROJECT_DIR"
 
 main_pid=""
 voicedesign_pid=""
-ornith_9b_pid=""
 ornith_mtp_9b_pid=""
 moss_image_pid=""
 flux3_image_pid=""
 easel_bridge_pid=""
-ornith_9b_llama_server_pid=""
 ornith_mtp_9b_llama_server_pid=""
-ornith_9b_watch_pid=""
 ornith_mtp_9b_watch_pid=""
-ornith_9b_backend_start_attempted=0
 ornith_mtp_9b_backend_start_attempted=0
 audio_cpp_pids=()
 localai_managed_started=0
@@ -496,7 +462,7 @@ cleanup() {
     # 日志进程异常退出时直接追加到原日志，避免 shutdown helper 也因 BrokenPipe 中断。
     exec >> "$START_LOG_FILE" 2>&1
   fi
-  local service_pids=("$easel_bridge_pid" "$main_pid" "$voicedesign_pid" "$ornith_9b_pid" "$ornith_mtp_9b_pid" "$moss_image_pid" "$flux3_image_pid" "$ornith_9b_watch_pid" "$ornith_mtp_9b_watch_pid" "${audio_cpp_pids[@]}")
+  local service_pids=("$easel_bridge_pid" "$main_pid" "$voicedesign_pid" "$ornith_mtp_9b_pid" "$moss_image_pid" "$flux3_image_pid" "$ornith_mtp_9b_watch_pid" "${audio_cpp_pids[@]}")
   local recovery_attempt=1
   echo "[退出] 收到停止信号，开始停止服务进程组和 llama.cpp 后端。"
 
@@ -522,12 +488,12 @@ cleanup() {
     fi
   fi
 
-  local backend_models=(Ornith-1.5-9B-GGUF Ornith-1.5-9B-MTP-GGUF-Q8)
-  local backend_hosts=("$ORNITH_9B_BACKEND_HOST" "$ORNITH_MTP_9B_BACKEND_HOST")
-  local backend_ports=("$ORNITH_9B_LLAMA_CPP_PORT" "$ORNITH_MTP_9B_LLAMA_CPP_PORT")
-  local backend_pid_files=("$ORNITH_9B_BACKEND_PID_FILE" "$ORNITH_MTP_9B_BACKEND_PID_FILE")
-  local backend_attempted=("$ornith_9b_backend_start_attempted" "$ornith_mtp_9b_backend_start_attempted")
-  local backend_pids=("$ornith_9b_llama_server_pid" "$ornith_mtp_9b_llama_server_pid")
+  local backend_models=(Ornith-1.5-9B-MTP-GGUF-Q8)
+  local backend_hosts=("$ORNITH_MTP_9B_BACKEND_HOST")
+  local backend_ports=("$ORNITH_MTP_9B_LLAMA_CPP_PORT")
+  local backend_pid_files=("$ORNITH_MTP_9B_BACKEND_PID_FILE")
+  local backend_attempted=("$ornith_mtp_9b_backend_start_attempted")
+  local backend_pids=("$ornith_mtp_9b_llama_server_pid")
   local backend_shutdown_args=()
   local backend_count="${#backend_models[@]}"
   local backend_index
@@ -633,7 +599,6 @@ fi
 uv run --no-sync --project "$MAIN_PROJECT_DIR" \
   python "$PROJECT_DIR/scripts/localai/preflight.py"
 
-rm -f -- "$ORNITH_9B_BACKEND_PID_FILE"
 rm -f -- "$ORNITH_MTP_9B_BACKEND_PID_FILE"
 start_ornith_backend() {
   local model_alias="$1"
@@ -645,28 +610,25 @@ start_ornith_backend() {
   local startup_timeout="$7"
   local poll_interval="$8"
   local mmproj_file="${9:-}"
-  local sleep_idle_seconds="$ORNITH_9B_SLEEP_IDLE_SECONDS"
-  if [[ "$model_alias" == "Ornith-1.5-9B-MTP-GGUF-Q8" ]]; then
-    sleep_idle_seconds="$ORNITH_MTP_9B_SLEEP_IDLE_SECONDS"
-  fi
+  local sleep_idle_seconds="$ORNITH_MTP_9B_SLEEP_IDLE_SECONDS"
   local backend_args=(
     --model "$model_file"
     --host "$backend_host"
     --port "$backend_port"
     --alias "$model_alias"
     --device CUDA0
-    --gpu-layers "$ORNITH_9B_N_GPU_LAYERS"
+    --gpu-layers "$ORNITH_MTP_9B_N_GPU_LAYERS"
     --fit off
     --flash-attn on
     --jinja
-    --ctx-size "$ORNITH_9B_CONTEXT_SIZE"
-    --batch-size "$ORNITH_9B_BATCH_SIZE"
-    --ubatch-size "$ORNITH_9B_UBATCH_SIZE"
-    --threads "$ORNITH_9B_THREADS"
-    --threads-batch "$ORNITH_9B_THREADS_BATCH"
-    --spec-type "$ORNITH_9B_SPEC_TYPE"
-    --spec-draft-n-max "$ORNITH_9B_DRAFT_MAX"
-    --cache-ram "$ORNITH_9B_CACHE_RAM_MIB"
+    --ctx-size "$ORNITH_MTP_9B_CONTEXT_SIZE"
+    --batch-size "$ORNITH_MTP_9B_BATCH_SIZE"
+    --ubatch-size "$ORNITH_MTP_9B_UBATCH_SIZE"
+    --threads "$ORNITH_MTP_9B_THREADS"
+    --threads-batch "$ORNITH_MTP_9B_THREADS_BATCH"
+    --spec-type "$ORNITH_MTP_9B_SPEC_TYPE"
+    --spec-draft-n-max "$ORNITH_MTP_9B_DRAFT_MAX"
+    --cache-ram "$ORNITH_MTP_9B_CACHE_RAM_MIB"
     --load-mode none
     --parallel 1
     --sleep-idle-seconds "$sleep_idle_seconds"
@@ -689,21 +651,6 @@ start_ornith_backend() {
     -- "${backend_args[@]}"
 }
 
-ornith_9b_backend_start_attempted=1
-start_ornith_backend \
-  Ornith-1.5-9B-GGUF \
-  "$ORNITH_9B_MODEL_FILE" \
-  "$ORNITH_9B_BACKEND_HOST" \
-  "$ORNITH_9B_LLAMA_CPP_PORT" \
-  "$ORNITH_9B_LLAMA_BASE_URL" \
-  "$ORNITH_9B_BACKEND_PID_FILE" \
-  "$ORNITH_9B_STARTUP_TIMEOUT" \
-  "$ORNITH_9B_SLEEP_POLL_INTERVAL"
-read -r ornith_9b_llama_server_pid < "$ORNITH_9B_BACKEND_PID_FILE"
-if [[ ! "$ornith_9b_llama_server_pid" =~ ^[1-9][0-9]*$ ]]; then
-  echo "Ornith 9B startup helper 未返回有效 backend PID。" >&2
-  exit 1
-fi
 ornith_mtp_9b_backend_start_attempted=1
 start_ornith_backend \
   Ornith-1.5-9B-MTP-GGUF-Q8 \
@@ -738,16 +685,6 @@ for index in "${!AUDIO_CPP_SERVICE_KEYS[@]}"; do
   audio_cpp_pids+=("$!")
 done
 
-ORNITH_9B_HOST="$ORNITH_9B_HOST" \
-  ORNITH_9B_PORT="$ORNITH_9B_PORT" \
-  ORNITH_9B_LLAMA_BASE_URL="$ORNITH_9B_LLAMA_BASE_URL" \
-  ORNITH_9B_BACKEND_HOST="$ORNITH_9B_BACKEND_HOST" \
-  ORNITH_9B_BACKEND_PID="$ornith_9b_llama_server_pid" \
-  ORNITH_9B_BACKEND_PGID="$ornith_9b_llama_server_pid" \
-  ORNITH_9B_LLAMA_CPP_PORT="$ORNITH_9B_LLAMA_CPP_PORT" \
-  setsid uv run --no-sync --project "$MAIN_PROJECT_DIR" \
-  python "$ORNITH_9B_SERVICE_DIR/main.py" &
-ornith_9b_pid=$!
 
 ORNITH_MTP_9B_HOST="$ORNITH_MTP_9B_HOST" \
   ORNITH_MTP_9B_PORT="$ORNITH_MTP_9B_PORT" \
@@ -781,13 +718,7 @@ setsid bash -c '
   backend_pid="$1"
   while kill -0 "$backend_pid" 2>/dev/null; do sleep 1; done
   exit 1
-' _ "$ornith_9b_llama_server_pid" &
-ornith_9b_watch_pid=$!
-setsid bash -c '
-  backend_pid="$1"
-  while kill -0 "$backend_pid" 2>/dev/null; do sleep 1; done
-  exit 1
 ' _ "$ornith_mtp_9b_llama_server_pid" &
 ornith_mtp_9b_watch_pid=$!
 
-wait -n "$easel_bridge_pid" "$main_pid" "$voicedesign_pid" "$ornith_9b_pid" "$ornith_mtp_9b_pid" "$moss_image_pid" "$flux3_image_pid" "$ornith_9b_watch_pid" "$ornith_mtp_9b_watch_pid" "${audio_cpp_pids[@]}"
+wait -n "$easel_bridge_pid" "$main_pid" "$voicedesign_pid" "$ornith_mtp_9b_pid" "$moss_image_pid" "$flux3_image_pid" "$ornith_mtp_9b_watch_pid" "${audio_cpp_pids[@]}"

@@ -17,15 +17,13 @@ from fastapi.testclient import TestClient
 
 from easel_bridge.app import (
     CHAT_MODEL_ID,
-    MTP_CHAT_MODEL_ID,
     MOSS_MODEL_ID,
     VOXCPM_MODEL_ID,
     create_app,
 )
 
 API_KEY = "bridge-test-secret-00000000000000000000000000000000"
-CHAT_URL = "http://ornith.test/v1/ornith-ai/Ornith-1.5-9B-GGUF"
-MTP_CHAT_URL = "http://ornith-mtp.test/v1/ornith-ai/Ornith-1.5-9B-MTP-GGUF-Q8"
+CHAT_URL = "http://ornith.test/v1/ornith-ai/Ornith-1.5-9B-MTP-GGUF-Q8"
 MOSS_URL = "http://moss.test/v1/openmoss/MOSS-Image-SFT-Q8_0"
 VOXCPM_URL = "http://voice.test/v1/OpenBMB/VoxCPM2-GGUF"
 PNG_B64 = "iVBORw0KGgo="
@@ -80,7 +78,7 @@ class EaselBridgeTests(unittest.TestCase):
 
         def upstream(request: httpx.Request) -> httpx.Response:
             self.requests.append(request)
-            if request.url in {httpx.URL(CHAT_URL), httpx.URL(MTP_CHAT_URL)}:
+            if request.url == httpx.URL(CHAT_URL):
                 if json.loads(request.content).get("stream"):
                     return httpx.Response(
                         200,
@@ -108,7 +106,6 @@ class EaselBridgeTests(unittest.TestCase):
         self.app = create_app(
             api_key=API_KEY,
             chat_url=CHAT_URL,
-            mtp_chat_url=MTP_CHAT_URL,
             moss_url=MOSS_URL,
             voxcpm_url=VOXCPM_URL,
             transport=self.transport,
@@ -117,6 +114,16 @@ class EaselBridgeTests(unittest.TestCase):
 
     def _headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {API_KEY}"}
+
+    def test_retired_chat_model_is_rejected_without_upstream_call(self) -> None:
+        """旧模型 ID 不得静默映射至 MTP 或继续调用已退役服务。"""
+        response = self.client.post(
+            "/v1/chat/completions",
+            headers=self._headers(),
+            json={"model": "Ornith-1.5-9B-GGUF", "messages": []},
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(self.requests, [])
 
     def test_delayed_stream_completes_without_false_disconnect(self) -> None:
         """真实 ASGI 接收通道在请求结束后仍等待客户端事件。"""
@@ -180,7 +187,7 @@ class EaselBridgeTests(unittest.TestCase):
         self.assertEqual(allowed.status_code, 200)
         self.assertEqual(
             {model["id"] for model in allowed.json()["data"]},
-            {CHAT_MODEL_ID, MTP_CHAT_MODEL_ID, MOSS_MODEL_ID, VOXCPM_MODEL_ID},
+            {CHAT_MODEL_ID, MOSS_MODEL_ID, VOXCPM_MODEL_ID},
         )
 
     def test_image_generation_maps_to_moss_route_and_returns_openai_image_shape(self) -> None:

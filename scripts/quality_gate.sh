@@ -23,7 +23,6 @@ lint_paths=(
     scripts/sdcpp
     scripts/model_telemetry.py
     model-text/llama_cpp_runtime
-    model-text/Ornith-1.5-9B-GGUF
     model-text/Ornith-1.5-9B-MTP-GGUF
     model-image
     easel_bridge

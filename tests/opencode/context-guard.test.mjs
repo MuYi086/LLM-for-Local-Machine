@@ -10,7 +10,7 @@ async function setup(directory = '/workspace/repo') {
   await plugin.setup({ location: { directory }, session: { hook: async (name, fn) => hooks.set(`session.${name}`, fn) }, tool: { hook: async (name, fn) => hooks.set(`tool.${name}`, fn) } });
   return hooks;
 }
-const event = () => ({sessionID: 's1', model: {providerID: 'local-ornith', id: 'Ornith-1.5-9B-GGUF'}, system: [{type: 'text', text: 'Write a six-part review in Chinese.'}], messages: [{role:'user',content:[{type:'text',text:'Read CONTEXT_BENCHMARK_PROMPT.md'}]}], tools: {read:{}}, options: {maxTokens:4096}});
+const event = () => ({sessionID: 's1', model: {providerID: 'local-ornith', id: 'Ornith-1.5-9B-MTP-GGUF-Q8'}, system: [{type: 'text', text: 'Write a six-part review in Chinese.'}], messages: [{role:'user',content:[{type:'text',text:'Read CONTEXT_BENCHMARK_PROMPT.md'}]}], tools: {read:{}}, options: {maxTokens:4096}});
 
 test('compaction gets dedicated headings without original review instructions', async () => {
   const hooks = await setup(); const input = event();
@@ -43,7 +43,7 @@ test('other sessions and files are not modified', async () => {
 });
 test('only summary HTTP body disables thinking and headers remain intact', async () => {
  const hooks=await setup();
- const input={...event(),kind:'compaction',request:new Request('http://127.0.0.1:8500/v1/chat/completions',{method:'POST',headers:{Authorization:'Bearer test', 'Content-Type':'application/json'},body:JSON.stringify({model:'Ornith-1.5-9B-GGUF',chat_template_kwargs:{custom:true,enable_thinking:true},messages:[{role:'user',content:'summary'}]})})};
+ const input={...event(),kind:'compaction',request:new Request('http://127.0.0.1:8500/v1/chat/completions',{method:'POST',headers:{Authorization:'Bearer test', 'Content-Type':'application/json'},body:JSON.stringify({model:'Ornith-1.5-9B-MTP-GGUF-Q8',chat_template_kwargs:{custom:true,enable_thinking:true},messages:[{role:'user',content:'summary'}]})})};
  await hooks.get('session.http.request')(input);const body=await input.request.json();assert.equal(body.chat_template_kwargs.enable_thinking,false);assert.equal(body.chat_template_kwargs.custom,true);assert.equal(input.request.headers.get('authorization'),'Bearer test');
  assert.equal(body.llm_context_guard, true);
  const primary={...event(),kind:'primary',request:new Request('http://127.0.0.1:8500/v1/chat/completions',{method:'POST',body:'{}'})};const before=primary.request;await hooks.get('session.http.request')(primary);assert.equal(primary.request,before);

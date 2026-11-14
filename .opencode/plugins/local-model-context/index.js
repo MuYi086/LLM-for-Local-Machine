@@ -20,7 +20,6 @@ Use short factual bullets below each heading; write (none) where necessary. Pres
 const SOURCES = [
   'start.sh',
   'easel_bridge/app.py',
-  'model-text/Ornith-1.5-9B-GGUF/app.py',
   'model-text/Ornith-1.5-9B-MTP-GGUF/app.py',
   'model-text/llama_cpp_runtime/app.py',
   'model-text/llama_cpp_runtime/runtime.py',

@@ -46,14 +46,15 @@ def main() -> None:
         ),
     )
     parser.add_argument(
-        "--existing-backend", default=os.getenv("ORNITH_9B_LLAMA_BASE_URL", "http://127.0.0.1:8505")
+        "--existing-backend",
+        default=os.getenv("ORNITH_MTP_9B_LLAMA_BASE_URL", "http://127.0.0.1:8506"),
     )
     args = parser.parse_args()
     if args.cache_mib <= 0 or args.context_copies < 1:
         parser.error("cache-mib 和 context-copies 必须为正数。")
     directory = (
         ROOT
-        / "storage/llm_tests/ornith_1_5_9b_gguf"
+        / "storage/llm_tests/ornith_1_5_9b_mtp_benchmarks"
         / datetime.now(UTC).strftime("sleep-cache-%Y%m%dT%H%M%S%fZ")
     )
     directory.mkdir(parents=True, exist_ok=False)
@@ -84,7 +85,7 @@ def main() -> None:
         "--port",
         str(args.port),
         "--alias",
-        "Ornith-1.5-9B-GGUF",
+        "Ornith-1.5-9B-MTP-GGUF-Q8",
         "--device",
         "CUDA0",
         "--gpu-layers",

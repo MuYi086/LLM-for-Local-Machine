@@ -121,7 +121,7 @@ def read_processes(owner_pid: int, *, pss: bool) -> list[dict[str, Any]]:
     # backend 由短生命周期 helper 创建，helper 退出后会被 reparent，不能仅靠启动树。
     backend_roles = {}
     executable = os.getenv("LLAMA_SERVER_BIN")
-    for prefix, role in (("ORNITH_9B", "ornith_backend"),):
+    for prefix, role in (("ORNITH_MTP_9B", "ornith_backend"),):
         pidfile = os.getenv(f"{prefix}_BACKEND_PID_FILE")
         if not pidfile or not executable:
             continue
@@ -155,7 +155,7 @@ def read_processes(owner_pid: int, *, pss: bool) -> list[dict[str, Any]]:
             if role == "service_tree":
                 command = (path / "cmdline").read_bytes()
                 for marker, label in (
-                    (b"Ornith-1.5-9B-GGUF/main.py", "ornith_adapter"),
+                    (b"Ornith-1.5-9B-MTP-GGUF-Q8/main.py", "ornith_adapter"),
                     (b"easel_bridge.app:app", "bridge"),
                 ):
                     if marker in command:
@@ -238,7 +238,7 @@ def collect(directory: Path, owner_pid: int, interval: float, log_path: Path | N
     )
     config = {
         key: os.environ[key]
-        for prefix in ("ORNITH_9B",)
+        for prefix in ("ORNITH_MTP_9B",)
         for suffix in allowed
         if (key := f"{prefix}_{suffix}") in os.environ
     }
@@ -251,7 +251,7 @@ def collect(directory: Path, owner_pid: int, interval: float, log_path: Path | N
     except (OSError, StopIteration, IndexError):
         cpu_model = None
     model_files = {}
-    for key in ("ORNITH_9B_MODEL_FILE",):
+    for key in ("ORNITH_MTP_9B_MODEL_FILE",):
         if key in os.environ:
             path = Path(os.environ[key])
             try:

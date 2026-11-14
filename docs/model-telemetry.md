@@ -2,7 +2,7 @@
 
 `bash start.sh` 默认启用性能记录。采集器不加载模型、不调用推理 API、不获取 GPU 锁；Ornith 仍使用原有共享 GPU 租约及 quarantine 收尾。
 
-跨 sleep RAM cache 启用后，manifest 记录 `ORNITH_9B_SLEEP_CACHE`、`ORNITH_9B_CACHE_RAM_MIB`。`usage.prompt_tokens` 仍为完整输入，`timings.cache_n` 为复用部分，`timings.prompt_n` 才是本轮实际 prefill 的 token 数。命中后应比较 prefill 毫秒、首事件及持锁时间，不以小批次 tok/s 判断是否加速。CPU RSS 包括有界缓存，sleep 后 RSS 较高不代表 CUDA 未释放；保存开销计入请求收尾。部署及实测见 [缓存补丁说明](llama-cpp-sleep-cache.md)。
+跨 sleep RAM cache 启用后，manifest 记录 `ORNITH_MTP_9B_SLEEP_CACHE`、`ORNITH_MTP_9B_CACHE_RAM_MIB`。`usage.prompt_tokens` 仍为完整输入，`timings.cache_n` 为复用部分，`timings.prompt_n` 才是本轮实际 prefill 的 token 数。命中后应比较 prefill 毫秒、首事件及持锁时间，不以小批次 tok/s 判断是否加速。CPU RSS 包括有界缓存，sleep 后 RSS 较高不代表 CUDA 未释放；保存开销计入请求收尾。部署及实测见 [缓存补丁说明](llama-cpp-sleep-cache.md)。
 
 ## 开关与目录
 

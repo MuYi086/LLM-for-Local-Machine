@@ -154,7 +154,7 @@ class LocalAIActiveScopeTests(unittest.TestCase):
                     {
                         "schema_version": 1,
                         "provider": "llama.cpp",
-                        "model": "Ornith-1.5-9B-GGUF",
+                        "model": "Ornith-1.5-9B-MTP-GGUF-Q8",
                         "host": "127.0.0.1",
                         "port": 18504,
                         "pid": 999991,
@@ -201,7 +201,7 @@ class LocalAIActiveScopeTests(unittest.TestCase):
     def test_quarantine_recovery_stops_every_llama_backend_target(self) -> None:
         targets = [
             {
-                "model": "Ornith-1.5-9B-GGUF",
+                "model": "Ornith-1.5-9B-MTP-GGUF-Q8",
                 "host": "127.0.0.1",
                 "port": 18505,
                 "pid": 999991,
@@ -293,7 +293,7 @@ class LocalAIActiveScopeTests(unittest.TestCase):
             lock_path = Path(temporary) / "gpu-runtime.lock"
             targets = [
                 (
-                    "Ornith-1.5-9B-GGUF",
+                    "Ornith-1.5-9B-MTP-GGUF-Q8",
                     "127.0.0.1",
                     18505,
                     999991,
@@ -345,7 +345,7 @@ class LocalAIActiveScopeTests(unittest.TestCase):
                     {
                         "schema_version": 1,
                         "provider": "llama.cpp",
-                        "model": "Ornith-1.5-9B-GGUF",
+                        "model": "Ornith-1.5-9B-MTP-GGUF-Q8",
                         "host": "127.0.0.1",
                         "port": 18505,
                         "pid": None,
@@ -411,7 +411,7 @@ class LocalAIActiveScopeTests(unittest.TestCase):
                     lock_path=lock_path,
                     backends=[
                         (
-                            "Ornith-1.5-9B-GGUF",
+                            "Ornith-1.5-9B-MTP-GGUF-Q8",
                             "127.0.0.1",
                             18505,
                             999991,
@@ -430,7 +430,7 @@ class LocalAIActiveScopeTests(unittest.TestCase):
     def test_recovery_stops_extra_llama_backends_before_other_provider(self) -> None:
         targets = [
             {
-                "model": "Ornith-1.5-9B-GGUF",
+                "model": "Ornith-1.5-9B-MTP-GGUF-Q8",
                 "host": "127.0.0.1",
                 "port": 18505,
                 "pid": 999991,
@@ -526,7 +526,7 @@ class LocalAIActiveScopeTests(unittest.TestCase):
                 json.dumps(
                     {
                         "provider": "llama.cpp",
-                        "model": "Ornith-1.5-9B-GGUF",
+                        "model": "Ornith-1.5-9B-MTP-GGUF-Q8",
                         "host": "127.0.0.1",
                         "port": 18504,
                         "pid": None,

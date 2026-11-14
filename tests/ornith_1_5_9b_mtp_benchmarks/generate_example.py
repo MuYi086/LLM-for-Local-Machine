@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""调用本机 Ornith-1.5-9B-GGUF API 并保存生成文本。"""
+"""调用本机 Ornith-1.5-9B-MTP-GGUF-Q8 API 并保存生成文本。"""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
-API_ROUTE = "/v1/ornith-ai/Ornith-1.5-9B-GGUF"
+API_ROUTE = "/v1/ornith-ai/Ornith-1.5-9B-MTP-GGUF-Q8"
 DEFAULT_PROMPT = "请用简洁的中文介绍一下你自己，并说明你擅长处理哪些任务。"
 
 
@@ -91,7 +91,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--base-url",
-        default=os.getenv("ORNITH_9B_TEST_BASE_URL", "http://127.0.0.1:8503"),
+        default=os.getenv("ORNITH_MTP_9B_TEST_BASE_URL", "http://127.0.0.1:8504"),
         help="Ornith 9B API 根地址。",
     )
     parser.add_argument("--prompt", default=DEFAULT_PROMPT, help="发送给模型的中文提示。")
@@ -100,8 +100,11 @@ def main() -> int:
     parser.add_argument(
         "--output-dir",
         default=os.getenv(
-            "ORNITH_9B_TEST_OUTPUT_DIR",
-            str(Path(os.getenv("STORAGE_DIR", ROOT / "storage")) / "llm_tests/ornith_1_5_9b_gguf"),
+            "ORNITH_MTP_9B_TEST_OUTPUT_DIR",
+            str(
+                Path(os.getenv("STORAGE_DIR", ROOT / "storage"))
+                / "llm_tests/ornith_1_5_9b_mtp_benchmarks"
+            ),
         ),
         help="生成文本输出目录。",
     )

@@ -20,7 +20,7 @@ uv run --project qa --locked python tests/model_web_comparison/run_comparison.py
 
 脚本保留原提示词、请求用量和资源数据，只生成 Ornith 9B 的报告与网页。运行前先退出已启动的 OpenCode/模型客户端，避免并发使用共享 GPU。
 
-Ornith 9B 当前启动默认使用 CUDA0、线程 6/8、上下文 98304、logical/physical batch 1024、load-mode none，以及主 GGUF 内置 MTP（草稿长度 4、F16 KV）。96k OpenCode 报告分析与同机参数对照见 [调优记录](../ornith_1_5_9b_gguf/performance.md)；本仓库质量门禁不加载模型。
+Ornith 9B 当前启动默认使用 CUDA0、线程 6/8、上下文 98304、logical/physical batch 1024、load-mode none，以及主 GGUF 内置 MTP（草稿长度 4、F16 KV）。96k OpenCode 报告分析与同机参数对照见 [调优记录](../ornith_1_5_9b_mtp_benchmarks/performance.md)；本仓库质量门禁不加载模型。
 
 ## 历史结果
 

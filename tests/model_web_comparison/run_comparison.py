@@ -27,13 +27,13 @@ TEMPERATURE = 0.0
 TOP_P = 1.0
 MODELS = (
     {
-        "key": "ornith_1_5_9b_gguf",
-        "name": "Ornith-1.5-9B-GGUF",
-        "api_base": "http://127.0.0.1:8503",
-        "route": "/v1/ornith-ai/Ornith-1.5-9B-GGUF",
+        "key": "ornith_1_5_9b_mtp_benchmarks",
+        "name": "Ornith-1.5-9B-MTP-GGUF-Q8",
+        "api_base": "http://127.0.0.1:8504",
+        "route": "/v1/ornith-ai/Ornith-1.5-9B-MTP-GGUF-Q8",
         "backend_host": "127.0.0.1",
-        "backend_port": 8505,
-        "output_dir": ROOT / "tests/ornith_1_5_9b_gguf/outputs",
+        "backend_port": 8506,
+        "output_dir": ROOT / "tests/ornith_1_5_9b_mtp_benchmarks/outputs",
     },
 )
 
@@ -370,7 +370,7 @@ def inspect_page_quality(model_key: str, page: str) -> list[str]:
 
 def make_preview_copy(model_key: str, page: str) -> tuple[str, int]:
     """为浏览器预览修复已识别的标签字符串引号，不改写原始模型输出。"""
-    if model_key != "ornith_1_5_9b_gguf":
+    if model_key != "ornith_1_5_9b_mtp_benchmarks":
         return page, 0
     replacements = (
         ("+ item.place + 」", '+ item.place + "」'),
@@ -452,7 +452,7 @@ def render_report(report: dict[str, Any]) -> str:
             "",
             "## 页面预览",
             "",
-            "- [并排预览](ornith_9b_latest_comparison.html)",
+            "- [并排预览](ornith_mtp_9b_latest_comparison.html)",
             *[
                 f"- [{result['model']} 原始 HTML]({os.path.relpath(ROOT / result['html_file'], TASK_DIR)})"
                 for result in report["results"]
@@ -528,7 +528,7 @@ def write_comparison_page(report: dict[str, Any]) -> None:
 </body>
 </html>
 """.replace("__FRAMES__", "\n".join(frames))
-    (TASK_DIR / "ornith_9b_latest_comparison.html").write_text(page, encoding="utf-8")
+    (TASK_DIR / "ornith_mtp_9b_latest_comparison.html").write_text(page, encoding="utf-8")
 
 
 def escape_html(value: str) -> str:
@@ -621,18 +621,18 @@ def main() -> int:
             print(f"  总耗时：{result['elapsed_seconds']} 秒", flush=True)
             print(f"  输出 token：{result['completion_tokens']}", flush=True)
             print(f"  速度：{result['tokens_per_second']} token/s", flush=True)
-        json_path = TASK_DIR / "ornith_9b_latest_report.json"
+        json_path = TASK_DIR / "ornith_mtp_9b_latest_report.json"
         json_path.write_text(
             json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
         )
-        markdown_path = TASK_DIR / "ornith_9b_latest_report.md"
+        markdown_path = TASK_DIR / "ornith_mtp_9b_latest_report.md"
         markdown_path.write_text(render_report(report), encoding="utf-8")
         write_comparison_page(report)
     except (OSError, RuntimeError, ValueError) as exc:
         print(f"网页模型对比执行失败：{exc}", file=sys.stderr)
         return 1
     print(f"对比报告：{markdown_path.relative_to(ROOT)}")
-    print(f"并排预览：{(TASK_DIR / 'ornith_9b_latest_comparison.html').relative_to(ROOT)}")
+    print(f"并排预览：{(TASK_DIR / 'ornith_mtp_9b_latest_comparison.html').relative_to(ROOT)}")
     return 0
 
 

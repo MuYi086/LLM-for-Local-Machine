@@ -1,6 +1,6 @@
 # LLM Local Backend
 
-本仓库当前提供九个音频模型 HTTP API、两个 Ornith 文本模型 API、MOSS 与 FLUX.3 Klein 两个图片 API、
+本仓库当前提供九个音频模型 HTTP API、一个 Ornith MTP 文本模型 API、MOSS 与 FLUX.3 Klein 两个图片 API、
 一个轻量控制面和一个 CPU 空间音频 renderer。
 所有 GPU API 共用同一个跨进程文件锁，接入约束、隔离和恢复步骤见[全局 GPU 锁说明](docs/global-gpu-lock.md)。
 
@@ -16,19 +16,17 @@
 | [SeedVC](model-audio/vc_seed-vc/) | 8342 | `POST /v1/SeedVC/SeedVC-MLX-GGUF`，音色转换 |
 | [Stable Audio SFX](model-audio/gen_stable-audio-3-small-sfx/) | 8343 | `POST /v1/stabilityai/Stable-Audio-3-Small-SFX-GGUF`，音效生成 |
 | [VoxCPM2](model-audio/tts_voxcpm2/) | 8313 | `POST /v1/OpenBMB/VoxCPM2-GGUF`，TTS、音色设计与可选参考克隆 |
-| [Ornith-1.5-9B-GGUF](model-text/Ornith-1.5-9B-GGUF/) | 8503 | `POST /v1/ornith-ai/Ornith-1.5-9B-GGUF`，CUDA 文本推理 |
 | [Ornith-1.5-9B-MTP-GGUF-Q8](model-text/Ornith-1.5-9B-MTP-GGUF/) | 8504 | `POST /v1/ornith-ai/Ornith-1.5-9B-MTP-GGUF-Q8`，CUDA MTP 文本与图片理解 |
-| [Ornith-1.5-9B-MTP-GGUF-Q8](model-text/Ornith-1.5-9B-MTP-GGUF/) | 8504 | `POST /v1/ornith-ai/Ornith-1.5-9B-MTP-GGUF-Q8`，MTP 文本与图片理解 |
 | [MOSS-Image-SFT-Q8_0](model-image/MOSS-Image-SFT-Q8_0/) | 8501 | `POST /v1/openmoss/MOSS-Image-SFT-Q8_0`，stable-diffusion.cpp CUDA 文生图 |
 | [FLUX-3-Image-Klein-GGUF-Q8](model-image/FLUX-3-Image-Klein-GGUF-Q8/) | 8502 | `POST /v1/openblack-forest-labs/FLUX-3-Image-Klein-GGUF-Q8` 文生图；`POST /v1/openblack-forest-labs/FLUX-3-Image-Klein-GGUF-Q8/edit` 图片编辑 |
 | [Steam Audio renderer](model-audio/spatial_steam-audio/) | 无 HTTP 端口 | C++17 CPU renderer，由 8300 控制面调用 |
-| [Easel API bridge](easel_bridge/) | 8500 | 受 Bearer Key 保护的 OpenAI-compatible 图片、语音和普通/MTP 9B 聊天接口 |
+| [Easel API bridge](easel_bridge/) | 8500 | 受 Bearer Key 保护的 OpenAI-compatible 图片、语音和MTP 9B 聊天接口 |
 
-共十七个 HTTP 进程由 `start.sh` 管理，包括仅绑定 loopback 的 Ornith llama-server backend `127.0.0.1:8505` 和 MTP backend `127.0.0.1:8506`。LocalAI 保持在 `127.0.0.1:8400`。文本 API 适配器复用
+共十五个 HTTP 进程由 `start.sh` 管理，包括仅绑定 loopback 的 Ornith llama-server backend `127.0.0.1:8506`。LocalAI 保持在 `127.0.0.1:8400`。文本 API 适配器复用
 控制面 Python 项目；八个新增 audio.cpp API 共用轻量 Python 运行环境，不额外安装
 Torch。`storage/` 中的用户运行数据不会由代码清理。
 
-Easel/OpenCode 桥接服务由 `start.sh` 一并启动在 `127.0.0.1:8500`，只代理 MOSS-Image-SFT、VoxCPM2 和 Ornith 9B Chat API（8503 普通模型、8504 MTP 模型）。
+Easel/OpenCode 桥接服务由 `start.sh` 一并启动在 `127.0.0.1:8500`，只代理 MOSS-Image-SFT、VoxCPM2 和 Ornith 9B Chat API（8504 MTP 模型）。
 它不会启动或绕过模型服务，底层 GPU 锁与 sleep-idle 生命周期仍由既有服务管理。MOSS、VoxCPM2 与 Ornith 的聊天桥接上游默认绑定 `127.0.0.1`，避免从网关之外绕过 Bearer 鉴权；可在本机环境变量中显式覆盖绑定地址。
 配置和 Easel 中的模型填写项见 [Easel 本地模型网关](docs/easel-bridge.md)。
 
@@ -38,7 +36,7 @@ Easel/OpenCode 桥接服务由 `start.sh` 一并启动在 `127.0.0.1:8500`，只
 固定版本 LocalAI/audio.cpp，以及带 CUDA、CUDA0 和 sleep-idle 支持的 llama.cpp `llama-server`。九个音频模型 GGUF 从
 `$HF_MIRROR_DIR/audio.cpp-gguf/` 读取；固定文件名、family/task 和服务路由见
 [`localai/manifests/audio-cpp-models.json`](localai/manifests/audio-cpp-models.json)。Ornith 9B GGUF
-从 `$HF_MIRROR_DIR/ornith-ai/Ornith-1.5-9B-GGUF/` 只读加载；MTP 主模型与 BF16 vision projector 从
+主模型与 BF16 vision projector 从
 `$HF_MIRROR_DIR/ornith-ai/Ornith-1.5-9B-MTP-GGUF/` 只读加载，不复制进仓库。
 版本和宿主制品指纹见[`localai/manifests/versions.json`](localai/manifests/versions.json)。
 运行与恢复步骤见[LocalAI/audio.cpp 运维说明](docs/localai-audiocpp-upgrade.md)。
@@ -76,8 +74,8 @@ bash start.sh
 脚本自动读取该文件；也可用 `EASEL_BRIDGE_ENV_FILE` 指定其他配置文件，网关端口由 `EASEL_BRIDGE_PORT` 设置，默认 8500。
 网关 Key 缺失、过短或使用模板占位符时，脚本在启动模型前退出，不会匿名运行。
 
-脚本先检查全部十七个监听端口、sd.cpp 二进制摘要、MOSS 与 FLUX.3 Klein 的模型组件、CUDA 构建的 llama.cpp、两个 Ornith 主模型和 MTP projector，注册九个 GGUF 候选，
-启动受管 LocalAI/audio.cpp 并执行 readiness 检查；随后通过共享 GPU 锁依次预热两个 Ornith backend，并确认模型进入 sleep-idle，
+脚本先检查全部十五个监听端口、sd.cpp 二进制摘要、MOSS 与 FLUX.3 Klein 的模型组件、CUDA 构建的 llama.cpp、Ornith MTP 主模型和 MTP projector，注册九个 GGUF 候选，
+启动受管 LocalAI/audio.cpp 并执行 readiness 检查；随后通过共享 GPU 锁预热 Ornith MTP backend，并确认模型进入 sleep-idle，
 再启动控制面与所有 API。文本 API 每次请求结束后持锁等待模型卸载，再释放 GPU 给其他 provider。
 任一服务进程退出时会清理其他进程组和 llama-server，再停止受管 LocalAI。按 `Ctrl+C`
 正常等待退出；遇到进程异常时，检查 `scripts/localai/manager.py status` 和 GPU quarantine 标记。
@@ -107,24 +105,20 @@ Ctrl+C、终端挂断及清理期间再次按 Ctrl+C 都会继续完成已启动
 | `VOXCPM2_HOST` | `127.0.0.1` | Easel 桥接使用的 VoxCPM2 上游监听地址 |
 | `AUDIO_CPP_*_MODEL_FILE` | `$HF_MIRROR_DIR/audio.cpp-gguf/<候选目录>/<固定文件名>` | 各服务 GGUF 路径，完整变量名见模型清单 |
 | `LLAMA_SERVER_BIN` | PATH 中的 `llama-server`，否则依次尝试 `$HOME/.local/src/llama.cpp/build-sleep-cache/bin/llama-server`、`build-cuda/bin/llama-server` | llama.cpp HTTP server；默认启用缓存时会核验补丁能力，也可显式设置路径 |
-| `ORNITH_9B_MODEL_FILE` | `$HF_MIRROR_DIR/ornith-ai/Ornith-1.5-9B-GGUF/Ornith-1.5-9B-Q8_0.gguf` | Ornith 9B 主模型，只读加载 |
-| `ORNITH_9B_LLAMA_BASE_URL` | `http://127.0.0.1:$ORNITH_9B_LLAMA_CPP_PORT` | 9B backend 根地址，必须与 loopback host 和端口一致 |
-| `ORNITH_9B_HOST` / `ORNITH_9B_PORT` | 继承 `HOST` / `8503` | Ornith 9B 对外 API 监听地址与端口 |
-| `ORNITH_9B_LLAMA_CPP_PORT` | `8505` | Ornith 9B llama-server loopback 端口，不绑定外部网卡 |
+| `ORNITH_MTP_9B_LLAMA_BASE_URL` | `http://127.0.0.1:$ORNITH_MTP_9B_LLAMA_CPP_PORT` | 9B backend 根地址，必须与 loopback host 和端口一致 |
+| `ORNITH_MTP_9B_HOST` / `ORNITH_MTP_9B_PORT` | 继承 `HOST` / `8504` | Ornith 9B 对外 API 监听地址与端口 |
 | `ORNITH_MTP_9B_MODEL_FILE` | `$HF_MIRROR_DIR/ornith-ai/Ornith-1.5-9B-MTP-GGUF/Ornith-1.5-9B-MTP-Q8_0.gguf` | MTP Q8 主模型，只读加载 |
 | `ORNITH_MTP_9B_MMPROJ_FILE` | `$HF_MIRROR_DIR/ornith-ai/Ornith-1.5-9B-MTP-GGUF/mmproj-Ornith-1.5-9B-BF16.gguf` | MTP vision projector，只读加载 |
-| `ORNITH_MTP_9B_HOST` / `ORNITH_MTP_9B_PORT` | 继承 `HOST` / `8504` | MTP API 监听地址与端口 |
-| `ORNITH_MTP_9B_LLAMA_BASE_URL` | `http://127.0.0.1:$ORNITH_MTP_9B_LLAMA_CPP_PORT` | MTP backend 根地址，必须与 loopback host 和端口一致 |
 | `ORNITH_MTP_9B_LLAMA_CPP_PORT` | `8506` | MTP llama-server loopback 端口，不绑定外部网卡 |
-| `ORNITH_9B_CONTEXT_SIZE` / `ORNITH_9B_BATCH_SIZE` | `98304` / `1024` | Ornith 9B 上下文与 logical batch size；96k 性能分析见 [调优记录](tests/ornith_1_5_9b_gguf/performance.md) |
-| `ORNITH_9B_UBATCH_SIZE` | `1024` | physical batch size，与 MTP 4 组合实测；内存不足可与 logical batch 一起回退到 512 |
-| `ORNITH_9B_THREADS` / `ORNITH_9B_THREADS_BATCH` | `6` / `8` | Ornith 9B CPU 推理与批处理线程数 |
-| `ORNITH_9B_N_GPU_LAYERS` | `99` | 尝试将可用 Ornith 9B 模型层卸载到 CUDA0 |
-| `ORNITH_9B_SPEC_TYPE` / `ORNITH_9B_DRAFT_MAX` | `draft-mtp` / `4` | 使用主 GGUF 内置 MTP 头，主/草稿 KV 保持 F16；设 `SPEC_TYPE=none` 可回退。更换 GGUF 须确认含 MTP 张量 |
-| `ORNITH_9B_SLEEP_CACHE` / `ORNITH_9B_CACHE_RAM_MIB` | `1` / `4096` | 两个 backend 各自的跨 sleep CPU 缓存开关与预算；上限合计 8192 MiB，仍每轮释放 GPU；需 [后端缓存补丁](docs/llama-cpp-sleep-cache.md)，设开关 `0` 回退 |
-| `ORNITH_9B_SLEEP_IDLE_SECONDS` | `1` | Ornith 9B llama.cpp 空闲后卸载模型和 KV cache 的秒数 |
-| `ORNITH_9B_STARTUP_TIMEOUT` | `1800` 秒 | 等待 Ornith 9B 首次加载并确认 sleep-idle 的最长时间 |
-| `ORNITH_9B_SLEEP_TIMEOUT` | `300` 秒 | Ornith 9B 单个请求结束后等待模型卸载的最长时间 |
+| `ORNITH_MTP_9B_CONTEXT_SIZE` / `ORNITH_MTP_9B_BATCH_SIZE` | `98304` / `1024` | Ornith 9B 上下文与 logical batch size；历史普通9B的96k性能分析见 [调优记录](tests/ornith_1_5_9b_mtp_benchmarks/performance.md) |
+| `ORNITH_MTP_9B_UBATCH_SIZE` | `1024` | physical batch size，与 MTP 4 组合实测；内存不足可与 logical batch 一起回退到 512 |
+| `ORNITH_MTP_9B_THREADS` / `ORNITH_MTP_9B_THREADS_BATCH` | `6` / `8` | Ornith 9B CPU 推理与批处理线程数 |
+| `ORNITH_MTP_9B_N_GPU_LAYERS` | `99` | 尝试将可用 Ornith 9B 模型层卸载到 CUDA0 |
+| `ORNITH_MTP_9B_SPEC_TYPE` / `ORNITH_MTP_9B_DRAFT_MAX` | `draft-mtp` / `4` | 使用主 GGUF 内置 MTP 头，主/草稿 KV 保持 F16；设 `SPEC_TYPE=none` 可回退。更换 GGUF 须确认含 MTP 张量 |
+| `ORNITH_MTP_9B_SLEEP_CACHE` / `ORNITH_MTP_9B_CACHE_RAM_MIB` | `1` / `4096` | MTP backend 的跨 sleep CPU 缓存开关与预算；上限 4096 MiB，仍每轮释放 GPU；需 [后端缓存补丁](docs/llama-cpp-sleep-cache.md)，设开关 `0` 回退 |
+| `ORNITH_MTP_9B_SLEEP_IDLE_SECONDS` | `1` | Ornith 9B llama.cpp 空闲后卸载模型和 KV cache 的秒数 |
+| `ORNITH_MTP_9B_STARTUP_TIMEOUT` | `1800` 秒 | 等待 Ornith 9B 首次加载并确认 sleep-idle 的最长时间 |
+| `ORNITH_MTP_9B_SLEEP_TIMEOUT` | `300` 秒 | Ornith 9B 单个请求结束后等待模型卸载的最长时间 |
 | `SDCPP_BIN` | `$HOME/.local/src/stable-diffusion.cpp/build/bin/sd-cli` | 固定版本 stable-diffusion.cpp CLI |
 | `SDCPP_BIN_SHA256` | 必须显式设置 | 启动前校验 sd-cli 文件摘要 |
 | `SDCPP_MODEL_MANIFEST` | `sdcpp/manifests/models.json` | MOSS 模型组件、参数和资源清单 |
@@ -190,19 +184,19 @@ curl -X POST http://127.0.0.1:8300/v1/audio/spatial/render \
 
 当前不支持 `diffuse`、非 `none` 遮挡和几何反射；服务会拒绝这些字段，不会静默降级。
 
-### Ornith-1.5-9B-GGUF 聊天补全
+### Ornith-1.5-9B-MTP-GGUF-Q8 聊天补全
 
 9B API 接受 OpenAI Chat Completions 格式，路由固定模型别名；每次请求使用共享 GPU 锁，并等待 backend 确认 sleep-idle 后释放：
 
 ```bash
-curl -X POST http://127.0.0.1:8503/v1/ornith-ai/Ornith-1.5-9B-GGUF \
+curl -X POST http://127.0.0.1:8504/v1/ornith-ai/Ornith-1.5-9B-MTP-GGUF-Q8 \
   -H 'Content-Type: application/json' \
   -d '{"messages":[{"role":"user","content":"请用中文介绍一下你自己。"}],"max_tokens":128}'
-uv run --project qa --locked python tests/ornith_1_5_9b_gguf/generate_example.py
+uv run --project qa --locked python tests/ornith_1_5_9b_mtp_benchmarks/generate_example.py
 ```
 
-真实模型样例默认保存在 `storage/llm_tests/ornith_1_5_9b_gguf/`；运行选项见
-[`tests/ornith_1_5_9b_gguf/README.md`](tests/ornith_1_5_9b_gguf/README.md)。
+真实模型样例默认保存在 `storage/llm_tests/ornith_1_5_9b_mtp_benchmarks/`；运行选项见
+[`tests/ornith_1_5_9b_mtp_benchmarks/README.md`](tests/ornith_1_5_9b_mtp_benchmarks/README.md)。
 
 ### Ornith-1.5-9B-MTP-GGUF-Q8 聊天与图片理解
 
@@ -326,3 +320,12 @@ Steam Audio SDK 和权重许可各自适用，不由仓库 Apache-2.0 许可覆�
 每轮测试使用 `python3 scripts/model_telemetry.py begin --label 96k-run1` 创建标记，回复结束后运行
 `python3 scripts/model_telemetry.py end <测试ID>` 生成报告。采集范围、操作步骤与指标口径见
 [模型性能记录说明](docs/model-telemetry.md)。
+
+### Ornith 单模型迁移说明
+
+当前只维护 MTP Q8（API 8504、backend 8506），启动栈不再占用8503或8505。
+部署参数统一使用 `ORNITH_MTP_9B_*`，旧的 `ORNITH_9B_*` 环境变量不再控制服务。
+网关仅接受 `Ornith-1.5-9B-MTP-GGUF-Q8` 聊天模型 ID，上游地址使用 `EASEL_BRIDGE_MTP_CHAT_URL`。
+本机 `.env.easel-bridge` 与 OpenCode 已设96k，output4096、buffer16384、keep10240，
+并沿用 draft3、纯文本、休眠1秒与MTP CUDA缓冲0.5秒。历史测试报告保留原始模型身份。
+旧服务目录和调用入口已移除，仓库外权重及历史生成结果不清理。须正常退出旧服务栈再启动新版本。

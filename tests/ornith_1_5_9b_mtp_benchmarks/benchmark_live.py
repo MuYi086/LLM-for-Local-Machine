@@ -21,8 +21,8 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
-API_ROUTE = "/v1/ornith-ai/Ornith-1.5-9B-GGUF"
-MODEL_ALIAS = "Ornith-1.5-9B-GGUF"
+API_ROUTE = "/v1/ornith-ai/Ornith-1.5-9B-MTP-GGUF-Q8"
+MODEL_ALIAS = "Ornith-1.5-9B-MTP-GGUF-Q8"
 DEFAULT_PROMPT = (
     "请用中文分点解释模型量化是什么，并说明 Q4 与 Q8 的主要区别。回答控制在 150 到 250 个汉字。"
 )
@@ -422,7 +422,7 @@ def write_report(report: dict[str, Any], output_dir: Path) -> tuple[Path, Path]:
     result = report["result"]
     resources = report["resources"]
     lines = [
-        "# Ornith-1.5-9B-GGUF 调用实测",
+        "# Ornith-1.5-9B-MTP-GGUF-Q8 调用实测",
         "",
         f"- 时间：{report['started_at']}",
         f"- 状态：{report['status']}",
@@ -464,11 +464,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--base-url",
-        default=os.getenv("ORNITH_9B_TEST_BASE_URL", "http://127.0.0.1:8503"),
+        default=os.getenv("ORNITH_MTP_9B_TEST_BASE_URL", "http://127.0.0.1:8504"),
         help="Ornith 9B API 根地址。",
     )
     parser.add_argument(
-        "--backend-port", type=int, default=int(os.getenv("ORNITH_9B_LLAMA_CPP_PORT", "8505"))
+        "--backend-port", type=int, default=int(os.getenv("ORNITH_MTP_9B_LLAMA_CPP_PORT", "8506"))
     )
     parser.add_argument("--prompt", default=DEFAULT_PROMPT, help="发送给模型的中文提示。")
     parser.add_argument("--max-tokens", type=int, default=256, help="生成 token 上限。")
@@ -477,8 +477,11 @@ def main() -> int:
     parser.add_argument(
         "--output-dir",
         default=os.getenv(
-            "ORNITH_9B_TEST_OUTPUT_DIR",
-            str(Path(os.getenv("STORAGE_DIR", ROOT / "storage")) / "llm_tests/ornith_1_5_9b_gguf"),
+            "ORNITH_MTP_9B_TEST_OUTPUT_DIR",
+            str(
+                Path(os.getenv("STORAGE_DIR", ROOT / "storage"))
+                / "llm_tests/ornith_1_5_9b_mtp_benchmarks"
+            ),
         ),
         help="实测报告和生成文本输出目录。",
     )

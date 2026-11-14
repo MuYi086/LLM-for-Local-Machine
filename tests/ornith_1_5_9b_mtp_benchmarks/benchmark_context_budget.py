@@ -19,12 +19,12 @@ def main() -> None:
     sys.path.insert(0, str(ROOT / "model-text"))
     from llama_cpp_runtime.app import create_app
 
-    base = os.getenv("ORNITH_9B_LLAMA_BASE_URL", "http://127.0.0.1:8505")
+    base = os.getenv("ORNITH_MTP_9B_LLAMA_BASE_URL", "http://127.0.0.1:8506")
     parsed = urlsplit(base)
-    pid = find_backend_pid(parsed.port or 8505)
+    pid = find_backend_pid(parsed.port or 8506)
     directory = (
         ROOT
-        / "storage/llm_tests/ornith_1_5_9b_gguf"
+        / "storage/llm_tests/ornith_1_5_9b_mtp_benchmarks"
         / datetime.now(UTC).strftime("context-budget-%Y%m%dT%H%M%S%fZ")
     )
     directory.mkdir(parents=True, exist_ok=False)
@@ -34,11 +34,11 @@ def main() -> None:
     os.environ.update(MODEL_TELEMETRY_ENABLED="true", MODEL_TELEMETRY_DIR=str(directory))
     try:
         app = create_app(
-            model_alias="Ornith-1.5-9B-GGUF",
-            backend_env_prefix="ORNITH_9B",
+            model_alias="Ornith-1.5-9B-MTP-GGUF-Q8",
+            backend_env_prefix="ORNITH_MTP_9B",
             backend_base_url=base,
             backend_host=parsed.hostname,
-            backend_port=parsed.port or 8505,
+            backend_port=parsed.port or 8506,
             backend_pid=pid,
             backend_pgid=pid,
             backend_executable=str(Path(f"/proc/{pid}/exe").resolve()),

@@ -27,5 +27,5 @@ def require_sleep_cache(base_url: str) -> None:
     ):
         raise RuntimeError(
             "backend 未支持或未启用 sleep prompt cache；请部署缓存补丁，"
-            "或设置 ORNITH_9B_SLEEP_CACHE=0 回退。"
+            "或设置 ORNITH_MTP_9B_SLEEP_CACHE=0 回退。"
         )

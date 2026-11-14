@@ -23,15 +23,11 @@ from llm_local_runtime.telemetry import TelemetryMiddleware
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-CHAT_MODEL_ID = "Ornith-1.5-9B-GGUF"
-MTP_CHAT_MODEL_ID = "Ornith-1.5-9B-MTP-GGUF-Q8"
+CHAT_MODEL_ID = "Ornith-1.5-9B-MTP-GGUF-Q8"
 MOSS_MODEL_ID = "MOSS-Image-SFT-Q8_0"
 VOXCPM_MODEL_ID = "OpenBMB/VoxCPM2-GGUF"
 
-DEFAULT_CHAT_URL = "http://127.0.0.1:8503/v1/ornith-ai/Ornith-1.5-9B-GGUF"
-DEFAULT_MTP_CHAT_URL = (
-    "http://127.0.0.1:8504/v1/ornith-ai/Ornith-1.5-9B-MTP-GGUF-Q8"
-)
+DEFAULT_CHAT_URL = "http://127.0.0.1:8504/v1/ornith-ai/Ornith-1.5-9B-MTP-GGUF-Q8"
 DEFAULT_MOSS_URL = "http://127.0.0.1:8501/v1/openmoss/MOSS-Image-SFT-Q8_0"
 DEFAULT_VOXCPM_URL = "http://127.0.0.1:8313/v1/OpenBMB/VoxCPM2-GGUF"
 
@@ -53,7 +49,6 @@ class BridgeSettings:
 
     api_key: str
     chat_url: str
-    mtp_chat_url: str
     moss_url: str
     voxcpm_url: str
     timeout_seconds: float
@@ -110,7 +105,6 @@ def _settings_from_environment(
     *,
     api_key: str | None,
     chat_url: str | None,
-    mtp_chat_url: str | None,
     moss_url: str | None,
     voxcpm_url: str | None,
     timeout_seconds: float | None,
@@ -152,11 +146,8 @@ def _settings_from_environment(
     return BridgeSettings(
         api_key=(env.get("EASEL_BRIDGE_API_KEY", "") if api_key is None else api_key).strip(),
         chat_url=_validate_upstream_url(
-            "EASEL_BRIDGE_CHAT_URL", chat_url or env.get("EASEL_BRIDGE_CHAT_URL", DEFAULT_CHAT_URL)
-        ),
-        mtp_chat_url=_validate_upstream_url(
             "EASEL_BRIDGE_MTP_CHAT_URL",
-            mtp_chat_url or env.get("EASEL_BRIDGE_MTP_CHAT_URL", DEFAULT_MTP_CHAT_URL),
+            chat_url or env.get("EASEL_BRIDGE_MTP_CHAT_URL", DEFAULT_CHAT_URL),
         ),
         moss_url=_validate_upstream_url(
             "EASEL_BRIDGE_MOSS_URL", moss_url or env.get("EASEL_BRIDGE_MOSS_URL", DEFAULT_MOSS_URL)
@@ -373,7 +364,6 @@ def create_app(
     *,
     api_key: str | None = None,
     chat_url: str | None = None,
-    mtp_chat_url: str | None = None,
     moss_url: str | None = None,
     voxcpm_url: str | None = None,
     timeout_seconds: float | None = None,
@@ -388,7 +378,6 @@ def create_app(
     settings = _settings_from_environment(
         api_key=api_key,
         chat_url=chat_url,
-        mtp_chat_url=mtp_chat_url,
         moss_url=moss_url,
         voxcpm_url=voxcpm_url,
         timeout_seconds=timeout_seconds,
@@ -438,7 +427,6 @@ def create_app(
                 {"id": model_id, "object": "model", "created": 0, "owned_by": "llm-local"}
                 for model_id in (
                     CHAT_MODEL_ID,
-                    MTP_CHAT_MODEL_ID,
                     MOSS_MODEL_ID,
                     VOXCPM_MODEL_ID,
                 )
@@ -516,7 +504,6 @@ def create_app(
         model_id = payload.get("model")
         chat_urls = {
             CHAT_MODEL_ID: settings.chat_url,
-            MTP_CHAT_MODEL_ID: settings.mtp_chat_url,
         }
         if not isinstance(model_id, str) or model_id not in chat_urls:
             return _error(404, f"未知聊天模型：{model_id or ''}", "model_not_found")

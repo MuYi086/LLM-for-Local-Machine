@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from tests.ornith_1_5_9b_gguf.benchmark_live import (
+from tests.ornith_1_5_9b_mtp_benchmarks.benchmark_live import (
     ResourceSample,
     build_request_payload,
     parse_backend_context_size,
@@ -24,7 +24,7 @@ class LiveBenchmarkTests(unittest.TestCase):
     def test_live_request_disables_thinking_and_requests_usage(self) -> None:
         payload = build_request_payload("测试提示", max_tokens=96)
 
-        self.assertEqual(payload["model"], "Ornith-1.5-9B-GGUF")
+        self.assertEqual(payload["model"], "Ornith-1.5-9B-MTP-GGUF-Q8")
         self.assertEqual(payload["messages"], [{"role": "user", "content": "测试提示"}])
         self.assertEqual(payload["chat_template_kwargs"], {"enable_thinking": False})
         self.assertEqual(payload["stream"], True)

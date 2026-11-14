@@ -63,7 +63,7 @@ def request_probe(
 ) -> dict:
     """记录真实 SSE 首 token、原生 timings 及系统资源，不按字符估算 token。"""
     payload = {
-        "model": "Ornith-1.5-9B-GGUF",
+        "model": "Ornith-1.5-9B-MTP-GGUF-Q8",
         "messages": messages if messages is not None else [{"role": "user", "content": prompt}],
         "temperature": 0,
         "seed": 42,
@@ -149,7 +149,8 @@ def main() -> None:
         ),
     )
     parser.add_argument(
-        "--existing-backend", default=os.getenv("ORNITH_9B_LLAMA_BASE_URL", "http://127.0.0.1:8505")
+        "--existing-backend",
+        default=os.getenv("ORNITH_MTP_9B_LLAMA_BASE_URL", "http://127.0.0.1:8506"),
     )
     parser.add_argument(
         "--profiles", nargs="+", choices=PROFILES, default=["baseline", "mtp2", "mtp4", "mtp4-q8kv"]
@@ -162,7 +163,7 @@ def main() -> None:
         parser.error("repeats 必须非负，context-copies 必须为正数。")
     output = (
         ROOT
-        / "storage/llm_tests/ornith_1_5_9b_gguf"
+        / "storage/llm_tests/ornith_1_5_9b_mtp_benchmarks"
         / datetime.now(UTC).strftime("tuning-%Y%m%dT%H%M%S%fZ")
     )
     output.mkdir(parents=True, exist_ok=False)
@@ -188,7 +189,7 @@ def main() -> None:
             "--port",
             str(args.port),
             "--alias",
-            "Ornith-1.5-9B-GGUF",
+            "Ornith-1.5-9B-MTP-GGUF-Q8",
             "--device",
             "CUDA0",
             "--gpu-layers",

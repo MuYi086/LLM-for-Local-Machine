@@ -99,7 +99,7 @@ class OpenCodeContextGuardTests(unittest.TestCase):
                         "id": "test",
                         "object": "chat.completion.chunk",
                         "created": 1,
-                        "model": "Ornith-1.5-9B-GGUF",
+                        "model": "Ornith-1.5-9B-MTP-GGUF-Q8",
                         "choices": [
                             {
                                 "index": 0,
@@ -112,7 +112,7 @@ class OpenCodeContextGuardTests(unittest.TestCase):
                         "id": "test",
                         "object": "chat.completion.chunk",
                         "created": 1,
-                        "model": "Ornith-1.5-9B-GGUF",
+                        "model": "Ornith-1.5-9B-MTP-GGUF-Q8",
                         "choices": [{"index": 0, "delta": {}, "finish_reason": finish}],
                         "usage": {
                             "prompt_tokens": usage,
@@ -143,7 +143,7 @@ class OpenCodeContextGuardTests(unittest.TestCase):
                 config_dir = temporary / "config/opencode"
                 config_dir.mkdir(parents=True)
                 config = {
-                    "model": "local-ornith/Ornith-1.5-9B-GGUF",
+                    "model": "local-ornith/Ornith-1.5-9B-MTP-GGUF-Q8",
                     "providers": {
                         "local-ornith": {
                             "package": "@opencode/ai/providers/openai-compatible",
@@ -152,7 +152,7 @@ class OpenCodeContextGuardTests(unittest.TestCase):
                                 "apiKey": "fake",
                             },
                             "models": {
-                                "Ornith-1.5-9B-GGUF": {
+                                "Ornith-1.5-9B-MTP-GGUF-Q8": {
                                     "limit": {"context": 32768, "output": 4096},
                                     "capabilities": {
                                         "tools": True,
