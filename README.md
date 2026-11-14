@@ -30,6 +30,8 @@ Easel/OpenCode 桥接服务由 `start.sh` 一并启动在 `127.0.0.1:8500`，只
 它不会启动或绕过模型服务，底层 GPU 锁与 sleep-idle 生命周期仍由既有服务管理。MOSS、VoxCPM2 与 Ornith 的聊天桥接上游默认绑定 `127.0.0.1`，避免从网关之外绕过 Bearer 鉴权；可在本机环境变量中显式覆盖绑定地址。
 配置和 Easel 中的模型填写项见 [Easel 本地模型网关](docs/easel-bridge.md)。
 
+可选的独立 Dagu 调度器提供 VoxCPM2 与 MOSS 后台队列，不改变现有模型 API 和 `start.sh`；部署与任务提交见 [Dagu 调度说明](docs/dagu.md)。
+
 ## 安装与启动
 
 部署需要 Linux、Python `3.12.13`、`uv`、FFmpeg/ffprobe、`setsid`、CUDA/NVIDIA 驱动、仓库外准备的

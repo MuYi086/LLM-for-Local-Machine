@@ -1,0 +1,11 @@
+queue: gpu-heavy
+working_dir: ../..
+params:
+  - name: job_id
+    required: true
+steps:
+  - id: generate
+    action: exec
+    with:
+      command: python3
+      args: [scripts/dagu/job.py, moss, "${params.job_id}"]

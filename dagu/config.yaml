@@ -1,0 +1,7 @@
+queues:
+  enabled: true
+  config:
+    - name: gpu-heavy
+      max_concurrency: 1
+    - name: cpu-post
+      max_concurrency: 3
