@@ -137,6 +137,40 @@
       }
     },
     {
+      "key": "stable_audio_3_medium",
+      "model_id": "llm-local.stable-audio-3-medium.audio-cpp",
+      "source_directory": "Stable-Audio-3-Medium-GGUF",
+      "required_file": "stable-audio-3-medium-f16.gguf",
+      "model_file_env": "AUDIO_CPP_STABLE_AUDIO_3_MEDIUM_MODEL_FILE",
+      "family": "stable_audio",
+      "task": "gen",
+      "service": {
+        "runtime": "audio_cpp_runtime",
+        "directory": "model-audio/Stable-Audio-3-Medium-GGUF",
+        "port": 8314,
+        "route": "/v1/stabilityai/Stable-Audio-3-Medium-GGUF-f16",
+        "kind": "sound_generation",
+        "description": "Stable Audio 3 Medium 文本提示音频生成"
+      }
+    },
+    {
+      "key": "moss_soundeffect",
+      "model_id": "llm-local.moss-soundeffect-v2.audio-cpp",
+      "source_directory": "MOSS-SoundEffect-v2-GGUF",
+      "required_file": "moss-soundeffect-v2-bf16.gguf",
+      "model_file_env": "AUDIO_CPP_MOSS_SOUNDEFFECT_MODEL_FILE",
+      "family": "moss_soundeffect",
+      "task": "gen",
+      "service": {
+        "runtime": "audio_cpp_runtime",
+        "directory": "model-audio/MOSS-SoundEffect-v2-GGUF",
+        "port": 8315,
+        "route": "/v1/openmoss/MOSS-SoundEffect-v2-GGUF-f16",
+        "kind": "sound_generation",
+        "description": "MOSS-SoundEffect v2 文本提示音效生成"
+      }
+    },
+    {
       "key": "voxcpm2",
       "model_id": "llm-local.voxcpm2.audio-cpp",
       "source_directory": "VoxCPM2-GGUF",

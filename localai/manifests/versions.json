@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "updated_on": "2026-11-09",
-  "status": "nine_local_audio_cpp_candidates_registered_quality_unverified",
-  "scope": "当前活跃 LocalAI/audio.cpp 固定宿主机版本与九个本地 GGUF 候选；VoiceDesign 的历史单样本记录不代表新增候选已完成运行验收。",
+  "updated_on": "2026-11-15",
+  "status": "eleven_local_audio_cpp_candidates_manifested_backend_upgrade_required",
+  "scope": "清单登记十一个本地 GGUF 候选；新 audio.cpp backend revision 需部署并重新核验。VoiceDesign 的历史单样本记录不代表新增候选已完成运行验收。",
   "localai": {
     "version": "v4.11.0",
     "source_commit": "58830f7ac508845a6f4efa32cfca06af422d4d82",
@@ -12,7 +12,7 @@
   "audio_cpp_backend": {
     "backend_name": "audio-cpp",
     "source_repository": "https://github.com/0xShug0/audio.cpp",
-    "source_commit": "9a02e61326aaaf9d462b584ca5e0daba22c0abfc",
+    "source_commit": "0382d37fe6e1a817b6b8fed5dcaab0e11fd1e8e6",
     "localai_source_commit": "58830f7ac508845a6f4efa32cfca06af422d4d82",
     "compute_variant": "CUDA 12",
     "source_pin_variable": "AUDIO_CPP_VERSION",
@@ -34,6 +34,6 @@
     "status": "local_gguf_single_sample_passed_output_validation_quality_unverified",
     "note": "BF16 GGUF 曾经由 LocalAI/audio.cpp 与 8301 API 完成一次短中文生成；听感、长文本和音色描述效果尚未验收。"
   },
-  "audio_cpp_model_candidate_count": 9,
+  "audio_cpp_model_candidate_count": 11,
   "audio_cpp_model_candidates_manifest": "localai/manifests/audio-cpp-models.json"
 }

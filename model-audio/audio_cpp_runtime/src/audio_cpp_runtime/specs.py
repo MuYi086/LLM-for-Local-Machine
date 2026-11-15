@@ -30,7 +30,7 @@ class ModelSpec:
 
 
 def _read_model_specs() -> dict[str, ModelSpec]:
-    """读取并检查共享候选清单中的八个模型服务。"""
+    """读取并检查共享候选清单中的 audio.cpp 模型服务。"""
     try:
         manifest = json.loads(MODEL_MANIFEST_PATH.read_text(encoding="utf-8"))
         candidates = manifest["models"]
@@ -72,8 +72,8 @@ def _read_model_specs() -> dict[str, ModelSpec]:
         routes.add(route)
         ports.add(port)
         specs[key] = ModelSpec(**values)
-    if len(specs) != 8:
-        raise RuntimeError(f"当前 audio.cpp runtime 应登记 8 个模型服务，实际为 {len(specs)} 个。")
+    if len(specs) != 10:
+        raise RuntimeError(f"当前 audio.cpp runtime 应登记 10 个模型服务，实际为 {len(specs)} 个。")
     return specs
 
 

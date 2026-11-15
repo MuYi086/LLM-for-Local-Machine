@@ -109,7 +109,7 @@ class MockLocalAIHealthClient:
 
 
 class AudioCppServiceTests(unittest.TestCase):
-    def test_registry_declares_all_eight_fixed_audio_cpp_models(self) -> None:
+    def test_registry_declares_all_ten_fixed_audio_cpp_models(self) -> None:
         self.assertEqual(
             set(MODEL_SPECS),
             {
@@ -120,11 +120,25 @@ class AudioCppServiceTests(unittest.TestCase):
                 "qwen3_tts_base",
                 "seed_vc",
                 "stable_audio_sfx",
+                "stable_audio_3_medium",
+                "moss_soundeffect",
                 "voxcpm2",
             },
         )
-        self.assertEqual(len({spec.route for spec in MODEL_SPECS.values()}), 8)
-        self.assertEqual(len({spec.port for spec in MODEL_SPECS.values()}), 8)
+        self.assertEqual(len({spec.route for spec in MODEL_SPECS.values()}), 10)
+        self.assertEqual(len({spec.port for spec in MODEL_SPECS.values()}), 10)
+        medium_spec = MODEL_SPECS["stable_audio_3_medium"]
+        self.assertEqual(medium_spec.port, 8314)
+        self.assertEqual(
+            medium_spec.route,
+            "/v1/stabilityai/Stable-Audio-3-Medium-GGUF-f16",
+        )
+        moss_spec = MODEL_SPECS["moss_soundeffect"]
+        self.assertEqual(moss_spec.port, 8315)
+        self.assertEqual(
+            moss_spec.route,
+            "/v1/openmoss/MOSS-SoundEffect-v2-GGUF-f16",
+        )
 
     def test_tts_reference_audio_runs_under_the_configured_shared_gpu_lock(self) -> None:
         spec = MODEL_SPECS["confucius4_tts"]
@@ -263,7 +277,12 @@ class AudioCppServiceTests(unittest.TestCase):
         self.assertEqual(fake_client.transformation[1]["reference"][1], _wav_bytes())
 
     def test_both_generation_models_forward_prompt_and_duration_under_gpu_lock(self) -> None:
-        for model_key in ("midashenglm_gen", "stable_audio_sfx"):
+        for model_key in (
+            "midashenglm_gen",
+            "stable_audio_sfx",
+            "stable_audio_3_medium",
+            "moss_soundeffect",
+        ):
             with self.subTest(model=model_key):
                 spec = MODEL_SPECS[model_key]
                 fake_client = FakeLocalAIClient()
@@ -293,7 +312,7 @@ class AudioCppServiceTests(unittest.TestCase):
 
                 self.assertEqual(response.status_code, 200, response.text)
                 self.assertEqual(fake_client.speech_request["model_id"], spec.model_id)
-                if model_key == "midashenglm_gen":
+                if model_key in {"midashenglm_gen", "moss_soundeffect"}:
                     self.assertEqual(fake_client.speech_request["params"], {"duration_sec": "3.0"})
                     self.assertNotIn("duration_seconds", fake_client.speech_request)
                 else:

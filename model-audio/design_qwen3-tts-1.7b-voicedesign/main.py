@@ -6,6 +6,7 @@ from __future__ import annotations
 import io
 import logging
 import os
+import secrets
 import tempfile
 import uuid
 import wave
@@ -46,6 +47,7 @@ class VoiceDesignRequest(BaseModel):
     max_chars_per_chunk: int = Field(default=0, ge=0, le=2000)
     pause_ms: int = Field(default=250, ge=0, le=10000)
     max_new_tokens: int = Field(default=2048, ge=1, le=4096)
+    seed: int | None = Field(default=None, ge=0, le=4294967295, strict=True)
     top_p: float | None = Field(default=None, gt=0, le=1)
     temperature: float | None = Field(default=None, gt=0, le=5)
 
@@ -183,6 +185,7 @@ def _generate_segments(
                 instruction=request.voice_description,
                 language=request.language,
                 max_new_tokens=request.max_new_tokens,
+                seed=request.seed,
                 top_p=request.top_p,
                 temperature=request.temperature,
             )
@@ -229,6 +232,8 @@ def create_app(
     @app.post("/v1/qwen/Qwen3-TTS-1.7B-VoiceDesign")
     def design_voice(request: VoiceDesignRequest) -> FileResponse:
         """通过 audio.cpp 合成并保存音色设计 WAV。"""
+        if request.seed is None:
+            request = request.model_copy(update={"seed": secrets.randbits(32)})
         chunks = _split_text(request.text, request.max_chars_per_chunk)
         try:
             segment_wavs = _generate_segments(config, request, chunks)
@@ -263,7 +268,7 @@ def create_app(
             output_path,
             media_type="audio/wav",
             filename=output_path.name,
-            headers={"X-Audio-Sample-Rate": str(sample_rate)},
+            headers={"X-Audio-Sample-Rate": str(sample_rate), "X-Audio-Seed": str(request.seed)},
         )
 
     return app

@@ -40,7 +40,7 @@ class AudioCppModelTestDirectoryTests(unittest.TestCase):
             for candidate in manifest["models"]
             if candidate["service"].get("runtime") == "audio_cpp_runtime"
         ]
-        self.assertEqual(len(candidates), 8)
+        self.assertEqual(len(candidates), 10)
 
         for candidate in candidates:
             key = candidate["key"]

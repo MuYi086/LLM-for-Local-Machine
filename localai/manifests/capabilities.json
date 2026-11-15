@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "captured_on": "2026-11-09",
+  "captured_on": "2026-11-15",
   "repository_head": "audio-cpp-gguf-integration-working-tree",
   "evidence_level": "E0",
-  "evidence_note": "活动能力清单覆盖 main 控制面、Qwen3-TTS VoiceDesign 与八个新增 audio.cpp 服务合同；上游 family/task 匹配仅为 E1 候选，不代表本地推理验收。",
+  "evidence_note": "活动能力清单覆盖 main 控制面、Qwen3-TTS VoiceDesign 与十个新增 audio.cpp 服务合同；上游 family/task 匹配仅为 E1 候选，不代表本地推理验收。",
   "service_count_with_uv_projects": 3,
   "services": [
     {
@@ -285,9 +285,8 @@
       "description": "LocalAI/audio.cpp Qwen3-TTS VoiceDesign",
       "request_schemas": {
         "VoiceDesignRequest": {
-          "line": 38,
+          "line": 39,
           "inherits": [],
-          "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
           "fields": [
             {
               "name": "voice_description",
@@ -300,7 +299,7 @@
               },
               "required": true,
               "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
-              "line": 43
+              "line": 44
             },
             {
               "name": "text",
@@ -313,7 +312,7 @@
               },
               "required": false,
               "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
-              "line": 44
+              "line": 45
             },
             {
               "name": "language",
@@ -325,7 +324,7 @@
               },
               "required": false,
               "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
-              "line": 45
+              "line": 46
             },
             {
               "name": "max_chars_per_chunk",
@@ -338,7 +337,7 @@
               },
               "required": false,
               "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
-              "line": 46
+              "line": 47
             },
             {
               "name": "pause_ms",
@@ -351,7 +350,7 @@
               },
               "required": false,
               "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
-              "line": 47
+              "line": 48
             },
             {
               "name": "max_new_tokens",
@@ -364,7 +363,21 @@
               },
               "required": false,
               "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
-              "line": 48
+              "line": 49
+            },
+            {
+              "name": "seed",
+              "type": "int | None",
+              "default": "None",
+              "default_factory": null,
+              "constraints": {
+                "ge": "0",
+                "le": "4294967295",
+                "strict": "True"
+              },
+              "required": false,
+              "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
+              "line": 50
             },
             {
               "name": "top_p",
@@ -377,7 +390,7 @@
               },
               "required": false,
               "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
-              "line": 49
+              "line": 51
             },
             {
               "name": "temperature",
@@ -390,9 +403,10 @@
               },
               "required": false,
               "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
-              "line": 50
+              "line": 52
             }
-          ]
+          ],
+          "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py"
         }
       },
       "routes": [
@@ -400,7 +414,7 @@
           "method": "GET",
           "path": "/v1/health",
           "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
-          "line": 215,
+          "line": 218,
           "parameters": [],
           "request_schemas": []
         },
@@ -408,7 +422,7 @@
           "method": "POST",
           "path": "/v1/qwen/Qwen3-TTS-1.7B-VoiceDesign",
           "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
-          "line": 229,
+          "line": 232,
           "parameters": [
             {
               "name": "request",
@@ -430,7 +444,7 @@
             "method": "GET",
             "path": "/v1/health",
             "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
-            "line": 215,
+            "line": 218,
             "source_fields": [],
             "field_mappings": [],
             "status": "active_contract"
@@ -439,7 +453,7 @@
             "method": "POST",
             "path": "/v1/qwen/Qwen3-TTS-1.7B-VoiceDesign",
             "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
-            "line": 229,
+            "line": 232,
             "source_fields": [
               {
                 "name": "voice_description",
@@ -452,7 +466,7 @@
                 },
                 "required": true,
                 "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
-                "line": 43
+                "line": 44
               },
               {
                 "name": "text",
@@ -465,7 +479,7 @@
                 },
                 "required": false,
                 "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
-                "line": 44
+                "line": 45
               },
               {
                 "name": "language",
@@ -477,7 +491,7 @@
                 },
                 "required": false,
                 "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
-                "line": 45
+                "line": 46
               },
               {
                 "name": "max_chars_per_chunk",
@@ -490,7 +504,7 @@
                 },
                 "required": false,
                 "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
-                "line": 46
+                "line": 47
               },
               {
                 "name": "pause_ms",
@@ -503,7 +517,7 @@
                 },
                 "required": false,
                 "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
-                "line": 47
+                "line": 48
               },
               {
                 "name": "max_new_tokens",
@@ -516,7 +530,21 @@
                 },
                 "required": false,
                 "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
-                "line": 48
+                "line": 49
+              },
+              {
+                "name": "seed",
+                "type": "int | None",
+                "default": "None",
+                "default_factory": null,
+                "constraints": {
+                  "ge": "0",
+                  "le": "4294967295",
+                  "strict": "True"
+                },
+                "required": false,
+                "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
+                "line": 50
               },
               {
                 "name": "top_p",
@@ -529,7 +557,7 @@
                 },
                 "required": false,
                 "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
-                "line": 49
+                "line": 51
               },
               {
                 "name": "temperature",
@@ -542,7 +570,7 @@
                 },
                 "required": false,
                 "source": "model-audio/design_qwen3-tts-1.7b-voicedesign/main.py",
-                "line": 50
+                "line": 52
               }
             ],
             "field_mappings": [
@@ -574,6 +602,11 @@
               {
                 "source_field": "max_new_tokens",
                 "destination_field": "service_contract.max_new_tokens",
+                "status": "preserved_active_contract"
+              },
+              {
+                "source_field": "seed",
+                "destination_field": "service_contract.seed",
                 "status": "preserved_active_contract"
               },
               {
@@ -613,7 +646,7 @@
           "method": "GET",
           "path": "/v1/health",
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-          "line": 328,
+          "line": 333,
           "parameters": [],
           "request_schemas": []
         },
@@ -621,7 +654,7 @@
           "method": "POST",
           "path": "/v1/netease/Confucius4-TTS-GGUF",
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-          "line": 340,
+          "line": 345,
           "parameters": [
             {
               "name": "text",
@@ -659,7 +692,7 @@
             "method": "GET",
             "path": "/v1/health",
             "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-            "line": 328,
+            "line": 333,
             "source_fields": [],
             "field_mappings": [],
             "status": "active_contract"
@@ -668,7 +701,7 @@
             "method": "POST",
             "path": "/v1/netease/Confucius4-TTS-GGUF",
             "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-            "line": 340,
+            "line": 345,
             "source_fields": [
               {
                 "name": "text",
@@ -743,7 +776,7 @@
           "method": "GET",
           "path": "/v1/health",
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-          "line": 328,
+          "line": 333,
           "parameters": [],
           "request_schemas": []
         },
@@ -751,7 +784,7 @@
           "method": "POST",
           "path": "/v1/indexTeam/IndexTTS2.5-GGUF",
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-          "line": 340,
+          "line": 345,
           "parameters": [
             {
               "name": "text",
@@ -789,7 +822,7 @@
             "method": "GET",
             "path": "/v1/health",
             "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-            "line": 328,
+            "line": 333,
             "source_fields": [],
             "field_mappings": [],
             "status": "active_contract"
@@ -798,7 +831,7 @@
             "method": "POST",
             "path": "/v1/indexTeam/IndexTTS2.5-GGUF",
             "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-            "line": 340,
+            "line": 345,
             "source_fields": [
               {
                 "name": "text",
@@ -907,7 +940,7 @@
           "method": "GET",
           "path": "/v1/health",
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-          "line": 328,
+          "line": 333,
           "parameters": [],
           "request_schemas": []
         },
@@ -915,7 +948,7 @@
           "method": "POST",
           "path": "/v1/mi/MiDashengLM-Gen-GGUF",
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-          "line": 380,
+          "line": 385,
           "parameters": [
             {
               "name": "payload",
@@ -937,7 +970,7 @@
             "method": "GET",
             "path": "/v1/health",
             "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-            "line": 328,
+            "line": 333,
             "source_fields": [],
             "field_mappings": [],
             "status": "active_contract"
@@ -946,7 +979,7 @@
             "method": "POST",
             "path": "/v1/mi/MiDashengLM-Gen-GGUF",
             "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-            "line": 380,
+            "line": 385,
             "source_fields": [
               {
                 "name": "text",
@@ -1013,7 +1046,7 @@
           "method": "GET",
           "path": "/v1/health",
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-          "line": 328,
+          "line": 333,
           "parameters": [],
           "request_schemas": []
         },
@@ -1021,7 +1054,7 @@
           "method": "POST",
           "path": "/v1/qwen/Qwen3-ASR-1.7B-GGUF",
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-          "line": 387,
+          "line": 392,
           "parameters": [
             {
               "name": "audio",
@@ -1053,7 +1086,7 @@
             "method": "GET",
             "path": "/v1/health",
             "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-            "line": 328,
+            "line": 333,
             "source_fields": [],
             "field_mappings": [],
             "status": "active_contract"
@@ -1062,7 +1095,7 @@
             "method": "POST",
             "path": "/v1/qwen/Qwen3-ASR-1.7B-GGUF",
             "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-            "line": 387,
+            "line": 392,
             "source_fields": [
               {
                 "name": "audio",
@@ -1126,7 +1159,7 @@
           "method": "GET",
           "path": "/v1/health",
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-          "line": 328,
+          "line": 333,
           "parameters": [],
           "request_schemas": []
         },
@@ -1134,7 +1167,7 @@
           "method": "POST",
           "path": "/v1/qwen/Qwen3-TTS-12Hz-1.7B-Base-GGUF",
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-          "line": 340,
+          "line": 345,
           "parameters": [
             {
               "name": "text",
@@ -1172,7 +1205,7 @@
             "method": "GET",
             "path": "/v1/health",
             "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-            "line": 328,
+            "line": 333,
             "source_fields": [],
             "field_mappings": [],
             "status": "active_contract"
@@ -1181,7 +1214,7 @@
             "method": "POST",
             "path": "/v1/qwen/Qwen3-TTS-12Hz-1.7B-Base-GGUF",
             "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-            "line": 340,
+            "line": 345,
             "source_fields": [
               {
                 "name": "text",
@@ -1256,7 +1289,7 @@
           "method": "GET",
           "path": "/v1/health",
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-          "line": 328,
+          "line": 333,
           "parameters": [],
           "request_schemas": []
         },
@@ -1264,7 +1297,7 @@
           "method": "POST",
           "path": "/v1/SeedVC/SeedVC-MLX-GGUF",
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-          "line": 404,
+          "line": 409,
           "parameters": [
             {
               "name": "audio",
@@ -1290,7 +1323,7 @@
             "method": "GET",
             "path": "/v1/health",
             "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-            "line": 328,
+            "line": 333,
             "source_fields": [],
             "field_mappings": [],
             "status": "active_contract"
@@ -1299,7 +1332,7 @@
             "method": "POST",
             "path": "/v1/SeedVC/SeedVC-MLX-GGUF",
             "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-            "line": 404,
+            "line": 409,
             "source_fields": [
               {
                 "name": "audio",
@@ -1386,7 +1419,7 @@
           "method": "GET",
           "path": "/v1/health",
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-          "line": 328,
+          "line": 333,
           "parameters": [],
           "request_schemas": []
         },
@@ -1394,7 +1427,7 @@
           "method": "POST",
           "path": "/v1/stabilityai/Stable-Audio-3-Small-SFX-GGUF",
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-          "line": 380,
+          "line": 385,
           "parameters": [
             {
               "name": "payload",
@@ -1416,7 +1449,7 @@
             "method": "GET",
             "path": "/v1/health",
             "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-            "line": 328,
+            "line": 333,
             "source_fields": [],
             "field_mappings": [],
             "status": "active_contract"
@@ -1425,7 +1458,287 @@
             "method": "POST",
             "path": "/v1/stabilityai/Stable-Audio-3-Small-SFX-GGUF",
             "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-            "line": 380,
+            "line": 385,
+            "source_fields": [
+              {
+                "name": "text",
+                "type": "str",
+                "default": null,
+                "default_factory": null,
+                "constraints": {
+                  "min_length": "1",
+                  "max_length": "2000"
+                },
+                "required": true,
+                "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
+                "line": 45
+              },
+              {
+                "name": "duration_seconds",
+                "type": "float",
+                "default": "8",
+                "default_factory": null,
+                "constraints": {
+                  "gt": "0",
+                  "le": "30"
+                },
+                "required": false,
+                "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
+                "line": 46
+              }
+            ],
+            "field_mappings": [
+              {
+                "source_field": "text",
+                "destination_field": "service_contract.text",
+                "status": "active_contract"
+              },
+              {
+                "source_field": "duration_seconds",
+                "destination_field": "service_contract.duration_seconds",
+                "status": "active_contract"
+              }
+            ],
+            "status": "active_contract"
+          }
+        ]
+      }
+    },
+    {
+      "project": "audio_cpp_stable_audio_3_medium",
+      "directory": "model-audio/Stable-Audio-3-Medium-GGUF",
+      "uv_project_directory": "model-audio/audio_cpp_runtime",
+      "ports": [
+        8314
+      ],
+      "phase": "active",
+      "scope": "local_audio_model",
+      "kind": "audio_cpp_model",
+      "description": "Stable Audio 3 Medium 文本提示音频生成",
+      "dynamic_model_key": "stable_audio_3_medium",
+      "dynamic_route": "/v1/stabilityai/Stable-Audio-3-Medium-GGUF-f16",
+      "dynamic_kind": "sound_generation",
+      "schema_source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
+      "request_schemas": {
+        "SoundGenerationRequest": {
+          "line": 40,
+          "inherits": [],
+          "fields": [
+            {
+              "name": "text",
+              "type": "str",
+              "default": null,
+              "default_factory": null,
+              "constraints": {
+                "min_length": "1",
+                "max_length": "2000"
+              },
+              "required": true,
+              "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
+              "line": 45
+            },
+            {
+              "name": "duration_seconds",
+              "type": "float",
+              "default": "8",
+              "default_factory": null,
+              "constraints": {
+                "gt": "0",
+                "le": "30"
+              },
+              "required": false,
+              "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
+              "line": 46
+            }
+          ],
+          "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py"
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/v1/health",
+          "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
+          "line": 333,
+          "parameters": [],
+          "request_schemas": []
+        },
+        {
+          "method": "POST",
+          "path": "/v1/stabilityai/Stable-Audio-3-Medium-GGUF-f16",
+          "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
+          "line": 385,
+          "parameters": [
+            {
+              "name": "payload",
+              "type": "SoundGenerationRequest",
+              "default": null,
+              "required": true
+            }
+          ],
+          "request_schemas": [
+            "SoundGenerationRequest"
+          ]
+        }
+      ],
+      "migration_field_mapping": {
+        "status": "active_contract",
+        "destination_candidate": "LocalAI/audio.cpp stable_audio/gen",
+        "routes": [
+          {
+            "method": "GET",
+            "path": "/v1/health",
+            "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
+            "line": 333,
+            "source_fields": [],
+            "field_mappings": [],
+            "status": "active_contract"
+          },
+          {
+            "method": "POST",
+            "path": "/v1/stabilityai/Stable-Audio-3-Medium-GGUF-f16",
+            "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
+            "line": 385,
+            "source_fields": [
+              {
+                "name": "text",
+                "type": "str",
+                "default": null,
+                "default_factory": null,
+                "constraints": {
+                  "min_length": "1",
+                  "max_length": "2000"
+                },
+                "required": true,
+                "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
+                "line": 45
+              },
+              {
+                "name": "duration_seconds",
+                "type": "float",
+                "default": "8",
+                "default_factory": null,
+                "constraints": {
+                  "gt": "0",
+                  "le": "30"
+                },
+                "required": false,
+                "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
+                "line": 46
+              }
+            ],
+            "field_mappings": [
+              {
+                "source_field": "text",
+                "destination_field": "service_contract.text",
+                "status": "active_contract"
+              },
+              {
+                "source_field": "duration_seconds",
+                "destination_field": "service_contract.duration_seconds",
+                "status": "active_contract"
+              }
+            ],
+            "status": "active_contract"
+          }
+        ]
+      }
+    },
+    {
+      "project": "audio_cpp_moss_soundeffect",
+      "directory": "model-audio/MOSS-SoundEffect-v2-GGUF",
+      "uv_project_directory": "model-audio/audio_cpp_runtime",
+      "ports": [
+        8315
+      ],
+      "phase": "active",
+      "scope": "local_audio_model",
+      "kind": "audio_cpp_model",
+      "description": "MOSS-SoundEffect v2 文本提示音效生成",
+      "dynamic_model_key": "moss_soundeffect",
+      "dynamic_route": "/v1/openmoss/MOSS-SoundEffect-v2-GGUF-f16",
+      "dynamic_kind": "sound_generation",
+      "schema_source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
+      "request_schemas": {
+        "SoundGenerationRequest": {
+          "line": 40,
+          "inherits": [],
+          "fields": [
+            {
+              "name": "text",
+              "type": "str",
+              "default": null,
+              "default_factory": null,
+              "constraints": {
+                "min_length": "1",
+                "max_length": "2000"
+              },
+              "required": true,
+              "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
+              "line": 45
+            },
+            {
+              "name": "duration_seconds",
+              "type": "float",
+              "default": "8",
+              "default_factory": null,
+              "constraints": {
+                "gt": "0",
+                "le": "30"
+              },
+              "required": false,
+              "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
+              "line": 46
+            }
+          ],
+          "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py"
+        }
+      },
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/v1/health",
+          "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
+          "line": 333,
+          "parameters": [],
+          "request_schemas": []
+        },
+        {
+          "method": "POST",
+          "path": "/v1/openmoss/MOSS-SoundEffect-v2-GGUF-f16",
+          "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
+          "line": 385,
+          "parameters": [
+            {
+              "name": "payload",
+              "type": "SoundGenerationRequest",
+              "default": null,
+              "required": true
+            }
+          ],
+          "request_schemas": [
+            "SoundGenerationRequest"
+          ]
+        }
+      ],
+      "migration_field_mapping": {
+        "status": "active_contract",
+        "destination_candidate": "LocalAI/audio.cpp moss_soundeffect/gen",
+        "routes": [
+          {
+            "method": "GET",
+            "path": "/v1/health",
+            "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
+            "line": 333,
+            "source_fields": [],
+            "field_mappings": [],
+            "status": "active_contract"
+          },
+          {
+            "method": "POST",
+            "path": "/v1/openmoss/MOSS-SoundEffect-v2-GGUF-f16",
+            "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
+            "line": 385,
             "source_fields": [
               {
                 "name": "text",
@@ -1492,7 +1805,7 @@
           "method": "GET",
           "path": "/v1/health",
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-          "line": 328,
+          "line": 333,
           "parameters": [],
           "request_schemas": []
         },
@@ -1500,7 +1813,7 @@
           "method": "POST",
           "path": "/v1/OpenBMB/VoxCPM2-GGUF",
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-          "line": 359,
+          "line": 364,
           "parameters": [
             {
               "name": "text",
@@ -1544,7 +1857,7 @@
             "method": "GET",
             "path": "/v1/health",
             "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-            "line": 328,
+            "line": 333,
             "source_fields": [],
             "field_mappings": [],
             "status": "active_contract"
@@ -1553,7 +1866,7 @@
             "method": "POST",
             "path": "/v1/OpenBMB/VoxCPM2-GGUF",
             "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-            "line": 359,
+            "line": 364,
             "source_fields": [
               {
                 "name": "text",
@@ -1620,8 +1933,8 @@
     }
   ],
   "audio_cpp_family_screen": {
-    "source_revision": "9a02e61326aaaf9d462b584ca5e0daba22c0abfc",
-    "source_readme": "https://github.com/0xShug0/audio.cpp/blob/9a02e61326aaaf9d462b584ca5e0daba22c0abfc/README.md",
+    "source_revision": "0382d37fe6e1a817b6b8fed5dcaab0e11fd1e8e6",
+    "source_readme": "https://github.com/0xShug0/audio.cpp/blob/0382d37fe6e1a817b6b8fed5dcaab0e11fd1e8e6/README.md",
     "evidence_level": "E1",
     "interpretation": "固定 revision 的上游 family/task 声明只作候选匹配；本清单中的服务状态以实际代码和本地模型制品为准。",
     "services": [
@@ -1643,7 +1956,7 @@
           "Design",
           "Ctrl"
         ],
-        "catalog_entry_line": 251,
+        "catalog_entry_line": 105,
         "assessment": "VoiceDesign 服务固定映射为 audio.cpp qwen3_tts/vdes。"
       },
       {
@@ -1651,9 +1964,10 @@
         "status": "family_candidate",
         "family": "confucius4_tts",
         "declared_tasks": [
+          "TTS",
           "Clone"
         ],
-        "catalog_entry_line": 224,
+        "catalog_entry_line": 80,
         "assessment": "固定本地 GGUF 候选映射为 audio.cpp confucius4_tts/clon。"
       },
       {
@@ -1665,7 +1979,7 @@
           "Clone",
           "Ctrl"
         ],
-        "catalog_entry_line": 235,
+        "catalog_entry_line": 89,
         "assessment": "固定本地 GGUF 候选映射为 audio.cpp index_tts2/clon。"
       },
       {
@@ -1673,9 +1987,10 @@
         "status": "family_candidate",
         "family": "midashenglm_gen",
         "declared_tasks": [
-          "Music"
+          "Music",
+          "SFX"
         ],
-        "catalog_entry_line": 331,
+        "catalog_entry_line": 184,
         "assessment": "固定本地 GGUF 候选映射为 audio.cpp midashenglm_gen/gen。"
       },
       {
@@ -1685,7 +2000,7 @@
         "declared_tasks": [
           "ASR"
         ],
-        "catalog_entry_line": 282,
+        "catalog_entry_line": 142,
         "assessment": "固定本地 GGUF 候选映射为 audio.cpp qwen3_asr/asr。"
       },
       {
@@ -1698,7 +2013,7 @@
           "Design",
           "Ctrl"
         ],
-        "catalog_entry_line": 251,
+        "catalog_entry_line": 105,
         "assessment": "固定本地 GGUF 候选映射为 audio.cpp qwen3_tts/tts。"
       },
       {
@@ -1708,7 +2023,7 @@
         "declared_tasks": [
           "VC"
         ],
-        "catalog_entry_line": 318,
+        "catalog_entry_line": 170,
         "assessment": "固定本地 GGUF 候选映射为 audio.cpp seed_vc/vc。"
       },
       {
@@ -1720,8 +2035,30 @@
           "SFX",
           "Edit"
         ],
-        "catalog_entry_line": 334,
+        "catalog_entry_line": 190,
         "assessment": "固定本地 GGUF 候选映射为 audio.cpp stable_audio/gen。"
+      },
+      {
+        "project": "audio_cpp_stable_audio_3_medium",
+        "status": "family_candidate",
+        "family": "stable_audio",
+        "declared_tasks": [
+          "Music",
+          "SFX",
+          "Edit"
+        ],
+        "catalog_entry_line": 190,
+        "assessment": "固定本地 GGUF 候选映射为 audio.cpp stable_audio/gen。"
+      },
+      {
+        "project": "audio_cpp_moss_soundeffect",
+        "status": "family_candidate",
+        "family": "moss_soundeffect",
+        "declared_tasks": [
+          "SFX"
+        ],
+        "catalog_entry_line": 187,
+        "assessment": "固定本地 BF16 GGUF 候选映射为 audio.cpp moss_soundeffect/gen。"
       },
       {
         "project": "audio_cpp_voxcpm2",
@@ -1733,7 +2070,7 @@
           "Design",
           "Ctrl"
         ],
-        "catalog_entry_line": 258,
+        "catalog_entry_line": 108,
         "assessment": "固定本地 GGUF 候选映射为 audio.cpp voxcpm2/tts。"
       }
     ]

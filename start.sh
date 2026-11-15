@@ -108,6 +108,8 @@ export AUDIO_CPP_QWEN3_ASR_MODEL_FILE="${AUDIO_CPP_QWEN3_ASR_MODEL_FILE:-$HF_MIR
 export AUDIO_CPP_QWEN3_TTS_BASE_MODEL_FILE="${AUDIO_CPP_QWEN3_TTS_BASE_MODEL_FILE:-$HF_MIRROR_DIR/audio.cpp-gguf/Qwen3-TTS-12Hz-1.7B-Base-GGUF/qwen3-tts-12hz-1.7b-base-q8_0_v2.gguf}"
 export AUDIO_CPP_SEED_VC_MODEL_FILE="${AUDIO_CPP_SEED_VC_MODEL_FILE:-$HF_MIRROR_DIR/audio.cpp-gguf/SeedVC-MLX-GGUF/seed-vc-mlx-f16.gguf}"
 export AUDIO_CPP_STABLE_AUDIO_SFX_MODEL_FILE="${AUDIO_CPP_STABLE_AUDIO_SFX_MODEL_FILE:-$HF_MIRROR_DIR/audio.cpp-gguf/Stable-Audio-3-Small-SFX-GGUF/stable-audio-3-small-sfx-f16.gguf}"
+export AUDIO_CPP_STABLE_AUDIO_3_MEDIUM_MODEL_FILE="${AUDIO_CPP_STABLE_AUDIO_3_MEDIUM_MODEL_FILE:-$HF_MIRROR_DIR/audio.cpp-gguf/Stable-Audio-3-Medium-GGUF/stable-audio-3-medium-f16.gguf}"
+export AUDIO_CPP_MOSS_SOUNDEFFECT_MODEL_FILE="${AUDIO_CPP_MOSS_SOUNDEFFECT_MODEL_FILE:-$HF_MIRROR_DIR/audio.cpp-gguf/MOSS-SoundEffect-v2-GGUF/moss-soundeffect-v2-bf16.gguf}"
 export AUDIO_CPP_VOXCPM2_MODEL_FILE="${AUDIO_CPP_VOXCPM2_MODEL_FILE:-$HF_MIRROR_DIR/audio.cpp-gguf/VoxCPM2-GGUF/voxcpm2-q8_0.gguf}"
 export ORNITH_MTP_9B_MODEL_FILE="${ORNITH_MTP_9B_MODEL_FILE:-$HF_MIRROR_DIR/ornith-ai/Ornith-1.5-9B-MTP-GGUF/Ornith-1.5-9B-MTP-Q8_0.gguf}"
 export ORNITH_MTP_9B_MMPROJ_FILE="${ORNITH_MTP_9B_MMPROJ_FILE:-$HF_MIRROR_DIR/ornith-ai/Ornith-1.5-9B-MTP-GGUF/mmproj-Ornith-1.5-9B-BF16.gguf}"
@@ -206,7 +208,7 @@ export EASEL_BRIDGE_VOXCPM_URL="${EASEL_BRIDGE_VOXCPM_URL:-http://127.0.0.1:${VO
 
 AUDIO_CPP_SERVICE_KEYS=(
   confucius4_tts index_tts25 midashenglm_gen qwen3_asr
-  qwen3_tts_base seed_vc stable_audio_sfx voxcpm2
+  qwen3_tts_base seed_vc stable_audio_sfx stable_audio_3_medium moss_soundeffect voxcpm2
 )
 AUDIO_CPP_SERVICE_DIRS=(
   "$PROJECT_DIR/model-audio/tts_confucius4-tts"
@@ -216,6 +218,8 @@ AUDIO_CPP_SERVICE_DIRS=(
   "$PROJECT_DIR/model-audio/tts_qwen3-1.7b-base"
   "$PROJECT_DIR/model-audio/vc_seed-vc"
   "$PROJECT_DIR/model-audio/gen_stable-audio-3-small-sfx"
+  "$PROJECT_DIR/model-audio/Stable-Audio-3-Medium-GGUF"
+  "$PROJECT_DIR/model-audio/MOSS-SoundEffect-v2-GGUF"
   "$PROJECT_DIR/model-audio/tts_voxcpm2"
 )
 AUDIO_CPP_SERVICE_ROUTES=(
@@ -226,6 +230,8 @@ AUDIO_CPP_SERVICE_ROUTES=(
   /v1/qwen/Qwen3-TTS-12Hz-1.7B-Base-GGUF
   /v1/SeedVC/SeedVC-MLX-GGUF
   /v1/stabilityai/Stable-Audio-3-Small-SFX-GGUF
+  /v1/stabilityai/Stable-Audio-3-Medium-GGUF-f16
+  /v1/openmoss/MOSS-SoundEffect-v2-GGUF-f16
   /v1/OpenBMB/VoxCPM2-GGUF
 )
 AUDIO_CPP_SERVICE_HOSTS=(
@@ -236,6 +242,8 @@ AUDIO_CPP_SERVICE_HOSTS=(
   "${QWEN3_TTS_BASE_HOST:-$HOST}"
   "${SEED_VC_HOST:-$HOST}"
   "${STABLE_AUDIO_SFX_HOST:-$HOST}"
+  "${STABLE_AUDIO_3_MEDIUM_HOST:-$HOST}"
+  "${MOSS_SOUNDEFFECT_HOST:-$HOST}"
   "${VOXCPM2_HOST:-127.0.0.1}"
 )
 AUDIO_CPP_SERVICE_PORTS=(
@@ -246,6 +254,8 @@ AUDIO_CPP_SERVICE_PORTS=(
   "${QWEN3_TTS_BASE_PORT:-8311}"
   "${SEED_VC_PORT:-8342}"
   "${STABLE_AUDIO_SFX_PORT:-8343}"
+  "${STABLE_AUDIO_3_MEDIUM_PORT:-8314}"
+  "${MOSS_SOUNDEFFECT_PORT:-8315}"
   "${VOXCPM2_PORT:-8313}"
 )
 

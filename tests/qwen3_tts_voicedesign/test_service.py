@@ -90,6 +90,45 @@ class VoiceDesignServiceTests(unittest.TestCase):
         self.assertEqual(len(files), 1)
         self.assertFalse((self.timbre_dir / ".references").exists())
 
+    def test_seed_is_returned_and_forwarded_for_each_segment(self) -> None:
+        fake = FakeLocalAIClient([make_wav(), make_wav()])
+        with patch(
+            "main.execute_localai_operation",
+            side_effect=lambda *, config, operation: operation(fake),
+        ):
+            response = self.client.post(
+                ROUTE,
+                json={
+                    "voice_description": "自然",
+                    "text": "你好世界",
+                    "max_chars_per_chunk": 2,
+                    "seed": 0,
+                },
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["x-audio-seed"], "0")
+        self.assertEqual([item["seed"] for item in fake.requests], [0, 0])
+
+    def test_seed_range_and_generated_seed(self) -> None:
+        fake = FakeLocalAIClient()
+        with (
+            patch("main.secrets.randbits", return_value=123),
+            patch(
+                "main.execute_localai_operation",
+                side_effect=lambda *, config, operation: operation(fake),
+            ),
+        ):
+            response = self.client.post(ROUTE, json={"voice_description": "自然", "text": "你好"})
+        self.assertEqual(response.headers["x-audio-seed"], "123")
+        self.assertEqual(fake.requests[0]["seed"], 123)
+        for value in [-1, 4294967296, "12"]:
+            self.assertEqual(
+                self.client.post(
+                    ROUTE, json={"voice_description": "自然", "seed": value}
+                ).status_code,
+                422,
+            )
+
     def test_blank_voice_description_is_rejected_before_inference(self) -> None:
         with patch("main.execute_localai_operation") as execute:
             response = self.client.post(

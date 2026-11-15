@@ -39,9 +39,12 @@ class LocalAIClient:
         max_new_tokens: int,
         top_p: float | None,
         temperature: float | None,
+        seed: int | None = None,
     ) -> tuple[bytes, float]:
         """用 LocalAI Qwen3 VoiceDesign 模型根据指令生成单段语音。"""
         params = {"max_tokens": str(max_new_tokens)}
+        if seed is not None:
+            params["seed"] = str(seed)
         if top_p is not None:
             params["top_p"] = str(top_p)
         if temperature is not None:

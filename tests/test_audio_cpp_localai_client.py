@@ -43,6 +43,21 @@ class AudioCppLocalAIClientTests(unittest.TestCase):
         self.assertEqual(request.call_args.args, ("POST", "/v1/audio/speech"))
         self.assertEqual(json.loads(request.call_args.kwargs["body"]), payload)
 
+    def test_voice_design_forwards_seed_to_localai_params(self) -> None:
+        wav = b"RIFF" + (b"\x00" * 4) + b"WAVE" + (b"\x00" * 16)
+        request = Mock(return_value=(wav, "audio/wav"))
+        self.client._request = request
+        self.client.design_voice(
+            text="你好",
+            instruction="自然",
+            language="Chinese",
+            max_new_tokens=2048,
+            top_p=None,
+            temperature=None,
+            seed=42,
+        )
+        self.assertEqual(json.loads(request.call_args.kwargs["body"])["params"]["seed"], "42")
+
     def test_transcription_streams_audio_and_maps_language_prompt(self) -> None:
         requests: list[dict[str, object]] = []
 

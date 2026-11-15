@@ -1,6 +1,6 @@
 # LLM Local Backend
 
-本仓库当前提供九个音频模型 HTTP API、一个 Ornith MTP 文本模型 API、MOSS 与 FLUX.3 Klein 两个图片 API、
+本仓库当前提供十一个音频模型 HTTP API、一个 Ornith MTP 文本模型 API、MOSS 与 FLUX.3 Klein 两个图片 API、
 一个轻量控制面和一个 CPU 空间音频 renderer。
 所有 GPU API 共用同一个跨进程文件锁，接入约束、隔离和恢复步骤见[全局 GPU 锁说明](docs/global-gpu-lock.md)。
 
@@ -15,6 +15,8 @@
 | [Qwen3-TTS Base](model-audio/tts_qwen3-1.7b-base/) | 8311 | `POST /v1/qwen/Qwen3-TTS-12Hz-1.7B-Base-GGUF`，参考音频克隆 |
 | [SeedVC](model-audio/vc_seed-vc/) | 8342 | `POST /v1/SeedVC/SeedVC-MLX-GGUF`，音色转换 |
 | [Stable Audio SFX](model-audio/gen_stable-audio-3-small-sfx/) | 8343 | `POST /v1/stabilityai/Stable-Audio-3-Small-SFX-GGUF`，音效生成 |
+| [Stable Audio 3 Medium](model-audio/Stable-Audio-3-Medium-GGUF/) | 8314 | `POST /v1/stabilityai/Stable-Audio-3-Medium-GGUF-f16`，音乐与音频生成 |
+| [MOSS-SoundEffect v2](model-audio/MOSS-SoundEffect-v2-GGUF/) | 8315 | `POST /v1/openmoss/MOSS-SoundEffect-v2-GGUF-f16`，文本提示音效生成 |
 | [VoxCPM2](model-audio/tts_voxcpm2/) | 8313 | `POST /v1/OpenBMB/VoxCPM2-GGUF`，TTS、音色设计与可选参考克隆 |
 | [Ornith-1.5-9B-MTP-GGUF-Q8](model-text/Ornith-1.5-9B-MTP-GGUF/) | 8504 | `POST /v1/ornith-ai/Ornith-1.5-9B-MTP-GGUF-Q8`，CUDA MTP 文本与图片理解 |
 | [MOSS-Image-SFT-Q8_0](model-image/MOSS-Image-SFT-Q8_0/) | 8501 | `POST /v1/openmoss/MOSS-Image-SFT-Q8_0`，stable-diffusion.cpp CUDA 文生图 |
@@ -22,8 +24,8 @@
 | [Steam Audio renderer](model-audio/spatial_steam-audio/) | 无 HTTP 端口 | C++17 CPU renderer，由 8300 控制面调用 |
 | [Easel API bridge](easel_bridge/) | 8500 | 受 Bearer Key 保护的 OpenAI-compatible 图片、语音和MTP 9B 聊天接口 |
 
-共十五个 HTTP 进程由 `start.sh` 管理，包括仅绑定 loopback 的 Ornith llama-server backend `127.0.0.1:8506`。LocalAI 保持在 `127.0.0.1:8400`。文本 API 适配器复用
-控制面 Python 项目；八个新增 audio.cpp API 共用轻量 Python 运行环境，不额外安装
+共十七个 HTTP 进程由 `start.sh` 管理，包括仅绑定 loopback 的 Ornith llama-server backend `127.0.0.1:8506`。LocalAI 保持在 `127.0.0.1:8400`。文本 API 适配器复用
+控制面 Python 项目；十个新增 audio.cpp API 共用轻量 Python 运行环境，不额外安装
 Torch。`storage/` 中的用户运行数据不会由代码清理。
 
 Easel/OpenCode 桥接服务由 `start.sh` 一并启动在 `127.0.0.1:8500`，只代理 MOSS-Image-SFT、VoxCPM2 和 Ornith 9B Chat API（8504 MTP 模型）。
@@ -35,7 +37,7 @@ Easel/OpenCode 桥接服务由 `start.sh` 一并启动在 `127.0.0.1:8500`，只
 ## 安装与启动
 
 部署需要 Linux、Python `3.12.13`、`uv`、FFmpeg/ffprobe、`setsid`、CUDA/NVIDIA 驱动、仓库外准备的
-固定版本 LocalAI/audio.cpp，以及带 CUDA、CUDA0 和 sleep-idle 支持的 llama.cpp `llama-server`。九个音频模型 GGUF 从
+固定版本 LocalAI/audio.cpp，以及带 CUDA、CUDA0 和 sleep-idle 支持的 llama.cpp `llama-server`。十一个音频模型 GGUF 从
 `$HF_MIRROR_DIR/audio.cpp-gguf/` 读取；固定文件名、family/task 和服务路由见
 [`localai/manifests/audio-cpp-models.json`](localai/manifests/audio-cpp-models.json)。Ornith 9B GGUF
 主模型与 BF16 vision projector 从
@@ -76,7 +78,7 @@ bash start.sh
 脚本自动读取该文件；也可用 `EASEL_BRIDGE_ENV_FILE` 指定其他配置文件，网关端口由 `EASEL_BRIDGE_PORT` 设置，默认 8500。
 网关 Key 缺失、过短或使用模板占位符时，脚本在启动模型前退出，不会匿名运行。
 
-脚本先检查全部十五个监听端口、sd.cpp 二进制摘要、MOSS 与 FLUX.3 Klein 的模型组件、CUDA 构建的 llama.cpp、Ornith MTP 主模型和 MTP projector，注册九个 GGUF 候选，
+脚本先检查全部十七个监听端口、sd.cpp 二进制摘要、MOSS 与 FLUX.3 Klein 的模型组件、CUDA 构建的 llama.cpp、Ornith MTP 主模型和 MTP projector，注册十一个 GGUF 候选，
 启动受管 LocalAI/audio.cpp 并执行 readiness 检查；随后通过共享 GPU 锁预热 Ornith MTP backend，并确认模型进入 sleep-idle，
 再启动控制面与所有 API。文本 API 每次请求结束后持锁等待模型卸载，再释放 GPU 给其他 provider。
 任一服务进程退出时会清理其他进程组和 llama-server，再停止受管 LocalAI。按 `Ctrl+C`
@@ -103,7 +105,7 @@ Ctrl+C、终端挂断及清理期间再次按 Ctrl+C 都会继续完成已启动
 | --- | --- | --- |
 | `HOST` / `PORT` | `0.0.0.0` / `8300` | 控制面监听地址与端口 |
 | `QWEN_VOICEDESIGN_HOST` / `QWEN_VOICEDESIGN_PORT` | 继承 `HOST` / `8301` | VoiceDesign 监听地址与端口 |
-| `AUDIO_CPP_*_PORT` | 各服务默认端口 | 八个 audio.cpp 服务端口，可分别覆盖 |
+| `AUDIO_CPP_*_PORT` | 各服务默认端口 | audio.cpp 服务端口，可分别覆盖；Stable Audio 3 Medium 使用 `STABLE_AUDIO_3_MEDIUM_PORT`，MOSS-SoundEffect v2 使用 `MOSS_SOUNDEFFECT_PORT` |
 | `VOXCPM2_HOST` | `127.0.0.1` | Easel 桥接使用的 VoxCPM2 上游监听地址 |
 | `AUDIO_CPP_*_MODEL_FILE` | `$HF_MIRROR_DIR/audio.cpp-gguf/<候选目录>/<固定文件名>` | 各服务 GGUF 路径，完整变量名见模型清单 |
 | `LLAMA_SERVER_BIN` | PATH 中的 `llama-server`，否则依次尝试 `$HOME/.local/src/llama.cpp/build-sleep-cache/bin/llama-server`、`build-cuda/bin/llama-server` | llama.cpp HTTP server；默认启用缓存时会核验补丁能力，也可显式设置路径 |
@@ -228,13 +230,13 @@ curl -X POST http://127.0.0.1:8301/v1/qwen/Qwen3-TTS-1.7B-VoiceDesign \
 ```
 
 请求字段：`voice_description` 必填，最长 2000 字；`text` 最长 12000 字；可选 `language`、
-`max_chars_per_chunk`、`pause_ms`、`max_new_tokens`、`top_p` 和 `temperature`。其他字段会被拒绝。
+`max_chars_per_chunk`、`pause_ms`、`max_new_tokens`、`top_p`、`temperature` 和 `seed`（0 至 4294967295）。未指定 seed 时服务随机生成；响应头 `X-Audio-Seed` 返回实际使用的值，分段时每段使用同一 seed。其他字段会被拒绝。
 生成请求通过共享 GPU 锁串行运行；队列超时或隔离状态返回 `503`。成功响应包含
 `X-Audio-Sample-Rate`。
 
 ### audio.cpp 模型 API
 
-八个新增 API 各自暴露 `GET /v1/health` 和清单中对应的 POST 路由。TTS/SeedVC 使用 multipart WAV 输入，
+各 audio.cpp API 暴露 `GET /v1/health` 和清单中对应的 POST 路由。TTS/SeedVC 使用 multipart WAV 输入，
 ASR 返回 JSON，其余生成任务返回 PCM WAV。参考文本、提示词、目标音色和时长字段按模型任务提供。
 TTS/ASR/转换的上传会流式暂存到唯一临时文件，单文件上限 64 MiB，请求结束后清理；这些 API 不长期保存输入或输出。
 
@@ -252,7 +254,7 @@ curl -X POST http://127.0.0.1:8311/v1/qwen/Qwen3-TTS-12Hz-1.7B-Base-GGUF \
 Qwen3-TTS Base 必须提供与 `reference_audio` 逐字匹配的 `reference_text`；`language=zh` 会映射到 audio.cpp
 接受的 `Chinese`。
 
-MiDashengLM-Gen 与 Stable Audio SFX 接受 JSON `text` 和可选 `duration_seconds`（默认 8 秒，最多 30 秒）。
+MiDashengLM-Gen、Stable Audio SFX、Stable Audio 3 Medium 与 MOSS-SoundEffect v2 接受 JSON `text` 和可选 `duration_seconds`（默认 8 秒，最多 30 秒）；MOSS-SoundEffect 的最短时长为 0.1 秒。
 Qwen3-ASR 接受 multipart `audio`，可选 `language` 与 `prompt`。SeedVC 接受 multipart `audio`（源音频）
 与 `reference`（目标音色参考），两者都必须是 WAV。VoxCPM2 接受 `text`，可选 `instruction`、
 `reference_audio`、`reference_text` 和 `language`。

@@ -594,7 +594,7 @@ class StartServicesTests(unittest.TestCase):
             )
             calls = trace_path.read_text(encoding="utf-8").splitlines()
             uv_calls = [call for call in calls if call.startswith("uv ")]
-            self.assertEqual(len(uv_calls), 18)
+            self.assertEqual(len(uv_calls), 20)
             bridge_call = next(call for call in uv_calls if "uvicorn easel_bridge.app:app" in call)
             self.assertIn("--host 127.0.0.1 --port 18500", bridge_call)
             upstreams = next(call for call in calls if call.startswith("bridge-upstreams "))
@@ -648,7 +648,7 @@ class StartServicesTests(unittest.TestCase):
                 for call in uv_calls
                 if f"--project {ROOT / 'model-audio/audio_cpp_runtime'}" in call
             ]
-            self.assertEqual(len(audio_cpp_calls), 8)
+            self.assertEqual(len(audio_cpp_calls), 10)
             for service_directory in (
                 "tts_confucius4-tts",
                 "tts_indextts2.5",
@@ -657,6 +657,8 @@ class StartServicesTests(unittest.TestCase):
                 "tts_qwen3-1.7b-base",
                 "vc_seed-vc",
                 "gen_stable-audio-3-small-sfx",
+                "Stable-Audio-3-Medium-GGUF",
+                "MOSS-SoundEffect-v2-GGUF",
                 "tts_voxcpm2",
             ):
                 self.assertEqual(
@@ -674,6 +676,8 @@ class StartServicesTests(unittest.TestCase):
                 "28311",
                 "28342",
                 "28343",
+                "8314",
+                "8315",
                 "28313",
                 "18504",
                 "18506",

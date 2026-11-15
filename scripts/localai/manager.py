@@ -590,6 +590,14 @@ class LocalAIManager:
             ) from exc
         current_version = self._localai_version_output()
         run_script = self._backend_run_script()
+        recorded_audio_cpp_commit = stamp.get("expected_audio_cpp_source_commit")
+        if recorded_audio_cpp_commit != self.audio_cpp_commit:
+            raise LocalAIManagerError(
+                "audio-cpp backend 校验记录对应源码 revision "
+                f"{recorded_audio_cpp_commit!r}，当前清单要求 {self.audio_cpp_commit}；"
+                "请先按 docs/localai-audiocpp-upgrade.md 重建并替换 backend，再运行 "
+                "verify-install。仅运行 verify-install 会把旧 backend 记录成新 revision。"
+            )
         expected = {
             "localai_version": self.localai_version,
             "expected_localai_source_commit": self.localai_commit,

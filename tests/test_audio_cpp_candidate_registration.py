@@ -40,11 +40,11 @@ class AudioCppCandidateRegistrationTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.temporary.cleanup()
 
-    def test_registers_all_nine_local_candidates_and_verifies_each(self) -> None:
+    def test_registers_all_eleven_local_candidates_and_verifies_each(self) -> None:
         self.manager.register_audio_cpp_candidates()
         self.manager.verify_audio_cpp_candidates()
 
-        self.assertEqual(len(list(self.models_dir.glob("*.yaml"))), 9)
+        self.assertEqual(len(list(self.models_dir.glob("*.yaml"))), 11)
         for candidate in self.models:
             model_id = candidate["model_id"]
             reference = self.models_dir / f"{model_id}.gguf"

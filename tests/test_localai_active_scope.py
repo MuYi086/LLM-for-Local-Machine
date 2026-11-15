@@ -13,7 +13,12 @@ from pathlib import Path
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path[:0] = [str(ROOT), str(ROOT / "inference_gateway/src"), str(ROOT / "llm_local_runtime/src")]
+sys.path[:0] = [
+    str(ROOT),
+    str(ROOT / "inference_gateway/src"),
+    str(ROOT / "llm_local_runtime/src"),
+    str(ROOT / "model-text"),
+]
 
 from inference_gateway.config import GatewayConfig  # noqa: E402
 from llama_cpp_runtime import runtime as llama_runtime  # noqa: E402
@@ -33,6 +38,8 @@ class LocalAIActiveScopeTests(unittest.TestCase):
             "audio_cpp_qwen3_tts_base",
             "audio_cpp_seed_vc",
             "audio_cpp_stable_audio_sfx",
+            "audio_cpp_stable_audio_3_medium",
+            "audio_cpp_moss_soundeffect",
             "audio_cpp_voxcpm2",
         }
         self.assertEqual(
@@ -51,16 +58,16 @@ class LocalAIActiveScopeTests(unittest.TestCase):
             version_manifest["active_model"]["name"],
             "llm-local.qwen3-tts.1p7b-voicedesign",
         )
-        self.assertEqual(version_manifest["audio_cpp_model_candidate_count"], 9)
+        self.assertEqual(version_manifest["audio_cpp_model_candidate_count"], 11)
         self.assertNotIn("qwen3_tts_candidates", version_manifest)
 
     def test_capability_validator_resolves_shared_audio_cpp_router(self) -> None:
         summary = validate_capabilities_manifest()
 
-        self.assertEqual(summary.service_count, 10)
+        self.assertEqual(summary.service_count, 12)
         self.assertEqual(summary.uv_project_count, 3)
-        self.assertEqual(summary.route_count, 23)
-        self.assertEqual(summary.family_candidate_count, 9)
+        self.assertEqual(summary.route_count, 27)
+        self.assertEqual(summary.family_candidate_count, 11)
 
     def test_qa_dependencies_and_quality_gate_exclude_retired_integrations(self) -> None:
         qa_project = (ROOT / "qa/pyproject.toml").read_text()

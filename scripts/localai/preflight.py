@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""校验固定 LocalAI/audio.cpp 安装、九个 GGUF 候选和服务 readiness。"""
+"""校验固定 LocalAI/audio.cpp 安装、候选 GGUF 和服务 readiness。"""
 
 from __future__ import annotations
 
@@ -45,9 +45,9 @@ def main() -> int:
             for candidate in manifest["models"]
             if candidate["service"]["runtime"] in {"voicedesign", "audio_cpp_runtime"}
         ]
-        if len(candidates) != 9:
+        if len(candidates) != 11:
             raise LocalAIManagerError(
-                f"期望九个 audio.cpp GGUF 候选，清单含 {len(candidates)} 个。"
+                f"期望十一个 audio.cpp 与 VoiceDesign GGUF 候选，清单含 {len(candidates)} 个。"
             )
 
         manager = LocalAIManager()
@@ -84,7 +84,7 @@ def main() -> int:
         print(f"LocalAI/audio.cpp 候选预检失败：{exc}", file=sys.stderr)
         return 1
 
-    print("LocalAI 已就绪，九个 audio.cpp 模型均已注册。")
+    print("LocalAI 与 audio.cpp 服务所需的十一个模型均已注册并就绪。")
     return 0
 
 

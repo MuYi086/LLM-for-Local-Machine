@@ -1,4 +1,4 @@
-"""串行调用八个本地 audio.cpp 服务并保存可播放的生成示例。"""
+"""串行调用本地 audio.cpp 服务并保存可播放的生成示例。"""
 
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ def build_parser(*, include_models: bool = True) -> argparse.ArgumentParser:
             "--models",
             nargs="+",
             default=["all"],
-            help="要生成的模型 key；默认依清单顺序串行运行全部八个模型。",
+            help="要生成的模型 key；默认依清单顺序串行运行全部模型。",
         )
     parser.add_argument(
         "--reference-audio",
@@ -269,6 +269,13 @@ def _generate_one(
             ),
             "stable_audio_sfx": (
                 "Footsteps on gravel, close perspective, crisp natural stone texture."
+            ),
+            "stable_audio_3_medium": (
+                "A warm cinematic ambient music bed with soft evolving synthesizers, "
+                "gentle piano, and a gradual spacious swell."
+            ),
+            "moss_soundeffect": (
+                "Steady rain pattering on a wooden roof, with distant thunder."
             ),
         }
         content, _ = _post(

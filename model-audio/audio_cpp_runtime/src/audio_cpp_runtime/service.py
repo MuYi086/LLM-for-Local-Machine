@@ -1,4 +1,4 @@
-"""共享八个 audio.cpp 模型 API 的请求校验、GPU 排队和 LocalAI 编排。"""
+"""共享 audio.cpp 模型 API 的请求校验、GPU 排队和 LocalAI 编排。"""
 
 from __future__ import annotations
 
@@ -38,7 +38,7 @@ _ALLOWED_AUDIO_SUFFIXES = {".aac", ".flac", ".m4a", ".mp3", ".ogg", ".wav", ".we
 
 
 class SoundGenerationRequest(BaseModel):
-    """MiDashengLM-Gen 或 Stable Audio SFX 生成请求。"""
+    """MiDashengLM-Gen、Stable Audio 或 MOSS 音频生成请求。"""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -260,13 +260,18 @@ def _generate_sound(
     config: GatewayConfig,
     payload: SoundGenerationRequest,
 ) -> Response:
-    """根据文本提示生成音效或结构化混合音频。"""
+    """根据文本提示生成音效、音乐或结构化混合音频。"""
     request = {
         "model_id": spec.model_id,
         "text": payload.text,
     }
-    if spec.key == "midashenglm_gen":
-        # audio.cpp 将 MiDasheng 时长作为模型专属 duration_sec 选项读取。
+    if spec.key in {"midashenglm_gen", "moss_soundeffect"}:
+        # MiDasheng 与 MOSS-SoundEffect 都通过模型专属 duration_sec 选项接收时长。
+        if spec.key == "moss_soundeffect" and payload.duration_seconds < 0.1:
+            raise HTTPException(
+                status_code=422,
+                detail="MOSS-SoundEffect 时长不能少于 0.1 秒。",
+            )
         request["params"] = {"duration_sec": str(payload.duration_seconds)}
     else:
         request["duration_seconds"] = payload.duration_seconds

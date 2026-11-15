@@ -12,7 +12,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST_PATH = ROOT / "localai/manifests/capabilities.json"
 _ROUTE_METHODS = {"get", "post", "put", "patch", "delete", "options", "head", "api_route"}
-_AUDIO_CPP_SOURCE_REVISION = "9a02e61326aaaf9d462b584ca5e0daba22c0abfc"
+_AUDIO_CPP_SOURCE_REVISION = "0382d37fe6e1a817b6b8fed5dcaab0e11fd1e8e6"
 _AUDIO_CPP_MODELS_PATH = ROOT / "localai/manifests/audio-cpp-models.json"
 _AUDIO_CPP_RUNTIME_SOURCE = "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py"
 _AUDIO_CPP_ROUTE_FUNCTIONS = {

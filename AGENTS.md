@@ -21,10 +21,10 @@
 
 ## 项目范围和服务
 
-仓库维护九个音频模型服务、一个 Ornith MTP 文本模型 API、MOSS 与 FLUX.3 Klein 两个图片 API、
-一个轻量控制面、Steam Audio CPU renderer 和 Easel/OpenCode API bridge。start.sh 管理十五个 HTTP 进程，包括一个只绑定 loopback 的 Ornith llama.cpp backend；
+仓库维护十一个音频模型服务、一个 Ornith MTP 文本模型 API、MOSS 与 FLUX.3 Klein 两个图片 API、
+一个轻量控制面、Steam Audio CPU renderer 和 Easel/OpenCode API bridge。start.sh 管理十七个 HTTP 进程，包括一个只绑定 loopback 的 Ornith llama.cpp backend；
 Steam Audio renderer 由控制面按需调用，
-不是 HTTP 服务。八个 audio.cpp 服务共用一个轻量 uv 项目，避免重复安装 Torch 和 Python 推理依赖。
+不是 HTTP 服务。十个 audio.cpp 服务共用一个轻量 uv 项目，避免重复安装 Torch 和 Python 推理依赖。
 
 | 服务 | 默认端口 | 主业务接口 | 职责 |
 | --- | ---: | --- | --- |
@@ -41,6 +41,8 @@ Steam Audio renderer 由控制面按需调用，
 | tts_qwen3-1.7b-base/ | 8311 | POST /v1/qwen/Qwen3-TTS-12Hz-1.7B-Base-GGUF | 参考音频克隆 |
 | vc_seed-vc/ | 8342 | POST /v1/SeedVC/SeedVC-MLX-GGUF | 音色转换 |
 | gen_stable-audio-3-small-sfx/ | 8343 | POST /v1/stabilityai/Stable-Audio-3-Small-SFX-GGUF | 音效生成 |
+| Stable-Audio-3-Medium-GGUF/ | 8314 | POST /v1/stabilityai/Stable-Audio-3-Medium-GGUF-f16 | 文本提示音频生成 |
+| MOSS-SoundEffect-v2-GGUF/ | 8315 | POST /v1/openmoss/MOSS-SoundEffect-v2-GGUF-f16 | 文本提示音效生成 |
 | tts_voxcpm2/ | 8313 | POST /v1/OpenBMB/VoxCPM2-GGUF | TTS、音色设计和可选参考克隆 |
 | spatial_steam-audio/ | 无 HTTP 端口 | 由 8300 控制面调用 | C++17 CPU 空间 renderer |
 | easel_bridge/ | 8500（仅 127.0.0.1） | GET /v1/models；POST /v1/images/generations、/v1/audio/speech、/v1/chat/completions | Bearer 鉴权及 OpenAI-compatible 路由代理；只调用现有模型 API |
@@ -65,10 +67,10 @@ Easel bridge 必须只监听 loopback，启动时必须设置至少 32 字节的
   scripts/sdcpp/manager.py 负责本机状态、预检和生成；model-image/ 下的两个服务分别提供 8501 与 8502 图片 API。
   视频模型尚未接入当前启动项。
   CLI 无 HTTP 端口，隔离恢复按 PID/starttime 与进程组核验，统一使用既有 recover_quarantine.py 入口。
-- model-audio/audio_cpp_runtime/ 是八个新增模型 API 的共享轻量 uv 项目，不安装 Torch。各模型目录的
+- model-audio/audio_cpp_runtime/ 是十个新增模型 API 的共享轻量 uv 项目，不安装 Torch。各模型目录的
   main.py 只从清单选择对应的共享服务合同。
 - model-text/llama_cpp_runtime/ 提供模型无关的 llama.cpp Chat Completions 适配器、backend 生命周期和 quarantine 管理，供 Ornith API 复用。
-- scripts/localai/manager.py 管理裸机 LocalAI/audio.cpp 固定版本、九个 GGUF 候选和宿主生命周期；不使用 Docker。
+- scripts/localai/manager.py 管理裸机 LocalAI/audio.cpp 固定版本、十一个 GGUF 候选和宿主生命周期；不使用 Docker。
 - model-audio/spatial_steam-audio/ 使用仓库外 Steam Audio SDK 与动态库，是 CPU renderer，不获取 GPU 锁。
 - qa/ 是无模型测试和 Ruff 项目；scripts/quality_gate.sh 与 CI 共用质量门禁。
 - model-text/scripts/training/、model-text/training/configs/ 是纯文本润色 LoRA 实验，不是语音模型训练或 HTTP 服务。
@@ -85,11 +87,11 @@ MTP Q8 模型与 BF16 vision projector 默认位于 `$HF_MIRROR_DIR/ornith-ai/Or
 main/、VoiceDesign 独立项目、model-audio/audio_cpp_runtime/ 和 qa/。依赖变化后在对应项目执行
 uv lock，提交 pyproject 与锁文件，并用 uv lock --check 验证。
 
-九个音频 GGUF 服务通过 LocalAI/audio.cpp 推理；Ornith 9B 文本模型由 CUDA 构建的 llama.cpp 推理。
+十一个音频 GGUF 服务通过 LocalAI/audio.cpp 推理；Ornith 9B 文本模型由 CUDA 构建的 llama.cpp 推理。
 模型权重、llama.cpp 源码和二进制均在仓库外，不提交权重或第三方源码。
 Ornith MTP API 默认使用 98304（96k）上下文；OpenCode buffer=16384、keep.tokens=10240。后端使用主 GGUF 内置 MTP、草稿长度 4、主/草稿 KV 为 F16、logical/physical batch 1024、线程 6/8、load-mode none，不需要独立草稿权重。backend 跨 sleep 缓存默认预算为 4096 MiB CPU RAM；需部署 docs/llama-cpp-sleep-cache.md 中的后端补丁，启动会核验实际能力。缓存不跨进程重启，超限回退冷算。96k 测试分析与同机实测见 tests/ornith_1_5_9b_mtp_benchmarks/performance.md；当前运行进程须重启才会采用新默认值。
 
-bash start.sh 自动读取 `.env.easel-bridge`，校验网关 Key，再检查全部十五个 HTTP 端口、sd.cpp 可执行文件摘要和 MOSS、FLUX.3 Klein 各自四个模型组件、Ornith MTP 主模型、MTP projector 和 CUDA llama-server，注册九个 LocalAI 候选并执行 readiness
+bash start.sh 自动读取 `.env.easel-bridge`，校验网关 Key，再检查全部十七个 HTTP 端口、sd.cpp 可执行文件摘要和 MOSS、FLUX.3 Klein 各自四个模型组件、Ornith MTP 主模型、MTP projector 和 CUDA llama-server，注册十一个 LocalAI 候选并执行 readiness
 预检；之后通过共享 GPU 锁预热 Ornith MTP backend，确认模型进入 sleep-idle 后再启动控制面和全部 API。
 任一服务退出时清理全部服务进程组并确认Ornith MTP llama.cpp backend 停止。使用 Ctrl+C 等待正常退出；若 backend 停止状态不能确认，
 保留 quarantine 标记并按恢复流程处理。
