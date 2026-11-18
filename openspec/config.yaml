@@ -1,0 +1,40 @@
+schema: spec-driven
+
+# Project context (optional)
+# Add only constraints that should guide OpenSpec artifacts and workflows.
+# Include constraints an agent cannot infer by reading the code.
+# Keep general project documentation and discoverable codebase facts out.
+context: |
+  面向项目所有者的 OpenSpec artifacts 优先使用简体中文。
+  代码标识符、路由、API 名称、命令和第三方专有名词保持原文。
+  服务事实（路由、端口、family/task、GGUF 文件名）以 localai/manifests/ 清单为准，
+  文档与实现冲突时先核对实现再更新文档。
+  无模型质量门禁不能代替真实模型验证；真实 GPU 推理验证单独串行安排。
+
+# Per-artifact rules (optional)
+rules:
+  proposal:
+    - 明确本次范围、已知依据和不确定事项；区分临时假设、待对齐与硬阻塞。
+    - 涉及服务合同或端口的改动必须引用清单事实，不得凭记忆复述端口与路由。
+  specs:
+    - 规范性要求只描述已确认的可观察行为；未实现的语义字段不得写成可用能力。
+  design:
+    - 复用既有 runtime、清单、GPU 锁与隔离机制；不引入第二套恢复工具或请求封装。
+    - 模型能力、上游契约或硬件行为不确定时，不自行编造真实行为。
+  tasks:
+    - 按实现、无模型验证、真实模型验证拆分任务，标明真实依赖与阻塞。
+    - 无模型回归通过不能代替真实模型验证；真实样例生成单独串行执行。
+    - 联调后同步清单、capabilities.json、README/AGENTS 口径与对应规格。
+  verification:
+    - 严格区分静态核对、无模型回归与真实模型验证三层，未验证项不勾选。
+
+# Per-operation guidance (optional)
+operations:
+  apply:
+    guidance:
+      - 优先推进不依赖待确认事项的任务，记录假设、责任方和影响范围。
+      - 不勾选尚未完成的无模型门禁或真实模型验证任务。
+  archive:
+    guidance:
+      - 核对已确认行为、实现和规格一致，明确未决事项及未验证范围。
+      - 归档时同步主规格与 coverage.md；服务口径漂移由 check_service_inventory.py 拦截。

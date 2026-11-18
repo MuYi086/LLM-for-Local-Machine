@@ -19,12 +19,63 @@
 4. 默认不并行执行多个 GPU 音频模型；全部阶段完成后执行最终质量检查。
 5. 不得把 AI 分离的估计分轨当作原生录音分轨。
 
+## 协作与需求工作流
+
+### 协作原则
+
+- 中文优先（见 [CONSTITUTION.md](CONSTITUTION.md)）；代码标识符、命令、路径、API 字段和第三方专有名词保留英文。
+- 项目事实以当前源码、清单和构建脚本为准；文档与实现冲突时，先核对实现，再更新文档。服务数量、
+  路由和端口口径由 `scripts/check_service_inventory.py` 在质量门禁中强制核对。
+- 先阅读相邻实现和既有文档再修改；保持最小改动，不重构无关代码，不覆盖用户已有变更。
+- 大型功能（新增模型服务、修改服务合同或端口、启动/隔离机制变更）必须先有规格与计划；普通修复
+  和小改动可直接实施，但要说明关键假设并提供可验证结果。
+- 不主动提交、推送或调用外部生产系统；涉及真实 GPU 推理的验证单独串行安排，不并入无模型门禁。
+
+### 需求分级
+
+| 类型 | 做法 |
+| --- | --- |
+| 局部修复、文案、配置微调 | 直接修改并验证，不建 change。 |
+| 新增模型 API、修改服务合同或端口 | 建立 OpenSpec change：proposal 确认范围与依据，design 对齐清单与 runtime 约束，tasks 拆分实现与验证，verification 记录实际结果。 |
+| 启动编排、GPU 锁、隔离恢复等高风险机制变更 | 规格先行：先确认关键规则与副作用，按风险制定规格与验收方案，再实施。 |
+
+### 不确定事项
+
+| 状态 | 处理 |
+| --- | --- |
+| 已确认 | 记录来源（代码、清单、实测报告），作为实现与验收依据。 |
+| 临时假设 | 标记假设及影响，实现保持可调整，不写入主规格。 |
+| 待对齐 | 记录责任方与临时处理，推进无依赖的任务。 |
+| 硬阻塞 | 暂停依赖该决定的任务；不得自行编造模型能力、上游契约或硬件行为。 |
+
+需要跟踪时在当前 change 的 verification.md 中用表格记录未决事项；确认后记录结果、来源和日期，
+并同步受影响的文档与规格。
+
+### 验证与收敛
+
+- 修改分三层验证：静态核对（`bash -n`、Ruff、能力清单校验、服务口径校验）、无模型回归
+  （`uv run --project qa --locked python -m unittest discover -s tests -v`）、真实模型验证（单独串行执行，
+  样例入口见「安装、启动与验证」）。
+- verification.md 严格区分以上三层；无模型测试通过不代表真实模型验证完成，未验证项不得勾选。
+- 行为或契约变化后同步 README、AGENTS.md、`localai/manifests/capabilities.json` 与对应规格；
+  归档前核对全部任务与验证记录，无法完成的真实模型验证明确列为未完成。
+
+### 规格与经验沉淀
+
+- 能力基线规格见 [openspec/specs/](openspec/specs/)，源码归属矩阵见 [openspec/coverage.md](openspec/coverage.md)，
+  change 流程与归档规则见 [openspec/README.md](openspec/README.md)。
+- 已验证、可复用的经验沉淀在 [docs/agent-memory/index.md](docs/agent-memory/index.md)；只记录确认过
+  且有来源的结论，不保存敏感信息或未确认假设。
+- 需求分级、临时契约与验证回写的具体操作见 [开发工作流](docs/dev-workflow.md)。`docs/superpowers/` 与
+  `.superpowers/sdd/` 是既有 SDD 历史记录，不据此推断当前接口；新工作统一使用 OpenSpec change。
+
 ## 项目范围和服务
 
-仓库维护十一个音频模型服务、一个 Ornith MTP 文本模型 API、MOSS 与 FLUX.3 Klein 两个图片 API、
-一个轻量控制面、Steam Audio CPU renderer 和 Easel/OpenCode API bridge。start.sh 管理十七个 HTTP 进程，包括一个只绑定 loopback 的 Ornith llama.cpp backend；
+仓库维护十五个音频模型服务、一个 Ornith MTP 文本模型 API、MOSS 与 FLUX.3 Klein 两个图片 API、
+一个轻量控制面、Steam Audio CPU renderer 和 Easel/OpenCode API bridge。start.sh 管理二十一个 HTTP 进程，包括一个只绑定 loopback 的 Ornith llama.cpp backend；
+LocalAI 固定版本由 scripts/localai/manager.py 在 127.0.0.1:8400 单独管理，不计入上述进程数；
 Steam Audio renderer 由控制面按需调用，
-不是 HTTP 服务。十个 audio.cpp 服务共用一个轻量 uv 项目，避免重复安装 Torch 和 Python 推理依赖。
+不是 HTTP 服务。十四个 audio.cpp 服务共用一个轻量 uv 项目，避免重复安装 Torch 和 Python 推理依赖。
 
 | 服务 | 默认端口 | 主业务接口 | 职责 |
 | --- | ---: | --- | --- |
@@ -44,12 +95,17 @@ Steam Audio renderer 由控制面按需调用，
 | Stable-Audio-3-Medium-GGUF/ | 8314 | POST /v1/stabilityai/Stable-Audio-3-Medium-GGUF-f16 | 文本提示音频生成 |
 | MOSS-SoundEffect-v2-GGUF/ | 8315 | POST /v1/openmoss/MOSS-SoundEffect-v2-GGUF-f16 | 文本提示音效生成 |
 | tts_voxcpm2/ | 8313 | POST /v1/OpenBMB/VoxCPM2-GGUF | TTS、音色设计和可选参考克隆 |
+| BS-RoFormer-ep368-GGUF/ | 8344 | POST /v1/audio-cpp/BS-RoFormer-ep368-GGUF | 人声与伴奏源分离，返回全部 WAV stems ZIP |
+| Qwen3-ForcedAligner-0.6B-GGUF/ | 8345 | POST /v1/audio-cpp/Qwen3-ForcedAligner-0.6B-GGUF | 已知逐字稿的词级时间对齐 JSON |
+| Mel-Band-RoFormer-GGUF/ | 8346 | POST /v1/audio-cpp/Mel-Band-RoFormer-GGUF | 音乐源分离，返回全部 WAV stems ZIP |
+| HTDemucs-GGUF/ | 8347 | POST /v1/audio-cpp/HTDemucs-GGUF | 多声部音乐分离，返回全部 WAV stems ZIP |
 | spatial_steam-audio/ | 无 HTTP 端口 | 由 8300 控制面调用 | C++17 CPU 空间 renderer |
 | easel_bridge/ | 8500（仅 127.0.0.1） | GET /v1/models；POST /v1/images/generations、/v1/audio/speech、/v1/chat/completions | Bearer 鉴权及 OpenAI-compatible 路由代理；只调用现有模型 API |
 
 文档按源码描述已接入的接口，不把上游 family 声明等同于模型能力。项目介绍、部署和 API 示例见
 [README.md](README.md)。GGUF 文件名、环境变量、LocalAI model ID、family/task、路由与端口以
-[audio-cpp-models.json](localai/manifests/audio-cpp-models.json) 为准。
+[audio-cpp-models.json](localai/manifests/audio-cpp-models.json) 为准；服务数量与端口口径由
+`scripts/check_service_inventory.py` 核对，文档落后于清单会在质量门禁失败。
 
 Easel bridge 必须只监听 loopback，启动时必须设置至少 32 字节的随机 `EASEL_BRIDGE_API_KEY`；严禁匿名运行或把该 Key 转发到上游。
 图片、语音与聊天请求只转发给既有 MOSS、VoxCPM2、Ornith API，不得直接加载模型或绕过共享 GPU 锁。
@@ -67,10 +123,10 @@ Easel bridge 必须只监听 loopback，启动时必须设置至少 32 字节的
   scripts/sdcpp/manager.py 负责本机状态、预检和生成；model-image/ 下的两个服务分别提供 8501 与 8502 图片 API。
   视频模型尚未接入当前启动项。
   CLI 无 HTTP 端口，隔离恢复按 PID/starttime 与进程组核验，统一使用既有 recover_quarantine.py 入口。
-- model-audio/audio_cpp_runtime/ 是十个新增模型 API 的共享轻量 uv 项目，不安装 Torch。各模型目录的
+- model-audio/audio_cpp_runtime/ 是十四个 audio.cpp 模型 API 的共享轻量 uv 项目，不安装 Torch。各模型目录的
   main.py 只从清单选择对应的共享服务合同。
 - model-text/llama_cpp_runtime/ 提供模型无关的 llama.cpp Chat Completions 适配器、backend 生命周期和 quarantine 管理，供 Ornith API 复用。
-- scripts/localai/manager.py 管理裸机 LocalAI/audio.cpp 固定版本、十一个 GGUF 候选和宿主生命周期；不使用 Docker。
+- scripts/localai/manager.py 管理裸机 LocalAI/audio.cpp 固定版本、十五个 GGUF 候选和宿主生命周期；不使用 Docker。
 - model-audio/spatial_steam-audio/ 使用仓库外 Steam Audio SDK 与动态库，是 CPU renderer，不获取 GPU 锁。
 - qa/ 是无模型测试和 Ruff 项目；scripts/quality_gate.sh 与 CI 共用质量门禁。
 - model-text/scripts/training/、model-text/training/configs/ 是纯文本润色 LoRA 实验，不是语音模型训练或 HTTP 服务。
@@ -87,16 +143,17 @@ MTP Q8 模型与 BF16 vision projector 默认位于 `$HF_MIRROR_DIR/ornith-ai/Or
 main/、VoiceDesign 独立项目、model-audio/audio_cpp_runtime/ 和 qa/。依赖变化后在对应项目执行
 uv lock，提交 pyproject 与锁文件，并用 uv lock --check 验证。
 
-十一个音频 GGUF 服务通过 LocalAI/audio.cpp 推理；Ornith 9B 文本模型由 CUDA 构建的 llama.cpp 推理。
+十五个音频模型服务全部通过 LocalAI/audio.cpp 推理，其中 VoiceDesign 使用独立 uv 项目、其余十四个共用
+audio_cpp_runtime；Ornith 9B 文本模型由 CUDA 构建的 llama.cpp 推理。
 模型权重、llama.cpp 源码和二进制均在仓库外，不提交权重或第三方源码。
 Ornith MTP API 默认使用 98304（96k）上下文；OpenCode buffer=16384、keep.tokens=10240。后端使用主 GGUF 内置 MTP、草稿长度 4、主/草稿 KV 为 F16、logical/physical batch 1024、线程 6/8、load-mode none，不需要独立草稿权重。backend 跨 sleep 缓存默认预算为 4096 MiB CPU RAM；需部署 docs/llama-cpp-sleep-cache.md 中的后端补丁，启动会核验实际能力。缓存不跨进程重启，超限回退冷算。96k 测试分析与同机实测见 tests/ornith_1_5_9b_mtp_benchmarks/performance.md；当前运行进程须重启才会采用新默认值。
 
-bash start.sh 自动读取 `.env.easel-bridge`，校验网关 Key，再检查全部十七个 HTTP 端口、sd.cpp 可执行文件摘要和 MOSS、FLUX.3 Klein 各自四个模型组件、Ornith MTP 主模型、MTP projector 和 CUDA llama-server，注册十一个 LocalAI 候选并执行 readiness
+bash start.sh 自动读取 `.env.easel-bridge`，校验网关 Key，再检查全部二十一个 HTTP 端口、sd.cpp 可执行文件摘要和 MOSS、FLUX.3 Klein 各自四个模型组件、Ornith MTP 主模型、MTP projector 和 CUDA llama-server，注册十五个 LocalAI 候选并执行 readiness
 预检；之后通过共享 GPU 锁预热 Ornith MTP backend，确认模型进入 sleep-idle 后再启动控制面和全部 API。
 任一服务退出时清理全部服务进程组并确认Ornith MTP llama.cpp backend 停止。使用 Ctrl+C 等待正常退出；若 backend 停止状态不能确认，
 保留 quarantine 标记并按恢复流程处理。
 
-无模型质量门禁：
+无模型质量门禁（含服务口径与能力清单校验）：
 
 ~~~bash
 bash -n start.sh
@@ -131,6 +188,9 @@ tests/audio_cpp/generate_examples.py，Ornith 文本样例用 tests/ornith_1_5_9
 - Qwen3-TTS Base 通过 WAV 参考音频克隆，且必须提供与音频逐字匹配的 `reference_text`；输入 `zh`/`zh-CN`
   会映射为 audio.cpp 接受的 `Chinese`。Confucius4 和 IndexTTS2.5 也通过 WAV 参考音频克隆；SeedVC 需要源音频和目标 WAV；
   Qwen3-ASR 返回转写 JSON；MiDashengLM-Gen 和 Stable Audio SFX 返回音频；VoxCPM2 允许无参考音频运行。
+- BS-RoFormer、Mel-Band-RoFormer 与 HTDemucs 接收 WAV 上传，经一次 transform 请求的 `X-Audio-Stems`
+  产物返回全部 WAV stems ZIP，不接受不完整或越界的 stem 清单；Qwen3-ForcedAligner 需要已知逐字稿，
+  返回词级时间对齐 JSON，响应缺少 words 时间戳时返回上游合同错误，不把普通转写误报为对齐结果。
 - Steam Audio 正式 balanced/immersive 路径必须保留对象边界，使用 Manifest v1 和重复 assets 字段，
   不在浏览器预混且不取 GPU 锁。Steam Audio pre-master 后只允许 loudnorm/编码，不叠加 Haas/aecho。
 - diffuse、非 none 遮挡和几何反射尚未实现；不得将保留的语义字段描述为可用能力。

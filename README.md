@@ -1,8 +1,9 @@
 # LLM Local Backend
 
-本仓库当前提供十一个音频模型 HTTP API、一个 Ornith MTP 文本模型 API、MOSS 与 FLUX.3 Klein 两个图片 API、
+本仓库当前提供十五个音频模型 HTTP API、一个 Ornith MTP 文本模型 API、MOSS 与 FLUX.3 Klein 两个图片 API、
 一个轻量控制面和一个 CPU 空间音频 renderer。
 所有 GPU API 共用同一个跨进程文件锁，接入约束、隔离和恢复步骤见[全局 GPU 锁说明](docs/global-gpu-lock.md)。
+开发协作规则见 [AGENTS.md](AGENTS.md)；需求分级、验证纪律与规格回写见[开发工作流](docs/dev-workflow.md)，行为基线规格见 [openspec/specs/](openspec/specs/)，已验证经验见[项目经验索引](docs/agent-memory/index.md)。
 
 | 组件 | 端口 | 接口/职责 |
 | --- | ---: | --- |
@@ -18,14 +19,18 @@
 | [Stable Audio 3 Medium](model-audio/Stable-Audio-3-Medium-GGUF/) | 8314 | `POST /v1/stabilityai/Stable-Audio-3-Medium-GGUF-f16`，音乐与音频生成 |
 | [MOSS-SoundEffect v2](model-audio/MOSS-SoundEffect-v2-GGUF/) | 8315 | `POST /v1/openmoss/MOSS-SoundEffect-v2-GGUF-f16`，文本提示音效生成 |
 | [VoxCPM2](model-audio/tts_voxcpm2/) | 8313 | `POST /v1/OpenBMB/VoxCPM2-GGUF`，TTS、音色设计与可选参考克隆 |
+| [BS-RoFormer](model-audio/BS-RoFormer-ep368-GGUF/) | 8344 | `POST /v1/audio-cpp/BS-RoFormer-ep368-GGUF`，人声/伴奏分离并返回全部 WAV stems ZIP |
+| [Qwen3 ForcedAligner](model-audio/Qwen3-ForcedAligner-0.6B-GGUF/) | 8345 | `POST /v1/audio-cpp/Qwen3-ForcedAligner-0.6B-GGUF`，已知逐字稿词级时间对齐 |
+| [Mel-Band RoFormer](model-audio/Mel-Band-RoFormer-GGUF/) | 8346 | `POST /v1/audio-cpp/Mel-Band-RoFormer-GGUF`，音乐源分离并返回全部 WAV stems ZIP |
+| [HTDemucs](model-audio/HTDemucs-GGUF/) | 8347 | `POST /v1/audio-cpp/HTDemucs-GGUF`，多声部音乐分离并返回全部 WAV stems ZIP |
 | [Ornith-1.5-9B-MTP-GGUF-Q8](model-text/Ornith-1.5-9B-MTP-GGUF/) | 8504 | `POST /v1/ornith-ai/Ornith-1.5-9B-MTP-GGUF-Q8`，CUDA MTP 文本与图片理解 |
 | [MOSS-Image-SFT-Q8_0](model-image/MOSS-Image-SFT-Q8_0/) | 8501 | `POST /v1/openmoss/MOSS-Image-SFT-Q8_0`，stable-diffusion.cpp CUDA 文生图 |
 | [FLUX-3-Image-Klein-GGUF-Q8](model-image/FLUX-3-Image-Klein-GGUF-Q8/) | 8502 | `POST /v1/openblack-forest-labs/FLUX-3-Image-Klein-GGUF-Q8` 文生图；`POST /v1/openblack-forest-labs/FLUX-3-Image-Klein-GGUF-Q8/edit` 图片编辑 |
 | [Steam Audio renderer](model-audio/spatial_steam-audio/) | 无 HTTP 端口 | C++17 CPU renderer，由 8300 控制面调用 |
 | [Easel API bridge](easel_bridge/) | 8500 | 受 Bearer Key 保护的 OpenAI-compatible 图片、语音和MTP 9B 聊天接口 |
 
-共十七个 HTTP 进程由 `start.sh` 管理，包括仅绑定 loopback 的 Ornith llama-server backend `127.0.0.1:8506`。LocalAI 保持在 `127.0.0.1:8400`。文本 API 适配器复用
-控制面 Python 项目；十个新增 audio.cpp API 共用轻量 Python 运行环境，不额外安装
+共二十一个 HTTP 进程由 `start.sh` 管理，包括仅绑定 loopback 的 Ornith llama-server backend `127.0.0.1:8506`。LocalAI 保持在 `127.0.0.1:8400`。文本 API 适配器复用
+控制面 Python 项目；十四个 audio.cpp API 共用轻量 Python 运行环境，不额外安装
 Torch。`storage/` 中的用户运行数据不会由代码清理。
 
 Easel/OpenCode 桥接服务由 `start.sh` 一并启动在 `127.0.0.1:8500`，只代理 MOSS-Image-SFT、VoxCPM2 和 Ornith 9B Chat API（8504 MTP 模型）。
@@ -37,7 +42,7 @@ Easel/OpenCode 桥接服务由 `start.sh` 一并启动在 `127.0.0.1:8500`，只
 ## 安装与启动
 
 部署需要 Linux、Python `3.12.13`、`uv`、FFmpeg/ffprobe、`setsid`、CUDA/NVIDIA 驱动、仓库外准备的
-固定版本 LocalAI/audio.cpp，以及带 CUDA、CUDA0 和 sleep-idle 支持的 llama.cpp `llama-server`。十一个音频模型 GGUF 从
+固定版本 LocalAI/audio.cpp，以及带 CUDA、CUDA0 和 sleep-idle 支持的 llama.cpp `llama-server`。十五个音频模型 GGUF 从
 `$HF_MIRROR_DIR/audio.cpp-gguf/` 读取；固定文件名、family/task 和服务路由见
 [`localai/manifests/audio-cpp-models.json`](localai/manifests/audio-cpp-models.json)。Ornith 9B GGUF
 主模型与 BF16 vision projector 从
@@ -78,7 +83,7 @@ bash start.sh
 脚本自动读取该文件；也可用 `EASEL_BRIDGE_ENV_FILE` 指定其他配置文件，网关端口由 `EASEL_BRIDGE_PORT` 设置，默认 8500。
 网关 Key 缺失、过短或使用模板占位符时，脚本在启动模型前退出，不会匿名运行。
 
-脚本先检查全部十七个监听端口、sd.cpp 二进制摘要、MOSS 与 FLUX.3 Klein 的模型组件、CUDA 构建的 llama.cpp、Ornith MTP 主模型和 MTP projector，注册十一个 GGUF 候选，
+脚本先检查全部二十一个监听端口、sd.cpp 二进制摘要、MOSS 与 FLUX.3 Klein 的模型组件、CUDA 构建的 llama.cpp、Ornith MTP 主模型和 MTP projector，注册十五个 GGUF 候选，
 启动受管 LocalAI/audio.cpp 并执行 readiness 检查；随后通过共享 GPU 锁预热 Ornith MTP backend，并确认模型进入 sleep-idle，
 再启动控制面与所有 API。文本 API 每次请求结束后持锁等待模型卸载，再释放 GPU 给其他 provider。
 任一服务进程退出时会清理其他进程组和 llama-server，再停止受管 LocalAI。按 `Ctrl+C`
