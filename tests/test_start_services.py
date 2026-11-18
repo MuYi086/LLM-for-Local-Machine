@@ -175,6 +175,10 @@ class StartServicesTests(unittest.TestCase):
                     "QWEN3_TTS_BASE_PORT": "28311",
                     "SEED_VC_PORT": "28342",
                     "STABLE_AUDIO_SFX_PORT": "28343",
+                    "BS_ROFORMER_PORT": "28344",
+                    "QWEN3_FORCED_ALIGNER_PORT": "28345",
+                    "MEL_BAND_ROFORMER_PORT": "28346",
+                    "HTDEMUCS_PORT": "28347",
                     "VOXCPM2_PORT": "28313",
                 },
             )
@@ -594,7 +598,7 @@ class StartServicesTests(unittest.TestCase):
             )
             calls = trace_path.read_text(encoding="utf-8").splitlines()
             uv_calls = [call for call in calls if call.startswith("uv ")]
-            self.assertEqual(len(uv_calls), 20)
+            self.assertEqual(len(uv_calls), 24)
             bridge_call = next(call for call in uv_calls if "uvicorn easel_bridge.app:app" in call)
             self.assertIn("--host 127.0.0.1 --port 18500", bridge_call)
             upstreams = next(call for call in calls if call.startswith("bridge-upstreams "))
@@ -648,7 +652,7 @@ class StartServicesTests(unittest.TestCase):
                 for call in uv_calls
                 if f"--project {ROOT / 'model-audio/audio_cpp_runtime'}" in call
             ]
-            self.assertEqual(len(audio_cpp_calls), 10)
+            self.assertEqual(len(audio_cpp_calls), 14)
             for service_directory in (
                 "tts_confucius4-tts",
                 "tts_indextts2.5",
@@ -660,6 +664,10 @@ class StartServicesTests(unittest.TestCase):
                 "Stable-Audio-3-Medium-GGUF",
                 "MOSS-SoundEffect-v2-GGUF",
                 "tts_voxcpm2",
+                "BS-RoFormer-ep368-GGUF",
+                "Qwen3-ForcedAligner-0.6B-GGUF",
+                "Mel-Band-RoFormer-GGUF",
+                "HTDemucs-GGUF",
             ):
                 self.assertEqual(
                     sum(f"{service_directory}/main.py" in call for call in uv_calls),
@@ -676,6 +684,10 @@ class StartServicesTests(unittest.TestCase):
                 "28311",
                 "28342",
                 "28343",
+                "28344",
+                "28345",
+                "28346",
+                "28347",
                 "8314",
                 "8315",
                 "28313",

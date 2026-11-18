@@ -4,16 +4,20 @@ from __future__ import annotations
 
 import asyncio
 import io
+import math
 import os
+import shutil
+import tempfile
 import uuid
 import wave
+import zipfile
 from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated, Any
 
 import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 from inference_gateway import (
     BackendQuarantinedError,
     GatewayConfig,
@@ -31,6 +35,7 @@ from llm_local_runtime import (
     stage_audio_upload,
 )
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+from starlette.background import BackgroundTask
 
 from .specs import MODEL_SPECS, ModelSpec
 
@@ -86,7 +91,12 @@ def _require_nonempty_text(name: str, value: str, max_length: int) -> str:
     return normalized
 
 
-def _stage_upload(upload: UploadFile, *, require_wav: bool = False) -> Path:
+def _stage_upload(
+    upload: UploadFile,
+    *,
+    require_wav: bool = False,
+    temporary_dir: Path | None = None,
+) -> Path:
     """将单个有界音频上传暂存到唯一文件，供后端安全读取。"""
     original_name = Path(upload.filename or "audio.wav").name
     suffix = Path(original_name).suffix.lower()
@@ -97,20 +107,25 @@ def _stage_upload(upload: UploadFile, *, require_wav: bool = False) -> Path:
     if require_wav and suffix != ".wav":
         raise HTTPException(status_code=415, detail="该任务的参考音频必须为 WAV。")
 
-    temporary_dir = Path(
-        os.getenv(
-            "AUDIO_CPP_TEMP_DIR",
-            str(
-                Path(os.getenv("GPU_LOCK_FILE", "storage/.cache/runtime/gpu-runtime.lock")).parent
-                / "audio_cpp_uploads"
-            ),
-        )
-    ).expanduser()
+    upload_dir = (
+        temporary_dir
+        or Path(
+            os.getenv(
+                "AUDIO_CPP_TEMP_DIR",
+                str(
+                    Path(
+                        os.getenv("GPU_LOCK_FILE", "storage/.cache/runtime/gpu-runtime.lock")
+                    ).parent
+                    / "audio_cpp_uploads"
+                ),
+            )
+        ).expanduser()
+    )
     try:
         staged = asyncio.run(
             stage_audio_upload(
                 upload,
-                temporary_dir,
+                upload_dir,
                 policy=UploadPolicy.from_environment(),
             )
         )
@@ -253,6 +268,161 @@ def _transcribe(
     if not isinstance(result, dict) or not isinstance(result.get("text"), str):
         raise HTTPException(status_code=502, detail="LocalAI/audio.cpp 未返回 transcription JSON。")
     return JSONResponse(result)
+
+
+def _validate_wav_file(path: Path, *, require_music_format: bool = False) -> None:
+    """检查暂存 WAV 的 PCM 数据、采样率和声道数，不整段载入内存。"""
+    try:
+        with wave.open(str(path), "rb") as source:
+            params = source.getparams()
+            if params.comptype != "NONE" or params.nframes <= 0:
+                raise HTTPException(status_code=415, detail="音频必须是非空 PCM WAV。")
+            if require_music_format and (
+                params.framerate != 44_100 or params.nchannels not in {1, 2}
+            ):
+                raise HTTPException(
+                    status_code=422,
+                    detail="分离输入必须为 44.1 kHz 单声道或立体声 WAV。",
+                )
+            if params.sampwidth not in {1, 2, 3, 4}:
+                raise HTTPException(status_code=415, detail="WAV PCM 采样宽度不受支持。")
+            remaining_frames = params.nframes
+            while remaining_frames:
+                frame_count = min(remaining_frames, 8_192)
+                frames = source.readframes(frame_count)
+                expected_size = frame_count * params.nchannels * params.sampwidth
+                if len(frames) != expected_size:
+                    raise HTTPException(status_code=415, detail="WAV PCM 采样数据不完整。")
+                remaining_frames -= frame_count
+    except (EOFError, OSError, wave.Error) as exc:
+        raise HTTPException(status_code=415, detail="上传文件不是有效 PCM WAV。") from exc
+
+
+def _valid_word_timestamps(words: object) -> bool:
+    """确认对齐结果含有效的词、起止秒数和非空时间范围。"""
+    if not isinstance(words, list) or not words:
+        return False
+    for item in words:
+        if not isinstance(item, dict):
+            return False
+        label = item.get("text", item.get("word"))
+        start = item.get("start")
+        end = item.get("end")
+        if (
+            not isinstance(label, str)
+            or not label.strip()
+            or not isinstance(start, (int, float))
+            or not isinstance(end, (int, float))
+            or isinstance(start, bool)
+            or isinstance(end, bool)
+            or start < 0
+            or end <= start
+        ):
+            return False
+        try:
+            if not math.isfinite(start) or not math.isfinite(end):
+                return False
+        except OverflowError:
+            return False
+    return True
+
+
+def _align_transcript(
+    spec: ModelSpec,
+    config: GatewayConfig,
+    *,
+    audio_upload: UploadFile,
+    text: str,
+    language: str,
+) -> JSONResponse:
+    """将已知逐字稿提交给 ForcedAligner 并返回词级时间戳。"""
+    normalized_text = _require_nonempty_text("text", text, 12_000)
+    normalized_language = _require_nonempty_text("language", language, 32)
+    audio_path = _stage_upload(audio_upload, require_wav=True)
+    try:
+        result = _run_locked(
+            config,
+            lambda client: client.transcribe(
+                filename=Path(audio_upload.filename or "speech.wav").name,
+                audio_path=audio_path,
+                language=normalized_language,
+                prompt=normalized_text,
+                response_format="verbose_json",
+                timestamp_granularities=["word"],
+            ),
+        )
+    finally:
+        audio_path.unlink(missing_ok=True)
+    if not isinstance(result, dict) or not _valid_word_timestamps(result.get("words")):
+        raise HTTPException(
+            status_code=502,
+            detail="LocalAI/audio.cpp 未返回有效的 ForcedAligner 词级时间戳。",
+        )
+    return JSONResponse(result)
+
+
+def _separate_sources(
+    spec: ModelSpec,
+    config: GatewayConfig,
+    *,
+    audio_upload: UploadFile,
+) -> FileResponse:
+    """在共享 GPU 锁内运行一次分离，并以 ZIP 返回所有命名 WAV stem。"""
+    temporary_root = Path(
+        os.getenv(
+            "AUDIO_CPP_TEMP_DIR",
+            str(
+                Path(os.getenv("GPU_LOCK_FILE", "storage/.cache/runtime/gpu-runtime.lock")).parent
+                / "audio_cpp_uploads"
+            ),
+        )
+    ).expanduser()
+    temporary_root.mkdir(parents=True, exist_ok=True)
+    output_dir = Path(tempfile.mkdtemp(prefix=f"{spec.key}-", dir=temporary_root))
+    archive_path = output_dir / f"{spec.key}.zip"
+    try:
+        audio_path = _stage_upload(
+            audio_upload,
+            require_wav=True,
+            temporary_dir=output_dir,
+        )
+        _validate_wav_file(audio_path, require_music_format=True)
+        stems = _run_locked(
+            config,
+            lambda client: client.transform_audio_stems(
+                model=spec.model_id,
+                audio_path=audio_path,
+                output_dir=output_dir,
+            ),
+        )
+        if not isinstance(stems, dict) or not stems:
+            raise HTTPException(status_code=502, detail="LocalAI/audio.cpp 未返回分离音轨。")
+        with zipfile.ZipFile(archive_path, "x", compression=zipfile.ZIP_STORED) as archive:
+            for name, stem_path in stems.items():
+                if (
+                    not isinstance(name, str)
+                    or not name
+                    or name in {".", ".."}
+                    or "/" in name
+                    or "\\" in name
+                    or any(ord(character) < 32 or ord(character) == 127 for character in name)
+                    or not isinstance(stem_path, Path)
+                    or not stem_path.is_file()
+                    or stem_path.resolve().parent != output_dir.resolve()
+                ):
+                    raise HTTPException(status_code=502, detail="分离音轨名称或路径无效。")
+                _validate_wav_file(stem_path)
+                archive.write(stem_path, arcname=f"{name}.wav")
+    except BaseException:
+        shutil.rmtree(output_dir, ignore_errors=True)
+        raise
+
+    return FileResponse(
+        archive_path,
+        media_type="application/zip",
+        filename=f"{spec.key}-stems.zip",
+        background=BackgroundTask(shutil.rmtree, output_dir, ignore_errors=True),
+    )
 
 
 def _generate_sound(
@@ -403,6 +573,30 @@ def create_app(model_key: str, gateway_config: GatewayConfig | None = None) -> F
                 language=language,
                 prompt=prompt,
             )
+
+    elif spec.kind == "forced_alignment":
+
+        @app.post(spec.route)
+        def forced_alignment(
+            audio: Annotated[UploadFile, File(...)],
+            text: Annotated[str, Form(min_length=1, max_length=12_000)],
+            language: Annotated[str, Form(min_length=1, max_length=32)],
+        ) -> JSONResponse:
+            """为已知逐字稿生成词级起止时间。"""
+            return _align_transcript(
+                spec,
+                config,
+                audio_upload=audio,
+                text=text,
+                language=language,
+            )
+
+    elif spec.kind == "source_separation":
+
+        @app.post(spec.route)
+        def source_separation(audio: Annotated[UploadFile, File(...)]) -> FileResponse:
+            """将音乐输入分为模型返回的全部命名音轨。"""
+            return _separate_sources(spec, config, audio_upload=audio)
 
     elif spec.kind == "voice_conversion":
 

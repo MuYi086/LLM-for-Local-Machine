@@ -6,6 +6,7 @@ import io
 import sys
 import unittest
 import wave
+import zipfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -27,6 +28,17 @@ def _wav_bytes() -> bytes:
         wav_file.setsampwidth(2)
         wav_file.setframerate(24_000)
         wav_file.writeframes(b"\x00\x00" * 240)
+    return output.getvalue()
+
+
+def _music_wav_bytes(sample_rate: int = 44_100, channels: int = 2) -> bytes:
+    """构造符合音乐分离输入要求的 PCM WAV。"""
+    output = io.BytesIO()
+    with wave.open(output, "wb") as wav_file:
+        wav_file.setnchannels(channels)
+        wav_file.setsampwidth(2)
+        wav_file.setframerate(sample_rate)
+        wav_file.writeframes(b"\x00\x00" * channels * 32)
     return output.getvalue()
 
 
@@ -52,8 +64,15 @@ class FakeLocalAIClient:
 
     def __init__(self) -> None:
         self.speech_request: dict[str, object] | None = None
-        self.transcription: tuple[str, bytes, str | None] | None = None
+        self.transcription: (
+            tuple[str, bytes, str | None, str | None, str, list[str] | None] | None
+        ) = None
         self.transformation: tuple[dict[str, str], dict[str, tuple[str, bytes, str]]] | None = None
+        self.separation: tuple[str, bytes, Path] | None = None
+        self.alignment_result: dict[str, object] = {
+            "text": "测试对齐",
+            "words": [{"text": "测试", "start": 0.0, "end": 0.5}],
+        }
 
     def synthesize_speech(self, request: dict[str, object]) -> bytes:
         self.speech_request = request
@@ -69,9 +88,18 @@ class FakeLocalAIClient:
         audio_path: Path,
         language: str | None,
         prompt: str | None,
-    ) -> dict[str, str]:
-        self.transcription = filename, audio_path.read_bytes(), language
-        return {"text": "测试转写"}
+        response_format: str = "json",
+        timestamp_granularities: list[str] | None = None,
+    ) -> dict[str, object]:
+        self.transcription = (
+            filename,
+            audio_path.read_bytes(),
+            language,
+            prompt,
+            response_format,
+            timestamp_granularities,
+        )
+        return self.alignment_result if prompt else {"text": "测试转写"}
 
     def transform_audio(
         self,
@@ -92,6 +120,21 @@ class FakeLocalAIClient:
         self.speech_request = request
         return _wav_bytes()
 
+    def transform_audio_stems(
+        self,
+        *,
+        model: str,
+        audio_path: Path,
+        output_dir: Path,
+    ) -> dict[str, Path]:
+        self.separation = model, audio_path.read_bytes(), output_dir
+        stems = {}
+        for name in ("vocals", "instrumental"):
+            path = output_dir / f"{name}.wav"
+            path.write_bytes(_music_wav_bytes())
+            stems[name] = path
+        return stems
+
 
 class MockLocalAIHealthClient:
     """记录不加载模型的 LocalAI readiness 查询。"""
@@ -109,7 +152,7 @@ class MockLocalAIHealthClient:
 
 
 class AudioCppServiceTests(unittest.TestCase):
-    def test_registry_declares_all_ten_fixed_audio_cpp_models(self) -> None:
+    def test_registry_declares_all_fourteen_fixed_audio_cpp_models(self) -> None:
         self.assertEqual(
             set(MODEL_SPECS),
             {
@@ -123,10 +166,14 @@ class AudioCppServiceTests(unittest.TestCase):
                 "stable_audio_3_medium",
                 "moss_soundeffect",
                 "voxcpm2",
+                "bs_roformer",
+                "qwen3_forced_aligner",
+                "mel_band_roformer",
+                "htdemucs",
             },
         )
-        self.assertEqual(len({spec.route for spec in MODEL_SPECS.values()}), 10)
-        self.assertEqual(len({spec.port for spec in MODEL_SPECS.values()}), 10)
+        self.assertEqual(len({spec.route for spec in MODEL_SPECS.values()}), 14)
+        self.assertEqual(len({spec.port for spec in MODEL_SPECS.values()}), 14)
         medium_spec = MODEL_SPECS["stable_audio_3_medium"]
         self.assertEqual(medium_spec.port, 8314)
         self.assertEqual(
@@ -252,7 +299,95 @@ class AudioCppServiceTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200, response.text)
         self.assertEqual(response.json(), {"text": "测试转写"})
-        self.assertEqual(fake_client.transcription, ("speech.wav", _wav_bytes(), "Chinese"))
+        self.assertEqual(
+            fake_client.transcription,
+            ("speech.wav", _wav_bytes(), "Chinese", None, "json", None),
+        )
+
+    def test_forced_alignment_requires_transcript_and_returns_word_timestamps(self) -> None:
+        spec = MODEL_SPECS["qwen3_forced_aligner"]
+        fake_client = FakeLocalAIClient()
+
+        def execute(*, config: GatewayConfig, operation: object) -> object:
+            self.assertEqual(config.model, spec.model_id)
+            self.assertEqual(config.gpu_lock_file, "/tmp/test-gpu-runtime.lock")
+            return operation(fake_client)  # type: ignore[operator]
+
+        with patch("audio_cpp_runtime.service.execute_localai_operation", side_effect=execute):
+            response = TestClient(
+                create_app("qwen3_forced_aligner", _gateway_config(spec.model_id))
+            ).post(
+                spec.route,
+                data={"text": "测试对齐", "language": "Chinese"},
+                files={"audio": ("speech.wav", _wav_bytes(), "audio/wav")},
+            )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json(), fake_client.alignment_result)
+        self.assertEqual(
+            fake_client.transcription,
+            (
+                "speech.wav",
+                _wav_bytes(),
+                "Chinese",
+                "测试对齐",
+                "verbose_json",
+                ["word"],
+            ),
+        )
+
+    def test_forced_alignment_rejects_transcription_without_word_timestamps(self) -> None:
+        spec = MODEL_SPECS["qwen3_forced_aligner"]
+        fake_client = FakeLocalAIClient()
+        fake_client.alignment_result = {"text": "测试对齐", "words": []}
+
+        with patch(
+            "audio_cpp_runtime.service.execute_localai_operation",
+            side_effect=lambda *, config, operation: operation(fake_client),
+        ):
+            response = TestClient(
+                create_app("qwen3_forced_aligner", _gateway_config(spec.model_id))
+            ).post(
+                spec.route,
+                data={"text": "测试对齐", "language": "Chinese"},
+                files={"audio": ("speech.wav", _wav_bytes(), "audio/wav")},
+            )
+
+        self.assertEqual(response.status_code, 502, response.text)
+
+    def test_source_separation_returns_every_named_stem_in_zip(self) -> None:
+        spec = MODEL_SPECS["bs_roformer"]
+        fake_client = FakeLocalAIClient()
+
+        def execute(*, config: GatewayConfig, operation: object) -> object:
+            self.assertEqual(config.model, spec.model_id)
+            self.assertEqual(config.gpu_lock_file, "/tmp/test-gpu-runtime.lock")
+            return operation(fake_client)  # type: ignore[operator]
+
+        with patch("audio_cpp_runtime.service.execute_localai_operation", side_effect=execute):
+            response = TestClient(create_app("bs_roformer", _gateway_config(spec.model_id))).post(
+                spec.route,
+                files={"audio": ("song.wav", _music_wav_bytes(), "audio/wav")},
+            )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.headers["content-type"], "application/zip")
+        with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+            self.assertEqual(set(archive.namelist()), {"vocals.wav", "instrumental.wav"})
+            self.assertTrue(archive.read("vocals.wav").startswith(b"RIFF"))
+        self.assertEqual(fake_client.separation[0], spec.model_id)
+        self.assertEqual(fake_client.separation[1], _music_wav_bytes())
+
+    def test_source_separation_rejects_non_44100_wav_before_gpu_lock(self) -> None:
+        spec = MODEL_SPECS["htdemucs"]
+        with patch("audio_cpp_runtime.service.execute_localai_operation") as execute:
+            response = TestClient(create_app("htdemucs", _gateway_config(spec.model_id))).post(
+                spec.route,
+                files={"audio": ("song.wav", _music_wav_bytes(sample_rate=48_000), "audio/wav")},
+            )
+
+        self.assertEqual(response.status_code, 422, response.text)
+        execute.assert_not_called()
 
     def test_seed_vc_requires_source_and_reference_and_returns_wav(self) -> None:
         spec = MODEL_SPECS["seed_vc"]

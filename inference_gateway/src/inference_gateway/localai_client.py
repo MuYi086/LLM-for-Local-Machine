@@ -5,16 +5,18 @@ from __future__ import annotations
 import http.client
 import json
 import mimetypes
+import re
 import time
 from collections.abc import Iterable
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 from .config import GatewayConfig
 from .errors import LocalAIRequestError, LocalAIUnavailableError
 
 _MAX_JSON_BYTES = 16 * 1024 * 1024
 _MAX_AUDIO_BYTES = 512 * 1024 * 1024
+_STEM_NAME_RE = re.compile(r"^[^/\\\x00-\x1f\x7f]{1,96}$")
 
 
 class LocalAIClient:
@@ -98,13 +100,20 @@ class LocalAIClient:
         audio_path: Path,
         language: str | None,
         prompt: str | None,
+        response_format: str = "json",
+        timestamp_granularities: list[str] | None = None,
     ) -> dict[str, object]:
         """将有界上传文件流式转交 LocalAI transcription API。"""
-        fields = {"model": self._config.model, "response_format": "json"}
+        fields = {"model": self._config.model, "response_format": response_format}
         if language:
             fields["language"] = language
         if prompt:
             fields["prompt"] = prompt
+        for index, granularity in enumerate(timestamp_granularities or []):
+            field_name = (
+                "timestamp_granularities[]" if index == 0 else f"timestamp_granularities[{index}]"
+            )
+            fields[field_name] = granularity
         result = self._post_multipart(
             "/v1/audio/transcriptions",
             fields=fields,
@@ -160,6 +169,119 @@ class LocalAIClient:
             raise LocalAIRequestError("LocalAI audio-transform 未返回 RIFF/WAVE 音频。")
         return audio_bytes
 
+    def transform_audio_stems(
+        self,
+        *,
+        model: str,
+        audio_path: Path,
+        output_dir: Path,
+    ) -> dict[str, Path]:
+        """执行一次 LocalAI 分离并下载响应头列出的全部 WAV stem。"""
+        response = self._post_multipart(
+            "/audio/transform",
+            fields={"model": model, "response_format": "wav"},
+            files={
+                "audio": (
+                    audio_path.name,
+                    audio_path,
+                    mimetypes.guess_type(audio_path.name)[0] or "audio/wav",
+                )
+            },
+            expect_json=False,
+            include_response_headers=True,
+        )
+        if (
+            not isinstance(response, tuple)
+            or len(response) != 3
+            or not isinstance(response[0], bytes)
+            or not isinstance(response[2], dict)
+        ):
+            raise LocalAIRequestError("LocalAI source-separation 响应格式无效。")
+
+        stem_header = next(
+            (value for key, value in response[2].items() if key.lower() == "x-audio-stems"),
+            None,
+        )
+        entries = self._parse_audio_stems(stem_header)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        written: dict[str, Path] = {}
+        try:
+            for name, request_path in entries:
+                result = self._request(
+                    "GET",
+                    request_path,
+                    timeout=self._config.request_timeout,
+                    response_limit=_MAX_AUDIO_BYTES,
+                    expect_json=False,
+                )
+                if not isinstance(result, tuple) or not isinstance(result[0], bytes):
+                    raise LocalAIRequestError(f"LocalAI stem 响应格式无效：{name}")
+                audio_bytes = result[0]
+                if (
+                    len(audio_bytes) < 12
+                    or audio_bytes[:4] != b"RIFF"
+                    or audio_bytes[8:12] != b"WAVE"
+                ):
+                    raise LocalAIRequestError(f"LocalAI stem 不是有效 WAV：{name}")
+                destination = output_dir / f"{name}.wav"
+                with destination.open("xb") as output:
+                    output.write(audio_bytes)
+                written[name] = destination
+        except BaseException:
+            for path in written.values():
+                path.unlink(missing_ok=True)
+            raise
+        return written
+
+    @staticmethod
+    def _parse_audio_stems(header_value: str | None) -> list[tuple[str, str]]:
+        """限制 LocalAI stem 清单为唯一名称和本机生成音频路径。"""
+        if not header_value:
+            raise LocalAIRequestError("LocalAI source-separation 响应缺少 X-Audio-Stems。")
+        try:
+            entries = json.loads(header_value)
+        except json.JSONDecodeError as exc:
+            raise LocalAIRequestError("LocalAI X-Audio-Stems 不是有效 JSON。") from exc
+        if not isinstance(entries, list) or not entries:
+            raise LocalAIRequestError("LocalAI X-Audio-Stems 必须包含至少一个分轨。")
+
+        result: list[tuple[str, str]] = []
+        seen: set[str] = set()
+        for entry in entries:
+            if not isinstance(entry, dict):
+                raise LocalAIRequestError("LocalAI X-Audio-Stems 条目格式无效。")
+            name = entry.get("name")
+            url = entry.get("url")
+            if (
+                not isinstance(name, str)
+                or not _STEM_NAME_RE.fullmatch(name)
+                or name in {".", ".."}
+            ):
+                raise LocalAIRequestError("LocalAI stem 名称无效。")
+            if name in seen:
+                raise LocalAIRequestError(f"LocalAI stem 名称重复：{name}")
+            if not isinstance(url, str):
+                raise LocalAIRequestError(f"LocalAI stem 路径无效：{name}")
+            parsed = urlsplit(url)
+            encoded_name = parsed.path.removeprefix("/generated-audio/")
+            filename = unquote(encoded_name)
+            if (
+                parsed.scheme
+                or parsed.netloc
+                or parsed.query
+                or parsed.fragment
+                or not parsed.path.startswith("/generated-audio/")
+                or not filename
+                or filename in {".", ".."}
+                or "/" in filename
+                or "\\" in filename
+                or any(ord(character) < 32 or ord(character) == 127 for character in filename)
+            ):
+                raise LocalAIRequestError(f"LocalAI stem URL 不属于生成音频路径：{name}")
+            seen.add(name)
+            result.append((name, parsed.path))
+        return result
+
     def _post_multipart(
         self,
         path: str,
@@ -167,6 +289,7 @@ class LocalAIClient:
         fields: dict[str, str],
         files: dict[str, tuple[str, Path, str]],
         expect_json: bool,
+        include_response_headers: bool = False,
     ) -> object:
         """以固定 Content-Length 分块发送 multipart，避免复制整段输入音频。"""
         boundary = f"llm-local-{time.time_ns():x}"
@@ -222,6 +345,7 @@ class LocalAIClient:
             timeout=self._config.request_timeout,
             response_limit=_MAX_JSON_BYTES if expect_json else _MAX_AUDIO_BYTES,
             expect_json=expect_json,
+            include_response_headers=include_response_headers,
         )
 
     def shutdown_model(self) -> None:
@@ -270,6 +394,7 @@ class LocalAIClient:
         headers: dict[str, str] | None = None,
         response_limit: int = _MAX_JSON_BYTES,
         expect_json: bool = True,
+        include_response_headers: bool = False,
     ) -> object:
         """执行有界 HTTP 请求并限制 JSON 或音频响应大小。"""
         connection = http.client.HTTPConnection(
@@ -330,7 +455,13 @@ class LocalAIClient:
             detail = response_body.decode("utf-8", errors="replace")[:2_000]
             raise LocalAIRequestError(f"LocalAI HTTP {response.status}: {detail}")
         if not expect_json:
-            return response_body, response.getheader("Content-Type", "")
+            response_result = (response_body, response.getheader("Content-Type", ""))
+            if include_response_headers:
+                return (
+                    *response_result,
+                    {key.lower(): value for key, value in response.getheaders()},
+                )
+            return response_result
         if not response_body:
             return {}
         try:

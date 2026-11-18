@@ -111,6 +111,10 @@ export AUDIO_CPP_STABLE_AUDIO_SFX_MODEL_FILE="${AUDIO_CPP_STABLE_AUDIO_SFX_MODEL
 export AUDIO_CPP_STABLE_AUDIO_3_MEDIUM_MODEL_FILE="${AUDIO_CPP_STABLE_AUDIO_3_MEDIUM_MODEL_FILE:-$HF_MIRROR_DIR/audio.cpp-gguf/Stable-Audio-3-Medium-GGUF/stable-audio-3-medium-f16.gguf}"
 export AUDIO_CPP_MOSS_SOUNDEFFECT_MODEL_FILE="${AUDIO_CPP_MOSS_SOUNDEFFECT_MODEL_FILE:-$HF_MIRROR_DIR/audio.cpp-gguf/MOSS-SoundEffect-v2-GGUF/moss-soundeffect-v2-bf16.gguf}"
 export AUDIO_CPP_VOXCPM2_MODEL_FILE="${AUDIO_CPP_VOXCPM2_MODEL_FILE:-$HF_MIRROR_DIR/audio.cpp-gguf/VoxCPM2-GGUF/voxcpm2-q8_0.gguf}"
+export AUDIO_CPP_BS_ROFORMER_MODEL_FILE="${AUDIO_CPP_BS_ROFORMER_MODEL_FILE:-$HF_MIRROR_DIR/audio.cpp-gguf/BS-RoFormer-ep368-GGUF/bs-roformer-ep368-q8_0.gguf}"
+export AUDIO_CPP_QWEN3_FORCED_ALIGNER_MODEL_FILE="${AUDIO_CPP_QWEN3_FORCED_ALIGNER_MODEL_FILE:-$HF_MIRROR_DIR/audio.cpp-gguf/Qwen3-ForcedAligner-0.6B-GGUF/qwen3-forced-aligner-0.6b-f16.gguf}"
+export AUDIO_CPP_MEL_BAND_ROFORMER_MODEL_FILE="${AUDIO_CPP_MEL_BAND_ROFORMER_MODEL_FILE:-$HF_MIRROR_DIR/audio.cpp-gguf/Mel-Band-RoFormer-GGUF/mel-band-roformer-f16.gguf}"
+export AUDIO_CPP_HTDEMUCS_MODEL_FILE="${AUDIO_CPP_HTDEMUCS_MODEL_FILE:-$HF_MIRROR_DIR/audio.cpp-gguf/HTDemucs-GGUF/htdemucs-f16.gguf}"
 export ORNITH_MTP_9B_MODEL_FILE="${ORNITH_MTP_9B_MODEL_FILE:-$HF_MIRROR_DIR/ornith-ai/Ornith-1.5-9B-MTP-GGUF/Ornith-1.5-9B-MTP-Q8_0.gguf}"
 export ORNITH_MTP_9B_MMPROJ_FILE="${ORNITH_MTP_9B_MMPROJ_FILE:-$HF_MIRROR_DIR/ornith-ai/Ornith-1.5-9B-MTP-GGUF/mmproj-Ornith-1.5-9B-BF16.gguf}"
 export SDCPP_BIN="${SDCPP_BIN:-$HOME/.local/src/stable-diffusion.cpp/build/bin/sd-cli}"
@@ -209,6 +213,7 @@ export EASEL_BRIDGE_VOXCPM_URL="${EASEL_BRIDGE_VOXCPM_URL:-http://127.0.0.1:${VO
 AUDIO_CPP_SERVICE_KEYS=(
   confucius4_tts index_tts25 midashenglm_gen qwen3_asr
   qwen3_tts_base seed_vc stable_audio_sfx stable_audio_3_medium moss_soundeffect voxcpm2
+  bs_roformer qwen3_forced_aligner mel_band_roformer htdemucs
 )
 AUDIO_CPP_SERVICE_DIRS=(
   "$PROJECT_DIR/model-audio/tts_confucius4-tts"
@@ -221,6 +226,10 @@ AUDIO_CPP_SERVICE_DIRS=(
   "$PROJECT_DIR/model-audio/Stable-Audio-3-Medium-GGUF"
   "$PROJECT_DIR/model-audio/MOSS-SoundEffect-v2-GGUF"
   "$PROJECT_DIR/model-audio/tts_voxcpm2"
+  "$PROJECT_DIR/model-audio/BS-RoFormer-ep368-GGUF"
+  "$PROJECT_DIR/model-audio/Qwen3-ForcedAligner-0.6B-GGUF"
+  "$PROJECT_DIR/model-audio/Mel-Band-RoFormer-GGUF"
+  "$PROJECT_DIR/model-audio/HTDemucs-GGUF"
 )
 AUDIO_CPP_SERVICE_ROUTES=(
   /v1/netease/Confucius4-TTS-GGUF
@@ -233,6 +242,10 @@ AUDIO_CPP_SERVICE_ROUTES=(
   /v1/stabilityai/Stable-Audio-3-Medium-GGUF-f16
   /v1/openmoss/MOSS-SoundEffect-v2-GGUF-f16
   /v1/OpenBMB/VoxCPM2-GGUF
+  /v1/audio-cpp/BS-RoFormer-ep368-GGUF
+  /v1/audio-cpp/Qwen3-ForcedAligner-0.6B-GGUF
+  /v1/audio-cpp/Mel-Band-RoFormer-GGUF
+  /v1/audio-cpp/HTDemucs-GGUF
 )
 AUDIO_CPP_SERVICE_HOSTS=(
   "${CONFUCIUS4_TTS_HOST:-$HOST}"
@@ -245,6 +258,10 @@ AUDIO_CPP_SERVICE_HOSTS=(
   "${STABLE_AUDIO_3_MEDIUM_HOST:-$HOST}"
   "${MOSS_SOUNDEFFECT_HOST:-$HOST}"
   "${VOXCPM2_HOST:-127.0.0.1}"
+  "${BS_ROFORMER_HOST:-$HOST}"
+  "${QWEN3_FORCED_ALIGNER_HOST:-$HOST}"
+  "${MEL_BAND_ROFORMER_HOST:-$HOST}"
+  "${HTDEMUCS_HOST:-$HOST}"
 )
 AUDIO_CPP_SERVICE_PORTS=(
   "${CONFUCIUS4_TTS_PORT:-8331}"
@@ -257,6 +274,10 @@ AUDIO_CPP_SERVICE_PORTS=(
   "${STABLE_AUDIO_3_MEDIUM_PORT:-8314}"
   "${MOSS_SOUNDEFFECT_PORT:-8315}"
   "${VOXCPM2_PORT:-8313}"
+  "${BS_ROFORMER_PORT:-8344}"
+  "${QWEN3_FORCED_ALIGNER_PORT:-8345}"
+  "${MEL_BAND_ROFORMER_PORT:-8346}"
+  "${HTDEMUCS_PORT:-8347}"
 )
 
 mkdir -p \

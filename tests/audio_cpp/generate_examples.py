@@ -5,11 +5,13 @@ from __future__ import annotations
 import argparse
 import http.client
 import json
+import math
 import mimetypes
 import os
 import sys
 import uuid
 import wave
+import zipfile
 from collections.abc import Iterable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -45,6 +47,22 @@ def build_parser(*, include_models: bool = True) -> argparse.ArgumentParser:
         help="SeedVC 源 WAV；默认使用 --reference-audio。",
     )
     parser.add_argument("--reference-text", help="Qwen3-TTS Base 的参考 WAV 逐字文本。")
+    parser.add_argument(
+        "--input-audio",
+        type=Path,
+        default=os.getenv("AUDIO_CPP_TEST_INPUT_AUDIO"),
+        help="源分离或 ForcedAligner 使用的 WAV；原文件只读。",
+    )
+    parser.add_argument(
+        "--transcript",
+        default=os.getenv("AUDIO_CPP_TEST_TRANSCRIPT"),
+        help="ForcedAligner 的已知逐字稿。",
+    )
+    parser.add_argument(
+        "--language",
+        default=os.getenv("AUDIO_CPP_TEST_LANGUAGE"),
+        help="ForcedAligner 稿件语言，例如 Chinese 或 English。",
+    )
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--timeout", type=float, default=900)
     parser.add_argument("--output-dir", type=Path, default=OUTPUT_DIR)
@@ -63,17 +81,96 @@ def _model_candidates() -> list[dict[str, object]]:
     ]
 
 
-def _validate_wav(path: Path) -> None:
+def _validate_wav(path: Path, *, require_music_format: bool = False) -> None:
     """确认测试输入为带采样帧的 PCM WAV。"""
     try:
         with wave.open(str(path), "rb") as source:
             params = source.getparams()
-            frames = source.readframes(params.nframes)
+            if params.comptype != "NONE" or params.nframes <= 0:
+                raise ValueError(f"音频不是非空 PCM WAV：{path}")
+            if require_music_format and (
+                params.framerate != 44_100 or params.nchannels not in {1, 2}
+            ):
+                raise ValueError(f"分离输入必须为 44.1 kHz 单声道或立体声 WAV：{path}")
+            if params.sampwidth not in {1, 2, 3, 4}:
+                raise ValueError(f"WAV PCM 采样宽度不受支持：{path}")
+            remaining_frames = params.nframes
+            while remaining_frames:
+                frame_count = min(remaining_frames, 8_192)
+                frames = source.readframes(frame_count)
+                expected_bytes = frame_count * params.nchannels * params.sampwidth
+                if len(frames) != expected_bytes:
+                    raise ValueError(f"音频没有完整 PCM 采样帧：{path}")
+                remaining_frames -= frame_count
     except (EOFError, OSError, wave.Error) as exc:
         raise ValueError(f"音频不是有效 WAV：{path}") from exc
-    expected_bytes = params.nframes * params.nchannels * params.sampwidth
-    if params.comptype != "NONE" or params.nframes <= 0 or len(frames) != expected_bytes:
-        raise ValueError(f"音频没有完整 PCM 采样帧：{path}")
+
+
+def _write_json(output_dir: Path, model_key: str, result: dict[str, object]) -> Path:
+    """校验 JSON 对象并原子保存真实 API 响应。"""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    suffix = f"{datetime.now(UTC):%Y%m%dT%H%M%SZ}-{uuid.uuid4().hex[:8]}"
+    destination = output_dir / f"{model_key}-{suffix}.json"
+    temporary = output_dir / f".{destination.name}.{uuid.uuid4().hex}.tmp"
+    try:
+        with temporary.open("x", encoding="utf-8") as output:
+            json.dump(result, output, ensure_ascii=False, indent=2)
+            output.write("\n")
+            output.flush()
+            os.fsync(output.fileno())
+        os.replace(temporary, destination)
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
+    return destination
+
+
+def _save_zip(output_dir: Path, model_key: str, content: bytes) -> Path:
+    """校验 ZIP 中包含安全命名的 PCM WAV stems 后原子保存。"""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    suffix = f"{datetime.now(UTC):%Y%m%dT%H%M%SZ}-{uuid.uuid4().hex[:8]}"
+    destination = output_dir / f"{model_key}-{suffix}.zip"
+    temporary = output_dir / f".{destination.name}.{uuid.uuid4().hex}.tmp"
+    try:
+        with temporary.open("xb") as output:
+            output.write(content)
+            output.flush()
+            os.fsync(output.fileno())
+        with zipfile.ZipFile(temporary) as archive:
+            names = archive.namelist()
+            if not names or len(set(names)) != len(names):
+                raise ValueError("源分离 ZIP 必须含有不重复的 WAV stem。")
+            for name in names:
+                if (
+                    Path(name).name != name
+                    or "/" in name
+                    or "\\" in name
+                    or any(ord(character) < 32 or ord(character) == 127 for character in name)
+                    or not name.lower().endswith(".wav")
+                    or name in {".", ".."}
+                ):
+                    raise ValueError(f"源分离 ZIP 中存在无效文件名：{name}")
+                with archive.open(name) as stem:
+                    with wave.open(stem, "rb") as wav_file:
+                        params = wav_file.getparams()
+                        if params.comptype != "NONE" or params.nframes <= 0:
+                            raise ValueError(f"分离 stem 不是非空 PCM WAV：{name}")
+                        remaining_frames = params.nframes
+                        while remaining_frames:
+                            frame_count = min(remaining_frames, 8_192)
+                            frames = wav_file.readframes(frame_count)
+                            expected_bytes = frame_count * params.nchannels * params.sampwidth
+                            if len(frames) != expected_bytes:
+                                raise ValueError(f"分离 stem PCM 数据不完整：{name}")
+                            remaining_frames -= frame_count
+        os.replace(temporary, destination)
+    except (OSError, EOFError, wave.Error, zipfile.BadZipFile) as exc:
+        temporary.unlink(missing_ok=True)
+        raise ValueError(f"源分离 API 未返回有效的 WAV ZIP：{exc}") from exc
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
+    return destination
 
 
 def _multipart_body(
@@ -193,6 +290,9 @@ def _generate_one(
     reference_audio: Path | None,
     reference_text: str | None,
     source_audio: Path | None,
+    input_audio: Path | None,
+    transcript: str | None,
+    language: str | None,
     output_dir: Path,
 ) -> Path:
     """调用一个模型，校验返回合同并保存输出。"""
@@ -234,14 +334,43 @@ def _generate_one(
         result = json.loads(content)
         if not isinstance(result, dict) or not isinstance(result.get("text"), str):
             raise ValueError(f"{key} 没有返回转写文本 JSON。")
-        output_dir.mkdir(parents=True, exist_ok=True)
-        destination = output_dir / f"{key}-{datetime.now(UTC):%Y%m%dT%H%M%SZ}.json"
-        temporary = destination.with_name(f".{destination.name}.{uuid.uuid4().hex}.tmp")
-        temporary.write_text(
-            json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        return _write_json(output_dir, key, result)
+
+    if kind == "forced_alignment":
+        if input_audio is None:
+            raise ValueError("Qwen3 ForcedAligner 需要通过 --input-audio 指定 WAV。")
+        if not transcript or not transcript.strip():
+            raise ValueError("Qwen3 ForcedAligner 需要通过 --transcript 指定已知逐字稿。")
+        if not language or not language.strip():
+            raise ValueError("Qwen3 ForcedAligner 需要通过 --language 指定稿件语言。")
+        content, _ = _post(
+            host,
+            port,
+            route,
+            timeout=timeout,
+            form_fields={"text": transcript.strip(), "language": language.strip()},
+            files={"audio": input_audio},
         )
-        os.replace(temporary, destination)
-        return destination
+        result = json.loads(content)
+        if not isinstance(result, dict) or not _has_valid_word_timestamps(result.get("words")):
+            raise ValueError(f"{key} 没有返回有效的词级时间戳 JSON。")
+        return _write_json(output_dir, key, result)
+
+    if kind == "source_separation":
+        if input_audio is None:
+            raise ValueError(f"{key} 需要通过 --input-audio 指定 44.1 kHz WAV。")
+        _validate_wav(input_audio, require_music_format=True)
+        content, content_type = _post(
+            host,
+            port,
+            route,
+            timeout=timeout,
+            form_fields={},
+            files={"audio": input_audio},
+        )
+        if "zip" not in content_type.lower():
+            raise ValueError(f"{key} 没有返回 ZIP 分离音轨：{content_type}")
+        return _save_zip(output_dir, key, content)
 
     if kind == "voice_conversion":
         if reference_audio is None:
@@ -274,9 +403,7 @@ def _generate_one(
                 "A warm cinematic ambient music bed with soft evolving synthesizers, "
                 "gentle piano, and a gradual spacious swell."
             ),
-            "moss_soundeffect": (
-                "Steady rain pattering on a wooden roof, with distant thunder."
-            ),
+            "moss_soundeffect": ("Steady rain pattering on a wooden roof, with distant thunder."),
         }
         content, _ = _post(
             host,
@@ -290,6 +417,35 @@ def _generate_one(
     raise ValueError(f"测试脚本未支持的 audio.cpp 服务类型：{kind}")
 
 
+def _has_valid_word_timestamps(words: object) -> bool:
+    """确认 ForcedAligner demo 响应含有效词级时间戳。"""
+    if not isinstance(words, list) or not words:
+        return False
+    for word in words:
+        if not isinstance(word, dict):
+            return False
+        label = word.get("text", word.get("word"))
+        start = word.get("start")
+        end = word.get("end")
+        if (
+            not isinstance(label, str)
+            or not label.strip()
+            or not isinstance(start, (int, float))
+            or not isinstance(end, (int, float))
+            or isinstance(start, bool)
+            or isinstance(end, bool)
+            or start < 0
+            or end <= start
+        ):
+            return False
+        try:
+            if not math.isfinite(start) or not math.isfinite(end):
+                return False
+        except OverflowError:
+            return False
+    return True
+
+
 def generate_examples(
     *,
     model_keys: list[str],
@@ -298,6 +454,9 @@ def generate_examples(
     reference_audio: Path | None,
     reference_text: str | None,
     source_audio: Path | None,
+    input_audio: Path | None,
+    transcript: str | None,
+    language: str | None,
     output_dir: Path,
 ) -> list[Path]:
     """依候选清单顺序串行生成所选模型的示例。"""
@@ -318,10 +477,29 @@ def generate_examples(
         raise ValueError("所选任务需要通过 --reference-audio 指定本地 PCM WAV。")
     if "qwen3_tts_base" in selected_keys and not reference_text:
         raise ValueError("Qwen3-TTS Base 需要通过 --reference-text 提供参考音频逐字稿。")
+    input_audio_keys = {
+        key
+        for key in selected_keys
+        if by_key[key]["service"]["kind"] in {"source_separation", "forced_alignment"}
+    }
+    if input_audio_keys and input_audio is None:
+        raise ValueError("源分离和 ForcedAligner 需要通过 --input-audio 指定本地 WAV。")
+    if "qwen3_forced_aligner" in selected_keys:
+        if not transcript:
+            raise ValueError("Qwen3 ForcedAligner 需要通过 --transcript 指定已知逐字稿。")
+        if not language:
+            raise ValueError("Qwen3 ForcedAligner 需要通过 --language 指定稿件语言。")
     if reference_audio is not None:
         _validate_wav(reference_audio)
     if source_audio is not None and source_audio != reference_audio:
         _validate_wav(source_audio)
+    if input_audio is not None:
+        _validate_wav(
+            input_audio,
+            require_music_format=any(
+                by_key[key]["service"]["kind"] == "source_separation" for key in input_audio_keys
+            ),
+        )
     if "seed_vc" in selected_keys and source_audio is None:
         source_audio = reference_audio
 
@@ -335,6 +513,9 @@ def generate_examples(
             reference_audio=reference_audio,
             reference_text=reference_text,
             source_audio=source_audio,
+            input_audio=input_audio,
+            transcript=transcript,
+            language=language,
             output_dir=output_dir,
         )
         output_paths.append(path)
@@ -362,6 +543,11 @@ def _execute(model_keys: list[str], arguments: argparse.Namespace) -> int:
         if arguments.source_audio is not None
         else reference_audio
     )
+    input_audio = (
+        Path(arguments.input_audio).expanduser().resolve()
+        if arguments.input_audio is not None
+        else None
+    )
     output_dir = Path(arguments.output_dir).expanduser().resolve()
     try:
         generate_examples(
@@ -371,6 +557,9 @@ def _execute(model_keys: list[str], arguments: argparse.Namespace) -> int:
             reference_audio=reference_audio,
             reference_text=arguments.reference_text,
             source_audio=source_audio,
+            input_audio=input_audio,
+            transcript=arguments.transcript,
+            language=arguments.language,
             output_dir=output_dir,
         )
     except (

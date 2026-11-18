@@ -41,6 +41,10 @@ class LocalAIActiveScopeTests(unittest.TestCase):
             "audio_cpp_stable_audio_3_medium",
             "audio_cpp_moss_soundeffect",
             "audio_cpp_voxcpm2",
+            "audio_cpp_bs_roformer",
+            "audio_cpp_qwen3_forced_aligner",
+            "audio_cpp_mel_band_roformer",
+            "audio_cpp_htdemucs",
         }
         self.assertEqual(
             {service["project"] for service in manifest["services"]},
@@ -58,16 +62,16 @@ class LocalAIActiveScopeTests(unittest.TestCase):
             version_manifest["active_model"]["name"],
             "llm-local.qwen3-tts.1p7b-voicedesign",
         )
-        self.assertEqual(version_manifest["audio_cpp_model_candidate_count"], 11)
+        self.assertEqual(version_manifest["audio_cpp_model_candidate_count"], 15)
         self.assertNotIn("qwen3_tts_candidates", version_manifest)
 
     def test_capability_validator_resolves_shared_audio_cpp_router(self) -> None:
         summary = validate_capabilities_manifest()
 
-        self.assertEqual(summary.service_count, 12)
+        self.assertEqual(summary.service_count, 16)
         self.assertEqual(summary.uv_project_count, 3)
-        self.assertEqual(summary.route_count, 27)
-        self.assertEqual(summary.family_candidate_count, 11)
+        self.assertEqual(summary.route_count, 35)
+        self.assertEqual(summary.family_candidate_count, 15)
 
     def test_qa_dependencies_and_quality_gate_exclude_retired_integrations(self) -> None:
         qa_project = (ROOT / "qa/pyproject.toml").read_text()

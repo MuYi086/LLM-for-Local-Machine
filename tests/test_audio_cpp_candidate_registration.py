@@ -40,11 +40,11 @@ class AudioCppCandidateRegistrationTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.temporary.cleanup()
 
-    def test_registers_all_eleven_local_candidates_and_verifies_each(self) -> None:
+    def test_registers_all_fifteen_local_candidates_and_verifies_each(self) -> None:
         self.manager.register_audio_cpp_candidates()
         self.manager.verify_audio_cpp_candidates()
 
-        self.assertEqual(len(list(self.models_dir.glob("*.yaml"))), 11)
+        self.assertEqual(len(list(self.models_dir.glob("*.yaml"))), 15)
         for candidate in self.models:
             model_id = candidate["model_id"]
             reference = self.models_dir / f"{model_id}.gguf"
@@ -61,6 +61,53 @@ class AudioCppCandidateRegistrationTests(unittest.TestCase):
             config = (self.models_dir / f"{model_id}.yaml").read_text()
             self.assertIn(f"family:{candidate['family']}", config)
             self.assertIn(f"task:{candidate['task']}", config)
+
+    def test_new_audio_tools_use_the_existing_mirror_files_and_service_routes(self) -> None:
+        expected = {
+            "bs_roformer": (
+                "BS-RoFormer-ep368-GGUF",
+                "bs-roformer-ep368-q8_0.gguf",
+                "bs_roformer",
+                "sep",
+                8344,
+            ),
+            "qwen3_forced_aligner": (
+                "Qwen3-ForcedAligner-0.6B-GGUF",
+                "qwen3-forced-aligner-0.6b-f16.gguf",
+                "qwen3_forced_aligner",
+                "align",
+                8345,
+            ),
+            "mel_band_roformer": (
+                "Mel-Band-RoFormer-GGUF",
+                "mel-band-roformer-f16.gguf",
+                "mel_band_roformer",
+                "sep",
+                8346,
+            ),
+            "htdemucs": (
+                "HTDemucs-GGUF",
+                "htdemucs-f16.gguf",
+                "htdemucs",
+                "sep",
+                8347,
+            ),
+        }
+        candidates = {candidate["key"]: candidate for candidate in self.models}
+
+        for key, values in expected.items():
+            with self.subTest(key=key):
+                source_directory, filename, family, task, port = values
+                candidate = candidates[key]
+                service = candidate["service"]
+                self.assertEqual(candidate["source_directory"], source_directory)
+                self.assertEqual(candidate["required_file"], filename)
+                self.assertEqual(candidate["family"], family)
+                self.assertEqual(candidate["task"], task)
+                self.assertEqual(service["runtime"], "audio_cpp_runtime")
+                self.assertEqual(service["directory"], f"model-audio/{source_directory}")
+                self.assertEqual(service["port"], port)
+                self.assertEqual(service["route"], f"/v1/audio-cpp/{source_directory}")
 
     def test_missing_candidate_prevents_partial_registration(self) -> None:
         (

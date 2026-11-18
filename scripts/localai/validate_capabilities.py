@@ -20,6 +20,8 @@ _AUDIO_CPP_ROUTE_FUNCTIONS = {
     "tts_optional_reference": "tts_optional_reference",
     "sound_generation": "sound_generation",
     "asr": "asr",
+    "forced_alignment": "forced_alignment",
+    "source_separation": "source_separation",
     "voice_conversion": "voice_conversion",
 }
 _AUDIO_CPP_FAMILY_SCREEN_STATUSES = {

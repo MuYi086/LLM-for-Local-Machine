@@ -23,6 +23,7 @@ lint_paths=(
     scripts/sdcpp
     scripts/dagu
     scripts/model_telemetry.py
+    scripts/check_service_inventory.py
     model-text/llama_cpp_runtime
     model-text/Ornith-1.5-9B-MTP-GGUF
     model-image
@@ -48,11 +49,18 @@ lint_paths+=(
     model-audio/vc_seed-vc
     model-audio/gen_stable-audio-3-small-sfx
     model-audio/tts_voxcpm2
+    model-audio/Stable-Audio-3-Medium-GGUF
+    model-audio/MOSS-SoundEffect-v2-GGUF
+    model-audio/BS-RoFormer-ep368-GGUF
+    model-audio/Qwen3-ForcedAligner-0.6B-GGUF
+    model-audio/Mel-Band-RoFormer-GGUF
+    model-audio/HTDemucs-GGUF
 )
 
 uv run --project qa --locked ruff check "${lint_paths[@]}"
 uv run --project qa --locked ruff format --check "${lint_paths[@]}"
 
 uv run --project qa --locked python scripts/localai/validate_capabilities.py
+uv run --project qa --locked python scripts/check_service_inventory.py
 uv run --project qa --locked python -m unittest discover -s tests -v
 # 此目录没有 __init__.py，默认 discovery 不会递归进入，需要显式执行。

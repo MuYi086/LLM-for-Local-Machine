@@ -72,8 +72,8 @@ def _read_model_specs() -> dict[str, ModelSpec]:
         routes.add(route)
         ports.add(port)
         specs[key] = ModelSpec(**values)
-    if len(specs) != 10:
-        raise RuntimeError(f"当前 audio.cpp runtime 应登记 10 个模型服务，实际为 {len(specs)} 个。")
+    if len(specs) != 14:
+        raise RuntimeError(f"当前 audio.cpp runtime 应登记 14 个模型服务，实际为 {len(specs)} 个。")
     return specs
 
 

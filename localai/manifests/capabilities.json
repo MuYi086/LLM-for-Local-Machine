@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "captured_on": "2026-11-15",
+  "captured_on": "2026-11-17",
   "repository_head": "audio-cpp-gguf-integration-working-tree",
   "evidence_level": "E0",
-  "evidence_note": "活动能力清单覆盖 main 控制面、Qwen3-TTS VoiceDesign 与十个新增 audio.cpp 服务合同；上游 family/task 匹配仅为 E1 候选，不代表本地推理验收。",
+  "evidence_note": "活动能力清单覆盖 main 控制面、Qwen3-TTS VoiceDesign 与十四个 audio.cpp 服务合同；上游 family/task 匹配仅为 E1 候选，不代表本地推理验收。",
   "service_count_with_uv_projects": 3,
   "services": [
     {
@@ -646,7 +646,7 @@
           "method": "GET",
           "path": "/v1/health",
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-          "line": 333,
+          "line": 503,
           "parameters": [],
           "request_schemas": []
         },
@@ -654,7 +654,7 @@
           "method": "POST",
           "path": "/v1/netease/Confucius4-TTS-GGUF",
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-          "line": 345,
+          "line": 515,
           "parameters": [
             {
               "name": "text",
@@ -692,7 +692,7 @@
             "method": "GET",
             "path": "/v1/health",
             "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-            "line": 333,
+            "line": 503,
             "source_fields": [],
             "field_mappings": [],
             "status": "active_contract"
@@ -701,7 +701,7 @@
             "method": "POST",
             "path": "/v1/netease/Confucius4-TTS-GGUF",
             "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-            "line": 345,
+            "line": 515,
             "source_fields": [
               {
                 "name": "text",
@@ -776,7 +776,7 @@
           "method": "GET",
           "path": "/v1/health",
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-          "line": 333,
+          "line": 503,
           "parameters": [],
           "request_schemas": []
         },
@@ -784,7 +784,7 @@
           "method": "POST",
           "path": "/v1/indexTeam/IndexTTS2.5-GGUF",
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-          "line": 345,
+          "line": 515,
           "parameters": [
             {
               "name": "text",
@@ -822,7 +822,7 @@
             "method": "GET",
             "path": "/v1/health",
             "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-            "line": 333,
+            "line": 503,
             "source_fields": [],
             "field_mappings": [],
             "status": "active_contract"
@@ -831,7 +831,7 @@
             "method": "POST",
             "path": "/v1/indexTeam/IndexTTS2.5-GGUF",
             "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-            "line": 345,
+            "line": 515,
             "source_fields": [
               {
                 "name": "text",
@@ -902,7 +902,7 @@
       "schema_source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
       "request_schemas": {
         "SoundGenerationRequest": {
-          "line": 40,
+          "line": 45,
           "inherits": [],
           "fields": [
             {
@@ -916,7 +916,7 @@
               },
               "required": true,
               "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-              "line": 45
+              "line": 50
             },
             {
               "name": "duration_seconds",
@@ -929,7 +929,7 @@
               },
               "required": false,
               "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-              "line": 46
+              "line": 51
             }
           ],
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py"
@@ -940,7 +940,7 @@
           "method": "GET",
           "path": "/v1/health",
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-          "line": 333,
+          "line": 503,
           "parameters": [],
           "request_schemas": []
         },
@@ -948,7 +948,7 @@
           "method": "POST",
           "path": "/v1/mi/MiDashengLM-Gen-GGUF",
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-          "line": 385,
+          "line": 555,
           "parameters": [
             {
               "name": "payload",
@@ -970,7 +970,7 @@
             "method": "GET",
             "path": "/v1/health",
             "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-            "line": 333,
+            "line": 503,
             "source_fields": [],
             "field_mappings": [],
             "status": "active_contract"
@@ -979,44 +979,30 @@
             "method": "POST",
             "path": "/v1/mi/MiDashengLM-Gen-GGUF",
             "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-            "line": 385,
+            "line": 555,
             "source_fields": [
               {
                 "name": "text",
                 "type": "str",
                 "default": null,
-                "default_factory": null,
-                "constraints": {
-                  "min_length": "1",
-                  "max_length": "2000"
-                },
-                "required": true,
-                "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-                "line": 45
+                "required": true
               },
               {
                 "name": "duration_seconds",
                 "type": "float",
                 "default": "8",
-                "default_factory": null,
-                "constraints": {
-                  "gt": "0",
-                  "le": "30"
-                },
-                "required": false,
-                "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-                "line": 46
+                "required": false
               }
             ],
             "field_mappings": [
               {
                 "source_field": "text",
-                "destination_field": "service_contract.text",
+                "destination_field": "request.text",
                 "status": "active_contract"
               },
               {
                 "source_field": "duration_seconds",
-                "destination_field": "service_contract.duration_seconds",
+                "destination_field": "request.params.duration_sec",
                 "status": "active_contract"
               }
             ],
@@ -1046,7 +1032,7 @@
           "method": "GET",
           "path": "/v1/health",
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-          "line": 333,
+          "line": 503,
           "parameters": [],
           "request_schemas": []
         },
@@ -1054,7 +1040,7 @@
           "method": "POST",
           "path": "/v1/qwen/Qwen3-ASR-1.7B-GGUF",
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-          "line": 392,
+          "line": 562,
           "parameters": [
             {
               "name": "audio",
@@ -1086,7 +1072,7 @@
             "method": "GET",
             "path": "/v1/health",
             "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-            "line": 333,
+            "line": 503,
             "source_fields": [],
             "field_mappings": [],
             "status": "active_contract"
@@ -1095,7 +1081,7 @@
             "method": "POST",
             "path": "/v1/qwen/Qwen3-ASR-1.7B-GGUF",
             "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-            "line": 392,
+            "line": 562,
             "source_fields": [
               {
                 "name": "audio",
@@ -1159,7 +1145,7 @@
           "method": "GET",
           "path": "/v1/health",
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-          "line": 333,
+          "line": 503,
           "parameters": [],
           "request_schemas": []
         },
@@ -1167,7 +1153,7 @@
           "method": "POST",
           "path": "/v1/qwen/Qwen3-TTS-12Hz-1.7B-Base-GGUF",
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-          "line": 345,
+          "line": 515,
           "parameters": [
             {
               "name": "text",
@@ -1205,7 +1191,7 @@
             "method": "GET",
             "path": "/v1/health",
             "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-            "line": 333,
+            "line": 503,
             "source_fields": [],
             "field_mappings": [],
             "status": "active_contract"
@@ -1214,7 +1200,7 @@
             "method": "POST",
             "path": "/v1/qwen/Qwen3-TTS-12Hz-1.7B-Base-GGUF",
             "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-            "line": 345,
+            "line": 515,
             "source_fields": [
               {
                 "name": "text",
@@ -1289,7 +1275,7 @@
           "method": "GET",
           "path": "/v1/health",
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-          "line": 333,
+          "line": 503,
           "parameters": [],
           "request_schemas": []
         },
@@ -1297,7 +1283,7 @@
           "method": "POST",
           "path": "/v1/SeedVC/SeedVC-MLX-GGUF",
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-          "line": 409,
+          "line": 603,
           "parameters": [
             {
               "name": "audio",
@@ -1323,7 +1309,7 @@
             "method": "GET",
             "path": "/v1/health",
             "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-            "line": 333,
+            "line": 503,
             "source_fields": [],
             "field_mappings": [],
             "status": "active_contract"
@@ -1332,7 +1318,7 @@
             "method": "POST",
             "path": "/v1/SeedVC/SeedVC-MLX-GGUF",
             "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-            "line": 409,
+            "line": 603,
             "source_fields": [
               {
                 "name": "audio",
@@ -1381,7 +1367,7 @@
       "schema_source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
       "request_schemas": {
         "SoundGenerationRequest": {
-          "line": 40,
+          "line": 45,
           "inherits": [],
           "fields": [
             {
@@ -1395,7 +1381,7 @@
               },
               "required": true,
               "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-              "line": 45
+              "line": 50
             },
             {
               "name": "duration_seconds",
@@ -1408,7 +1394,7 @@
               },
               "required": false,
               "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-              "line": 46
+              "line": 51
             }
           ],
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py"
@@ -1419,7 +1405,7 @@
           "method": "GET",
           "path": "/v1/health",
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-          "line": 333,
+          "line": 503,
           "parameters": [],
           "request_schemas": []
         },
@@ -1427,7 +1413,7 @@
           "method": "POST",
           "path": "/v1/stabilityai/Stable-Audio-3-Small-SFX-GGUF",
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-          "line": 385,
+          "line": 555,
           "parameters": [
             {
               "name": "payload",
@@ -1449,7 +1435,7 @@
             "method": "GET",
             "path": "/v1/health",
             "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-            "line": 333,
+            "line": 503,
             "source_fields": [],
             "field_mappings": [],
             "status": "active_contract"
@@ -1458,44 +1444,30 @@
             "method": "POST",
             "path": "/v1/stabilityai/Stable-Audio-3-Small-SFX-GGUF",
             "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-            "line": 385,
+            "line": 555,
             "source_fields": [
               {
                 "name": "text",
                 "type": "str",
                 "default": null,
-                "default_factory": null,
-                "constraints": {
-                  "min_length": "1",
-                  "max_length": "2000"
-                },
-                "required": true,
-                "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-                "line": 45
+                "required": true
               },
               {
                 "name": "duration_seconds",
                 "type": "float",
                 "default": "8",
-                "default_factory": null,
-                "constraints": {
-                  "gt": "0",
-                  "le": "30"
-                },
-                "required": false,
-                "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-                "line": 46
+                "required": false
               }
             ],
             "field_mappings": [
               {
                 "source_field": "text",
-                "destination_field": "service_contract.text",
+                "destination_field": "request.text",
                 "status": "active_contract"
               },
               {
                 "source_field": "duration_seconds",
-                "destination_field": "service_contract.duration_seconds",
+                "destination_field": "request.duration_seconds",
                 "status": "active_contract"
               }
             ],
@@ -1521,7 +1493,7 @@
       "schema_source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
       "request_schemas": {
         "SoundGenerationRequest": {
-          "line": 40,
+          "line": 45,
           "inherits": [],
           "fields": [
             {
@@ -1535,7 +1507,7 @@
               },
               "required": true,
               "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-              "line": 45
+              "line": 50
             },
             {
               "name": "duration_seconds",
@@ -1548,7 +1520,7 @@
               },
               "required": false,
               "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-              "line": 46
+              "line": 51
             }
           ],
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py"
@@ -1559,7 +1531,7 @@
           "method": "GET",
           "path": "/v1/health",
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-          "line": 333,
+          "line": 503,
           "parameters": [],
           "request_schemas": []
         },
@@ -1567,7 +1539,7 @@
           "method": "POST",
           "path": "/v1/stabilityai/Stable-Audio-3-Medium-GGUF-f16",
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-          "line": 385,
+          "line": 555,
           "parameters": [
             {
               "name": "payload",
@@ -1589,7 +1561,7 @@
             "method": "GET",
             "path": "/v1/health",
             "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-            "line": 333,
+            "line": 503,
             "source_fields": [],
             "field_mappings": [],
             "status": "active_contract"
@@ -1598,44 +1570,30 @@
             "method": "POST",
             "path": "/v1/stabilityai/Stable-Audio-3-Medium-GGUF-f16",
             "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-            "line": 385,
+            "line": 555,
             "source_fields": [
               {
                 "name": "text",
                 "type": "str",
                 "default": null,
-                "default_factory": null,
-                "constraints": {
-                  "min_length": "1",
-                  "max_length": "2000"
-                },
-                "required": true,
-                "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-                "line": 45
+                "required": true
               },
               {
                 "name": "duration_seconds",
                 "type": "float",
                 "default": "8",
-                "default_factory": null,
-                "constraints": {
-                  "gt": "0",
-                  "le": "30"
-                },
-                "required": false,
-                "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-                "line": 46
+                "required": false
               }
             ],
             "field_mappings": [
               {
                 "source_field": "text",
-                "destination_field": "service_contract.text",
+                "destination_field": "request.text",
                 "status": "active_contract"
               },
               {
                 "source_field": "duration_seconds",
-                "destination_field": "service_contract.duration_seconds",
+                "destination_field": "request.duration_seconds",
                 "status": "active_contract"
               }
             ],
@@ -1661,7 +1619,7 @@
       "schema_source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
       "request_schemas": {
         "SoundGenerationRequest": {
-          "line": 40,
+          "line": 45,
           "inherits": [],
           "fields": [
             {
@@ -1675,7 +1633,7 @@
               },
               "required": true,
               "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-              "line": 45
+              "line": 50
             },
             {
               "name": "duration_seconds",
@@ -1688,7 +1646,7 @@
               },
               "required": false,
               "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-              "line": 46
+              "line": 51
             }
           ],
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py"
@@ -1699,7 +1657,7 @@
           "method": "GET",
           "path": "/v1/health",
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-          "line": 333,
+          "line": 503,
           "parameters": [],
           "request_schemas": []
         },
@@ -1707,7 +1665,7 @@
           "method": "POST",
           "path": "/v1/openmoss/MOSS-SoundEffect-v2-GGUF-f16",
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-          "line": 385,
+          "line": 555,
           "parameters": [
             {
               "name": "payload",
@@ -1729,7 +1687,7 @@
             "method": "GET",
             "path": "/v1/health",
             "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-            "line": 333,
+            "line": 503,
             "source_fields": [],
             "field_mappings": [],
             "status": "active_contract"
@@ -1738,44 +1696,30 @@
             "method": "POST",
             "path": "/v1/openmoss/MOSS-SoundEffect-v2-GGUF-f16",
             "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-            "line": 385,
+            "line": 555,
             "source_fields": [
               {
                 "name": "text",
                 "type": "str",
                 "default": null,
-                "default_factory": null,
-                "constraints": {
-                  "min_length": "1",
-                  "max_length": "2000"
-                },
-                "required": true,
-                "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-                "line": 45
+                "required": true
               },
               {
                 "name": "duration_seconds",
                 "type": "float",
                 "default": "8",
-                "default_factory": null,
-                "constraints": {
-                  "gt": "0",
-                  "le": "30"
-                },
-                "required": false,
-                "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-                "line": 46
+                "required": false
               }
             ],
             "field_mappings": [
               {
                 "source_field": "text",
-                "destination_field": "service_contract.text",
+                "destination_field": "request.text",
                 "status": "active_contract"
               },
               {
                 "source_field": "duration_seconds",
-                "destination_field": "service_contract.duration_seconds",
+                "destination_field": "request.params.duration_sec",
                 "status": "active_contract"
               }
             ],
@@ -1805,7 +1749,7 @@
           "method": "GET",
           "path": "/v1/health",
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-          "line": 333,
+          "line": 503,
           "parameters": [],
           "request_schemas": []
         },
@@ -1813,7 +1757,7 @@
           "method": "POST",
           "path": "/v1/OpenBMB/VoxCPM2-GGUF",
           "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-          "line": 364,
+          "line": 534,
           "parameters": [
             {
               "name": "text",
@@ -1857,7 +1801,7 @@
             "method": "GET",
             "path": "/v1/health",
             "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-            "line": 333,
+            "line": 503,
             "source_fields": [],
             "field_mappings": [],
             "status": "active_contract"
@@ -1866,7 +1810,7 @@
             "method": "POST",
             "path": "/v1/OpenBMB/VoxCPM2-GGUF",
             "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
-            "line": 364,
+            "line": 534,
             "source_fields": [
               {
                 "name": "text",
@@ -1923,6 +1867,356 @@
               {
                 "source_field": "instruction",
                 "destination_field": "service_contract.instruction",
+                "status": "active_contract"
+              }
+            ],
+            "status": "active_contract"
+          }
+        ]
+      }
+    },
+    {
+      "project": "audio_cpp_bs_roformer",
+      "directory": "model-audio/BS-RoFormer-ep368-GGUF",
+      "uv_project_directory": "model-audio/audio_cpp_runtime",
+      "ports": [
+        8344
+      ],
+      "phase": "active",
+      "scope": "local_audio_model",
+      "kind": "audio_cpp_model",
+      "description": "BS-RoFormer 人声与伴奏分离",
+      "dynamic_model_key": "bs_roformer",
+      "dynamic_route": "/v1/audio-cpp/BS-RoFormer-ep368-GGUF",
+      "dynamic_kind": "source_separation",
+      "schema_source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
+      "request_schemas": {},
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/v1/health",
+          "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
+          "line": 503,
+          "parameters": [],
+          "request_schemas": []
+        },
+        {
+          "method": "POST",
+          "path": "/v1/audio-cpp/BS-RoFormer-ep368-GGUF",
+          "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
+          "line": 596,
+          "parameters": [
+            {
+              "name": "audio",
+              "type": "Annotated[UploadFile, File(...)]",
+              "default": null,
+              "required": true
+            }
+          ],
+          "request_schemas": []
+        }
+      ],
+      "migration_field_mapping": {
+        "status": "active_contract",
+        "destination_candidate": "LocalAI/audio.cpp source separation/sep",
+        "routes": [
+          {
+            "method": "GET",
+            "path": "/v1/health",
+            "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
+            "line": 503,
+            "source_fields": [],
+            "field_mappings": [],
+            "status": "active_contract"
+          },
+          {
+            "method": "POST",
+            "path": "/v1/audio-cpp/BS-RoFormer-ep368-GGUF",
+            "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
+            "line": 596,
+            "source_fields": [
+              {
+                "name": "audio",
+                "type": "Annotated[UploadFile, File(...)]",
+                "default": null,
+                "required": true
+              }
+            ],
+            "field_mappings": [
+              {
+                "source_field": "audio",
+                "destination_field": "service_contract.audio",
+                "status": "active_contract"
+              }
+            ],
+            "status": "active_contract"
+          }
+        ]
+      }
+    },
+    {
+      "project": "audio_cpp_qwen3_forced_aligner",
+      "directory": "model-audio/Qwen3-ForcedAligner-0.6B-GGUF",
+      "uv_project_directory": "model-audio/audio_cpp_runtime",
+      "ports": [
+        8345
+      ],
+      "phase": "active",
+      "scope": "local_audio_model",
+      "kind": "audio_cpp_model",
+      "description": "Qwen3 ForcedAligner 词级时间戳对齐",
+      "dynamic_model_key": "qwen3_forced_aligner",
+      "dynamic_route": "/v1/audio-cpp/Qwen3-ForcedAligner-0.6B-GGUF",
+      "dynamic_kind": "forced_alignment",
+      "schema_source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
+      "request_schemas": {},
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/v1/health",
+          "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
+          "line": 503,
+          "parameters": [],
+          "request_schemas": []
+        },
+        {
+          "method": "POST",
+          "path": "/v1/audio-cpp/Qwen3-ForcedAligner-0.6B-GGUF",
+          "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
+          "line": 579,
+          "parameters": [
+            {
+              "name": "audio",
+              "type": "Annotated[UploadFile, File(...)]",
+              "default": null,
+              "required": true
+            },
+            {
+              "name": "text",
+              "type": "Annotated[str, Form(min_length=1, max_length=12000)]",
+              "default": null,
+              "required": true
+            },
+            {
+              "name": "language",
+              "type": "Annotated[str, Form(min_length=1, max_length=32)]",
+              "default": null,
+              "required": true
+            }
+          ],
+          "request_schemas": []
+        }
+      ],
+      "migration_field_mapping": {
+        "status": "active_contract",
+        "destination_candidate": "LocalAI/audio.cpp qwen3_forced_aligner/align",
+        "routes": [
+          {
+            "method": "GET",
+            "path": "/v1/health",
+            "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
+            "line": 503,
+            "source_fields": [],
+            "field_mappings": [],
+            "status": "active_contract"
+          },
+          {
+            "method": "POST",
+            "path": "/v1/audio-cpp/Qwen3-ForcedAligner-0.6B-GGUF",
+            "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
+            "line": 579,
+            "source_fields": [
+              {
+                "name": "audio",
+                "type": "Annotated[UploadFile, File(...)]",
+                "default": null,
+                "required": true
+              },
+              {
+                "name": "text",
+                "type": "Annotated[str, Form(min_length=1, max_length=12000)]",
+                "default": null,
+                "required": true
+              },
+              {
+                "name": "language",
+                "type": "Annotated[str, Form(min_length=1, max_length=32)]",
+                "default": null,
+                "required": true
+              }
+            ],
+            "field_mappings": [
+              {
+                "source_field": "audio",
+                "destination_field": "service_contract.audio",
+                "status": "active_contract"
+              },
+              {
+                "source_field": "text",
+                "destination_field": "service_contract.text",
+                "status": "active_contract"
+              },
+              {
+                "source_field": "language",
+                "destination_field": "service_contract.language",
+                "status": "active_contract"
+              }
+            ],
+            "status": "active_contract"
+          }
+        ]
+      }
+    },
+    {
+      "project": "audio_cpp_mel_band_roformer",
+      "directory": "model-audio/Mel-Band-RoFormer-GGUF",
+      "uv_project_directory": "model-audio/audio_cpp_runtime",
+      "ports": [
+        8346
+      ],
+      "phase": "active",
+      "scope": "local_audio_model",
+      "kind": "audio_cpp_model",
+      "description": "Mel-Band RoFormer 音乐源分离",
+      "dynamic_model_key": "mel_band_roformer",
+      "dynamic_route": "/v1/audio-cpp/Mel-Band-RoFormer-GGUF",
+      "dynamic_kind": "source_separation",
+      "schema_source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
+      "request_schemas": {},
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/v1/health",
+          "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
+          "line": 503,
+          "parameters": [],
+          "request_schemas": []
+        },
+        {
+          "method": "POST",
+          "path": "/v1/audio-cpp/Mel-Band-RoFormer-GGUF",
+          "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
+          "line": 596,
+          "parameters": [
+            {
+              "name": "audio",
+              "type": "Annotated[UploadFile, File(...)]",
+              "default": null,
+              "required": true
+            }
+          ],
+          "request_schemas": []
+        }
+      ],
+      "migration_field_mapping": {
+        "status": "active_contract",
+        "destination_candidate": "LocalAI/audio.cpp source separation/sep",
+        "routes": [
+          {
+            "method": "GET",
+            "path": "/v1/health",
+            "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
+            "line": 503,
+            "source_fields": [],
+            "field_mappings": [],
+            "status": "active_contract"
+          },
+          {
+            "method": "POST",
+            "path": "/v1/audio-cpp/Mel-Band-RoFormer-GGUF",
+            "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
+            "line": 596,
+            "source_fields": [
+              {
+                "name": "audio",
+                "type": "Annotated[UploadFile, File(...)]",
+                "default": null,
+                "required": true
+              }
+            ],
+            "field_mappings": [
+              {
+                "source_field": "audio",
+                "destination_field": "service_contract.audio",
+                "status": "active_contract"
+              }
+            ],
+            "status": "active_contract"
+          }
+        ]
+      }
+    },
+    {
+      "project": "audio_cpp_htdemucs",
+      "directory": "model-audio/HTDemucs-GGUF",
+      "uv_project_directory": "model-audio/audio_cpp_runtime",
+      "ports": [
+        8347
+      ],
+      "phase": "active",
+      "scope": "local_audio_model",
+      "kind": "audio_cpp_model",
+      "description": "HTDemucs 四声部音乐分离",
+      "dynamic_model_key": "htdemucs",
+      "dynamic_route": "/v1/audio-cpp/HTDemucs-GGUF",
+      "dynamic_kind": "source_separation",
+      "schema_source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
+      "request_schemas": {},
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/v1/health",
+          "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
+          "line": 503,
+          "parameters": [],
+          "request_schemas": []
+        },
+        {
+          "method": "POST",
+          "path": "/v1/audio-cpp/HTDemucs-GGUF",
+          "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
+          "line": 596,
+          "parameters": [
+            {
+              "name": "audio",
+              "type": "Annotated[UploadFile, File(...)]",
+              "default": null,
+              "required": true
+            }
+          ],
+          "request_schemas": []
+        }
+      ],
+      "migration_field_mapping": {
+        "status": "active_contract",
+        "destination_candidate": "LocalAI/audio.cpp source separation/sep",
+        "routes": [
+          {
+            "method": "GET",
+            "path": "/v1/health",
+            "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
+            "line": 503,
+            "source_fields": [],
+            "field_mappings": [],
+            "status": "active_contract"
+          },
+          {
+            "method": "POST",
+            "path": "/v1/audio-cpp/HTDemucs-GGUF",
+            "source": "model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py",
+            "line": 596,
+            "source_fields": [
+              {
+                "name": "audio",
+                "type": "Annotated[UploadFile, File(...)]",
+                "default": null,
+                "required": true
+              }
+            ],
+            "field_mappings": [
+              {
+                "source_field": "audio",
+                "destination_field": "service_contract.audio",
                 "status": "active_contract"
               }
             ],
@@ -2072,6 +2366,46 @@
         ],
         "catalog_entry_line": 108,
         "assessment": "固定本地 GGUF 候选映射为 audio.cpp voxcpm2/tts。"
+      },
+      {
+        "project": "audio_cpp_bs_roformer",
+        "status": "family_candidate",
+        "family": "bs_roformer",
+        "declared_tasks": [
+          "Sep"
+        ],
+        "catalog_entry_line": 159,
+        "assessment": "固定本地 GGUF 候选映射为 audio.cpp source-separation family/sep，并经 LocalAI AudioTransform 返回命名 stems。"
+      },
+      {
+        "project": "audio_cpp_qwen3_forced_aligner",
+        "status": "family_candidate",
+        "family": "qwen3_forced_aligner",
+        "declared_tasks": [
+          "Align"
+        ],
+        "catalog_entry_line": 143,
+        "assessment": "固定本地 GGUF 候选映射为 audio.cpp qwen3_forced_aligner/align，通过已知逐字稿 prompt 返回词级时间戳。"
+      },
+      {
+        "project": "audio_cpp_mel_band_roformer",
+        "status": "family_candidate",
+        "family": "mel_band_roformer",
+        "declared_tasks": [
+          "Sep"
+        ],
+        "catalog_entry_line": 164,
+        "assessment": "固定本地 GGUF 候选映射为 audio.cpp source-separation family/sep，并经 LocalAI AudioTransform 返回命名 stems。"
+      },
+      {
+        "project": "audio_cpp_htdemucs",
+        "status": "family_candidate",
+        "family": "htdemucs",
+        "declared_tasks": [
+          "Sep"
+        ],
+        "catalog_entry_line": 162,
+        "assessment": "固定本地 GGUF 候选映射为 audio.cpp source-separation family/sep，并经 LocalAI AudioTransform 返回命名 stems。"
       }
     ]
   }

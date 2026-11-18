@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import io
 import json
 import tempfile
 import unittest
+import wave
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -88,6 +90,108 @@ class AudioCppLocalAIClientTests(unittest.TestCase):
         self.assertIn(b'name="prompt"', body)
         self.assertIn(b"input-audio", body)
         self.assertEqual(int(requests[0]["headers"]["Content-Length"]), len(body))
+
+    def test_transcription_can_request_verbose_json_for_forced_alignment(self) -> None:
+        requests: list[dict[str, object]] = []
+
+        def capture_request(*args: object, **kwargs: object) -> dict[str, object]:
+            kwargs["body"] = b"".join(kwargs["body"])
+            requests.append({"args": args, **kwargs})
+            return {"text": "hello", "words": [{"text": "hello", "start": 0, "end": 1}]}
+
+        self.client._request = Mock(side_effect=capture_request)  # type: ignore[method-assign]
+        with tempfile.TemporaryDirectory() as temporary:
+            audio_path = Path(temporary) / "spoken.wav"
+            audio_path.write_bytes(b"input-audio")
+            result = self.client.transcribe(
+                filename="spoken.wav",
+                audio_path=audio_path,
+                language="English",
+                prompt="hello",
+                response_format="verbose_json",
+                timestamp_granularities=["word"],
+            )
+
+        self.assertIn("words", result)
+        self.assertIn(b'name="response_format"', requests[0]["body"])
+        self.assertIn(b"verbose_json", requests[0]["body"])
+        self.assertIn(b'name="timestamp_granularities[]"', requests[0]["body"])
+        self.assertIn(b"word", requests[0]["body"])
+        self.assertIn(b"hello", requests[0]["body"])
+
+    def test_transform_audio_stems_reads_and_saves_all_named_wavs(self) -> None:
+        wav_output = io.BytesIO()
+        with wave.open(wav_output, "wb") as output:
+            output.setnchannels(1)
+            output.setsampwidth(2)
+            output.setframerate(44_100)
+            output.writeframes(b"\x00\x00" * 4)
+        wav = wav_output.getvalue()
+        requests: list[tuple[str, str, dict[str, object]]] = []
+
+        def capture_request(method: str, path: str, **kwargs: object) -> object:
+            requests.append((method, path, kwargs))
+            if method == "POST":
+                kwargs["body"] = b"".join(kwargs["body"])
+                return (
+                    wav,
+                    "audio/wav",
+                    {
+                        "X-Audio-Stems": json.dumps(
+                            [
+                                {"name": "vocals", "url": "/generated-audio/run.vocals.wav"},
+                                {
+                                    "name": "instrumental",
+                                    "url": "/generated-audio/run.instrumental.wav",
+                                },
+                            ]
+                        )
+                    },
+                )
+            return wav, "audio/wav"
+
+        self.client._request = Mock(side_effect=capture_request)  # type: ignore[method-assign]
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "song.wav"
+            source.write_bytes(wav)
+            output_dir = Path(temporary) / "stems"
+            output_dir.mkdir()
+            stems = self.client.transform_audio_stems(
+                model=_gateway_config().model,
+                audio_path=source,
+                output_dir=output_dir,
+            )
+            self.assertEqual(set(stems), {"vocals", "instrumental"})
+            self.assertEqual(stems["vocals"].read_bytes(), wav)
+            self.assertEqual(stems["instrumental"].read_bytes(), wav)
+            self.assertEqual(requests[0][0:2], ("POST", "/audio/transform"))
+            self.assertIn(b"response_format", requests[0][2]["body"])
+            self.assertIn(
+                ("GET", "/generated-audio/run.vocals.wav"),
+                [item[:2] for item in requests],
+            )
+
+    def test_transform_audio_stems_rejects_urls_outside_generated_audio(self) -> None:
+        wav = b"RIFF" + (b"\x00" * 4) + b"WAVE" + (b"\x00" * 16)
+        request = Mock(
+            return_value=(
+                wav,
+                "audio/wav",
+                {"X-Audio-Stems": '[{"name":"vocals","url":"/v1/models"}]'},
+            )
+        )
+        self.client._request = request  # type: ignore[method-assign]
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "song.wav"
+            source.write_bytes(wav)
+            output_dir = Path(temporary) / "stems"
+            output_dir.mkdir()
+            with self.assertRaises(LocalAIRequestError):
+                self.client.transform_audio_stems(
+                    model=_gateway_config().model,
+                    audio_path=source,
+                    output_dir=output_dir,
+                )
 
     def test_sound_generation_uses_localai_sound_generation_payload(self) -> None:
         wav = b"RIFF" + (b"\x00" * 4) + b"WAVE" + (b"\x00" * 16)

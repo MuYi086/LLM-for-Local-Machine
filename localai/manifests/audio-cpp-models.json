@@ -186,6 +186,74 @@
         "kind": "tts_optional_reference",
         "description": "VoxCPM2 多语 TTS、音色设计与参考音频克隆"
       }
+    },
+    {
+      "key": "bs_roformer",
+      "model_id": "llm-local.bs-roformer-ep368.audio-cpp",
+      "source_directory": "BS-RoFormer-ep368-GGUF",
+      "required_file": "bs-roformer-ep368-q8_0.gguf",
+      "model_file_env": "AUDIO_CPP_BS_ROFORMER_MODEL_FILE",
+      "family": "bs_roformer",
+      "task": "sep",
+      "service": {
+        "runtime": "audio_cpp_runtime",
+        "directory": "model-audio/BS-RoFormer-ep368-GGUF",
+        "port": 8344,
+        "route": "/v1/audio-cpp/BS-RoFormer-ep368-GGUF",
+        "kind": "source_separation",
+        "description": "BS-RoFormer 人声与伴奏分离"
+      }
+    },
+    {
+      "key": "qwen3_forced_aligner",
+      "model_id": "llm-local.qwen3-forced-aligner-0.6b.audio-cpp",
+      "source_directory": "Qwen3-ForcedAligner-0.6B-GGUF",
+      "required_file": "qwen3-forced-aligner-0.6b-f16.gguf",
+      "model_file_env": "AUDIO_CPP_QWEN3_FORCED_ALIGNER_MODEL_FILE",
+      "family": "qwen3_forced_aligner",
+      "task": "align",
+      "service": {
+        "runtime": "audio_cpp_runtime",
+        "directory": "model-audio/Qwen3-ForcedAligner-0.6B-GGUF",
+        "port": 8345,
+        "route": "/v1/audio-cpp/Qwen3-ForcedAligner-0.6B-GGUF",
+        "kind": "forced_alignment",
+        "description": "Qwen3 ForcedAligner 词级时间戳对齐"
+      }
+    },
+    {
+      "key": "mel_band_roformer",
+      "model_id": "llm-local.mel-band-roformer.audio-cpp",
+      "source_directory": "Mel-Band-RoFormer-GGUF",
+      "required_file": "mel-band-roformer-f16.gguf",
+      "model_file_env": "AUDIO_CPP_MEL_BAND_ROFORMER_MODEL_FILE",
+      "family": "mel_band_roformer",
+      "task": "sep",
+      "service": {
+        "runtime": "audio_cpp_runtime",
+        "directory": "model-audio/Mel-Band-RoFormer-GGUF",
+        "port": 8346,
+        "route": "/v1/audio-cpp/Mel-Band-RoFormer-GGUF",
+        "kind": "source_separation",
+        "description": "Mel-Band RoFormer 音乐源分离"
+      }
+    },
+    {
+      "key": "htdemucs",
+      "model_id": "llm-local.htdemucs.audio-cpp",
+      "source_directory": "HTDemucs-GGUF",
+      "required_file": "htdemucs-f16.gguf",
+      "model_file_env": "AUDIO_CPP_HTDEMUCS_MODEL_FILE",
+      "family": "htdemucs",
+      "task": "sep",
+      "service": {
+        "runtime": "audio_cpp_runtime",
+        "directory": "model-audio/HTDemucs-GGUF",
+        "port": 8347,
+        "route": "/v1/audio-cpp/HTDemucs-GGUF",
+        "kind": "source_separation",
+        "description": "HTDemucs 四声部音乐分离"
+      }
     }
   ]
 }

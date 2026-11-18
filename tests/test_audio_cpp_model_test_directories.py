@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
+import tempfile
 import unittest
+import wave
+import zipfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -23,15 +27,10 @@ class AudioCppModelTestDirectoryTests(unittest.TestCase):
             )
 
         self.assertEqual(result, 0)
-        generate.assert_called_once_with(
-            model_keys=["midashenglm_gen"],
-            host="127.0.0.1",
-            timeout=12,
-            reference_audio=None,
-            reference_text=None,
-            source_audio=None,
-            output_dir=ROOT / "storage/audio_cpp_tests",
-        )
+        self.assertEqual(generate.call_args.kwargs["model_keys"], ["midashenglm_gen"])
+        self.assertEqual(generate.call_args.kwargs["input_audio"], None)
+        self.assertEqual(generate.call_args.kwargs["transcript"], None)
+        self.assertEqual(generate.call_args.kwargs["language"], None)
 
     def test_each_audio_cpp_service_has_a_model_specific_generation_runner(self) -> None:
         manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
@@ -40,7 +39,7 @@ class AudioCppModelTestDirectoryTests(unittest.TestCase):
             for candidate in manifest["models"]
             if candidate["service"].get("runtime") == "audio_cpp_runtime"
         ]
-        self.assertEqual(len(candidates), 10)
+        self.assertEqual(len(candidates), 14)
 
         for candidate in candidates:
             key = candidate["key"]
@@ -62,6 +61,100 @@ class AudioCppModelTestDirectoryTests(unittest.TestCase):
                     module_spec.loader.exec_module(module)
                     self.assertEqual(module.main(), 0)
                 run.assert_called_once_with(key)
+
+    def test_source_separation_demo_saves_and_checks_the_complete_zip(self) -> None:
+        candidate = next(
+            item for item in generate_examples._model_candidates() if item["key"] == "bs_roformer"
+        )
+        wav = io.BytesIO()
+        with wave.open(wav, "wb") as output:
+            output.setnchannels(1)
+            output.setsampwidth(2)
+            output.setframerate(44_100)
+            output.writeframes(b"\x00\x00" * 4)
+        archive = io.BytesIO()
+        with zipfile.ZipFile(archive, "w") as output:
+            output.writestr("vocals.wav", wav.getvalue())
+            output.writestr("instrumental.wav", wav.getvalue())
+
+        with (
+            patch.object(
+                generate_examples,
+                "_post",
+                return_value=(archive.getvalue(), "application/zip"),
+            ) as post,
+            patch.object(
+                generate_examples, "_save_zip", wraps=generate_examples._save_zip
+            ) as save_zip,
+            tempfile.TemporaryDirectory() as temporary,
+        ):
+            source = Path(temporary) / "music.wav"
+            source.write_bytes(wav.getvalue())
+            output_dir = Path(temporary) / "output"
+            path = generate_examples._generate_one(
+                candidate,
+                host="127.0.0.1",
+                timeout=30,
+                reference_audio=None,
+                reference_text=None,
+                source_audio=None,
+                input_audio=source,
+                transcript=None,
+                language="Chinese",
+                output_dir=output_dir,
+            )
+
+            with zipfile.ZipFile(path) as saved_archive:
+                self.assertEqual(
+                    set(saved_archive.namelist()),
+                    {"vocals.wav", "instrumental.wav"},
+                )
+            self.assertEqual(save_zip.call_count, 1)
+            self.assertEqual(post.call_args.args[1:3], (8344, candidate["service"]["route"]))
+
+    def test_forced_aligner_demo_sends_transcript_and_saves_timestamps(self) -> None:
+        candidate = next(
+            item
+            for item in generate_examples._model_candidates()
+            if item["key"] == "qwen3_forced_aligner"
+        )
+        result = {"text": "Hello world.", "words": [{"text": "Hello", "start": 0, "end": 0.4}]}
+        wav = io.BytesIO()
+        with wave.open(wav, "wb") as output:
+            output.setnchannels(1)
+            output.setsampwidth(2)
+            output.setframerate(16_000)
+            output.writeframes(b"\x00\x00" * 4)
+        with (
+            patch.object(
+                generate_examples,
+                "_post",
+                return_value=(json.dumps(result).encode(), "application/json"),
+            ) as post,
+            tempfile.TemporaryDirectory() as temporary,
+        ):
+            source = Path(temporary) / "speech.wav"
+            source.write_bytes(wav.getvalue())
+            output_dir = Path(temporary) / "output"
+            path = generate_examples._generate_one(
+                candidate,
+                host="127.0.0.1",
+                timeout=30,
+                reference_audio=None,
+                reference_text=None,
+                source_audio=None,
+                input_audio=source,
+                transcript="Hello world.",
+                language="English",
+                output_dir=output_dir,
+            )
+
+            self.assertEqual(json.loads(path.read_text()), result)
+            self.assertEqual(post.call_args.args[1:3], (8345, candidate["service"]["route"]))
+            self.assertEqual(
+                post.call_args.kwargs["form_fields"],
+                {"text": "Hello world.", "language": "English"},
+            )
 
 
 if __name__ == "__main__":

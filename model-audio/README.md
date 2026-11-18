@@ -1,6 +1,6 @@
 # 音频模型与处理
 
-当前音频运行面维护十一个 GPU 模型 API 和一个 CPU 空间音频 renderer。十个新接入的 audio.cpp 服务共享
+当前音频运行面维护十五个 GPU 模型 API 和一个 CPU 空间音频 renderer。十四个 audio.cpp 服务共享
 `audio_cpp_runtime` uv 项目，不安装 Torch；VoiceDesign 保持独立环境。所有 GPU 服务共用同一
 `GPU_LOCK_FILE`，按跨进程队列串行推理。
 
@@ -17,9 +17,13 @@
 | `Stable-Audio-3-Medium-GGUF/` | Stable Audio 3 Medium 文本提示音频生成 | 8314 | `POST /v1/stabilityai/Stable-Audio-3-Medium-GGUF-f16` |
 | `MOSS-SoundEffect-v2-GGUF/` | MOSS-SoundEffect v2 文本提示音效生成（BF16 GGUF） | 8315 | `POST /v1/openmoss/MOSS-SoundEffect-v2-GGUF-f16` |
 | `tts_voxcpm2/` | VoxCPM2 TTS、音色设计与可选参考克隆 | 8313 | `POST /v1/OpenBMB/VoxCPM2-GGUF` |
+| `BS-RoFormer-ep368-GGUF/` | BS-RoFormer 人声与伴奏分离 | 8344 | `POST /v1/audio-cpp/BS-RoFormer-ep368-GGUF` |
+| `Qwen3-ForcedAligner-0.6B-GGUF/` | Qwen3 ForcedAligner 逐字稿词级对齐 | 8345 | `POST /v1/audio-cpp/Qwen3-ForcedAligner-0.6B-GGUF` |
+| `Mel-Band-RoFormer-GGUF/` | Mel-Band RoFormer 音乐源分离 | 8346 | `POST /v1/audio-cpp/Mel-Band-RoFormer-GGUF` |
+| `HTDemucs-GGUF/` | HTDemucs 多声部音乐分离 | 8347 | `POST /v1/audio-cpp/HTDemucs-GGUF` |
 | `spatial_steam-audio/` | Steam Audio C++17 双耳空间 renderer | 无 HTTP 端口 | 由 8300 控制面调用，纯 CPU |
 
-十个共享运行时服务各自有薄型 `main.py` 入口；模型 ID、GGUF 文件名、LocalAI family/task、路由和端口
+十四个共享运行时服务各自有薄型 `main.py` 入口；模型 ID、GGUF 文件名、LocalAI family/task、路由和端口
 集中在 `localai/manifests/audio-cpp-models.json`。健康检查统一为 `GET /v1/health`，不会触发推理。
 
 各服务请求格式、端口、部署步骤和全局 GPU 锁说明见根目录 [README](../README.md)。
