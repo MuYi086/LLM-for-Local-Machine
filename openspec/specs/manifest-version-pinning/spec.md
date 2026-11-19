@@ -9,6 +9,7 @@ stable-diffusion.cpp commit、task enum 补丁前置、sd.cpp 摘要校验，以
 ## 实现依据
 
 - [localai/manifests/versions.json](../../../localai/manifests/versions.json)
+- [localai/manifests/qwen3-tts-voicedesign-candidate.yaml](../../../localai/manifests/qwen3-tts-voicedesign-candidate.yaml)
 - [sdcpp/manifests/versions.json](../../../sdcpp/manifests/versions.json)
 - [scripts/localai/manager.py](../../../scripts/localai/manager.py)
 - [scripts/localai/patches/audio-cpp-task-kinds.patch](../../../scripts/localai/patches/audio-cpp-task-kinds.patch)
@@ -80,3 +81,14 @@ LocalAI v4.11.0 的 backend adapter 未镜像 audio.cpp 新 revision 的 `TurnDe
 
 - **WHEN** 绕过 manager 手工增删 LocalAI models 目录条目
 - **THEN** 该状态不受受控注册合同保障，需用 manager 重新核对后再运行
+
+### Requirement: 候选 YAML 模板不落绝对路径
+
+候选 YAML 模板 MUST 使用占位符（如 `__QWEN3_VOICEDESIGN_MODEL_PATH__`）表达受控相对 GGUF 引用，
+由 manager 在注册时替换；模板中的 `family`、`task`、`backend`、`device` MUST 与候选清单一致，
+MUST NOT 在仓库中提交解析后的机器专用绝对路径或密钥。
+
+#### Scenario: 注册 VoiceDesign 候选
+
+- **WHEN** manager 注册 `llm-local.qwen3-tts.1p7b-voicedesign`
+- **THEN** 占位符被替换为清单声明的受控相对引用，family/task 与清单一致，仓库中不留绝对路径

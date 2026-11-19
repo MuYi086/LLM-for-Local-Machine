@@ -40,7 +40,7 @@
 - 仓库原生门禁：`bash scripts/quality_gate.sh`（含 `scripts/check_service_inventory.py` 与
   `scripts/localai/validate_capabilities.py`），不依赖 Node.js，是 CI 的唯一门禁。
 - OpenSpec CLI（npm 包 `@fission-ai/openspec`，可用 `npx -y @fission-ai/openspec` 免安装运行）：
-  - `openspec validate --all --strict` 校验主规格与活动 change（2026-11-19 实测 16/16 通过，主规格覆盖 16 个能力域）；
+  - `openspec validate --all --strict` 校验主规格与活动 change（2026-11-19 实测 16/16 通过：总览 + 15 个能力域）；
   - `openspec validate --all --strict --archived` 额外核对归档 change 任务全部完成；
   - `openspec list --specs` 查看规格清单，`openspec show <名称>` 查看单个规格或 change，
     `openspec doctor` 检查根配置健康。

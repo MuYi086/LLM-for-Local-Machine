@@ -15,6 +15,8 @@
 - [scripts/model_telemetry.py](../../../scripts/model_telemetry.py)
 - [config/model-telemetry.env](../../../config/model-telemetry.env)
 - [docs/model-telemetry.md](../../../docs/model-telemetry.md)
+- [tests/test_model_telemetry.py](../../../tests/test_model_telemetry.py)
+- [tests/test_telemetry_brief.py](../../../tests/test_telemetry_brief.py)
 
 ## Requirements
 
@@ -76,7 +78,8 @@ MUST NOT 超过 4096 UTF-8 字节；完整数据 MUST 继续落盘。`attached=t
 
 `--attach-result` MUST 只更新匹配同一测试 ID 的唯一 `MODEL_TELEMETRY_BEGIN`/`MODEL_TELEMETRY_END`
 统计块；目标 MUST 是已有普通 Markdown 文件，符号链接、缺少标记、重复标记和错误 ID MUST 拒绝；
-写回 MUST 使用文件锁与原子替换，MUST NOT 修改块外正文或手动补录的客户端统计。
+写回 MUST 使用文件锁与原子替换，MUST NOT 修改块外正文或手动补录的客户端统计。采集与写回行为
+MUST 由 `tests/test_model_telemetry.py` 与 `tests/test_telemetry_brief.py` 无模型覆盖。
 
 #### Scenario: 合法写回
 

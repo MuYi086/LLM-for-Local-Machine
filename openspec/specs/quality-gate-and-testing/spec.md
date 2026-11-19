@@ -91,3 +91,9 @@ MUST NOT 再读完整 JSON/Markdown；采集与写回细则见
 
 - **WHEN** 一轮真实模型基准完成
 - **THEN** 归档附件为受字节上限约束的简报，完整遥测保留在 `storage/.cache/runtime/telemetry/` 运行数据目录
+
+## 未决事项
+
+| 事项 | 状态 | 依据 / 责任方 | 临时处理 | 确认结果 |
+| --- | --- | --- | --- | --- |
+| `llm_local_runtime/uv.lock` 存在但未纳入 `quality_gate.sh` 的 `uv lock --check`；`inference_gateway/pyproject.toml` 无锁文件 | 待对齐 | `quality_gate.sh` 的 `lock_projects` 与仓库实际文件；责任方：维护者 | 门禁按现有四个项目执行，不擅自扩大范围或修改门禁脚本 | 待确认共享包与网关项目是否应纳入门禁；确认后同步本规格与 `quality_gate.sh` |

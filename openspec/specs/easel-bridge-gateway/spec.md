@@ -29,6 +29,11 @@ MUST NOT 匿名运行，MUST NOT 把该 Key 转发到上游。
 - **WHEN** 客户端以正确 Bearer Key 访问网关路由
 - **THEN** 请求按白名单转发；转发请求中只含上游模型 API 所需字段，不含网关自身 Key
 
+#### Scenario: 覆盖监听端口
+
+- **WHEN** 部署显式设置合法范围内的 `EASEL_BRIDGE_PORT`
+- **THEN** 网关只在该端口的 127.0.0.1 上监听，仍不绑定外部网卡，鉴权要求不变
+
 ### Requirement: 路由只代理既有模型 API
 
 网关 MUST 只提供 `GET /v1/models`、`POST /v1/images/generations`、`POST /v1/audio/speech`、
@@ -49,8 +54,10 @@ Ornith MTP 9B（8504）API；MUST NOT 直接加载模型或绕过共享 GPU 锁�
 
 OpenAI-compatible 请求 MUST 按既有文档合同处理：图片 `n` 最多 4 且使用 `WIDTHxHEIGHT` 尺寸，每张依次
 生成；语音接受 `voice=alloy` 占位值，仅支持默认 `speed=1`，输出 WAV 或 MP3，MP3 MUST 由本机 FFmpeg
-从 VoxCPM2 的 WAV 响应转换，MUST NOT 写临时音频文件；请求体上限 12 MiB、响应体上限 64 MiB、上游
-超时 900 秒，HTTP 重定向 MUST 关闭。越界参数 MUST 在转发前拒绝，MUST NOT 向上游伪造不支持的能力。
+从 VoxCPM2 的 WAV 响应转换，MUST NOT 写临时音频文件；请求体上限 12 MiB、响应体上限 64 MiB、
+上游超时（`EASEL_BRIDGE_TIMEOUT`，默认 900 秒）、FFmpeg 二进制（`EASEL_BRIDGE_FFMPEG_BIN`）与转码
+超时（`EASEL_BRIDGE_FFMPEG_TIMEOUT`，默认 120 秒）MUST 为正数配置，等待上游或转码超时 MUST 返回
+504；HTTP 重定向 MUST 关闭。越界参数 MUST 在转发前拒绝，MUST NOT 向上游伪造不支持的能力。
 
 #### Scenario: 请求速度调节
 
