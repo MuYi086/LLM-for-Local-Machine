@@ -16,6 +16,10 @@
 - [docs/python-engineering.md](../../../docs/python-engineering.md)
 - [docs/model-telemetry.md](../../../docs/model-telemetry.md)
 - [docs/opencode-compaction-budget.md](../../../docs/opencode-compaction-budget.md)
+- [scripts/model_telemetry.py](../../../scripts/model_telemetry.py)
+- [config/model-telemetry.env](../../../config/model-telemetry.env)
+- [llm_local_runtime/src/llm_local_runtime/telemetry.py](../../../llm_local_runtime/src/llm_local_runtime/telemetry.py)
+- [llm_local_runtime/src/llm_local_runtime/telemetry_brief.py](../../../llm_local_runtime/src/llm_local_runtime/telemetry_brief.py)
 
 ## Requirements
 
@@ -78,9 +82,12 @@ CI MUST 在 push 与 PR 时执行 `scripts/quality_gate.sh`，与本地门禁保
 
 ### Requirement: 基准归档使用简报
 
-基准归档 MUST 使用 `end --attach-result --brief` 收尾，MUST NOT 把完整遥测 JSON 或大型报告送回模型。
+基准归档 MUST 使用 `end --attach-result --brief` 收尾，简报 stdout MUST NOT 超过 4096 UTF-8 字节；
+MUST NOT 把完整遥测 JSON 或大型报告送回模型。`attached=true` 且 `test_state=ended` 即视为统计块确认，
+MUST NOT 再读完整 JSON/Markdown；采集与写回细则见
+[model-telemetry](../model-telemetry/spec.md)。
 
 #### Scenario: 归档性能记录
 
 - **WHEN** 一轮真实模型基准完成
-- **THEN** 归档附件为简报形式，完整遥测保留在 `storage/.cache/runtime/telemetry/` 运行数据目录
+- **THEN** 归档附件为受字节上限约束的简报，完整遥测保留在 `storage/.cache/runtime/telemetry/` 运行数据目录

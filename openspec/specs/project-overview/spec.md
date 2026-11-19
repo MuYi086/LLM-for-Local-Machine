@@ -47,21 +47,18 @@ openspec/specs/ 维护行为基线。文档与实现冲突时 MUST 先核对实�
 
 ### Requirement: 能力域导航保持可用
 
-每个能力域 MUST 有对应主规格且链接可达：
-[audio.cpp 音频模型服务](../audio-cpp-services/spec.md)、
-[Ornith 文本模型](../ornith-text-model/spec.md)、
-[图片服务](../image-sdcpp-services/spec.md)、
-[控制面与空间渲染](../control-plane-and-spatial-render/spec.md)、
-[GPU 锁与隔离](../gpu-lock-and-quarantine/spec.md)、
-[上传与保留策略](../storage-retention-and-upload/spec.md)、
-[质量门禁与测试](../quality-gate-and-testing/spec.md)、
-[Easel 网关](../easel-bridge-gateway/spec.md)、
-[服务生命周期与启动](../service-lifecycle-and-startup/spec.md)。
+每个能力域 MUST 有对应主规格且链接可达，完整清单见下方「能力域清单」；维护者 MUST 能通过
+源码归属矩阵（[openspec/coverage.md](../../coverage.md)）定位实现依据。
 
 #### Scenario: 定位某个服务的约束
 
 - **WHEN** 维护者需要确认某服务的当前行为基线
 - **THEN** 通过源码归属矩阵（[openspec/coverage.md](../../coverage.md)）找到对应规格与实现依据
+
+#### Scenario: 区分服务能力与治理约定
+
+- **WHEN** 询问遥测、Dagu 调度、音乐后处理或协作纪律是否属于当前能力
+- **THEN** 按能力域导航定位对应主规格，服务事实仍以清单为准，治理约定不冒充已实现工具能力
 
 ### Requirement: 历史资料不推断当前能力
 
@@ -72,3 +69,26 @@ openspec/specs/ 维护行为基线。文档与实现冲突时 MUST 先核对实�
 
 - **WHEN** 历史方案与当前清单冲突
 - **THEN** 以清单与主规格为准，历史文档仅作背景记录
+
+## 能力域清单
+
+服务与机制域：
+
+- [audio.cpp 音频模型服务](../audio-cpp-services/spec.md)
+- [Ornith 文本模型](../ornith-text-model/spec.md)
+- [图片服务](../image-sdcpp-services/spec.md)
+- [控制面与空间渲染](../control-plane-and-spatial-render/spec.md)
+- [GPU 锁与隔离](../gpu-lock-and-quarantine/spec.md)
+- [上传与保留策略](../storage-retention-and-upload/spec.md)
+- [质量门禁与测试](../quality-gate-and-testing/spec.md)
+- [Easel 网关](../easel-bridge-gateway/spec.md)
+- [服务生命周期与启动](../service-lifecycle-and-startup/spec.md)
+
+运行与治理域：
+
+- [模型性能记录](../model-telemetry/spec.md)
+- [OpenCode 上下文插件与固定上下文基准](../opencode-context-and-benchmark/spec.md)
+- [Dagu 独立作业调度](../dagu-job-worker/spec.md)
+- [音乐后处理编排规则](../music-postprocessing/spec.md)
+- [清单版本锁定与外部二进制核验](../manifest-version-pinning/spec.md)
+- [工程协作与验证纪律](../engineering-collaboration/spec.md)

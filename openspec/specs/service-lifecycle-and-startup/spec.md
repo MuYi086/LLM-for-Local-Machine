@@ -12,7 +12,10 @@
 - [scripts/localai/preflight.py](../../../scripts/localai/preflight.py)
 - [main/check_ports.py](../../../main/check_ports.py)
 - [.env.easel-bridge.example](../../../.env.easel-bridge.example)
+- [scripts/llama_cpp/build_sleep_cache.py](../../../scripts/llama_cpp/build_sleep_cache.py)
 - [docs/dagu.md](../../../docs/dagu.md)
+- [README.md](../../../README.md)
+- [scripts/dagu/start.sh](../../../scripts/dagu/start.sh)
 
 ## Requirements
 
@@ -37,6 +40,24 @@ sd.cpp 可执行文件摘要和 MOSS、FLUX.3 Klein 各自四个模型组件、O
 
 - **WHEN** `.env.easel-bridge` 缺少至少 32 字节的随机 `EASEL_BRIDGE_API_KEY`
 - **THEN** 启动预检失败，网关不以匿名或弱 Key 状态运行
+
+### Requirement: 启动日志实时同步且权限受控
+
+每次 `start.sh` MUST 把完整控制台输出实时同步到 `$RUNTIME_CACHE_DIR/logs/` 下的独立日志文件
+（默认 `storage/.cache/runtime/logs/`），并在启动时打印本次日志完整路径；日志文件 MUST 由 `mktemp`
+创建且默认仅当前用户可读写。日志进程 MUST 避开终端退出信号，由主脚本统一清理服务；日志管道异常时
+清理过程 MUST 追加到同一文件。Ctrl+C、终端挂断及清理期间再次 Ctrl+C MUST 继续完成已启动进程组的
+退出确认。
+
+#### Scenario: 启动后收集诊断日志
+
+- **WHEN** 服务异常需要排查
+- **THEN** 终端打印的本次启动日志文件存在且仅当前用户可读，包含完整控制台输出
+
+#### Scenario: 终端挂断或中断
+
+- **WHEN** 清理期间终端挂断或再次按下 Ctrl+C
+- **THEN** 不丢失日志，继续完成进程组退出确认，不把清理日志写入另一文件
 
 ### Requirement: Ornith 预热先于全部 API
 

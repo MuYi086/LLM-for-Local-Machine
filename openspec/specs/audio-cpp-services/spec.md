@@ -13,6 +13,7 @@
 - [scripts/localai/validate_capabilities.py](../../../scripts/localai/validate_capabilities.py)
 - [model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py](../../../model-audio/audio_cpp_runtime/src/audio_cpp_runtime/service.py)
 - [model-audio/audio_cpp_runtime/src/audio_cpp_runtime/specs.py](../../../model-audio/audio_cpp_runtime/src/audio_cpp_runtime/specs.py)
+- [model-audio/（十五个服务入口 main.py）](../../../model-audio/)
 - [docs/localai-audiocpp-upgrade.md](../../../docs/localai-audiocpp-upgrade.md)
 
 ## Requirements

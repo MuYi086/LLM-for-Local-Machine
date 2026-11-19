@@ -11,6 +11,7 @@
 - [llm_local_runtime/src/llm_local_runtime/gpu.py](../../../llm_local_runtime/src/llm_local_runtime/gpu.py)
 - [main/storage_maintenance.py](../../../main/storage_maintenance.py)
 - [AGENTS.md 存储与提交约束](../../../AGENTS.md)
+- [README.md 存储与清理](../../../README.md)
 
 ## Requirements
 
@@ -83,3 +84,9 @@ Ornith 真实样例写入 `storage/llm_tests/`；新增 audio.cpp API MUST NOT �
 
 - **WHEN** 策略试图覆盖用户上传或策略外目录
 - **THEN** 清理不执行并报告风险，不以任何路径折叠方式删除未授权内容
+
+#### Scenario: 预览后执行清理
+
+- **WHEN** 显式设置 `STORAGE_RETENTION_HOURS` 或 `STORAGE_RETENTION_MAX_BYTES`
+- **THEN** 先以 `python main/storage_maintenance.py` 预览计划，确认后才传 `--apply`；脚本只匹配
+  `storage/timbre/` 下的 `qwen_voicedesign_*.wav`，不触及其他运行数据

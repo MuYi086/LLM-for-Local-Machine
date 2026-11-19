@@ -13,7 +13,9 @@
 - [main/spatial_schema.py](../../../main/spatial_schema.py)
 - [main/spatial_trajectory.py](../../../main/spatial_trajectory.py)
 - [main/steam_audio_render.py](../../../main/steam_audio_render.py)
+- [main/render_progress.py](../../../main/render_progress.py)
 - [docs/spatial-trajectories.md](../../../docs/spatial-trajectories.md)
+- [README.md](../../../README.md)
 - [model-audio/spatial_steam-audio/](../../../model-audio/spatial_steam-audio/)
 
 ## Requirements
@@ -31,8 +33,8 @@ main/ 控制面 MUST 只负责健康/控制、共享上传检查、CPU 导出和
 
 #### Scenario: 共享 CPU 导出
 
-- **WHEN** 客户端请求 `POST /v1/audio/export`
-- **THEN** 控制面在 CPU 上完成导出编排，不触发任何模型加载
+- **WHEN** 客户端请求 `POST /v1/audio/export`，可传 `profile=standard` 与 `output_format`
+- **THEN** 控制面在 CPU 上完成单一预混音轨的导出编排，不触发模型加载，也不执行对象级空间定位
 
 ### Requirement: 阻塞任务不进入事件循环
 
@@ -56,12 +58,13 @@ SDK 与动态库的 C++17 CPU renderer，MUST NOT 获取 GPU 锁。
 ### Requirement: 正式路径保留对象边界
 
 Steam Audio 正式 balanced/immersive 路径 MUST 保留对象边界，使用 Manifest v1 和重复 assets
-字段，MUST NOT 在浏览器预混。
+字段，每个 `asset_filename` MUST 与一个上传文件对应；renderer 逐对象应用 Direct Effect 与双耳
+HRTF，生成 48 kHz 双声道 pre-master，MUST NOT 在浏览器预混。
 
 #### Scenario: 提交多对象场景
 
-- **WHEN** 场景 Manifest 包含多个对象与重复 assets 字段
-- **THEN** renderer 按对象边界渲染，不把对象预先混合成单轨
+- **WHEN** 场景 Manifest 包含多个对象与重复 assets 字段，且文件名一一对应
+- **THEN** renderer 按对象边界应用 Direct Effect 与 HRTF 渲染，不把对象预先混合成单轨
 
 ### Requirement: pre-master 后只允许响度归一与编码
 
@@ -80,6 +83,23 @@ diffuse、非 none 遮挡和几何反射尚未实现；保留的语义字段 MUS
 
 - **WHEN** 渲染请求包含非 none 遮挡或几何反射字段
 - **THEN** 该请求被拒绝或忽略并明确说明能力未实现，不产生伪造的渲染结果
+
+### Requirement: 空间任务进度按 job_id 轮询
+
+渲染请求可携带 `job_id` 用于轮询 `GET /v1/audio/spatial/render/progress/{job_id}`；进度快照 MUST
+只保留在当前控制面进程内存中，成功或失败终态默认保留一小时。job_id MUST 为 8–80 位安全 ASCII
+标识，重复提交或非法 ID MUST 被拒绝；进度 MUST 单调递增且终态不可回退，未知或过期任务 MUST NOT
+返回伪造快照。
+
+#### Scenario: 轮询长任务进度
+
+- **WHEN** 客户端以合法 job_id 查询进行中的渲染任务
+- **THEN** 返回当前阶段、进度与消息，终态一小时后淘汰快照
+
+#### Scenario: 重复或非法 job_id
+
+- **WHEN** job_id 格式非法或在保留期内已存在
+- **THEN** 任务注册被拒绝，不复用或覆盖既有进度
 
 ### Requirement: 空间轨迹合同以文档为准
 

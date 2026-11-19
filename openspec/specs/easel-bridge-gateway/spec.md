@@ -15,7 +15,8 @@
 
 ### Requirement: 只监听 loopback 且强制随机 Key
 
-网关 MUST 只监听 127.0.0.1:8500；启动 MUST 设置至少 32 字节的随机 `EASEL_BRIDGE_API_KEY`；
+网关 MUST 只监听 127.0.0.1，默认端口 8500，可由 `EASEL_BRIDGE_PORT` 覆盖为 1–65535 的合法端口，
+MUST NOT 绑定非 loopback 地址；启动 MUST 设置至少 32 字节的随机 `EASEL_BRIDGE_API_KEY`；
 MUST NOT 匿名运行，MUST NOT 把该 Key 转发到上游。
 
 #### Scenario: 缺少网关 Key
@@ -43,6 +44,23 @@ Ornith MTP 9B（8504）API；MUST NOT 直接加载模型或绕过共享 GPU 锁�
 
 - **WHEN** 请求参数引用白名单之外的模型或能力
 - **THEN** 网关拒绝该请求，不尝试构造对未接入服务的调用
+
+### Requirement: 兼容请求字段有明确边界
+
+OpenAI-compatible 请求 MUST 按既有文档合同处理：图片 `n` 最多 4 且使用 `WIDTHxHEIGHT` 尺寸，每张依次
+生成；语音接受 `voice=alloy` 占位值，仅支持默认 `speed=1`，输出 WAV 或 MP3，MP3 MUST 由本机 FFmpeg
+从 VoxCPM2 的 WAV 响应转换，MUST NOT 写临时音频文件；请求体上限 12 MiB、响应体上限 64 MiB、上游
+超时 900 秒，HTTP 重定向 MUST 关闭。越界参数 MUST 在转发前拒绝，MUST NOT 向上游伪造不支持的能力。
+
+#### Scenario: 请求速度调节
+
+- **WHEN** 客户端对 `POST /v1/audio/speech` 提交非默认 `speed`
+- **THEN** 请求按仅支持默认 `speed=1` 的合同处理，不向 VoxCPM2 声称支持速度调节
+
+#### Scenario: 请求 MP3 输出
+
+- **WHEN** 客户端请求 MP3
+- **THEN** 网关用本机 FFmpeg 转换 WAV 响应，不写临时音频文件
 
 ### Requirement: 上游默认绑定 loopback
 

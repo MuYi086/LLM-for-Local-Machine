@@ -10,7 +10,10 @@
 - [inference_gateway/src/inference_gateway/sdcpp/execution.py](../../../inference_gateway/src/inference_gateway/sdcpp/execution.py)
 - [inference_gateway/src/inference_gateway/sdcpp/worker.py](../../../inference_gateway/src/inference_gateway/sdcpp/worker.py)
 - [scripts/sdcpp/manager.py](../../../scripts/sdcpp/manager.py)
+- [model-image/MOSS-Image-SFT-Q8_0/main.py](../../../model-image/MOSS-Image-SFT-Q8_0/main.py)
+- [model-image/FLUX-3-Image-Klein-GGUF-Q8/main.py](../../../model-image/FLUX-3-Image-Klein-GGUF-Q8/main.py)
 - [sdcpp/manifests/models.json](../../../sdcpp/manifests/models.json)
+- [sdcpp/manifests/versions.json](../../../sdcpp/manifests/versions.json)
 - [docs/sdcpp-runtime.md](../../../docs/sdcpp-runtime.md)
 
 ## Requirements
@@ -66,6 +69,12 @@ inference_gateway.sdcpp MUST 作为按请求启动的 sd.cpp CLI provider 运行
 
 - **WHEN** start.sh 或 manager 执行预检
 - **THEN** sd.cpp 可执行文件摘要与清单声明的模型组件一致才继续，否则启动失败
+
+#### Scenario: 二进制版本或摘要不匹配
+
+- **WHEN** `sd-cli` 摘要与 `SDCPP_BIN_SHA256` 不符，或版本锁定与 `sdcpp/manifests/versions.json` 不一致
+- **THEN** 预检失败并报告不一致，不用未核验的二进制生成，版本口径以
+  [清单版本锁定](../manifest-version-pinning/spec.md) 为准
 
 ### Requirement: 隔离恢复统一入口
 

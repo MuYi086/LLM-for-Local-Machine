@@ -11,6 +11,8 @@
 - [docs/global-gpu-lock.md](../../../docs/global-gpu-lock.md)
 - [scripts/localai/recover_quarantine.py](../../../scripts/localai/recover_quarantine.py)
 - [inference_gateway/src/inference_gateway/execution.py](../../../inference_gateway/src/inference_gateway/execution.py)
+- [inference_gateway/src/inference_gateway/config.py](../../../inference_gateway/src/inference_gateway/config.py)
+- [inference_gateway/src/inference_gateway/errors.py](../../../inference_gateway/src/inference_gateway/errors.py)
 
 ## Requirements
 
@@ -83,6 +85,35 @@ sdcpp CLI provider 无 HTTP 端口；其隔离与恢复 MUST 按 PID/starttime �
 
 - **WHEN** 图片生成的 worker 进程未确认退出
 - **THEN** 保留 quarantine 标记，按统一恢复流程处理
+
+### Requirement: 网关配置在启动前拒绝不安全值
+
+`inference_gateway.config` MUST 校验 provider 只取 `native` 或 `localai`，`localai` 必须显式设置
+`LLM_LOCALAI_ENABLED=true` 才可用；`LLM_LOCALAI_BASE_URL` MUST 是不带凭据、无 query/fragment、
+无无效端口的本机 HTTP 回环地址；LocalAI model 名称 MUST 只含字母、数字、点、下划线和短横线；
+连接/请求/清理超时与 `GPU_LOCK_WAIT_TIMEOUT` MUST 为有限正数，`CUDA_RELEASE_DELAY` MUST 为有限
+非负数。非法配置 MUST 抛出配置错误并阻止启动，MUST NOT 进入半可用状态。
+
+#### Scenario: 配置外部 LocalAI 地址
+
+- **WHEN** `LLM_LOCALAI_BASE_URL` 指向非 loopback 地址或包含凭据
+- **THEN** 网关拒绝该配置，不向外部地址发起任何推理请求
+
+#### Scenario: provider 或超时非法
+
+- **WHEN** provider 非 `native`/`localai`，localai 未显式启用，或任一超时非正数
+- **THEN** 启动失败并报告具体变量，不进入部分启动状态
+
+### Requirement: 网关错误分类保持隔离语义
+
+网关 MUST 使用稳定错误类型区分配置错误、provider 能力不支持、LocalAI 不可用、LocalAI 请求或
+响应不符合约定，以及 backend 停止无法确认的隔离错误（`BackendQuarantinedError`）。隔离类错误
+MUST 阻止后续 GPU 推理，并只在恢复流程确认后解除；普通上游错误 MUST NOT 被误报为隔离恢复成功。
+
+#### Scenario: 后端停止无法确认
+
+- **WHEN** provider 无法确认 backend 已退出
+- **THEN** 返回隔离类错误并保留 `.quarantine` 标记，后续 GPU 请求被拒绝
 
 ### Requirement: 不取锁的执行保持边界
 
