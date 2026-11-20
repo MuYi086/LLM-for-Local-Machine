@@ -18,7 +18,7 @@ class TelemetryBriefTests(unittest.TestCase):
             "test_id": "a" * 32,
             "test_state": "ended",
             "window_seconds": 12.3,
-            "services": {"ornith_9b": {"requests": 3, "completion_tokens": 50}},
+            "services": {"local_model": {"requests": 3, "completion_tokens": 50}},
             "resources": {
                 "sample_count": 8,
                 "processes": [
@@ -29,8 +29,7 @@ class TelemetryBriefTests(unittest.TestCase):
                         "rss_mib": {"sampled_peak": 999999},
                     }
                     for i in range(5000)
-                ]
-                + [{"role": "ornith_backend", "rss_mib": {"sampled_peak": 1234}}],
+                ],
                 "gpu_used_mib": {"GPU-1": {"sampled_peak": 14500}},
                 "memory_mib": {"used_mib": {"sampled_peak": 5000}},
             },
@@ -43,9 +42,8 @@ class TelemetryBriefTests(unittest.TestCase):
         self.assertNotIn("RAW_RECORD", result)
         brief = json.loads(result)
         self.assertTrue(brief["attached"])
-        self.assertEqual(brief["resources"]["backend_rss_peak_mib"], 1234)
         self.assertEqual(brief["warnings_count"], 100)
-        self.assertEqual(brief["services"]["ornith_9b"]["requests"], 3)
+        self.assertEqual(brief["services"]["local_model"]["requests"], 3)
 
     def test_missing_metrics_stay_unknown(self):
         brief = json.loads(render_brief({"services": {"bridge": {}}}, Path("report.json")))

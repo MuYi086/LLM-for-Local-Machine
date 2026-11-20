@@ -33,12 +33,11 @@ MUST NOT 匿名运行，MUST NOT 把该 Key 转发到上游。
 
 - **WHEN** 部署显式设置合法范围内的 `EASEL_BRIDGE_PORT`
 - **THEN** 网关只在该端口的 127.0.0.1 上监听，仍不绑定外部网卡，鉴权要求不变
-
 ### Requirement: 路由只代理既有模型 API
 
-网关 MUST 只提供 `GET /v1/models`、`POST /v1/images/generations`、`POST /v1/audio/speech`、
-`POST /v1/chat/completions`，并分别转发给既有 MOSS-Image-SFT（8501）、VoxCPM2（8313）与
-Ornith MTP 9B（8504）API；MUST NOT 直接加载模型或绕过共享 GPU 锁。
+网关 MUST 只提供 `GET /v1/models`、`POST /v1/images/generations`、`POST /v1/audio/speech`，
+并分别转发给既有 MOSS-Image-SFT（8501）与 VoxCPM2（8313）API；MUST NOT 直接加载模型或绕过共享 GPU 锁。
+网关 MUST NOT 提供聊天路由，也 MUST NOT 转发任何本地聊天模型请求。
 
 #### Scenario: 语音合成请求
 
@@ -50,6 +49,10 @@ Ornith MTP 9B（8504）API；MUST NOT 直接加载模型或绕过共享 GPU 锁�
 - **WHEN** 请求参数引用白名单之外的模型或能力
 - **THEN** 网关拒绝该请求，不尝试构造对未接入服务的调用
 
+#### Scenario: 聊天路由已移除
+
+- **WHEN** 客户端请求 `POST /v1/chat/completions`
+- **THEN** 网关返回 404，不连接任何已下线的聊天服务
 ### Requirement: 兼容请求字段有明确边界
 
 OpenAI-compatible 请求 MUST 按既有文档合同处理：图片 `n` 最多 4 且使用 `WIDTHxHEIGHT` 尺寸，每张依次
@@ -68,17 +71,16 @@ OpenAI-compatible 请求 MUST 按既有文档合同处理：图片 `n` 最多 4 
 
 - **WHEN** 客户端请求 MP3
 - **THEN** 网关用本机 FFmpeg 转换 WAV 响应，不写临时音频文件
-
 ### Requirement: 上游默认绑定 loopback
 
-网关转发的上游地址 MUST 默认指向 loopback（`EASEL_BRIDGE_MOSS_URL`、`EASEL_BRIDGE_VOXCPM_URL`、
-`EASEL_BRIDGE_MTP_CHAT_URL`），避免从网关之外绕过 Bearer 鉴权；覆盖绑定属于显式部署决策。
+网关转发的上游地址 MUST 默认指向 loopback（`EASEL_BRIDGE_MOSS_URL`、`EASEL_BRIDGE_VOXCPM_URL`），
+避免从网关之外绕过 Bearer 鉴权；覆盖绑定属于显式部署决策。聊天上游配置 `EASEL_BRIDGE_MTP_CHAT_URL`
+MUST NOT 存在。
 
 #### Scenario: 默认部署
 
 - **WHEN** 按默认环境变量启动
-- **THEN** 三个上游 URL 均指向本机回环地址，外部无法直接访问被代理的模型 API
-
+- **THEN** 两个上游 URL 均指向本机回环地址，外部无法直接访问被代理的模型 API
 ### Requirement: 配置说明与网关实现同步
 
 网关的配置项、模型填写项与兼容限制 MUST 以 [docs/easel-bridge.md](../../../docs/easel-bridge.md)

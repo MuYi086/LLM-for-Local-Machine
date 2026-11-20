@@ -17,23 +17,21 @@
 
 ### Requirement: 服务口径与清单一致
 
-仓库维护十五个音频模型服务（十四个 audio.cpp 服务共用共享 runtime，VoiceDesign 使用独立 uv 项目）、
-一个 Ornith MTP 文本模型 API、MOSS 与 FLUX.3 Klein 两个图片 API、一个轻量控制面、Steam Audio CPU
-renderer 和 Easel/OpenCode API bridge；start.sh 管理二十一个 HTTP 进程（含仅绑定 loopback 的
-Ornith llama.cpp backend）；LocalAI 固定版本由 `scripts/localai/manager.py` 在 127.0.0.1:8400 单独
-管理，MUST NOT 计入上述进程数。服务数量、路由与端口口径 MUST 与清单一致，由
-`scripts/check_service_inventory.py` 在质量门禁中核对。
+start.sh 管理的 HTTP 进程数量 MUST 与 `localai/manifests/audio-cpp-models.json` 推导值一致，
+固定 HTTP 服务为控制面（8300）、Easel bridge（8500）、MOSS-Image-SFT（8501）、FLUX.3 Klein（8502），
+合计四个；十五个音频模型服务加四个固定服务共十九个 HTTP 进程。README.md 与 AGENTS.md 的服务表、
+数量声明 MUST 与该口径一致，由 `scripts/check_service_inventory.py` 在质量门禁中核对。
+端口 8504 与 8506 及 `/v1/ornith-ai/...` 路由 MUST NOT 出现在服务清单与文档中。
 
 #### Scenario: 查询当前服务清单
 
-- **WHEN** 维护者阅读 README、AGENTS.md 或主规格确认服务口径
-- **THEN** 三处与 `localai/manifests/audio-cpp-models.json` 及 start.sh 一致，否则门禁失败
+- **WHEN** 核对 README、AGENTS、start.sh 与清单
+- **THEN** 十五个音频服务、四个固定服务、十九个 HTTP 进程的口径全部一致，无 8504/8506 残留
 
 #### Scenario: 新增或退役模型服务
 
-- **WHEN** 清单、start.sh 或端口分配变化
-- **THEN** README 服务表、AGENTS.md 服务表与对应能力域规格同步更新后归档
-
+- **WHEN** 音频候选增减或固定服务变化
+- **THEN** 清单、start.sh、README、AGENTS 同步更新，并通过 `scripts/check_service_inventory.py`
 ### Requirement: 事实来源分层固定
 
 项目事实 MUST 按以下层级取用：模型清单与构建脚本（`localai/manifests/`、`sdcpp/manifests/`、
@@ -44,7 +42,6 @@ openspec/specs/ 维护行为基线。文档与实现冲突时 MUST 先核对实�
 
 - **WHEN** 文档描述与清单或源码行为不一致
 - **THEN** 以实现为准修正文档并记录原因，不按旧文档推断行为
-
 ### Requirement: 能力域导航保持可用
 
 每个能力域 MUST 有对应主规格且链接可达，完整清单见下方「能力域清单」；维护者 MUST 能通过
@@ -59,7 +56,6 @@ openspec/specs/ 维护行为基线。文档与实现冲突时 MUST 先核对实�
 
 - **WHEN** 询问遥测、Dagu 调度、音乐后处理或协作纪律是否属于当前能力
 - **THEN** 按能力域导航定位对应主规格，服务事实仍以清单为准，治理约定不冒充已实现工具能力
-
 ### Requirement: 历史资料不推断当前能力
 
 历史报告、任务草稿（task*.md）、SDD plans/ledgers 与已退役目录 MUST NOT 用于推断当前接口；
@@ -75,7 +71,6 @@ openspec/specs/ 维护行为基线。文档与实现冲突时 MUST 先核对实�
 服务与机制域：
 
 - [audio.cpp 音频模型服务](../audio-cpp-services/spec.md)
-- [Ornith 文本模型](../ornith-text-model/spec.md)
 - [图片服务](../image-sdcpp-services/spec.md)
 - [控制面与空间渲染](../control-plane-and-spatial-render/spec.md)
 - [GPU 锁与隔离](../gpu-lock-and-quarantine/spec.md)
@@ -87,7 +82,6 @@ openspec/specs/ 维护行为基线。文档与实现冲突时 MUST 先核对实�
 运行与治理域：
 
 - [模型性能记录](../model-telemetry/spec.md)
-- [OpenCode 上下文插件与固定上下文基准](../opencode-context-and-benchmark/spec.md)
 - [Dagu 独立作业调度](../dagu-job-worker/spec.md)
 - [音乐后处理编排规则](../music-postprocessing/spec.md)
 - [清单版本锁定与外部二进制核验](../manifest-version-pinning/spec.md)

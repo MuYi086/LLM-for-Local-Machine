@@ -33,11 +33,6 @@ def render_brief(report: dict[str, Any], source_json: Path, target: Path | None 
         return number(value.get("sampled_peak")) if isinstance(value, dict) else None
 
     resources = report.get("resources", {})
-    backend = [
-        peak(p.get("rss_mib"))
-        for p in resources.get("processes", [])
-        if p.get("role") == "ornith_backend"
-    ]
     gpu = [peak(v) for v in resources.get("gpu_used_mib", {}).values()]
     services = {}
     selected = sorted(report.get("services", {}).items())[:4]
@@ -72,7 +67,6 @@ def render_brief(report: dict[str, Any], source_json: Path, target: Path | None 
             "sample_count": number(resources.get("sample_count")),
             "gpu_peak_mib": max((v for v in gpu if v is not None), default=None),
             "guest_used_peak_mib": peak(resources.get("memory_mib", {}).get("used_mib")),
-            "backend_rss_peak_mib": max((v for v in backend if v is not None), default=None),
         },
         "warnings_count": len(warnings),
         "warnings": [str(w)[:160] for w in warnings[:3]],

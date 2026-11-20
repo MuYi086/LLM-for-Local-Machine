@@ -58,7 +58,7 @@
 
 默认目录 MUST 保持：VoiceDesign 音色位于 `storage/timbre/`；控制面与服务临时文件位于
 `$RUNTIME_CACHE_DIR`；FLUX 编辑上传临时目录为 `$RUNTIME_CACHE_DIR/sdcpp_uploads` 且请求结束后删除；
-Ornith 真实样例写入 `storage/llm_tests/`；新增 audio.cpp API MUST NOT 长期保存上传或输出。
+新增 audio.cpp API MUST NOT 长期保存上传或输出。
 
 #### Scenario: 请求级临时文件
 

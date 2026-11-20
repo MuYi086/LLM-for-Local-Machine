@@ -42,8 +42,7 @@ spec-driven 工作流并适配后端模型服务仓库。协作原则与技术�
    （`scripts/check_service_inventory.py`）。
 2. **无模型回归**：`uv run --project qa --locked python -m unittest discover -s tests -v`；
    测试不下载权重、不依赖 CUDA、不调用真实模型。
-3. **真实模型验证**：单独串行执行（音频样例 `tests/audio_cpp/generate_examples.py`，
-   Ornith 样例 `tests/ornith_1_5_9b_mtp_benchmarks/generate_example.py`），输出写入运行数据目录。
+3. **真实模型验证**：单独串行执行（音频样例 `tests/audio_cpp/generate_examples.py`），输出写入运行数据目录。
 
 以上三层 MUST 分开记录：无模型回归通过不代表真实模型验证完成；无法完成的真实模型验证
 明确列为未完成，不通过勾选或措辞掩盖。行为或契约变化后同步受影响的清单、

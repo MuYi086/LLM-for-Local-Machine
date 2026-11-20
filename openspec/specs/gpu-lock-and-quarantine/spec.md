@@ -30,22 +30,6 @@ CPU/文件预检 MUST 在获取锁前完成，持锁时间只保留给真正需�
 
 - **WHEN** 请求进入仅涉及文件、清单或配置的预检阶段
 - **THEN** 预检在获取锁之前完成，不占用 GPU 队列等待时间
-
-### Requirement: Ornith 请求持锁期间完成生命周期确认
-
-Ornith 请求在持锁后 MUST 先确认 backend `/props.is_sleeping`，再提交推理；结束后 MUST 确认模型
-卸载并等待 `CUDA_RELEASE_DELAY`，最终在 finally 中释放锁。
-
-#### Scenario: 正常推理请求
-
-- **WHEN** Ornith 请求获得 GPU 锁
-- **THEN** 依次完成 sleep 状态确认、推理、卸载确认与延迟等待后释放锁
-
-#### Scenario: 推理中途异常
-
-- **WHEN** 推理或卸载确认抛出异常
-- **THEN** 锁仍由 finally 释放，不因异常路径造成锁泄漏
-
 ### Requirement: 队列等待有界且显式
 
 GPU 队列默认等待 900 秒；部署值 MUST 为正数；超时请求 MUST 返回 503，不得无限排队。
@@ -59,12 +43,11 @@ GPU 队列默认等待 900 秒；部署值 MUST 为正数；超时请求 MUST �
 
 - **WHEN** 队列等待被配置为非正数
 - **THEN** 启动或配置校验失败，拒绝以非法值运行
-
 ### Requirement: 隔离标记阻止一切 GPU 推理
 
-`.quarantine` 标记存在时，任何 GPU provider MUST NOT 推理；LocalAI MUST 确认 backend 已关闭；
-Ornith MUST 确认 llama.cpp 进程组和各自 loopback API 已退出；标记 MUST 仅在
-`scripts/localai/recover_quarantine.py` 完成上述确认后移除。
+`.quarantine` 标记存在时，任何 GPU provider MUST NOT 推理。LocalAI MUST 确认 backend 已关闭；
+sd.cpp MUST 按进程身份核验；仅使用 `scripts/localai/recover_quarantine.py` 完成确认后移除标记。
+llama.cpp provider 的隔离恢复分支 MUST NOT 存在，因为对应 backend 已下线。
 
 #### Scenario: backend 停止状态不能确认
 
@@ -74,8 +57,7 @@ Ornith MUST 确认 llama.cpp 进程组和各自 loopback API 已退出；标记 
 #### Scenario: 执行恢复流程
 
 - **WHEN** 维护者运行 `scripts/localai/recover_quarantine.py`
-- **THEN** 脚本核验进程组与 loopback API 退出状态，确认后才允许移除隔离标记
-
+- **THEN** 脚本按 LocalAI 或 sd.cpp 既有流程核验 backend 退出状态，确认后才允许移除隔离标记
 ### Requirement: CLI provider 按进程身份核验
 
 sdcpp CLI provider 无 HTTP 端口；其隔离与恢复 MUST 按 PID/starttime 与进程组核验，
@@ -85,7 +67,6 @@ sdcpp CLI provider 无 HTTP 端口；其隔离与恢复 MUST 按 PID/starttime �
 
 - **WHEN** 图片生成的 worker 进程未确认退出
 - **THEN** 保留 quarantine 标记，按统一恢复流程处理
-
 ### Requirement: 网关配置在启动前拒绝不安全值
 
 `inference_gateway.config` MUST 校验 provider 只取 `native` 或 `localai`，`localai` 必须显式设置
@@ -103,7 +84,6 @@ sdcpp CLI provider 无 HTTP 端口；其隔离与恢复 MUST 按 PID/starttime �
 
 - **WHEN** provider 非 `native`/`localai`，localai 未显式启用，或任一超时非正数
 - **THEN** 启动失败并报告具体变量，不进入部分启动状态
-
 ### Requirement: 网关错误分类保持隔离语义
 
 网关 MUST 使用稳定错误类型区分配置错误、provider 能力不支持、LocalAI 不可用、LocalAI 请求或
@@ -114,7 +94,6 @@ MUST 阻止后续 GPU 推理，并只在恢复流程确认后解除；普通上�
 
 - **WHEN** provider 无法确认 backend 已退出
 - **THEN** 返回隔离类错误并保留 `.quarantine` 标记，后续 GPU 请求被拒绝
-
 ### Requirement: 不取锁的执行保持边界
 
 Steam Audio renderer 是 CPU 实现，MUST NOT 获取 GPU 锁；默认 MUST NOT 并行执行多个 GPU 音频

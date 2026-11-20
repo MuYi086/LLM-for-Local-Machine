@@ -17,17 +17,14 @@ from io import BytesIO
 from typing import Annotated, Any, Literal
 
 import httpx
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
-from fastapi.responses import JSONResponse, Response, StreamingResponse
-from llm_local_runtime.telemetry import TelemetryMiddleware
+from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-CHAT_MODEL_ID = "Ornith-1.5-9B-MTP-GGUF-Q8"
 MOSS_MODEL_ID = "MOSS-Image-SFT-Q8_0"
 VOXCPM_MODEL_ID = "OpenBMB/VoxCPM2-GGUF"
 
-DEFAULT_CHAT_URL = "http://127.0.0.1:8504/v1/ornith-ai/Ornith-1.5-9B-MTP-GGUF-Q8"
 DEFAULT_MOSS_URL = "http://127.0.0.1:8501/v1/openmoss/MOSS-Image-SFT-Q8_0"
 DEFAULT_VOXCPM_URL = "http://127.0.0.1:8313/v1/OpenBMB/VoxCPM2-GGUF"
 
@@ -48,7 +45,6 @@ class BridgeSettings:
     """网关鉴权、上游地址和资源上限。"""
 
     api_key: str
-    chat_url: str
     moss_url: str
     voxcpm_url: str
     timeout_seconds: float
@@ -104,7 +100,6 @@ def _validate_upstream_url(name: str, value: str) -> str:
 def _settings_from_environment(
     *,
     api_key: str | None,
-    chat_url: str | None,
     moss_url: str | None,
     voxcpm_url: str | None,
     timeout_seconds: float | None,
@@ -145,10 +140,6 @@ def _settings_from_environment(
         raise ValueError("请求和响应大小限制必须是正整数。")
     return BridgeSettings(
         api_key=(env.get("EASEL_BRIDGE_API_KEY", "") if api_key is None else api_key).strip(),
-        chat_url=_validate_upstream_url(
-            "EASEL_BRIDGE_MTP_CHAT_URL",
-            chat_url or env.get("EASEL_BRIDGE_MTP_CHAT_URL", DEFAULT_CHAT_URL),
-        ),
         moss_url=_validate_upstream_url(
             "EASEL_BRIDGE_MOSS_URL", moss_url or env.get("EASEL_BRIDGE_MOSS_URL", DEFAULT_MOSS_URL)
         ),
@@ -363,7 +354,6 @@ def _is_wav(audio: bytes) -> bool:
 def create_app(
     *,
     api_key: str | None = None,
-    chat_url: str | None = None,
     moss_url: str | None = None,
     voxcpm_url: str | None = None,
     timeout_seconds: float | None = None,
@@ -377,7 +367,6 @@ def create_app(
     """创建 Easel 网关，保留上游服务自身的 GPU 锁和模型生命周期。"""
     settings = _settings_from_environment(
         api_key=api_key,
-        chat_url=chat_url,
         moss_url=moss_url,
         voxcpm_url=voxcpm_url,
         timeout_seconds=timeout_seconds,
@@ -400,7 +389,6 @@ def create_app(
         yield
 
     app = FastAPI(title="Easel Local Model Bridge", lifespan=lifespan)
-    app.add_middleware(TelemetryMiddleware, service="bridge", paths={"/v1/chat/completions"})
     app.state.bridge_settings = settings
     app.add_middleware(RequestBodyLimitMiddleware, max_bytes=settings.max_request_bytes)
 
@@ -426,7 +414,6 @@ def create_app(
             "data": [
                 {"id": model_id, "object": "model", "created": 0, "owned_by": "llm-local"}
                 for model_id in (
-                    CHAT_MODEL_ID,
                     MOSS_MODEL_ID,
                     VOXCPM_MODEL_ID,
                 )
@@ -488,72 +475,6 @@ def create_app(
             except (KeyError, TypeError, ValueError, json.JSONDecodeError):
                 return _error(502, "MOSS 返回了无效的图片响应。", "upstream_error")
         return JSONResponse({"created": created, "data": data})
-
-    @app.post("/v1/chat/completions")
-    async def chat_completions(
-        request: Request,
-        _auth: None = Depends(verify_key),
-    ) -> Response:
-        """把 OpenAI Chat Completions 请求转发给已有 Ornith 适配器。"""
-        try:
-            payload = await request.json()
-        except (ValueError, UnicodeDecodeError):
-            return _error(400, "请求体不是有效 JSON。")
-        if not isinstance(payload, dict):
-            return _error(400, "请求体必须是 JSON 对象。")
-        model_id = payload.get("model")
-        chat_urls = {
-            CHAT_MODEL_ID: settings.chat_url,
-        }
-        if not isinstance(model_id, str) or model_id not in chat_urls:
-            return _error(404, f"未知聊天模型：{model_id or ''}", "model_not_found")
-        upstream_url = chat_urls[model_id]
-
-        client = httpx.AsyncClient(
-            transport=transport,
-            timeout=settings.timeout_seconds,
-            trust_env=False,
-            follow_redirects=False,
-        )
-        try:
-            trace = request.scope.get("model_telemetry")
-            headers = {"X-Model-Request-ID": trace.request_id} if trace else {}
-            upstream_request = client.build_request(
-                "POST", upstream_url, json=payload, headers=headers
-            )
-            upstream = await client.send(upstream_request, stream=True)
-        except httpx.TimeoutException:
-            await client.aclose()
-            return _error(504, "等待本地模型响应超时。", "upstream_timeout")
-        except httpx.RequestError:
-            await client.aclose()
-            return _error(502, "无法连接本地模型服务。", "upstream_error")
-
-        if upstream.status_code >= 400 or not payload.get("stream"):
-            try:
-                body = await _read_limited(upstream, settings.max_response_bytes)
-                headers = _upstream_headers(upstream.headers)
-                return Response(content=body, status_code=upstream.status_code, headers=headers)
-            except HTTPException as exc:
-                return _error(exc.status_code, str(exc.detail), "upstream_error")
-            finally:
-                await upstream.aclose()
-                await client.aclose()
-
-        async def stream_body():
-            try:
-                async for chunk in upstream.aiter_raw():
-                    yield chunk
-            finally:
-                await upstream.aclose()
-                await client.aclose()
-
-        return StreamingResponse(
-            stream_body(),
-            status_code=upstream.status_code,
-            headers=_upstream_headers(upstream.headers),
-            media_type=upstream.headers.get("content-type", "text/event-stream"),
-        )
 
     @app.post("/v1/audio/speech")
     async def speech(

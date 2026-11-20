@@ -21,14 +21,12 @@ README_PATH = ROOT / "README.md"
 AGENTS_PATH = ROOT / "AGENTS.md"
 START_SH_PATH = ROOT / "start.sh"
 
-# 非音频模型的固定 HTTP 服务；LocalAI(8400) 由 manager.py 单独管理，不在这 21 个进程之列。
+# 非音频模型的固定 HTTP 服务；LocalAI(8400) 由 manager.py 单独管理，不在这 19 个进程之列。
 FIXED_HTTP_SERVICES: tuple[tuple[str, int], ...] = (
     ("Control-plane 控制面", 8300),
     ("Easel bridge 网关", 8500),
     ("MOSS-Image-SFT 图片 API", 8501),
     ("FLUX.3 Klein 图片 API", 8502),
-    ("Ornith MTP 9B API", 8504),
-    ("Ornith llama.cpp backend（仅 loopback）", 8506),
 )
 
 # 清单允许的服务 runtime；出现新 runtime 时应先更新本脚本再合入。

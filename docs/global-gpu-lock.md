@@ -20,14 +20,12 @@ GPU 推理前调用 `gpu_runtime_lock(lock_path, label, timeout_seconds=...)`。
 
 1. 先完成不使用 GPU 的请求、文件和权重检查。
 2. 取得同一路径的排他 `flock` 后才启动模型或调用 backend。
-3. 成功、异常和超时路径都必须回收显存：LocalAI 确认 backend shutdown；Ornith 确认各自
-   `llama-server /props` 返回 `is_sleeping: true`，并继续持锁等待 `CUDA_RELEASE_DELAY`。
-   清理异常不能覆盖原始推理错误。
+3. 成功、异常和超时路径都必须回收显存：LocalAI 确认 backend shutdown，sd.cpp 等待
+   `CUDA_RELEASE_DELAY`。清理异常不能覆盖原始推理错误。
 4. 在 `finally` 中释放锁。
 
-VoiceDesign 和 audio.cpp provider 通过 `inference_gateway.execution.execute_localai_operation` 走此流程；
-Ornith 的 backend startup、请求与 shutdown 通过 `llm_local_runtime.gpu_runtime_lock` 申请同一租约。
-每个文本模型请求在 POST 前确认对应 backend 已处于 sleep-idle，避免撞入 sleep 转换窗口。今后增加其他 GPU provider 时，也必须复用共享锁；
+VoiceDesign 和 audio.cpp provider 通过 `inference_gateway.execution.execute_localai_operation` 走此流程，
+sd.cpp provider 通过同一把锁串行执行。今后增加其他 GPU provider 时，也必须复用共享锁；
 不得另建模型专属锁，也不得绕过锁直接启动 GPU worker。Steam Audio renderer 是 CPU 路径，健康信息中报告
 `gpu_lock: false`，不加入队列。
 
@@ -45,14 +43,14 @@ Ornith 的 backend startup、请求与 shutdown 通过 `llm_local_runtime.gpu_ru
 provider 取得文件锁会先检查该标记；标记存在时立即拒绝推理，避免不确定的残留模型继续占用显存。
 不能仅因 HTTP shutdown 返回成功就删除标记，必须确认受管模型/backend 进程组已退出。
 
-LocalAI、Ornith 与 sd.cpp 共用恢复入口：
+LocalAI 与 sd.cpp 共用恢复入口：
 
 ```bash
 python3 scripts/localai/recover_quarantine.py
 ```
 
-恢复脚本先确认没有活动 GPU 请求，在同一锁下读取 `provider` 并分派处理。LocalAI 未确认 shutdown，或
-llama.cpp 进程组或 loopback API 仍活动时，会保留隔离标记。只有确认对应 backend 进程组和端口退出后才原子删除标记。
+恢复脚本先确认没有活动 GPU 请求，在同一锁下读取 `provider` 并分派处理。backend 未确认退出时会保留隔离标记，
+只有确认对应进程退出后才原子删除标记。
 新增 GPU provider 也必须提供相同强度的进程回收与恢复流程，不能自行绕过 quarantine。
 
 ## sd.cpp CLI provider

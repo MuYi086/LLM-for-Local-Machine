@@ -4,12 +4,9 @@
 from __future__ import annotations
 
 import fcntl
-import ipaddress
 import json
 import os
-import signal
 import sys
-import time
 from dataclasses import replace
 from pathlib import Path
 
@@ -17,17 +14,12 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "inference_gateway/src"))
 sys.path.insert(0, str(ROOT / "llm_local_runtime/src"))
-sys.path.insert(0, str(ROOT / "model-text"))
 
 from inference_gateway.sdcpp.processes import recover_sdcpp  # noqa: E402
-from llama_cpp_runtime import runtime as llama_runtime  # noqa: E402
 
 from inference_gateway import LocalAIClient, load_gateway_config  # noqa: E402
 from llm_local_runtime import gpu_quarantine_path  # noqa: E402
 from scripts.localai.manager import LocalAIManager, LocalAIManagerError  # noqa: E402
-
-_loopback_port_open = llama_runtime.loopback_port_open
-process_start_time = llama_runtime.process_start_time
 
 
 def _environment_lock_path() -> Path:
@@ -68,125 +60,6 @@ def _process_command_line(pid: int) -> list[str] | None:
     except OSError:
         return None
     return [argument.decode(errors="replace") for argument in raw.split(b"\0") if argument]
-
-
-def _validate_llama_cpp_marker(
-    marker: dict[str, object],
-) -> tuple[str, int, int | None, int | None]:
-    """检查 llama.cpp 标记中的 backend 地址和进程身份。"""
-    host = marker.get("host")
-    port = marker.get("port")
-    pid = marker.get("pid")
-    pgid = marker.get("pgid")
-    if not isinstance(host, str):
-        raise ValueError("llama.cpp 隔离标记缺少 host。")
-    if host != "localhost":
-        try:
-            if not ipaddress.ip_address(host).is_loopback:
-                raise ValueError("llama.cpp 隔离标记 host 不是 loopback。")
-        except ValueError as exc:
-            raise ValueError("llama.cpp 隔离标记 host 不是 loopback。") from exc
-    if not isinstance(port, int) or not 1 <= port <= 65535:
-        raise ValueError("llama.cpp 隔离标记缺少有效 loopback 端口。")
-    if pid is not None and (not isinstance(pid, int) or pid <= 0):
-        raise ValueError("llama.cpp 隔离标记 pid 无效。")
-    if pgid is not None and (not isinstance(pgid, int) or pgid <= 0):
-        raise ValueError("llama.cpp 隔离标记 pgid 无效。")
-    if (pid is None) != (pgid is None):
-        raise ValueError("llama.cpp 隔离标记必须同时包含 pid 和 pgid，或二者都为空。")
-    if pid is not None and pgid != pid:
-        raise ValueError("llama.cpp backend 进程组与 pid 不一致，保留隔离状态。")
-    return host, port, pid, pgid
-
-
-def _recover_llama_cpp_target(marker: dict[str, object]) -> int:
-    """停止一个 llama.cpp backend，并确认进程组与 loopback API 均已退出。"""
-    try:
-        host, port, pid, pgid = _validate_llama_cpp_marker(marker)
-        timeout = float(os.getenv("LLM_LOCALAI_CLEANUP_TIMEOUT", "30"))
-        if timeout <= 0:
-            raise ValueError("LLM_LOCALAI_CLEANUP_TIMEOUT 必须为正数。")
-        original_start_time = marker.get("pid_start_time")
-        if pid is not None:
-            current_start_time = process_start_time(pid)
-            if current_start_time is not None and original_start_time != current_start_time:
-                pid = None
-                pgid = None
-            elif current_start_time is not None:
-                command_line = _process_command_line(pid)
-                executable = marker.get("executable")
-                port_argument = ["--port", str(port)]
-                if (
-                    not isinstance(executable, str)
-                    or command_line is None
-                    or not command_line
-                    or not any(
-                        argument.startswith("/")
-                        and Path(argument).resolve() == Path(executable).resolve()
-                        for argument in command_line[:2]
-                    )
-                    or not any(
-                        command_line[index : index + 2] == port_argument
-                        for index in range(len(command_line) - 1)
-                    )
-                ):
-                    print(
-                        "隔离标记中的 PID 与 llama-server 命令不匹配，保留隔离状态。",
-                        file=sys.stderr,
-                    )
-                    return 1
-            elif original_start_time is not None and _process_group_exists(pgid or 0):
-                print("无法核对 llama.cpp backend 的进程启动时间，保留隔离状态。", file=sys.stderr)
-                return 1
-
-        if pgid is not None and _process_group_exists(pgid):
-            os.killpg(pgid, signal.SIGTERM)
-            deadline = time.monotonic() + min(timeout, 5.0)
-            while time.monotonic() < deadline and _process_group_exists(pgid):
-                time.sleep(0.1)
-            if _process_group_exists(pgid):
-                os.killpg(pgid, signal.SIGKILL)
-
-        deadline = time.monotonic() + timeout
-        while time.monotonic() < deadline:
-            group_stopped = pgid is None or not _process_group_exists(pgid)
-            api_stopped = not _loopback_port_open(host, port)
-            if group_stopped and api_stopped:
-                print(f"llama.cpp 进程组和 loopback API 已退出：{host}:{port}")
-                return 0
-            time.sleep(0.2)
-        print(
-            "llama.cpp backend 进程组或 loopback API 仍活动，保留 GPU 隔离标记。",
-            file=sys.stderr,
-        )
-        return 1
-    except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
-        print(f"llama.cpp backend 恢复失败，保留隔离标记：{exc}", file=sys.stderr)
-        return 1
-
-
-def _recover_llama_cpp_targets(targets: object) -> int:
-    """按 marker 中的完整列表停止并确认每个 llama.cpp backend。"""
-    if not isinstance(targets, list) or not targets:
-        print("llama.cpp 隔离标记缺少有效 backend 列表。", file=sys.stderr)
-        return 1
-    for target in targets:
-        if not isinstance(target, dict) or _recover_llama_cpp_target(target) != 0:
-            return 1
-    return 0
-
-
-def _recover_llama_cpp(marker_path: Path, marker: dict[str, object]) -> int:
-    """停止 marker 中所有 llama.cpp backend 后再解除共享 GPU 隔离。"""
-    targets = marker.get("backends")
-    if targets is None:
-        targets = [marker]
-    if _recover_llama_cpp_targets(targets) != 0:
-        return 1
-    marker_path.unlink()
-    _sync_marker_directory(marker_path)
-    print("所有 llama.cpp 进程组和 loopback API 已退出，GPU 隔离已解除。")
-    return 0
 
 
 def _recover_localai(marker_path: Path, marker: dict[str, object]) -> int:
@@ -264,9 +137,6 @@ def main() -> int:
                 print("隔离标记格式无效，保留隔离状态。", file=sys.stderr)
                 return 1
             provider = marker.get("provider", "localai")
-            if provider != "llama.cpp" and "llama_cpp_backends" in marker:
-                if _recover_llama_cpp_targets(marker["llama_cpp_backends"]) != 0:
-                    return 1
             if provider == "stable-diffusion.cpp":
                 try:
                     recover_sdcpp(
@@ -277,8 +147,6 @@ def main() -> int:
                     return 1
                 print("sd.cpp 进程组已确认停止，GPU 隔离已解除。")
                 return 0
-            if provider == "llama.cpp":
-                return _recover_llama_cpp(marker_path, marker)
             if provider != "localai":
                 print(f"隔离标记 provider 不受支持：{provider}。", file=sys.stderr)
                 return 1

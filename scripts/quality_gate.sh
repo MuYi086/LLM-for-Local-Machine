@@ -19,13 +19,10 @@ lint_paths=(
     llm_local_runtime
     inference_gateway
     scripts/localai
-    scripts/llama_cpp
     scripts/sdcpp
     scripts/dagu
     scripts/model_telemetry.py
     scripts/check_service_inventory.py
-    model-text/llama_cpp_runtime
-    model-text/Ornith-1.5-9B-MTP-GGUF
     model-image
     easel_bridge
 )

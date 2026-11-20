@@ -137,18 +137,6 @@ class ResourceAndReportTests(unittest.TestCase):
             )
             self.assertEqual(read_memory(Path(root, "missing")), {})
 
-    def test_native_log_parser_does_not_save_other_log_text(self):
-        from llm_local_runtime.telemetry_resources import parse_backend_line
-
-        row = parse_backend_line(
-            "1.42.282.758 I slot print_timing: id 0 | task 538 | prompt eval time = 15390.16 ms / 10331 tokens ( 1.49 ms per token, 671.27 tokens per second)"
-        )
-        self.assertEqual(row["task_id"], 538)
-        self.assertEqual(row["phase"], "prompt")
-        self.assertEqual(row["tokens"], 10331)
-        self.assertEqual(row["tokens_per_second"], 671.27)
-        self.assertIsNone(parse_backend_line("request body private password"))
-
     def test_report_filters_time_and_keeps_services_separate(self):
         from llm_local_runtime.telemetry_cli import build_report
 
@@ -167,7 +155,7 @@ class ResourceAndReportTests(unittest.TestCase):
                 {
                     "started_at": "2026-11-12T02:00:01+00:00",
                     "ended_at": "2026-11-12T02:00:05+00:00",
-                    "service": "ornith",
+                    "service": "local_model",
                     "request_id": "a",
                     "duration_ms": 4000,
                     "usage": {"completion_tokens": 10},
@@ -187,7 +175,7 @@ class ResourceAndReportTests(unittest.TestCase):
             )
             self.assertEqual(len(report["requests"]), 2)
             self.assertEqual(report["services"]["bridge"]["completion_tokens"], 10)
-            self.assertEqual(report["services"]["ornith"]["completion_tokens"], 10)
+            self.assertEqual(report["services"]["local_model"]["completion_tokens"], 10)
             self.assertTrue(report["warnings"])
 
     def test_begin_end_never_overwrite_existing_test(self):
@@ -231,7 +219,7 @@ class ResourceAndReportTests(unittest.TestCase):
                 json.dumps(
                     {
                         "started_at": "2026-11-12T02:00:01+00:00",
-                        "service": "ornith",
+                        "service": "local_model",
                         "request_id": "request",
                         "trace_id": "trace",
                     }
@@ -242,7 +230,7 @@ class ResourceAndReportTests(unittest.TestCase):
                 directory, "2026-11-12T02:00:00+00:00", "2026-11-12T02:01:00+00:00"
             )
             self.assertEqual(result["requests"][0]["outcome"], "unfinished")
-            self.assertIsNone(result["services"]["ornith"]["completion_tokens"])
+            self.assertIsNone(result["services"]["local_model"]["completion_tokens"])
             self.assertTrue(any("结束记录" in text for text in result["warnings"]))
 
     def test_pretest_baseline_is_not_counted_as_task_peak(self):
@@ -286,35 +274,6 @@ class ResourceAndReportTests(unittest.TestCase):
             self.assertEqual(report["requests"], [])
             self.assertTrue(report["warnings"])
 
-    def test_backend_pidfile_tracks_process_outside_startup_tree(self):
-        import shutil
-
-        from llm_local_runtime.telemetry_resources import read_processes
-
-        executable = shutil.which("sleep")
-        with tempfile.TemporaryDirectory() as root:
-            pidfile = Path(root, "backend.pid")
-            process = subprocess.Popen([executable, "30"])
-            try:
-                pidfile.write_text(str(process.pid))
-                with patch.dict(
-                    "os.environ",
-                    {
-                        "ORNITH_MTP_9B_BACKEND_PID_FILE": str(pidfile),
-                        "LLAMA_SERVER_BIN": executable,
-                    },
-                ):
-                    rows = read_processes(2147483647, pss=False)
-                row = next((row for row in rows if row["pid"] == process.pid), None)
-                self.assertIsNotNone(row)
-                self.assertEqual(row["role"], "ornith_backend")
-                self.assertGreaterEqual(row["rss_mib"], 0)
-            finally:
-                process.terminate()
-                process.wait(timeout=5)
-
-
-class ReportAttachmentTests(unittest.TestCase):
     def test_attach_replaces_only_matching_test_block_and_preserves_review(self):
         from llm_local_runtime.telemetry_cli import attach_result
 

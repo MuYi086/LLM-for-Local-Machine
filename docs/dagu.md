@@ -1,6 +1,6 @@
 # Dagu 独立任务调度
 
-Dagu 是可选的后台调度层。先用 `bash start.sh` 启动既有模型服务；Ornith、图片和音频 API 仍可直接调用。Dagu 通过 HTTP 调用 MOSS 与 VoxCPM2，既不加载模型，也不提前获取 GPU 锁。GPU 锁、backend 收尾和 quarantine 仍由模型服务负责。Dagu 故障不会改变直接调用入口。
+Dagu 是可选的后台调度层。先用 `bash start.sh` 启动既有模型服务；图片和音频 API 仍可直接调用。Dagu 通过 HTTP 调用 MOSS 与 VoxCPM2，既不加载模型，也不提前获取 GPU 锁。GPU 锁、backend 收尾和 quarantine 仍由模型服务负责。Dagu 故障不会改变直接调用入口。
 
 ## 安装与启动
 

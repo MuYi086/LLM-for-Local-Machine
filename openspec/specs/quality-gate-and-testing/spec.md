@@ -62,8 +62,7 @@ CI MUST 在 push 与 PR 时执行 `scripts/quality_gate.sh`，与本地门禁保
 ### Requirement: 真实模型验证单独串行
 
 真实模型生成 MUST 独立于无模型门禁单独串行执行：音频样例用
-`tests/audio_cpp/generate_examples.py`，Ornith 文本样例用
-`tests/ornith_1_5_9b_mtp_benchmarks/generate_example.py`，输出放入运行数据目录。
+`tests/audio_cpp/generate_examples.py`，输出放入运行数据目录。
 
 #### Scenario: 执行真实样例
 

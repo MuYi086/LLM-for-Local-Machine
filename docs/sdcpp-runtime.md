@@ -9,7 +9,7 @@
 
 - `inference_gateway.sdcpp`：严格清单、结构化参数、组件预检、共享 GPU 锁和独立 CLI 进程组。
 - `scripts/sdcpp/manager.py`：`status`、`validate`、`generate`。
-- `scripts/localai/recover_quarantine.py`：统一分派 LocalAI、llama.cpp 和 sd.cpp 隔离恢复。
+- `scripts/localai/recover_quarantine.py`：统一分派 LocalAI 和 sd.cpp 隔离恢复。
 - PNG 图片和 AVI 视频按 UUID 写入独立目录，成功后原子发布；失败仅清理当前请求。
 - `generation.json` 保存请求与二进制摘要；返回 JSON 包含排队、worker 总耗时和共享显存采样指标。
   worker 总耗时包括加载、生成和回收，尚不拆分模型加载与采样时间；显存指标不是模型独占显存。

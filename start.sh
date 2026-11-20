@@ -18,8 +18,6 @@ MAIN_PROJECT_DIR="$MAIN_DIR"
 VOICEDESIGN_PROJECT_DIR="$PROJECT_DIR/model-audio/design_qwen3-tts-1.7b-voicedesign"
 AUDIO_CPP_RUNTIME_PROJECT_DIR="$PROJECT_DIR/model-audio/audio_cpp_runtime"
 AUDIO_CPP_RUNTIME_SRC="$AUDIO_CPP_RUNTIME_PROJECT_DIR/src"
-MODEL_TEXT_DIR="$PROJECT_DIR/model-text"
-ORNITH_MTP_9B_SERVICE_DIR="$MODEL_TEXT_DIR/Ornith-1.5-9B-MTP-GGUF"
 MOSS_IMAGE_SERVICE_DIR="$PROJECT_DIR/model-image/MOSS-Image-SFT-Q8_0"
 FLUX3_IMAGE_SERVICE_DIR="$PROJECT_DIR/model-image/FLUX-3-Image-Klein-GGUF-Q8"
 EASEL_BRIDGE_ENV_FILE="${EASEL_BRIDGE_ENV_FILE:-$PROJECT_DIR/.env.easel-bridge}"
@@ -48,10 +46,6 @@ if [[ ! -f "$MOSS_IMAGE_SERVICE_DIR/main.py" ]]; then
 fi
 if [[ ! -f "$FLUX3_IMAGE_SERVICE_DIR/main.py" ]]; then
   echo "缺少 FLUX.3 Klein 图片服务：$FLUX3_IMAGE_SERVICE_DIR/main.py" >&2
-  exit 1
-fi
-if [[ ! -f "$ORNITH_MTP_9B_SERVICE_DIR/main.py" ]]; then
-  echo "缺少 Ornith-1.5-9B-MTP-GGUF 服务：$ORNITH_MTP_9B_SERVICE_DIR/main.py" >&2
   exit 1
 fi
 if [[ ! -f "$PROJECT_DIR/easel_bridge/app.py" ]]; then
@@ -98,7 +92,7 @@ if [[ ! "$EASEL_BRIDGE_PORT" =~ ^[1-9][0-9]*$ ]] || (( EASEL_BRIDGE_PORT > 65535
   exit 1
 fi
 
-export PYTHONPATH="$MODEL_TEXT_DIR:$AUDIO_CPP_RUNTIME_SRC:$LLM_LOCAL_RUNTIME_SRC:$INFERENCE_GATEWAY_SRC${PYTHONPATH:+:$PYTHONPATH}"
+export PYTHONPATH="$AUDIO_CPP_RUNTIME_SRC:$LLM_LOCAL_RUNTIME_SRC:$INFERENCE_GATEWAY_SRC${PYTHONPATH:+:$PYTHONPATH}"
 export HF_MIRROR_DIR="${HF_MIRROR_DIR:-$HOME/hf-mirror}"
 export QWEN_VOICEDESIGN_MODEL_FILE="${QWEN_VOICEDESIGN_MODEL_FILE:-$HF_MIRROR_DIR/audio.cpp-gguf/Qwen3-TTS-12Hz-1.7B-VoiceDesign-GGUF/qwen3-tts-12hz-1.7b-voicedesign-bf16.gguf}"
 export AUDIO_CPP_CONFUCIUS4_TTS_MODEL_FILE="${AUDIO_CPP_CONFUCIUS4_TTS_MODEL_FILE:-$HF_MIRROR_DIR/audio.cpp-gguf/Confucius4-TTS-GGUF/confucius4-tts-orig.gguf}"
@@ -115,8 +109,6 @@ export AUDIO_CPP_BS_ROFORMER_MODEL_FILE="${AUDIO_CPP_BS_ROFORMER_MODEL_FILE:-$HF
 export AUDIO_CPP_QWEN3_FORCED_ALIGNER_MODEL_FILE="${AUDIO_CPP_QWEN3_FORCED_ALIGNER_MODEL_FILE:-$HF_MIRROR_DIR/audio.cpp-gguf/Qwen3-ForcedAligner-0.6B-GGUF/qwen3-forced-aligner-0.6b-f16.gguf}"
 export AUDIO_CPP_MEL_BAND_ROFORMER_MODEL_FILE="${AUDIO_CPP_MEL_BAND_ROFORMER_MODEL_FILE:-$HF_MIRROR_DIR/audio.cpp-gguf/Mel-Band-RoFormer-GGUF/mel-band-roformer-f16.gguf}"
 export AUDIO_CPP_HTDEMUCS_MODEL_FILE="${AUDIO_CPP_HTDEMUCS_MODEL_FILE:-$HF_MIRROR_DIR/audio.cpp-gguf/HTDemucs-GGUF/htdemucs-f16.gguf}"
-export ORNITH_MTP_9B_MODEL_FILE="${ORNITH_MTP_9B_MODEL_FILE:-$HF_MIRROR_DIR/ornith-ai/Ornith-1.5-9B-MTP-GGUF/Ornith-1.5-9B-MTP-Q8_0.gguf}"
-export ORNITH_MTP_9B_MMPROJ_FILE="${ORNITH_MTP_9B_MMPROJ_FILE:-$HF_MIRROR_DIR/ornith-ai/Ornith-1.5-9B-MTP-GGUF/mmproj-Ornith-1.5-9B-BF16.gguf}"
 export SDCPP_BIN="${SDCPP_BIN:-$HOME/.local/src/stable-diffusion.cpp/build/bin/sd-cli}"
 export SDCPP_BIN_SHA256="${SDCPP_BIN_SHA256:-}"
 export SDCPP_MODEL_MANIFEST="${SDCPP_MODEL_MANIFEST:-$PROJECT_DIR/sdcpp/manifests/models.json}"
@@ -126,22 +118,6 @@ export SDCPP_CLEANUP_TIMEOUT="${SDCPP_CLEANUP_TIMEOUT:-30}"
 export FLUX3_IMAGE_UPLOAD_DIR="${FLUX3_IMAGE_UPLOAD_DIR:-$RUNTIME_CACHE_DIR/sdcpp_uploads}"
 export FLUX3_IMAGE_MAX_UPLOAD_BYTES="${FLUX3_IMAGE_MAX_UPLOAD_BYTES:-67108864}"
 export TIMBRE_STORAGE_DIR="${TIMBRE_STORAGE_DIR:-$STORAGE_DIR/timbre}"
-
-if [[ -z "${LLAMA_SERVER_BIN:-}" ]]; then
-  LLAMA_SERVER_BIN="$(command -v llama-server || true)"
-  if [[ -z "$LLAMA_SERVER_BIN" ]]; then
-    local_cached_llama_server="$HOME/.local/src/llama.cpp/build-sleep-cache/bin/llama-server"
-    local_cuda_llama_server="$HOME/.local/src/llama.cpp/build-cuda/bin/llama-server"
-    if [[ -x "$local_cached_llama_server" ]]; then
-      LLAMA_SERVER_BIN="$local_cached_llama_server"
-    elif [[ -x "$local_cuda_llama_server" ]]; then
-      LLAMA_SERVER_BIN="$local_cuda_llama_server"
-    fi
-  fi
-elif [[ "$LLAMA_SERVER_BIN" != */* ]]; then
-  LLAMA_SERVER_BIN="$(command -v "$LLAMA_SERVER_BIN" || true)"
-fi
-export LLAMA_SERVER_BIN
 
 export LLM_LOCALAI_ENABLED="${LLM_LOCALAI_ENABLED:-true}"
 export LLM_LOCALAI_MANAGED="${LLM_LOCALAI_MANAGED:-true}"
@@ -175,6 +151,10 @@ export GPU_LOCK_WAIT_TIMEOUT="${GPU_LOCK_WAIT_TIMEOUT:-900}"
 export GPU_METRICS_SAMPLE_INTERVAL="${GPU_METRICS_SAMPLE_INTERVAL:-0.5}"
 export CUDA_RELEASE_DELAY="${CUDA_RELEASE_DELAY:-2.0}"
 export LOCAL_FILES_ONLY="${LOCAL_FILES_ONLY:-1}"
+if [[ ! "$GPU_LOCK_WAIT_TIMEOUT" =~ ^[0-9]+([.][0-9]+)?$ || ! "$GPU_LOCK_WAIT_TIMEOUT" =~ [1-9] ]]; then
+  echo "GPU_LOCK_WAIT_TIMEOUT 必须是正数。" >&2
+  exit 1
+fi
 
 export HOST="${HOST:-0.0.0.0}"
 export PORT="${PORT:-8300}"
@@ -184,29 +164,6 @@ export FLUX3_IMAGE_HOST="${FLUX3_IMAGE_HOST:-$HOST}"
 export FLUX3_IMAGE_PORT="${FLUX3_IMAGE_PORT:-8502}"
 export QWEN_VOICEDESIGN_HOST="${QWEN_VOICEDESIGN_HOST:-$HOST}"
 export QWEN_VOICEDESIGN_PORT="${QWEN_VOICEDESIGN_PORT:-8301}"
-export ORNITH_MTP_9B_CONTEXT_SIZE="${ORNITH_MTP_9B_CONTEXT_SIZE:-98304}"
-export ORNITH_MTP_9B_BATCH_SIZE="${ORNITH_MTP_9B_BATCH_SIZE:-1024}"
-export ORNITH_MTP_9B_UBATCH_SIZE="${ORNITH_MTP_9B_UBATCH_SIZE:-1024}"
-export ORNITH_MTP_9B_THREADS="${ORNITH_MTP_9B_THREADS:-6}"
-export ORNITH_MTP_9B_THREADS_BATCH="${ORNITH_MTP_9B_THREADS_BATCH:-8}"
-export ORNITH_MTP_9B_N_GPU_LAYERS="${ORNITH_MTP_9B_N_GPU_LAYERS:-99}"
-export ORNITH_MTP_9B_SPEC_TYPE="${ORNITH_MTP_9B_SPEC_TYPE:-draft-mtp}"
-export ORNITH_MTP_9B_DRAFT_MAX="${ORNITH_MTP_9B_DRAFT_MAX:-4}"
-export ORNITH_MTP_9B_SLEEP_CACHE="${ORNITH_MTP_9B_SLEEP_CACHE:-1}"
-export ORNITH_MTP_9B_CACHE_RAM_MIB="${ORNITH_MTP_9B_CACHE_RAM_MIB:-4096}"
-export LLAMA_SERVER_SLEEP_PROMPT_CACHE="$ORNITH_MTP_9B_SLEEP_CACHE"
-export ORNITH_MTP_9B_SLEEP_IDLE_SECONDS="${ORNITH_MTP_9B_SLEEP_IDLE_SECONDS:-1}"
-export ORNITH_MTP_9B_STARTUP_TIMEOUT="${ORNITH_MTP_9B_STARTUP_TIMEOUT:-1800}"
-export ORNITH_MTP_9B_SLEEP_TIMEOUT="${ORNITH_MTP_9B_SLEEP_TIMEOUT:-300}"
-export ORNITH_MTP_9B_SLEEP_POLL_INTERVAL="${ORNITH_MTP_9B_SLEEP_POLL_INTERVAL:-0.25}"
-export ORNITH_MTP_9B_HOST="${ORNITH_MTP_9B_HOST:-$HOST}"
-export ORNITH_MTP_9B_VISION_ENABLED="${ORNITH_MTP_9B_VISION_ENABLED:-1}"
-export ORNITH_MTP_9B_PORT="${ORNITH_MTP_9B_PORT:-8504}"
-export ORNITH_MTP_9B_BACKEND_HOST=127.0.0.1
-export ORNITH_MTP_9B_LLAMA_CPP_PORT="${ORNITH_MTP_9B_LLAMA_CPP_PORT:-8506}"
-export ORNITH_MTP_9B_LLAMA_BASE_URL="${ORNITH_MTP_9B_LLAMA_BASE_URL:-http://127.0.0.1:$ORNITH_MTP_9B_LLAMA_CPP_PORT}"
-export ORNITH_MTP_9B_BACKEND_PID_FILE="${ORNITH_MTP_9B_BACKEND_PID_FILE:-$RUNTIME_CACHE_DIR/ornith-mtp-9b-llama-server.pid}"
-export EASEL_BRIDGE_MTP_CHAT_URL="${EASEL_BRIDGE_MTP_CHAT_URL:-http://127.0.0.1:$ORNITH_MTP_9B_PORT/v1/ornith-ai/Ornith-1.5-9B-MTP-GGUF-Q8}"
 export EASEL_BRIDGE_MOSS_URL="${EASEL_BRIDGE_MOSS_URL:-http://127.0.0.1:$MOSS_IMAGE_PORT/v1/openmoss/MOSS-Image-SFT-Q8_0}"
 export EASEL_BRIDGE_VOXCPM_URL="${EASEL_BRIDGE_VOXCPM_URL:-http://127.0.0.1:${VOXCPM2_PORT:-8313}/v1/OpenBMB/VoxCPM2-GGUF}"
 
@@ -290,8 +247,6 @@ mkdir -p \
 PORT_CHECK_ARGS=(
   'Control-plane' "$HOST" "$PORT"
   'Qwen3-TTS VoiceDesign' "$QWEN_VOICEDESIGN_HOST" "$QWEN_VOICEDESIGN_PORT"
-  'Ornith MTP 9B API' "$ORNITH_MTP_9B_HOST" "$ORNITH_MTP_9B_PORT"
-  'Ornith MTP 9B llama.cpp backend' "$ORNITH_MTP_9B_BACKEND_HOST" "$ORNITH_MTP_9B_LLAMA_CPP_PORT"
   'MOSS-Image-SFT API' "$MOSS_IMAGE_HOST" "$MOSS_IMAGE_PORT"
   'FLUX.3 Klein Image API' "$FLUX3_IMAGE_HOST" "$FLUX3_IMAGE_PORT"
   'OpenAI-compatible bridge' '127.0.0.1' "$EASEL_BRIDGE_PORT"
@@ -340,84 +295,6 @@ for model_component in \
   fi
 done
 
-if [[ "$ORNITH_MTP_9B_LLAMA_BASE_URL" != "http://127.0.0.1:$ORNITH_MTP_9B_LLAMA_CPP_PORT" ]]; then
-  echo "ORNITH_MTP_9B_LLAMA_BASE_URL 必须与 MTP backend 的 127.0.0.1:$ORNITH_MTP_9B_LLAMA_CPP_PORT 一致。" >&2
-  exit 1
-fi
-
-if [[ -z "$LLAMA_SERVER_BIN" || ! -x "$LLAMA_SERVER_BIN" ]]; then
-  echo "找不到可执行的 llama-server；请安装 llama.cpp 或设置 LLAMA_SERVER_BIN。" >&2
-  exit 1
-fi
-if [[ ! -s "$ORNITH_MTP_9B_MODEL_FILE" ]]; then
-  echo "Ornith MTP 9B GGUF 缺失或为空：$ORNITH_MTP_9B_MODEL_FILE" >&2
-  exit 1
-fi
-if [[ ! -s "$ORNITH_MTP_9B_MMPROJ_FILE" ]]; then
-  echo "Ornith MTP 9B mmproj 缺失或为空：$ORNITH_MTP_9B_MMPROJ_FILE" >&2
-  exit 1
-fi
-for setting in CONTEXT_SIZE BATCH_SIZE UBATCH_SIZE THREADS THREADS_BATCH N_GPU_LAYERS DRAFT_MAX CACHE_RAM_MIB SLEEP_IDLE_SECONDS STARTUP_TIMEOUT; do
-  value_name="ORNITH_MTP_9B_${setting}"
-  if [[ ! "${!value_name}" =~ ^[1-9][0-9]*$ ]]; then
-    echo "$value_name 必须是正整数。" >&2
-    exit 1
-  fi
-done
-if [[ ! "$ORNITH_MTP_9B_SLEEP_IDLE_SECONDS" =~ ^[1-9][0-9]*$ ]]; then
-  echo "ORNITH_MTP_9B_SLEEP_IDLE_SECONDS 必须是正整数；当前后端不接受 0。" >&2
-  exit 1
-fi
-if [[ "$ORNITH_MTP_9B_SLEEP_CACHE" != "0" && "$ORNITH_MTP_9B_SLEEP_CACHE" != "1" ]]; then
-  echo "ORNITH_MTP_9B_SLEEP_CACHE 必须是 0 或 1。" >&2
-  exit 1
-fi
-if [[ "$ORNITH_MTP_9B_SPEC_TYPE" != "none" && "$ORNITH_MTP_9B_SPEC_TYPE" != "draft-mtp" ]]; then
-  echo "ORNITH_MTP_9B_SPEC_TYPE 必须是 none 或 draft-mtp。" >&2
-  exit 1
-fi
-if (( ORNITH_MTP_9B_CONTEXT_SIZE > 163840 )); then
-  echo "ORNITH_MTP_9B_CONTEXT_SIZE 不得超过 163840。" >&2
-  exit 1
-fi
-for value_name in ORNITH_MTP_9B_SLEEP_TIMEOUT ORNITH_MTP_9B_SLEEP_POLL_INTERVAL GPU_LOCK_WAIT_TIMEOUT; do
-  value="${!value_name}"
-  if [[ ! "$value" =~ ^[0-9]+([.][0-9]+)?$ || ! "$value" =~ [1-9] ]]; then
-    echo "$value_name 必须是正数。" >&2
-    exit 1
-  fi
-done
-for value_name in ORNITH_MTP_9B_STARTUP_TIMEOUT; do
-  if [[ ! "${!value_name}" =~ ^[1-9][0-9]*$ ]]; then
-    echo "$value_name 必须是正整数。" >&2
-    exit 1
-  fi
-done
-for value_name in ORNITH_MTP_9B_SLEEP_TIMEOUT ORNITH_MTP_9B_SLEEP_POLL_INTERVAL; do
-  value="${!value_name}"
-  if [[ ! "$value" =~ ^[0-9]+([.][0-9]+)?$ || ! "$value" =~ [1-9] ]]; then
-    echo "$value_name 必须是正数。" >&2
-    exit 1
-  fi
-done
-if ! [[ "$CUDA_RELEASE_DELAY" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
-  echo "CUDA_RELEASE_DELAY 必须是非负数。" >&2
-  exit 1
-fi
-DEVICE_LIST="$("$LLAMA_SERVER_BIN" --list-devices 2>&1 || true)"
-if ! grep -q 'CUDA0' <<<"$DEVICE_LIST"; then
-  echo "llama-server 未提供 CUDA0 设备；请安装 CUDA 构建的 llama.cpp。" >&2
-  printf '%s\n' "$DEVICE_LIST" >&2
-  exit 1
-fi
-LLAMA_HELP="$("$LLAMA_SERVER_BIN" --help 2>&1 || true)"
-REQUIRED_LLAMA_FLAGS=(--sleep-idle-seconds --load-mode --spec-type --spec-draft-n-max --ubatch-size --cache-ram --mmproj --mmproj-offload)
-for required_flag in "${REQUIRED_LLAMA_FLAGS[@]}"; do
-  if ! grep -q -- "$required_flag" <<<"$LLAMA_HELP"; then
-    echo "llama-server 缺少所需参数：$required_flag。" >&2
-    exit 1
-  fi
-done
 if [[ -e "$GPU_LOCK_FILE.quarantine" ]]; then
   echo "GPU quarantine 标记存在：$GPU_LOCK_FILE.quarantine；请先运行 scripts/localai/recover_quarantine.py。" >&2
   exit 1
@@ -442,12 +319,6 @@ echo "Spatial render:        http://$HOST:$PORT/v1/audio/spatial/render"
 echo "VoiceDesign project:   $VOICEDESIGN_PROJECT_DIR"
 echo "audio.cpp runtime:     $AUDIO_CPP_RUNTIME_PROJECT_DIR"
 echo "VoiceDesign GGUF:      $QWEN_VOICEDESIGN_MODEL_FILE"
-echo "Ornith profile:        ctx=$ORNITH_MTP_9B_CONTEXT_SIZE batch=$ORNITH_MTP_9B_BATCH_SIZE/$ORNITH_MTP_9B_UBATCH_SIZE spec=$ORNITH_MTP_9B_SPEC_TYPE draft=$ORNITH_MTP_9B_DRAFT_MAX"
-echo "Ornith sleep cache:    enabled=$ORNITH_MTP_9B_SLEEP_CACHE CPU budget=${ORNITH_MTP_9B_CACHE_RAM_MIB}MiB"
-echo "Ornith MTP GGUF:       $ORNITH_MTP_9B_MODEL_FILE"
-echo "Ornith MTP mmproj:     $ORNITH_MTP_9B_MMPROJ_FILE"
-echo "Ornith MTP backend:    $LLAMA_SERVER_BIN (CUDA0, 127.0.0.1:$ORNITH_MTP_9B_LLAMA_CPP_PORT)"
-echo "Ornith MTP API:        http://$ORNITH_MTP_9B_HOST:$ORNITH_MTP_9B_PORT/v1/ornith-ai/Ornith-1.5-9B-MTP-GGUF-Q8"
 echo "MOSS-Image-SFT API:   http://$MOSS_IMAGE_HOST:$MOSS_IMAGE_PORT/v1/openmoss/MOSS-Image-SFT-Q8_0"
 echo "FLUX.3 Klein API:     http://$FLUX3_IMAGE_HOST:$FLUX3_IMAGE_PORT/v1/openblack-forest-labs/FLUX-3-Image-Klein-GGUF-Q8"
 echo "OpenAI-compatible:    http://127.0.0.1:$EASEL_BRIDGE_PORT/v1 (OpenCode / Easel)"
@@ -472,13 +343,9 @@ cd "$PROJECT_DIR"
 
 main_pid=""
 voicedesign_pid=""
-ornith_mtp_9b_pid=""
 moss_image_pid=""
 flux3_image_pid=""
 easel_bridge_pid=""
-ornith_mtp_9b_llama_server_pid=""
-ornith_mtp_9b_watch_pid=""
-ornith_mtp_9b_backend_start_attempted=0
 audio_cpp_pids=()
 localai_managed_started=0
 telemetry_pid=""
@@ -493,9 +360,9 @@ cleanup() {
     # 日志进程异常退出时直接追加到原日志，避免 shutdown helper 也因 BrokenPipe 中断。
     exec >> "$START_LOG_FILE" 2>&1
   fi
-  local service_pids=("$easel_bridge_pid" "$main_pid" "$voicedesign_pid" "$ornith_mtp_9b_pid" "$moss_image_pid" "$flux3_image_pid" "$ornith_mtp_9b_watch_pid" "${audio_cpp_pids[@]}")
+  local service_pids=("$easel_bridge_pid" "$main_pid" "$voicedesign_pid" "$moss_image_pid" "$flux3_image_pid" "${audio_cpp_pids[@]}")
   local recovery_attempt=1
-  echo "[退出] 收到停止信号，开始停止服务进程组和 llama.cpp 后端。"
+  echo "[退出] 收到停止信号，开始停止服务进程组。"
 
   for pid in "${service_pids[@]}"; do
     if [[ -n "$pid" ]] && kill -0 -- "-$pid" 2>/dev/null; then
@@ -515,50 +382,6 @@ cleanup() {
   if [[ "$localai_managed_started" == "1" ]]; then
     if ! python3 "$PROJECT_DIR/scripts/localai/manager.py" stop; then
       echo "LocalAI 进程组停止未确认，请检查 GPU 隔离标记并运行 scripts/localai/manager.py status。" >&2
-      [[ "$status" != "0" ]] || status=1
-    fi
-  fi
-
-  local backend_models=(Ornith-1.5-9B-MTP-GGUF-Q8)
-  local backend_hosts=("$ORNITH_MTP_9B_BACKEND_HOST")
-  local backend_ports=("$ORNITH_MTP_9B_LLAMA_CPP_PORT")
-  local backend_pid_files=("$ORNITH_MTP_9B_BACKEND_PID_FILE")
-  local backend_attempted=("$ornith_mtp_9b_backend_start_attempted")
-  local backend_pids=("$ornith_mtp_9b_llama_server_pid")
-  local backend_shutdown_args=()
-  local backend_count="${#backend_models[@]}"
-  local backend_index
-  for ((backend_index = 0; backend_index < backend_count; backend_index++)); do
-    local backend_pid="${backend_pids[$backend_index]}"
-    if [[ -z "$backend_pid" && "${backend_attempted[$backend_index]}" == "1" && -s "${backend_pid_files[$backend_index]}" ]]; then
-      read -r backend_pid < "${backend_pid_files[$backend_index]}" || true
-    fi
-    if [[ -n "$backend_pid" && "$backend_pid" =~ ^[1-9][0-9]*$ ]]; then
-      backend_shutdown_args+=(
-        --backend
-        "${backend_models[$backend_index]}"
-        "${backend_hosts[$backend_index]}"
-        "${backend_ports[$backend_index]}"
-        "$backend_pid"
-        "$backend_pid"
-        "$LLAMA_SERVER_BIN"
-      )
-    fi
-  done
-  if ((${#backend_shutdown_args[@]} > 0)); then
-    echo "[退出] 正在通过同一 quarantine 事务确认所有 Ornith llama.cpp backend 停止。"
-    if python3 -m llama_cpp_runtime.runtime shutdown-many \
-      --lock-file "$GPU_LOCK_FILE" \
-      --lock-timeout "$GPU_LOCK_WAIT_TIMEOUT" \
-      --cleanup-timeout "${LLM_LOCALAI_CLEANUP_TIMEOUT:-30}" \
-      --cuda-release-delay "$CUDA_RELEASE_DELAY" \
-      "${backend_shutdown_args[@]}"; then
-      for pid_file in "${backend_pid_files[@]}"; do
-        rm -f -- "$pid_file"
-      done
-      echo "[退出] 已确认所有 Ornith llama.cpp backend 停止。"
-    else
-      echo "至少一个 Ornith llama.cpp backend 未确认停止，保留 GPU quarantine 标记。" >&2
       [[ "$status" != "0" ]] || status=1
     fi
   fi
@@ -630,75 +453,6 @@ fi
 uv run --no-sync --project "$MAIN_PROJECT_DIR" \
   python "$PROJECT_DIR/scripts/localai/preflight.py"
 
-rm -f -- "$ORNITH_MTP_9B_BACKEND_PID_FILE"
-start_ornith_backend() {
-  local model_alias="$1"
-  local model_file="$2"
-  local backend_host="$3"
-  local backend_port="$4"
-  local base_url="$5"
-  local pid_file="$6"
-  local startup_timeout="$7"
-  local poll_interval="$8"
-  local mmproj_file="${9:-}"
-  local sleep_idle_seconds="$ORNITH_MTP_9B_SLEEP_IDLE_SECONDS"
-  local backend_args=(
-    --model "$model_file"
-    --host "$backend_host"
-    --port "$backend_port"
-    --alias "$model_alias"
-    --device CUDA0
-    --gpu-layers "$ORNITH_MTP_9B_N_GPU_LAYERS"
-    --fit off
-    --flash-attn on
-    --jinja
-    --ctx-size "$ORNITH_MTP_9B_CONTEXT_SIZE"
-    --batch-size "$ORNITH_MTP_9B_BATCH_SIZE"
-    --ubatch-size "$ORNITH_MTP_9B_UBATCH_SIZE"
-    --threads "$ORNITH_MTP_9B_THREADS"
-    --threads-batch "$ORNITH_MTP_9B_THREADS_BATCH"
-    --spec-type "$ORNITH_MTP_9B_SPEC_TYPE"
-    --spec-draft-n-max "$ORNITH_MTP_9B_DRAFT_MAX"
-    --cache-ram "$ORNITH_MTP_9B_CACHE_RAM_MIB"
-    --load-mode none
-    --parallel 1
-    --sleep-idle-seconds "$sleep_idle_seconds"
-  )
-  if [[ -n "$mmproj_file" && "$ORNITH_MTP_9B_VISION_ENABLED" == 1 ]]; then
-    backend_args+=(--mmproj "$mmproj_file" --mmproj-offload)
-  fi
-  python3 -m llama_cpp_runtime.runtime startup \
-    --lock-file "$GPU_LOCK_FILE" \
-    --pid-file "$pid_file" \
-    --host "$backend_host" \
-    --port "$backend_port" \
-    --model "$model_alias" \
-    --base-url "$base_url" \
-    --executable "$LLAMA_SERVER_BIN" \
-    --lock-timeout "$GPU_LOCK_WAIT_TIMEOUT" \
-    --timeout "$startup_timeout" \
-    --interval "$poll_interval" \
-    --cuda-release-delay "$CUDA_RELEASE_DELAY" \
-    -- "${backend_args[@]}"
-}
-
-ornith_mtp_9b_backend_start_attempted=1
-start_ornith_backend \
-  Ornith-1.5-9B-MTP-GGUF-Q8 \
-  "$ORNITH_MTP_9B_MODEL_FILE" \
-  "$ORNITH_MTP_9B_BACKEND_HOST" \
-  "$ORNITH_MTP_9B_LLAMA_CPP_PORT" \
-  "$ORNITH_MTP_9B_LLAMA_BASE_URL" \
-  "$ORNITH_MTP_9B_BACKEND_PID_FILE" \
-  "$ORNITH_MTP_9B_STARTUP_TIMEOUT" \
-  "$ORNITH_MTP_9B_SLEEP_POLL_INTERVAL" \
-  "$ORNITH_MTP_9B_MMPROJ_FILE"
-read -r ornith_mtp_9b_llama_server_pid < "$ORNITH_MTP_9B_BACKEND_PID_FILE"
-if [[ ! "$ornith_mtp_9b_llama_server_pid" =~ ^[1-9][0-9]*$ ]]; then
-  echo "Ornith MTP 9B startup helper 未返回有效 backend PID。" >&2
-  exit 1
-fi
-
 setsid uv run --no-sync --project "$MAIN_PROJECT_DIR" python "$MAIN_DIR/main.py" &
 main_pid=$!
 QWEN_VOICEDESIGN_HOST="$QWEN_VOICEDESIGN_HOST" \
@@ -717,17 +471,6 @@ for index in "${!AUDIO_CPP_SERVICE_KEYS[@]}"; do
 done
 
 
-ORNITH_MTP_9B_HOST="$ORNITH_MTP_9B_HOST" \
-  ORNITH_MTP_9B_PORT="$ORNITH_MTP_9B_PORT" \
-  ORNITH_MTP_9B_LLAMA_BASE_URL="$ORNITH_MTP_9B_LLAMA_BASE_URL" \
-  ORNITH_MTP_9B_BACKEND_HOST="$ORNITH_MTP_9B_BACKEND_HOST" \
-  ORNITH_MTP_9B_BACKEND_PID="$ornith_mtp_9b_llama_server_pid" \
-  ORNITH_MTP_9B_BACKEND_PGID="$ornith_mtp_9b_llama_server_pid" \
-  ORNITH_MTP_9B_LLAMA_CPP_PORT="$ORNITH_MTP_9B_LLAMA_CPP_PORT" \
-  setsid uv run --no-sync --project "$MAIN_PROJECT_DIR" \
-  python "$ORNITH_MTP_9B_SERVICE_DIR/main.py" &
-ornith_mtp_9b_pid=$!
-
 HOST="$MOSS_IMAGE_HOST" PORT="$MOSS_IMAGE_PORT" \
   setsid uv run --no-sync --project "$MAIN_PROJECT_DIR" \
   python "$MOSS_IMAGE_SERVICE_DIR/main.py" &
@@ -745,11 +488,4 @@ setsid uv run --no-sync --project "$MAIN_PROJECT_DIR" \
   --host 127.0.0.1 --port "$EASEL_BRIDGE_PORT" &
 easel_bridge_pid=$!
 
-setsid bash -c '
-  backend_pid="$1"
-  while kill -0 "$backend_pid" 2>/dev/null; do sleep 1; done
-  exit 1
-' _ "$ornith_mtp_9b_llama_server_pid" &
-ornith_mtp_9b_watch_pid=$!
-
-wait -n "$easel_bridge_pid" "$main_pid" "$voicedesign_pid" "$ornith_mtp_9b_pid" "$moss_image_pid" "$flux3_image_pid" "$ornith_mtp_9b_watch_pid" "${audio_cpp_pids[@]}"
+wait -n "$easel_bridge_pid" "$main_pid" "$voicedesign_pid" "$moss_image_pid" "$flux3_image_pid" "${audio_cpp_pids[@]}"

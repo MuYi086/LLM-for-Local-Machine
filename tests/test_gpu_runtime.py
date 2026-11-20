@@ -72,7 +72,7 @@ class GpuRuntimeLockTests(unittest.TestCase):
             with patch.object(gpu_module, "_read_gpu_memory_mib", return_value=None):
                 with gpu_runtime_lock(
                     lock_path,
-                    "llama.cpp/shutdown-many",
+                    "sd.cpp/shutdown",
                     timeout_seconds=1,
                     allow_quarantine=True,
                 ):
